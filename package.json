@@ -1,0 +1,54 @@
+{
+  "name": "hyper-hyper-space",
+  "version": "0.1.0",
+  "license": "MIT",
+  "author": "Santiago Bazerque",
+  "main": "dist/index.js",
+  "module": "dist/hyper-hyper-space.esm.js",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "start": "tsdx watch",
+    "build": "tsdx build",
+    "test": "tsdx test",
+    "lint": "tsdx lint"
+  },
+  "peerDependencies": {},
+  "husky": {
+    "hooks": {
+      "pre-commit": "tsdx lint"
+    }
+  },
+  "prettier": {
+    "printWidth": 80,
+    "semi": true,
+    "singleQuote": true,
+    "trailingComma": "es5"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.23",
+    "core-js-bundle": "^3.6.4",
+    "fake-indexeddb": "^3.0.0",
+    "husky": "^3.1.0",
+    "tsdx": "^0.11.0",
+    "tslib": "^1.10.0",
+    "typescript": "^3.7.3"
+  },
+  "dependencies": {
+    "@types/node": "^13.5.0",
+    "chacha-js": "^2.1.1",
+    "jsencrypt": "^3.0.0-rc.1",
+    "jshashes": "^1.0.7",
+    "wrtc": "^0.4.1"
+  },
+  "jest": {
+    "verbose": true,
+    "modulePaths": [
+      "<rootDir>/src/",
+      "<rootDir>/poly/node/",
+      "<rootDir>/node_modules/**"
+    ]
+  }
+}
