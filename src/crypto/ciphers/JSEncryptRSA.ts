@@ -25,8 +25,6 @@ class JSEncryptRSA implements RSA {
 
     loadKeyPair(format: string, publicKey: string, privateKey?: string) {
 
-        console.log(format);
-
         if (format !== JSEncryptRSA.PKCS8) {
             throw new Error("Currently only pkcs8 encoded RSA keys are supported, sorry");
         }
