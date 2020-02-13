@@ -4,7 +4,7 @@ import { HashedObject } from './HashedObject';
 class HashedSet<T> {
 
     static hash(element: any) : Hash {
-        return Hashing.forLiteral(HashedObject.literalize(element));
+        return Hashing.forLiteral(HashedObject.toLiteral(element));
     }
 
     hashedElements : Map<Hash, T>;
@@ -47,7 +47,7 @@ class HashedSet<T> {
     }
 
     fromArrays(hashes: string[], elements: any[]) {
-        for (let i=0; i<HashedSet.length; i++) {
+        for (let i=0; i<hashes.length; i++) {
             this.hashedElements.set(hashes[i], elements[i]);
         }
     }

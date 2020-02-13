@@ -1,7 +1,20 @@
+import { RSAKeyPair } from './RSAKeyPair';
 import { RSAPublicKey } from './RSAPublicKey';
 import { HashedObject } from 'data/model/HashedObject';
 
+
 class Identity extends HashedObject {
+
+    static className = 'hss/Identity';
+
+    static create(info: object, keyPair: RSAKeyPair) : Identity {
+        let id = new Identity();
+
+        id.info = info;
+        id.publicKey = keyPair.makePublicKey();
+        
+        return id;
+    }
 
     info?: object;
     publicKey?: RSAPublicKey;
@@ -12,6 +25,10 @@ class Identity extends HashedObject {
 
     init() {
         super.init();
+    }
+
+    getClass() {
+        return Identity.className;
     }
 
     verify(text: string, signature: string) {
@@ -25,5 +42,7 @@ class Identity extends HashedObject {
     }
 
 }
+
+HashedObject.registerClass(Identity.className, Identity);
 
 export { Identity };

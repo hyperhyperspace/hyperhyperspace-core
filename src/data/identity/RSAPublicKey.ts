@@ -1,9 +1,12 @@
 import { RSA, RSAImpl } from 'crypto/ciphers';
 import { HashedObject } from 'data/model/HashedObject';
+import { RSAKeyPair } from './RSAKeyPair';
 
 class RSAPublicKey extends HashedObject {
 
-    static fromKeys(format: string, publicKey: string) {
+    static className = 'hhs/RSAPublicKey';
+
+    static fromKeys(format: string, publicKey: string) : RSAPublicKey {
         
         let pk = new RSAPublicKey();
 
@@ -12,7 +15,7 @@ class RSAPublicKey extends HashedObject {
 
         pk.init();
 
-        return publicKey;
+        return pk;
     }
 
     format?: string;
@@ -30,12 +33,20 @@ class RSAPublicKey extends HashedObject {
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey());
     }
 
+    getClass() {
+        return RSAPublicKey.className;
+    }
+
     getFormat() {
         return this.format as string;
     }
 
     getPublicKey() {
         return this.publicKey as string;
+    }
+
+    getKeyPairHash() {
+        return RSAKeyPair.hashPublicKeyPart(this.format as string, this.publicKey as string);
     }
 
     verify(text: string, signature: string) {
@@ -47,5 +58,7 @@ class RSAPublicKey extends HashedObject {
     }
 
 }
+
+HashedObject.registerClass(RSAPublicKey.className, RSAPublicKey);
 
 export { RSAPublicKey };
