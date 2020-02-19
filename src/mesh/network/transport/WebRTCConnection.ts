@@ -1,4 +1,4 @@
-import { LinkupAddress, LinkupManager } from 'net/linkup';
+import { LinkupAddress, LinkupManager } from 'mesh/network';
 import { Logger, LogLevel } from 'util/logging';
 
 import { WebRTCShim } from 'webrtcpoly';
