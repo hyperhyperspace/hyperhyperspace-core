@@ -4,7 +4,16 @@ import { HashedObject } from './HashedObject';
 class HashedSet<T> {
 
     static hash(element: any) : Hash {
-        return Hashing.forLiteral(HashedObject.toLiteral(element));
+
+        let hash: Hash;
+
+        if (element instanceof HashedObject) {
+            hash = (element as HashedObject).hash();
+        } else {
+            hash = Hashing.forValue(HashedObject.literalizeField('', element).value);
+        }
+
+        return hash;
     }
 
     hashedElements : Map<Hash, T>;
@@ -31,6 +40,10 @@ class HashedSet<T> {
 
     hasByHash(hash: string) {
         return this.hashedElements.has(hash);
+    }
+
+    elements() : IterableIterator<T> {
+        return this.hashedElements.values();
     }
 
     toArrays() : {hashes: string[], elements: T[]} {

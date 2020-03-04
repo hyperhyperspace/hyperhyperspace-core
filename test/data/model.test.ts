@@ -1,4 +1,6 @@
 import { HashedObject, HashedSet, Serialization } from 'data/model';
+import { Hash } from 'data/model/Hashing';
+import { Dependency } from 'data/model/HashedObject';
 
 class SomethingHashed extends HashedObject {
     name?: string;
@@ -21,8 +23,8 @@ describe('Data model', () => {
     test( 'Basic types', () => {
         
         const original = ['hello', 1.0, false, 2.5, 'bye', true];
-        const literal  = HashedObject.toLiteral(original);
-        const reconstructed = HashedObject.fromLiteral(literal);
+        const literalization  = HashedObject.literalizeField('original', original);
+        const reconstructed = HashedObject.deliteralizeField(literalization.value, new Map<Hash, Dependency>());
 
         for (let i=0; i<original.length; i++) {
             expect(original[i]).toEqual(reconstructed[i]);
@@ -41,10 +43,10 @@ describe('Data model', () => {
             set2.add(element);
         }
 
-        const literal1 = HashedObject.toLiteral(set2);
-        const literal2 = HashedObject.toLiteral(set2);
+        const literal1 = HashedObject.literalizeField('set1', set1);
+        const literal2 = HashedObject.literalizeField('set2', set2);
 
-        expect(Serialization.default(literal1)).toEqual(Serialization.default(literal2));
+        expect(Serialization.default(literal1.value)).toEqual(Serialization.default(literal2.value));
         
         expect(set1.has('five')).toBeTruthy();
         expect(set1.has('seven')).toBeFalsy();
@@ -68,9 +70,17 @@ describe('Data model', () => {
 
         a.things?.add(b);
 
-        let a_literal = HashedObject.toLiteral(a);
+        let a_literal = a.toLiteral();
 
         let a2 = HashedObject.fromLiteral(a_literal);
+
+        console.log('========');
+        console.log(a);
+        console.log('========');
+        console.log(a_literal);
+        console.log('========');
+        console.log(a2);
+        console.log('========');
 
         expect(a.equals(a2)).toBeTruthy();
     });

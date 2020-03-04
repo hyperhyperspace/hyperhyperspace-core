@@ -41,6 +41,14 @@ class Identity extends HashedObject {
         return this.publicKey?.encrypt(text);
     }
 
+    getPublicKey() {
+        return this.publicKey as RSAPublicKey;
+    }
+
+    getKeyPairHash() {
+        return this.getPublicKey().getKeyPairHash();
+    }
+
 }
 
 HashedObject.registerClass(Identity.className, Identity);

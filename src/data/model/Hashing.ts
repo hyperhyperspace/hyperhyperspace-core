@@ -25,12 +25,6 @@ class Hashing {
         
         return Hashing.forString(text, seed);
     }
-
-    static forLiteral(literal: {value: any, dependencies: Map<Hash, any>}, seed?: string) : Hash {
-        
-        return Hashing.forValue(literal['value'], seed);
-
-    }
  }
 
 export { Hashing, Hash };
