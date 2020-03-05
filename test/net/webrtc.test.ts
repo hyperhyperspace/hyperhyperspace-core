@@ -1,6 +1,6 @@
-import { WebRTCConnection } from 'mesh/network';
+import { WebRTCConnection } from 'peer/network';
 
-import { LinkupManager, LinkupAddress } from 'mesh/network';
+import { LinkupManager, LinkupAddress } from 'peer/network';
 
 
 

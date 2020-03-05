@@ -1,4 +1,4 @@
-import { LinkupManager, LinkupAddress } from 'mesh/network';
+import { LinkupManager, LinkupAddress } from 'peer/network';
 
 describe('Single-host LinkupManager', () => {
     test('Call starting', (done) => {
