@@ -1,4 +1,4 @@
-import { LinkupAddress, LinkupManager } from 'peer/network';
+import { LinkupAddress, LinkupManager } from 'peer/net';
 import { Logger, LogLevel } from 'util/logging';
 
 import { WebRTCShim } from 'webrtcpoly';
