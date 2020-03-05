@@ -5,7 +5,7 @@ import { PackedLiteral } from 'data/storage/Store';
 interface Backend {
 
     store(packed : PackedLiteral) : Promise<void>;
-    load(hash: Hash) : Promise<PackedLiteral>;
+    load(hash: Hash) : Promise<PackedLiteral | undefined>;
 
 }
 

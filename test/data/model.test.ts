@@ -1,5 +1,4 @@
-import { HashedObject, HashedSet, Serialization } from 'data/model';
-import { Hash } from 'data/model/Hashing';
+import { HashedObject, HashedSet, Hash, Serialization } from 'data/model';
 import { Dependency } from 'data/model/HashedObject';
 
 class SomethingHashed extends HashedObject {
@@ -73,14 +72,6 @@ describe('Data model', () => {
         let a_literal = a.toLiteral();
 
         let a2 = HashedObject.fromLiteral(a_literal);
-
-        console.log('========');
-        console.log(a);
-        console.log('========');
-        console.log(a_literal);
-        console.log('========');
-        console.log(a2);
-        console.log('========');
 
         expect(a.equals(a2)).toBeTruthy();
     });

@@ -72,7 +72,7 @@ class Store {
     }
 
     async load(hash: Hash) : Promise<HashedObject | undefined> {
-        
+
         return this.loadWithLiteral(hash).then((loaded : {object: HashedObject, literal: Literal} | undefined) => {
             return loaded?.object;
         });
@@ -82,9 +82,12 @@ class Store {
 
         let packed = await this.backend.load(hash);
         
-        let loaded = await this.unpackWithLiteral(packed);
-        
-        return loaded;
+        if (packed === undefined) {
+            return undefined;
+        } else {
+            return this.unpackWithLiteral(packed);
+        }
+       
     }
 
     async unpack(packed: PackedLiteral) : Promise<HashedObject> {
@@ -117,9 +120,8 @@ class Store {
 
         let hashedObject = HashedObject.fromLiteral(literal)
 
-        return {object: hashedObject, literal: literal};
+        return Promise.resolve({object: hashedObject, literal: literal});
     }
 }
 
 export { Store, PackedLiteral };
-

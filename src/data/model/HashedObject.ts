@@ -237,7 +237,6 @@ class HashedObject {
 
     private static stringifyLiteralWithIndent(literal: {value: any, dependencies : Map<Hash, any>}, indent: number) : string{
        
-        console.log(literal);
         const value = literal['value'];
         const dependencies = literal['dependencies'];
 
@@ -309,10 +308,7 @@ class HashedObject {
     static stringifyHashedLiterals(hashedLiterals: {hash: Hash, literals: Map<Hash, any>}) : string {
         let s = '';
 
-        console.log(hashedLiterals['literals']);
-
         for (let hash of hashedLiterals['literals'].keys()) {
-            console.log(hash);
             s = s + hash + ' =>';
             s = s + HashedObject.stringifyLiteralWithIndent({'value': hashedLiterals['literals'].get(hash), dependencies: hashedLiterals['literals']}, 1);
         }
@@ -321,5 +317,7 @@ class HashedObject {
     }
 
 }
+
+HashedObject.registerClass('HashedObject', HashedObject);
 
 export { HashedObject, Literal, Dependency };

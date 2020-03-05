@@ -1,3 +1,5 @@
+require('indexeddbpoly');
+
 import { Backend } from 'data/storage/Backend'; 
 import { PackedLiteral } from 'data/storage/Store';
 
@@ -69,15 +71,15 @@ class IdbBackend implements Backend {
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY, reference, {timestamp: true, multi: true});
         }
 
-        return idb.put(storable.packed.hash, storable).then((_key : IDBValidKey) => { });
+        return idb.put(IdbBackend.OBJ_STORE, storable).then((_key : IDBValidKey) => { });
 
     }
     
-    async load(hash: string): Promise<PackedLiteral> {
+    async load(hash: string): Promise<PackedLiteral | undefined> {
 
         let idb = await this.idbPromise;
 
-        return idb.get(IdbBackend.OBJ_STORE, hash) as Promise<PackedLiteral>;
+        return idb.get(IdbBackend.OBJ_STORE, hash).then((storable: IdbStorageFormat | undefined) => (storable?.packed)) as Promise<PackedLiteral | undefined>;
     }
 
     private static assignIdxValue(storable: IdbStorageFormat, key: string, value: string, params?:{timestamp?: boolean, multi?: boolean}) {
