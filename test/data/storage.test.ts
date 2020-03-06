@@ -1,22 +1,8 @@
 import { Store, IdbBackend } from 'data/storage';
-import { HashedObject, HashedSet } from 'data/model';
+import { HashedObject } from 'data/model';
 
-class SomethingHashed extends HashedObject {
-    name?: string;
-    amount?: number;
-    things?: HashedSet<any>;
+import { SomethingHashed } from './env/SomethingHashed';
 
-    constructor() {
-        super();
-        this.things = new HashedSet();
-    }
-
-    getClass() {
-        return 'SomethingHashed';
-    }
-}
-
-HashedObject.registerClass('SomethingHashed', SomethingHashed);
 
 describe('Storage', () => {
     test( 'Indexeddb-based save / load cycle', (done) => {

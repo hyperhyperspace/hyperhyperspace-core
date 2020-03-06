@@ -1,22 +1,7 @@
 import { HashedObject, HashedSet, Hash, Serialization } from 'data/model';
 import { Dependency } from 'data/model/HashedObject';
 
-class SomethingHashed extends HashedObject {
-    name?: string;
-    amount?: number;
-    things?: HashedSet<any>;
-
-    constructor() {
-        super();
-        this.things = new HashedSet();
-    }
-
-    getClass() {
-        return 'SomethingHashed';
-    }
-}
-
-HashedObject.registerClass('SomethingHashed', SomethingHashed);
+import { SomethingHashed } from './env/SomethingHashed';
 
 describe('Data model', () => {
     test( 'Basic types', () => {
