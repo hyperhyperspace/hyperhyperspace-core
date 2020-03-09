@@ -66,7 +66,7 @@ class Store {
         for (const dep of literal.dependencies) {
             await this.saveWithLiteral(dep.object, dep.literal);
             packed.dependencies.push(dep.literal.hash);
-            packed.references.push(literal.value.class + '.' + dep.path);
+            packed.references.push(literal.value._class + '.' + dep.path);
         }
 
         return packed;
@@ -141,10 +141,11 @@ class Store {
 
     private async unpackSearchResults(searchResults: BackendSearchResults) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
         let objects = [] as Array<HashedObject>;
-
-        searchResults.items.forEach(async (packed) => {
-            objects.push((await this.unpackWithLiteral(packed))?.object as HashedObject);
-        });
+        
+        for (let packed of searchResults.items) {
+            let obj = (await this.unpackWithLiteral(packed))?.object as HashedObject;
+            objects.push(obj);
+        }
 
         return {objects: objects, start: searchResults.start, end: searchResults.end};    
     }

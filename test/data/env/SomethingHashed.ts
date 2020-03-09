@@ -1,6 +1,9 @@
 import { HashedObject, HashedSet } from 'data/model';
 
 class SomethingHashed extends HashedObject {
+
+    static readonly CLASS_NAME = 'SomethingHashed';
+
     name?: string;
     amount?: number;
     things?: HashedSet<any>;
@@ -11,10 +14,10 @@ class SomethingHashed extends HashedObject {
     }
 
     getClass() {
-        return 'SomethingHashed';
+        return SomethingHashed.CLASS_NAME;
     }
 }
 
-HashedObject.registerClass('SomethingHashed', SomethingHashed);
+HashedObject.registerClass(SomethingHashed.CLASS_NAME, SomethingHashed);
 
 export { SomethingHashed };

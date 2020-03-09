@@ -5,7 +5,7 @@ import { SomethingHashed } from './env/SomethingHashed';
 
 
 describe('Storage', () => {
-    test( 'Indexeddb-based save / load cycle', (done) => {
+    test( 'Indexeddb-based save / load cycle', async () => {
         let a = new SomethingHashed();
         let b = new SomethingHashed();
 
@@ -25,12 +25,18 @@ describe('Storage', () => {
 
         let store = new Store(new IdbBackend('test-storage-backend'));
 
-        store.save(a).then(() => {
-            store.load(a.hash()).then((a2 : HashedObject | undefined) => {
-                expect(a.equals(a2 as HashedObject)).toBeTruthy();
-                done();
-            });
+        await store.save(a).then(() => {
+            
         });
+
+        let a2 = await store.load(a.hash()) as HashedObject;
+
+        expect(a.equals(a2 as HashedObject)).toBeTruthy();
+
+        let hashedThings = await store.loadByClass(SomethingHashed.CLASS_NAME);
+
+        expect(hashedThings.objects[0].hash()).toEqual(b.hash());
+        expect(hashedThings.objects[1].hash()).toEqual(a.hash());
 
     });
 });

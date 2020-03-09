@@ -67,10 +67,14 @@ class IdbBackend implements Backend {
         IdbBackend.assignIdxValue(storable, IdbBackend.CLASS_TIMESTAMP_IDX_KEY, storable.packed.value._class, {timestamp: true});
 
         for (let i=0; i<packed.dependencies.length; i++) {
-            let reference = packed.value._class + '.' + packed.references[i] + '#' + packed.dependencies[i];
+            let reference = packed.references[i] + '#' + packed.dependencies[i];
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCES_IDX_KEY, reference, {multi: true});
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY, reference, {timestamp: true, multi: true});
         }
+
+        
+        //console.log('about to store:');
+        //console.log(storable);
 
         return idb.put(IdbBackend.OBJ_STORE, storable).then((_key : IDBValidKey) => { });
 
@@ -132,8 +136,9 @@ class IdbBackend implements Backend {
             const limit = params?.limit;
 
             while ((limit === undefined || searchResults.items.length < limit) && cursor) {
-      
+                
                 let storable = cursor.value as IdbStorageFormat;
+                
                 searchResults.items.push(storable.packed);
                 if (searchResults.start === undefined) {
                     searchResults.start = cursor.key.toString();
@@ -144,7 +149,9 @@ class IdbBackend implements Backend {
             }
         }
 
-        return ingestCursor().then(() => searchResults);
+        await ingestCursor();
+        
+        return searchResults;
     }
 
     private static assignIdxValue(storable: IdbStorageFormat, key: string, value: string, params?:{timestamp?: boolean, multi?: boolean}) {
@@ -160,10 +167,8 @@ class IdbBackend implements Backend {
             }
             values.push(value);
         } else {
-
+            storable.indexes[key] = value;
         }
-
-        storable.indexes[key]
     }
 
     private static addTimestampToValue(value: string, timestamp: string) {
