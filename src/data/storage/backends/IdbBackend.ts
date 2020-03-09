@@ -1,7 +1,8 @@
 require('indexeddbpoly');
 
-import { Backend, SearchParams, SearchResults } from 'data/storage/Backend'; 
+import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
 import { PackedLiteral } from 'data/storage/Store';
+import { Hash } from 'data/model/Hashing';
 
 import { openDB, IDBPDatabase } from 'idb';
 
@@ -82,15 +83,16 @@ class IdbBackend implements Backend {
         return idb.get(IdbBackend.OBJ_STORE, hash).then((storable: IdbStorageFormat | undefined) => (storable?.packed)) as Promise<PackedLiteral | undefined>;
     }
 
-    async searchByClass(className: string, params?: SearchParams): Promise<SearchResults> {
+    async searchByClass(className: string, params?: BackendSearchParams): Promise<BackendSearchResults> {
         return this.searchByIndex(IdbBackend.CLASS_TIMESTAMP_IDX_KEY + '_idx', className, params);
     }
 
-    async searchByReference(path: string, refHash: string, params?: SearchParams): Promise<SearchResults> {
-        return this.searchByIndex(IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY + '_idx', path + '#' + refHash, params);
+    async searchByReference(referringClassName: string, referringPath: string, referencedHash: Hash, params?: BackendSearchParams): Promise<BackendSearchResults> {
+        return this.searchByIndex(IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY + '_idx', 
+                                  referringClassName + '.' + referringPath + '#' + referencedHash, params);
     }
 
-    private async searchByIndex(index: string, value: string, params?: SearchParams) : Promise<SearchResults> {
+    private async searchByIndex(index: string, value: string, params?: BackendSearchParams) : Promise<BackendSearchResults> {
         
         let idb = await this.idbPromise;
 
@@ -117,7 +119,7 @@ class IdbBackend implements Backend {
         const range = IDBKeyRange.bound(range_start, range_end, true, true);
         const direction = order === 'asc' ? 'next' : 'prev';
 
-        let searchResults = {} as SearchResults;
+        let searchResults = {} as BackendSearchResults;
 
         searchResults.items = [] as Array<PackedLiteral>;
         searchResults.start = undefined;

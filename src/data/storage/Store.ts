@@ -1,4 +1,4 @@
-import { Backend } from 'data/storage/Backend'; 
+import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
 import { HashedObject, Literal, Dependency } from 'data/model/HashedObject';
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
@@ -12,6 +12,7 @@ type PackedLiteral = {
     references: Array<string>
 };
 
+type LoadParams = BackendSearchParams;
 
 class Store {
 
@@ -78,6 +79,21 @@ class Store {
         });
     }
 
+    async loadByClass(className: string, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+
+        let searchResults = await this.backend.searchByClass(className, params);
+
+        return this.unpackSearchResults(searchResults);
+
+    }
+
+    async loadByReference(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+
+        let searchResults = await this.backend.searchByReference(referringClassName, referringPath, referencedHash, params);
+
+        return this.unpackSearchResults(searchResults);
+    }
+
     private async loadWithLiteral(hash: Hash) : Promise<{object: HashedObject, literal: Literal} | undefined> {
 
         let packed = await this.backend.load(hash);
@@ -121,6 +137,16 @@ class Store {
         let hashedObject = HashedObject.fromLiteral(literal)
 
         return Promise.resolve({object: hashedObject, literal: literal});
+    }
+
+    private async unpackSearchResults(searchResults: BackendSearchResults) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+        let objects = [] as Array<HashedObject>;
+
+        searchResults.items.forEach(async (packed) => {
+            objects.push((await this.unpackWithLiteral(packed))?.object as HashedObject);
+        });
+
+        return {objects: objects, start: searchResults.start, end: searchResults.end};    
     }
 }
 
