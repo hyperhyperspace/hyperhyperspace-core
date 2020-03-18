@@ -39,6 +39,7 @@
   "dependencies": {
     "@types/node": "^13.5.0",
     "chacha-js": "^2.1.1",
+    "get-random-values": "^1.2.0",
     "idb": "^5.0.1",
     "jsencrypt": "^3.0.0-rc.1",
     "jshashes": "^1.0.7",
