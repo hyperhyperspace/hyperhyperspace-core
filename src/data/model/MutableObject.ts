@@ -81,27 +81,25 @@ type MutationOp = { };
 
 const BITS_FOR_ID = 128;
 
-abstract class ReplicatedObject extends HashedObject {
+abstract class MutableObject extends HashedObject {
 
 
-    uniqueId   : string;
+    id         : string;
     pendingOps : Array<MutationOp>;
-    autoSave   : boolean;
 
     constructor() {
         super();
 
         //TODO: use b64 here
-        this.uniqueId   = new RNGImpl().randomHexString(BITS_FOR_ID);
+        this.id   = new RNGImpl().randomHexString(BITS_FOR_ID);
         this.pendingOps = [];
-        this.autoSave   = true;
     }
 
     abstract validateOp(op: MutationOp): void;
     abstract applyOp(op: MutationOp): void;
 
-    setUniqueId(uniqueId: string) {
-        this.uniqueId = uniqueId;
+    setId(id: string) {
+        this.id = id;
     }
 
     enqueueOp(op: MutationOp) : void {
@@ -110,4 +108,4 @@ abstract class ReplicatedObject extends HashedObject {
 
 }
 
-export { ReplicatedObject }
+export { MutableObject }
