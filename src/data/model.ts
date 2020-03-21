@@ -1,4 +1,4 @@
-export { HashedObject, ObjectLiteral, ObjectReference, Dependency } from './model/HashedObject';
+export { HashedObject, Literal, LiteralizedObject, Reference, Dependency } from './model/HashedObject';
 export { MutableObject } from './model/MutableObject';
 export { HashReference } from './model/HashReference';
 export { HashedSet } from './model/HashedSet';

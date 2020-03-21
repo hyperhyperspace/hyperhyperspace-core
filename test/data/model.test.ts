@@ -1,5 +1,5 @@
 import { HashedObject, HashedSet, Hash, Serialization } from 'data/model';
-import { Dependency } from 'data/model/HashedObject';
+import { LiteralizedObject } from 'data/model/HashedObject';
 
 import { SomethingHashed } from './env/SomethingHashed';
 
@@ -8,7 +8,7 @@ describe('Data model', () => {
         
         const original = ['hello', 1.0, false, 2.5, 'bye', true];
         const literalization  = HashedObject.literalizeField('original', original);
-        const reconstructed = HashedObject.deliteralizeField(literalization.value, new Map<Hash, Dependency>());
+        const reconstructed = HashedObject.deliteralizeField(literalization.value, new Map<Hash, LiteralizedObject>());
 
         for (let i=0; i<original.length; i++) {
             expect(original[i]).toEqual(reconstructed[i]);
@@ -58,9 +58,7 @@ describe('Data model', () => {
 
         let a_literal = a.toLiteral();
 
-        HashedObject.fromLiteral(a_literal);
-
-        let a2 = a_literal.object;
+        let a2 = HashedObject.fromLiteral(a_literal);
 
         expect(a.equals(a2)).toBeTruthy();
 

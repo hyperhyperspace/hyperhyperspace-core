@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, MutableObject, ObjectLiteral, ObjectReference, Dependency } from 'data/model.ts';
+import { HashedObject, MutableObject, Literal, LiteralizedObject, Reference, Dependency } from 'data/model.ts';
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 
@@ -39,35 +39,34 @@ class Store {
             }
     }
 
-    private async saveWithLiteral(literal: ObjectLiteral) : Promise<void> {
+    private async saveWithLiteral(literal: Literal) : Promise<void> {
 
 
-        let object = literal.object;
         let loaded = await this.load(literal.hash);
 
         if (loaded !== undefined) {
             return Promise.resolve();
         }
 
-        let packed = await this.packWithLiteral(object, literal);
+        let packed = await this.packWithLiteral(literal);
         
         await this.backend.store(packed);
     }
 
     async pack(object: HashedObject) {
-        let packed = await this.packWithLiteral(object, object.toLiteral());
+        let packed = await this.packWithLiteral(object.toLiteral());
 
         return packed;
     }
 
-    private async packWithLiteral(object: HashedObject, literal: ObjectLiteral) {
+    private async packWithLiteral(literal: Literal) {
         let packed = {} as PackedLiteral;
 
-        packed.hash    = literal.hash;
-        packed.value = literal.literal;
+        packed.hash  = literal.hash;
+        packed.value = literal.value;
         packed.signatures = [];
 
-        for (const author of object.getAuthors()) {
+        for (const author of literal.authors) {
 
             let keyHash = author.getKeyPairHash();
             let key     = await (this.load(keyHash) as Promise<RSAKeyPair>);
@@ -82,14 +81,14 @@ class Store {
 
             packedDep.path = dep.path;
 
-            if ((dep.target as ObjectLiteral).literal) {
-                let depLiteral = dep.target as ObjectLiteral;
-                await this.saveWithLiteral(depLiteral);
-                packedDep.className = depLiteral.object.getClass();
+            if ((dep.target as LiteralizedObject).literal) {
+                let depLiteral = (dep.target as LiteralizedObject).literal;
+                await this.saveWithLiteral((dep.target as LiteralizedObject).literal);
+                packedDep.className = depLiteral.value._class;
                 packedDep.hash = depLiteral.hash;
                 packedDep.type = 'literal';   
             } else {
-                let depReference = dep.target as ObjectReference;
+                let depReference = dep.target as Reference;
                 packedDep.className = depReference.className;
                 packedDep.hash = depReference.hash;
                 packedDep.type = 'reference';
@@ -101,9 +100,12 @@ class Store {
     }
 
     async load(hash: Hash) : Promise<HashedObject | undefined> {
-
-        return this.loadWithLiteral(hash).then((loaded : ObjectLiteral | undefined) => {
-            return loaded?.object;
+        return this.loadWithLiteral(hash).then((loaded : Literal | undefined) => {
+            if (loaded === undefined) {
+                return undefined;
+            } else {
+                return HashedObject.fromLiteral(loaded);
+            }
         });
     }
 
@@ -122,7 +124,7 @@ class Store {
         return this.unpackSearchResults(searchResults);
     }
 
-    private async loadWithLiteral(hash: Hash) : Promise<ObjectLiteral | undefined> {
+    private async loadWithLiteral(hash: Hash) : Promise<Literal | undefined> {
 
         let packed = await this.backend.load(hash);
         
@@ -137,14 +139,14 @@ class Store {
     async unpack(packed: PackedLiteral) : Promise<HashedObject> {
         let unpacked = await this.unpackWithLiteral(packed);
 
-        return unpacked?.object as HashedObject;
+        return HashedObject.fromLiteral(unpacked);
     }
 
-    private async unpackWithLiteral(packed: PackedLiteral) : Promise<ObjectLiteral | undefined> {
-        let literal = {} as ObjectLiteral;
+    private async unpackWithLiteral(packed: PackedLiteral) : Promise<Literal> {
+        let literal = {} as Literal;
 
         literal.hash = packed.hash;
-        literal.literal = packed.value;
+        literal.value = packed.value;
         literal.dependencies = new Set<Dependency>();
 
         for (let i=0; i<packed.dependencies.length; i++) {
@@ -158,10 +160,10 @@ class Store {
                 if (loaded === undefined) {
                     throw new Error("Trying to unpack " + packed.hash + " but found unmet dependency " + packedDep.hash);
                 } else {
-                    dependency.target = loaded;
+                    dependency.target = {literal: loaded, object: HashedObject.fromLiteral(loaded) } as LiteralizedObject;
                 }
             } else {
-                dependency.target = { hash : packedDep.hash, className : packedDep.hash } as ObjectReference;
+                dependency.target = { hash : packedDep.hash, className : packedDep.hash } as Reference;
             }
 
             literal.dependencies.add(dependency);
@@ -176,7 +178,7 @@ class Store {
         let objects = [] as Array<HashedObject>;
         
         for (let packed of searchResults.items) {
-            let obj = (await this.unpackWithLiteral(packed))?.object as HashedObject;
+            let obj = HashedObject.fromLiteral(await this.unpackWithLiteral(packed));
             objects.push(obj);
         }
 
