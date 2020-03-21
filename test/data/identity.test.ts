@@ -54,9 +54,9 @@ describe('Identity', () => {
 
         let id = Identity.create(info, keyPair);
 
-        let literal1 = id.toLiteral();
+        let literal1 = id.toLiteralContext();
 
-        let id2 = HashedObject.fromLiteral(literal1);
+        let id2 = HashedObject.fromLiteralContext(literal1);
 
         expect(id.equals(id2)).toBeTruthy();
 

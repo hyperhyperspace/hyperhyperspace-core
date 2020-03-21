@@ -1,5 +1,4 @@
-import { HashedObject, HashedSet, Hash, Serialization } from 'data/model';
-import { LiteralizedObject } from 'data/model/HashedObject';
+import { HashedObject, HashedSet, Hash, Literal, Serialization } from 'data/model';
 
 import { SomethingHashed } from './env/SomethingHashed';
 
@@ -7,8 +6,9 @@ describe('Data model', () => {
     test( 'Basic types', () => {
         
         const original = ['hello', 1.0, false, 2.5, 'bye', true];
-        const literalization  = HashedObject.literalizeField('original', original);
-        const reconstructed = HashedObject.deliteralizeField(literalization.value, new Map<Hash, LiteralizedObject>());
+        const context = { objects : new Map<Hash, HashedObject>(), literals: new Map<Hash, Literal>() }
+        const literalization  = HashedObject.literalizeField('original', original, context);
+        const reconstructed = HashedObject.deliteralizeField(literalization.value, context);
 
         for (let i=0; i<original.length; i++) {
             expect(original[i]).toEqual(reconstructed[i]);
@@ -27,8 +27,11 @@ describe('Data model', () => {
             set2.add(element);
         }
 
-        const literal1 = HashedObject.literalizeField('set1', set1);
-        const literal2 = HashedObject.literalizeField('set2', set2);
+        const context1 = { objects : new Map<Hash, HashedObject>(), literals: new Map<Hash, Literal>() }
+        const context2 = { objects : new Map<Hash, HashedObject>(), literals: new Map<Hash, Literal>() }
+
+        const literal1 = HashedObject.literalizeField('set1', set1, context1);
+        const literal2 = HashedObject.literalizeField('set2', set2, context2);
 
         expect(Serialization.default(literal1.value)).toEqual(Serialization.default(literal2.value));
         
@@ -56,9 +59,11 @@ describe('Data model', () => {
 
         a.reference = b.createReference();
 
-        let a_literal = a.toLiteral();
+        let a_literal = a.toLiteralContext();
 
-        let a2 = HashedObject.fromLiteral(a_literal);
+        a_literal.context.objects = new Map<Hash, HashedObject>();
+
+        let a2 = HashedObject.fromLiteralContext(a_literal);
 
         expect(a.equals(a2)).toBeTruthy();
 

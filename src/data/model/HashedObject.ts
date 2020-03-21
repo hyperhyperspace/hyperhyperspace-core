@@ -2,11 +2,13 @@ import { Hashing, Hash } from './Hashing';
 import { HashedSet } from './HashedSet';
 import { Identity } from 'data/identity/Identity';
 import { HashReference } from './HashReference';
+import { __spreadArrays } from 'tslib';
 
-type Literal           = { hash: Hash, value: any, authors: Set<Identity>, dependencies: Set<Dependency> }
-type Reference         = { hash: Hash, className: string };
-type LiteralizedObject = { literal: Literal, object: Object };
-type Dependency        = { path: string, target: (LiteralizedObject | Reference) };
+type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
+type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
+
+type Context = { objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal> };
+type LiteralContext = { hash: Hash, context: Context };
 
 class HashedObject {
 
@@ -34,7 +36,7 @@ class HashedObject {
     }
 
     hash() {
-        return this.toLiteral().hash;
+        return this.toLiteralContext().hash;
     }
 
     createReference() : HashReference {
@@ -45,7 +47,16 @@ class HashedObject {
         return 'HashedObject';
     }
 
-    toLiteral() : Literal {
+    toLiteralContext() : LiteralContext {
+
+         let context = { objects: new Map(), literals: new Map() } as Context
+
+         let hash = this.literalizeInContext(context, '');
+
+         return {hash: hash, context: context };
+    }
+
+    literalizeInContext(context: Context, path: string) : Hash {
         
         let fields = {} as any;
         let dependencies = new Set<Dependency>();
@@ -55,7 +66,11 @@ class HashedObject {
                 let value = (this as any)[fieldName];
 
                 if (HashedObject.shouldLiteralizeField(value)) {
-                    let fieldLiteral = HashedObject.literalizeField(fieldName, value);
+                    let fieldPath = fieldName;
+                    if (path !== '') {
+                        fieldPath = path + '.' + fieldName;
+                    }
+                    let fieldLiteral = HashedObject.literalizeField(fieldPath, value, context);
                     fields[fieldName] = fieldLiteral.value;
                     HashedObject.collectChildDeps(dependencies, fieldLiteral.dependencies);
                 }
@@ -69,8 +84,15 @@ class HashedObject {
         };
 
         let hash = Hashing.forValue(value);
+        
+        let authors = value['_fields']['authors']['_hashes'] as Array<Hash>;
 
-        return { hash: hash, value: value, authors: new Set(this.getAuthors()) , dependencies: dependencies };
+        let literal: Literal = { hash: hash, value: value, authors: authors , dependencies: dependencies };
+
+        context.objects.set(hash, this);
+        context.literals.set(hash, literal);
+
+        return hash;
     }
 
     equals(another: HashedObject) {
@@ -96,7 +118,7 @@ class HashedObject {
         }
     }
 
-    static literalizeField(fieldPath: string, something: any) : { value: any, dependencies : Set<Dependency> }  {
+    static literalizeField(fieldPath: string, something: any, context: Context) : { value: any, dependencies : Set<Dependency> }  {
 
         let typ = typeof(something);
 
@@ -111,7 +133,7 @@ class HashedObject {
                 let index = 0;
                 for (const elmt of something) {
                     if (HashedObject.shouldLiteralizeField(elmt)) {
-                        let child = HashedObject.literalizeField(fieldPath, elmt); // should we put the index into the path? but then we can't reuse this code for sets...
+                        let child = HashedObject.literalizeField(fieldPath, elmt, context); // should we put the index into the path? but then we can't reuse this code for sets...
                         value.push(child.value);
                         HashedObject.collectChildDeps(dependencies, child.dependencies);
                         index = index + 1;
@@ -121,7 +143,7 @@ class HashedObject {
                 let hset = something as HashedSet<any>;
                 let arrays = hset.toArrays();
                 let hashes = arrays.hashes;
-                let child = HashedObject.literalizeField(fieldPath, arrays.elements);
+                let child = HashedObject.literalizeField(fieldPath, arrays.elements, context);
                 let elements = child.value;
                 HashedObject.collectChildDeps(dependencies, child.dependencies);
 
@@ -132,15 +154,19 @@ class HashedObject {
                 if (something instanceof HashReference) {
                     let reference = something as HashReference;
 
+                    let dependency : Dependency = { path: fieldPath, hash: reference.hash, className: reference.className, type: 'reference'};
+                    dependencies.add(dependency);
+
                     value = { _type: 'hashed_object_reference', _hash: reference.hash, _class: reference.className};
                 } else if (something instanceof HashedObject) {
                     let hashedObject = something as HashedObject;
-                    let literalized = { object: hashedObject, literal: hashedObject.toLiteral() } as LiteralizedObject;
 
-                    let dependency = { path: fieldPath, target: literalized};
+                    let hash = hashedObject.literalizeInContext(context, fieldPath);
+
+                    let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClass(), type: 'literal'};
                     dependencies.add(dependency);
 
-                    value = { _type: 'hashed_object_dependency', _hash: literalized.literal.hash };
+                    value = { _type: 'hashed_object_dependency', _hash: hash };
                 } else {
                     value = {} as any;
 
@@ -148,7 +174,7 @@ class HashedObject {
                         if (fieldName.length>0 && fieldName[0] !== '_') {
                             let fieldValue = (something as any)[fieldName];
                             if (HashedObject.shouldLiteralizeField(fieldValue)) {
-                                let field = HashedObject.literalizeField(fieldPath + '.' + fieldName, fieldValue);
+                                let field = HashedObject.literalizeField(fieldPath + '.' + fieldName, fieldValue, context);
                                 value[fieldName] = field.value;
                                 HashedObject.collectChildDeps(dependencies, field.dependencies);
                             }
@@ -163,16 +189,46 @@ class HashedObject {
         return { value: value, dependencies: dependencies };
     }
 
-    static fromLiteral(literal: Literal) : HashedObject {
+
+    static fromLiteralContext(literalContext: LiteralContext ) : HashedObject {
+        let context = literalContext.context;
+
+        let literal = context.literals.get(literalContext.hash);
+        
+        if (literal === undefined) {
+            throw new Error('Literal with hash ' + literalContext.hash + ' is missing from deliteralization context');
+        }
+
+        HashedObject.deliteralizeInContext(literal, context);
+
+        return context.objects.get(literalContext.hash) as HashedObject;
+    }
+
+    static deliteralizeInContext(literal: Literal, context: Context) : void {
+
+        let hashedObject = context.objects.get(literal.hash);
+
+        if (hashedObject !== undefined) {
+            return;
+        }
+
         const value = literal.value;
-        const dependencies = new Map<Hash, LiteralizedObject>();
 
         for (const dep of literal.dependencies) {
-            if ((dep.target as LiteralizedObject).literal) {
-                let literalized = (dep.target as LiteralizedObject) as LiteralizedObject;
-                dependencies.set(literalized.literal.hash, literalized);
+            if (dep.type === 'literal') {
+                let depHashedObject = context.objects.get(dep.hash);
+                if (depHashedObject === undefined) {
+                    let depLiteral = context.literals.get(dep.hash);
+                    if (depLiteral === undefined) {
+                        throw new Error('Literal with hash ' + literal.hash + ' has missing dependency ' + dep.hash + ' in deliteralization context');
+                    }
+                    HashedObject.deliteralizeInContext(depLiteral, context);
+                    depHashedObject = context.objects.get(dep.hash) as HashedObject;
+                }
             }   
         }
+
+        // all the dependencies have been delieralized in the context
 
         if (value['_type'] !== 'hashed_object') {
             throw new Error("Missing 'hashed_object' type signature while attempting to deliteralize " + literal.hash);
@@ -180,7 +236,7 @@ class HashedObject {
         
         let constr = HashedObject.knownClasses.get(value['_class']);
 
-        let hashedObject;
+        
 
         if (constr === undefined) {
             hashedObject = new HashedObject();
@@ -190,16 +246,16 @@ class HashedObject {
 
         for (const [fieldName, fieldValue] of Object.entries(value['_fields'])) {
             if (fieldName.length>0 && fieldName[0] !== '_') {
-                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, dependencies);
+                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context);
             }
         }
 
         hashedObject.init();
 
-        return hashedObject;
+        context.objects.set(literal.hash, hashedObject);
     }
 
-    static deliteralizeField(value: any, dependencies: Map<Hash, LiteralizedObject>) : any  {
+    static deliteralizeField(value: any, context: Context) : any  {
 
         let something: any;
 
@@ -211,18 +267,18 @@ class HashedObject {
             if (Array.isArray(value)) {
                 something = [];
                for (const elmt of value) {
-                   something.push(HashedObject.deliteralizeField(elmt, dependencies));
+                   something.push(HashedObject.deliteralizeField(elmt, context));
                }
             } else if (value['_type'] === undefined) {
                 something = {} as any;
 
                 for (const [fieldName, fieldValue] of Object.entries(value)) {
-                    something[fieldName] = HashedObject.deliteralizeField(fieldValue, dependencies);
+                    something[fieldName] = HashedObject.deliteralizeField(fieldValue, context);
                 }
             } else {
                 if (value['_type'] === 'hashed_set') {
                     let hashes = value['_hashes'];
-                    let elements = HashedObject.deliteralizeField(value['_elements'], dependencies);
+                    let elements = HashedObject.deliteralizeField(value['_elements'], context);
                     
                     something = new HashedSet();
                     something.fromArrays(hashes, elements);
@@ -230,7 +286,15 @@ class HashedObject {
                     something = new HashReference(value['_hash'], value['_class']);
                 } else if (value['_type'] === 'hashed_object_dependency') {
                     let hash = value['_hash'];
-                    something = (dependencies.get(hash) as LiteralizedObject).object;
+                    let literal = context.literals.get(hash);
+
+                    if (literal === undefined) {
+                        throw new Error('Literal ' + hash + ' is missing in deliteralization context' );
+                    }
+
+                    HashedObject.deliteralizeInContext(literal, context);
+
+                    something = context.objects.get(hash) as HashedObject;
                 } else if (value['_type'] === 'hashed_object') {
                     throw new Error("Attempted to deliteralize embedded hashed object in literal (a hash reference should be used instead)");
                 } else {
@@ -244,7 +308,7 @@ class HashedObject {
         return something;
     }
 
-    static collectChildDeps<T extends (Dependency | Reference)> (parentDeps : Set<T>, childDeps : Set<T>) {
+    static collectChildDeps(parentDeps : Set<Dependency>, childDeps : Set<Dependency>) {
         for (const childDep of childDeps) {
             parentDeps.add(childDep);
         }
@@ -341,4 +405,4 @@ class HashedObject {
 
 HashedObject.registerClass('HashedObject', HashedObject);
 
-export { HashedObject, Literal, LiteralizedObject, Reference, Dependency };
+export { HashedObject, Literal, Dependency, LiteralContext, Context };
