@@ -67,7 +67,7 @@ class IdbBackend implements Backend {
         IdbBackend.assignIdxValue(storable, IdbBackend.CLASS_TIMESTAMP_IDX_KEY, storable.packed.value._class, {timestamp: true});
 
         for (let i=0; i<packed.dependencies.length; i++) {
-            let reference = packed.references[i] + '#' + packed.dependencies[i];
+            let reference = packed.dependencies[i].className + '.' + packed.dependencies[i].path + '#' + packed.dependencies[i].hash;
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCES_IDX_KEY, reference, {multi: true});
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY, reference, {timestamp: true, multi: true});
         }

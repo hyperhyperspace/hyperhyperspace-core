@@ -1,10 +1,12 @@
 import { Hashing, Hash } from './Hashing';
 import { HashedSet } from './HashedSet';
 import { Identity } from 'data/identity/Identity';
+import { HashReference } from './HashReference';
 //import { __spreadArrays } from 'tslib';
 
-type Literal    = { hash: Hash, value: any, dependencies: Set<Dependency>}
-type Dependency = { path: string, object: HashedObject, literal: Literal };
+type ObjectLiteral    = { hash: Hash, object: HashedObject, literal: any, dependencies: Set<Dependency> }
+type ObjectReference  = { hash: Hash, className: string };
+type Dependency       = { path: string, target: (ObjectLiteral | ObjectReference) };
 
 class HashedObject {
 
@@ -35,11 +37,15 @@ class HashedObject {
         return this.toLiteral().hash;
     }
 
+    createReference() : HashReference {
+        return new HashReference(this.hash(), this.getClass());
+    }
+
     getClass() {
         return 'HashedObject';
     }
 
-    toLiteral() : Literal {
+    toLiteral() : ObjectLiteral {
         
         let fields = {} as any;
         let dependencies = new Set<Dependency>();
@@ -47,6 +53,7 @@ class HashedObject {
         for (const fieldName of Object.keys(this)) {
             if (fieldName.length > 0 && fieldName[0] !== '_') {
                 let value = (this as any)[fieldName];
+
                 if (HashedObject.shouldLiteralizeField(value)) {
                     let fieldLiteral = HashedObject.literalizeField(fieldName, value);
                     fields[fieldName] = fieldLiteral.value;
@@ -63,7 +70,7 @@ class HashedObject {
 
         let hash = Hashing.forValue(value);
 
-        return { hash: hash, value: value, dependencies: dependencies};
+        return { hash: hash, object: this, literal: value, dependencies: dependencies };
     }
 
     equals(another: HashedObject) {
@@ -71,7 +78,12 @@ class HashedObject {
     }
 
     static shouldLiteralizeField(something: any) {
-        if (something === undefined || something === null) {
+
+        if (something === null) {
+            throw new Error('HashedObject and its derivatives do not support null-valued fields.');
+        }
+
+        if (something === undefined) {
             return false;
         } else {
             let typ = typeof(something);
@@ -84,7 +96,7 @@ class HashedObject {
         }
     }
 
-    static literalizeField(fieldPath: string, something: any) : { value: any, dependencies: Set<Dependency> }  {
+    static literalizeField(fieldPath: string, something: any) : { value: any, dependencies : Set<Dependency> }  {
 
         let typ = typeof(something);
 
@@ -117,14 +129,18 @@ class HashedObject {
 
             } else { // not a set nor an array
 
-                if (something instanceof HashedObject) {
+                if (something instanceof HashReference) {
+                    let reference = something as HashReference;
+
+                    value = { _type: 'hashed_object_reference', _hash: reference.hash, _class: reference.className};
+                } else if (something instanceof HashedObject) {
                     let hashedObject = something as HashedObject;
                     let literal = hashedObject.toLiteral();
 
-                    let dependency = { path: fieldPath, object: hashedObject, literal: literal};
+                    let dependency = { path: fieldPath, target: literal};
                     dependencies.add(dependency);
 
-                    value = { _type: 'hashed_object_reference', _hash: literal.hash };
+                    value = { _type: 'hashed_object_dependency', _hash: literal.hash };
                 } else {
                     value = {} as any;
 
@@ -144,15 +160,17 @@ class HashedObject {
             throw Error("Unexpected type encountered while attempting to literalize: " + typ);
         }
 
-        return { value: value, dependencies: dependencies};
+        return { value: value, dependencies: dependencies };
     }
 
-    static fromLiteral(literal: Literal) : HashedObject {
-        const value = literal.value;
+    static fromLiteral(literal: ObjectLiteral) : void {
+        const value = literal.literal;
         const dependencies = new Map<Hash, Dependency>();
-        
+
         for (const dep of literal.dependencies) {
-            dependencies.set(dep.literal.hash, dep);
+            if ((dep.target as ObjectLiteral).literal) {
+                dependencies.set(dep.target.hash, dep);
+            }   
         }
 
         if (value['_type'] !== 'hashed_object') {
@@ -177,7 +195,7 @@ class HashedObject {
 
         hashedObject.init();
 
-        return hashedObject;
+        literal.object = hashedObject;
     }
 
     static deliteralizeField(value: any, dependencies: Map<Hash, Dependency>) : any  {
@@ -208,8 +226,10 @@ class HashedObject {
                     something = new HashedSet();
                     something.fromArrays(hashes, elements);
                 } else if (value['_type'] === 'hashed_object_reference') {
+                    something = new HashReference(value['_hash'], value['_class']);
+                } else if (value['_type'] === 'hashed_object_dependency') {
                     let hash = value['_hash'];
-                    something = (dependencies.get(hash) as Dependency).object;
+                    something = ((dependencies.get(hash) as Dependency).target as ObjectLiteral).object;
                 } else if (value['_type'] === 'hashed_object') {
                     throw new Error("Attempted to deliteralize embedded hashed object in literal (a hash reference should be used instead)");
                 } else {
@@ -223,7 +243,7 @@ class HashedObject {
         return something;
     }
 
-    static collectChildDeps(parentDeps : Set<Dependency>, childDeps : Set<Dependency>) {
+    static collectChildDeps<T extends (Dependency | ObjectReference)> (parentDeps : Set<T>, childDeps : Set<T>) {
         for (const childDep of childDeps) {
             parentDeps.add(childDep);
         }
@@ -320,4 +340,4 @@ class HashedObject {
 
 HashedObject.registerClass('HashedObject', HashedObject);
 
-export { HashedObject, Literal, Dependency };
+export { HashedObject, ObjectLiteral, ObjectReference, Dependency };

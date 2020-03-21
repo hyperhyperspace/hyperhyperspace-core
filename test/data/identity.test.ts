@@ -56,7 +56,9 @@ describe('Identity', () => {
 
         let literal1 = id.toLiteral();
 
-        let id2 = HashedObject.fromLiteral(literal1);
+        HashedObject.fromLiteral(literal1);
+
+        let id2 = literal1.object;
 
         expect(id.equals(id2)).toBeTruthy();
 

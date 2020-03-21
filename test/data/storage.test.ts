@@ -25,9 +25,7 @@ describe('Storage', () => {
 
         let store = new Store(new IdbBackend('test-storage-backend'));
 
-        await store.save(a).then(() => {
-            
-        });
+        await store.save(a);
 
         let a2 = await store.load(a.hash()) as HashedObject;
 

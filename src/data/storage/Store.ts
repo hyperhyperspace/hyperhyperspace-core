@@ -1,16 +1,13 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, Literal, Dependency } from 'data/model/HashedObject';
+import { HashedObject, MutableObject, ObjectLiteral, ObjectReference, Dependency } from 'data/model.ts';
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 
 
-type PackedLiteral = { 
-    hash : Hash,
-    value: any,
-    signatures : Map<Hash, string>,
-    dependencies: Array<Hash>,
-    references: Array<string>
-};
+type PackedLiteral = { hash : Hash, value: any, signatures : Array<[Hash, String]>,
+                       dependencies: Array<PackedDependency> };
+
+type PackedDependency = { hash: Hash, path: string, className: string, type: ('literal'|'reference') };
 
 type LoadParams = BackendSearchParams;
 
@@ -22,12 +19,30 @@ class Store {
         this.backend = backend;
     }
 
-    async save(object: HashedObject) {
-        return this.saveWithLiteral(object, object.toLiteral());
+    async save(object: HashedObject) : Promise<void>{
+
+        let saving = this.saveWithLiteral(object.toLiteral());
+
+        if (object instanceof MutableObject) {
+            saving = saving.then(() => this.saveOperations(object));
+        }
+
+        return saving;
     }
 
-    private async saveWithLiteral(object: HashedObject, literal: Literal) : Promise<void> {
+    private async saveOperations(mutable: MutableObject) : Promise<void> {
+            let pendingOps = mutable.getUnsavedOps();
 
+            for (const op of pendingOps) {
+                await this.save(op);
+                mutable.removeUnsavedOp(op);
+            }
+    }
+
+    private async saveWithLiteral(literal: ObjectLiteral) : Promise<void> {
+
+
+        let object = literal.object;
         let loaded = await this.load(literal.hash);
 
         if (loaded !== undefined) {
@@ -45,28 +60,41 @@ class Store {
         return packed;
     }
 
-    private async packWithLiteral(object: HashedObject, literal: Literal) {
+    private async packWithLiteral(object: HashedObject, literal: ObjectLiteral) {
         let packed = {} as PackedLiteral;
 
         packed.hash    = literal.hash;
-        packed.value = literal.value;
-        packed.signatures = new Map<Hash, string>();
+        packed.value = literal.literal;
+        packed.signatures = [];
 
         for (const author of object.getAuthors()) {
 
             let keyHash = author.getKeyPairHash();
             let key     = await (this.load(keyHash) as Promise<RSAKeyPair>);
-            packed.signatures.set(author.hash(), key.sign(packed.hash));
-
+            packed.signatures.push([author.hash(), key.sign(packed.hash)]);
         }
 
-        packed.dependencies = new Array<Hash>();
-        packed.references = new Array<string>();
+        packed.dependencies = [];
 
         for (const dep of literal.dependencies) {
-            await this.saveWithLiteral(dep.object, dep.literal);
-            packed.dependencies.push(dep.literal.hash);
-            packed.references.push(literal.value._class + '.' + dep.path);
+
+            let packedDep = {} as PackedDependency;
+
+            packedDep.path = dep.path;
+
+            if ((dep.target as ObjectLiteral).literal) {
+                let depLiteral = dep.target as ObjectLiteral;
+                await this.saveWithLiteral(depLiteral);
+                packedDep.className = depLiteral.object.getClass();
+                packedDep.hash = depLiteral.hash;
+                packedDep.type = 'literal';   
+            } else {
+                let depReference = dep.target as ObjectReference;
+                packedDep.className = depReference.className;
+                packedDep.hash = depReference.hash;
+                packedDep.type = 'reference';
+            }
+            packed.dependencies.push(packedDep);
         }
 
         return packed;
@@ -74,7 +102,7 @@ class Store {
 
     async load(hash: Hash) : Promise<HashedObject | undefined> {
 
-        return this.loadWithLiteral(hash).then((loaded : {object: HashedObject, literal: Literal} | undefined) => {
+        return this.loadWithLiteral(hash).then((loaded : ObjectLiteral | undefined) => {
             return loaded?.object;
         });
     }
@@ -94,7 +122,7 @@ class Store {
         return this.unpackSearchResults(searchResults);
     }
 
-    private async loadWithLiteral(hash: Hash) : Promise<{object: HashedObject, literal: Literal} | undefined> {
+    private async loadWithLiteral(hash: Hash) : Promise<ObjectLiteral | undefined> {
 
         let packed = await this.backend.load(hash);
         
@@ -112,31 +140,36 @@ class Store {
         return unpacked?.object as HashedObject;
     }
 
-    private async unpackWithLiteral(packed: PackedLiteral) : Promise<{object: HashedObject, literal: Literal} | undefined> {
-        let literal = {} as Literal;
+    private async unpackWithLiteral(packed: PackedLiteral) : Promise<ObjectLiteral | undefined> {
+        let literal = {} as ObjectLiteral;
 
         literal.hash = packed.hash;
-        literal.value = packed.value;
+        literal.literal = packed.value;
         literal.dependencies = new Set<Dependency>();
 
         for (let i=0; i<packed.dependencies.length; i++) {
-            let dependencyHash = packed.dependencies[i];
-            let dependencyPath = packed.references[i];
+            let packedDep = packed.dependencies[i];
 
             let dependency = {} as Dependency;
+            dependency.path = packedDep.path;
 
-            let loaded = await (this.loadWithLiteral(dependencyHash) as Promise<{object: HashedObject, literal: Literal}>);
-            
-            dependency.object  = loaded.object;
-            dependency.literal = loaded.literal;
-            dependency.path    = dependencyPath;
+            if (packedDep.type === 'literal') {
+                let loaded = await this.loadWithLiteral(packedDep.hash);
+                if (loaded === undefined) {
+                    throw new Error("Trying to unpack " + packed.hash + " but found unmet dependency " + packedDep.hash);
+                } else {
+                    dependency.target = loaded;
+                }
+            } else {
+                dependency.target = { hash : packedDep.hash, className : packedDep.hash } as ObjectReference;
+            }
 
             literal.dependencies.add(dependency);
         }
 
-        let hashedObject = HashedObject.fromLiteral(literal)
+        HashedObject.fromLiteral(literal)
 
-        return Promise.resolve({object: hashedObject, literal: literal});
+        return Promise.resolve(literal);
     }
 
     private async unpackSearchResults(searchResults: BackendSearchResults) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {

@@ -1,4 +1,4 @@
-import { HashedObject, HashedSet } from 'data/model';
+import { HashedObject, HashedSet, HashReference } from 'data/model';
 
 class SomethingHashed extends HashedObject {
 
@@ -7,6 +7,7 @@ class SomethingHashed extends HashedObject {
     name?: string;
     amount?: number;
     things?: HashedSet<any>;
+    reference?: HashReference;
 
     constructor() {
         super();

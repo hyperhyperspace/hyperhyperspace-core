@@ -54,10 +54,18 @@ describe('Data model', () => {
 
         a.things?.add(b);
 
+        a.reference = b.createReference();
+
         let a_literal = a.toLiteral();
 
-        let a2 = HashedObject.fromLiteral(a_literal);
+        HashedObject.fromLiteral(a_literal);
+
+        let a2 = a_literal.object;
 
         expect(a.equals(a2)).toBeTruthy();
+
+        a.reference = undefined;
+
+        expect(a.equals(a2)).toBeFalsy();
     });
 });

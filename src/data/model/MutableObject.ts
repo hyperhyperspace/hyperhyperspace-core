@@ -1,8 +1,7 @@
-import { HashedObject } from "./HashedObject";
-import { HashedSet } from './HashedSet';
-import { Identity } from 'data/identity/Identity';
-import { Store } from 'data/storage/Store';
+import { HashedObject } from './HashedObject';
+import { MutationOp } from './MutationOp';
 import { RNGImpl } from 'crypto/random';
+
 
 
 // concepts: - mutable object
@@ -77,33 +76,54 @@ it could be nice if this terminal object could be an operation itself, maybe? ag
 
 // 
 
-type MutationOp = { };
-
 const BITS_FOR_ID = 128;
 
 abstract class MutableObject extends HashedObject {
 
-
-    id         : string;
-    pendingOps : Array<MutationOp>;
+    id          : string;
+    _unsavedOps : Array<MutationOp>;
+    
+    //_currentOps      : Set<HashedObject>;
 
     constructor() {
         super();
 
         //TODO: use b64 here
         this.id   = new RNGImpl().randomHexString(BITS_FOR_ID);
-        this.pendingOps = [];
+        this._unsavedOps = [];
+        //this._lastOps      = new Set();
+        //this._followingOps = new Set();
     }
 
-    abstract validateOp(op: MutationOp): void;
-    abstract applyOp(op: MutationOp): void;
+    abstract validate(op: MutationOp): boolean;
+    abstract mutate(op: MutationOp): void;
 
     setId(id: string) {
         this.id = id;
     }
 
-    enqueueOp(op: MutationOp) : void {
-        this.pendingOps.push(op);
+    apply(op: MutationOp) : void {
+
+
+        if (!this.validate(op)) {
+            throw new Error ('Invalid op ' + op.hash() + 'attempted for ' + this.hash());
+        } else {
+            this.mutate(op);
+            this._unsavedOps.push(op);
+        }
+    }
+
+    getUnsavedOps() {
+        return this._unsavedOps.slice(0, this._unsavedOps.length);
+    }
+
+    removeUnsavedOp(op : MutationOp) {
+
+        const idx = this._unsavedOps.indexOf(op);
+
+        if (idx >= 0) {
+            this._unsavedOps.splice(idx, 1);
+        }
     }
 
 }
