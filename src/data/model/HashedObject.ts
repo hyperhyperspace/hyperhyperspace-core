@@ -40,10 +40,10 @@ class HashedObject {
     }
 
     createReference() : HashReference {
-        return new HashReference(this.hash(), this.getClass());
+        return new HashReference(this.hash(), this.getClassName());
     }
 
-    getClass() {
+    getClassName() {
         return 'HashedObject';
     }
 
@@ -79,7 +79,7 @@ class HashedObject {
         
         let value = {
             _type: 'hashed_object', 
-            _class: this.getClass(),
+            _class: this.getClassName(),
             _fields : fields
         };
 
@@ -163,7 +163,7 @@ class HashedObject {
 
                     let hash = hashedObject.literalizeInContext(context, fieldPath);
 
-                    let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClass(), type: 'literal'};
+                    let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClassName(), type: 'literal'};
                     dependencies.add(dependency);
 
                     value = { _type: 'hashed_object_dependency', _hash: hash };

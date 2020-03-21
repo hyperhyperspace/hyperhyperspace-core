@@ -27,7 +27,7 @@ class Identity extends HashedObject {
         super.init();
     }
 
-    getClass() {
+    getClassName() {
         return Identity.className;
     }
 

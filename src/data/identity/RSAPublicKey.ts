@@ -33,7 +33,7 @@ class RSAPublicKey extends HashedObject {
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey());
     }
 
-    getClass() {
+    getClassName() {
         return RSAPublicKey.className;
     }
 

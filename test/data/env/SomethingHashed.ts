@@ -14,11 +14,34 @@ class SomethingHashed extends HashedObject {
         this.things = new HashedSet();
     }
 
-    getClass() {
+    getClassName() {
         return SomethingHashed.CLASS_NAME;
     }
 }
 
 HashedObject.registerClass(SomethingHashed.CLASS_NAME, SomethingHashed);
 
-export { SomethingHashed };
+let createHashedObjects = () => {
+    let a = new SomethingHashed();
+    let b = new SomethingHashed();
+
+    let name = 'la la la';
+    let amount = 199;
+
+    a.name = name;
+    a.amount = amount;
+
+    let name2 = 'le le le';
+    let amount2 = 3;
+
+    b.name = name2;
+    b.amount = amount2;
+
+    a.things?.add(b);
+
+    a.reference = b.createReference();
+
+    return {a: a, b: b};
+}
+
+export { SomethingHashed, createHashedObjects };

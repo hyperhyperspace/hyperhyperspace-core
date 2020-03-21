@@ -1,6 +1,6 @@
 import { HashedObject, HashedSet, Hash, Literal, Serialization } from 'data/model';
 
-import { SomethingHashed } from './env/SomethingHashed';
+import { SomethingHashed, createHashedObjects } from './env/SomethingHashed';
 
 describe('Data model', () => {
     test( 'Basic types', () => {
@@ -40,24 +40,11 @@ describe('Data model', () => {
     });
 
     test('HashedObject subclasses', () => {
-        let a = new SomethingHashed();
-        let b = new SomethingHashed();
 
-        let name = 'la la la';
-        let amount = 199;
 
-        a.name = name;
-        a.amount = amount;
+        let os = createHashedObjects();
 
-        let name2 = 'le le le';
-        let amount2 = 3;
-
-        b.name = name2;
-        b.amount = amount2;
-
-        a.things?.add(b);
-
-        a.reference = b.createReference();
+        let a: SomethingHashed = os.a;
 
         let a_literal = a.toLiteralContext();
 
