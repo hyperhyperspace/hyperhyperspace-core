@@ -72,10 +72,6 @@ it could be nice if this terminal object could be an operation itself, maybe? ag
 
 */
 
-
-
-// 
-
 const BITS_FOR_ID = 128;
 
 abstract class MutableObject extends HashedObject {
