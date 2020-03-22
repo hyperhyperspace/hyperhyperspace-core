@@ -118,7 +118,7 @@ class HashedObject {
         }
     }
 
-    static literalizeField(fieldPath: string, something: any, context: Context) : { value: any, dependencies : Set<Dependency> }  {
+    static literalizeField(fieldPath: string, something: any, context?: Context) : { value: any, dependencies : Set<Dependency> }  {
 
         let typ = typeof(something);
 
@@ -160,6 +160,10 @@ class HashedObject {
                     value = { _type: 'hashed_object_reference', _hash: reference.hash, _class: reference.className};
                 } else if (something instanceof HashedObject) {
                     let hashedObject = something as HashedObject;
+
+                    if (context === undefined) {
+                        throw new Error('Context needed to deliteralize HashedObject');
+                    }
 
                     let hash = hashedObject.literalizeInContext(context, fieldPath);
 

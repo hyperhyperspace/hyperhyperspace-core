@@ -82,8 +82,6 @@ abstract class MutableObject extends HashedObject {
 
     id          : string;
     _unsavedOps : Array<MutationOp>;
-    
-    //_currentOps      : Set<HashedObject>;
 
     constructor() {
         super();
@@ -91,8 +89,6 @@ abstract class MutableObject extends HashedObject {
         //TODO: use b64 here
         this.id   = new RNGImpl().randomHexString(BITS_FOR_ID);
         this._unsavedOps = [];
-        //this._lastOps      = new Set();
-        //this._followingOps = new Set();
     }
 
     abstract validate(op: MutationOp): boolean;
@@ -104,7 +100,6 @@ abstract class MutableObject extends HashedObject {
 
     apply(op: MutationOp) : void {
 
-
         if (!this.validate(op)) {
             throw new Error ('Invalid op ' + op.hash() + 'attempted for ' + this.hash());
         } else {
@@ -113,17 +108,16 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    getUnsavedOps() {
-        return this._unsavedOps.slice(0, this._unsavedOps.length);
+    takeNextOpToSave() {
+        if (this._unsavedOps.length > 0) {
+            return this._unsavedOps.shift();
+        } else {
+            return undefined;
+        }
     }
 
-    removeUnsavedOp(op : MutationOp) {
-
-        const idx = this._unsavedOps.indexOf(op);
-
-        if (idx >= 0) {
-            this._unsavedOps.splice(idx, 1);
-        }
+    returnNextOpToSave(op: MutationOp) {
+        this._unsavedOps.unshift(op);
     }
 
 }

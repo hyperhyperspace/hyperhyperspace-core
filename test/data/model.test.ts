@@ -27,11 +27,8 @@ describe('Data model', () => {
             set2.add(element);
         }
 
-        const context1 = { objects : new Map<Hash, HashedObject>(), literals: new Map<Hash, Literal>() }
-        const context2 = { objects : new Map<Hash, HashedObject>(), literals: new Map<Hash, Literal>() }
-
-        const literal1 = HashedObject.literalizeField('set1', set1, context1);
-        const literal2 = HashedObject.literalizeField('set2', set2, context2);
+        const literal1 = HashedObject.literalizeField('set1', set1);
+        const literal2 = HashedObject.literalizeField('set2', set2);
 
         expect(Serialization.default(literal1.value)).toEqual(Serialization.default(literal2.value));
         

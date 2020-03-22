@@ -34,12 +34,19 @@ class Store {
     }
 
     private async saveOperations(mutable: MutableObject) : Promise<void> {
-            let pendingOps = mutable.getUnsavedOps();
 
-            for (const op of pendingOps) {
+
+        let op = mutable.takeNextOpToSave();
+        
+        while (op !== undefined) {
+            try {
                 await this.save(op);
-                mutable.removeUnsavedOp(op);
+            } catch (e) {
+                mutable.returnNextOpToSave(op);
+                throw e;
             }
+            op = mutable.takeNextOpToSave();
+        }
     }
 
     private async saveWithContext(hash: Hash, context: Context) : Promise<void> {
@@ -67,7 +74,7 @@ class Store {
         
         await this.backend.store(packed);
     }
-
+    
     /*async pack(object: HashedObject) {
         let packed = await this.packLiteral(object.toLiteral());
 
@@ -93,20 +100,25 @@ class Store {
     }
 
     async load(hash: Hash) : Promise<HashedObject | undefined> {
-        return this.loadLiteral(hash).then(async (loaded : Literal | undefined) => {
-            if (loaded === undefined) {
-                return undefined;
-            } else {
 
-                let context : Context = { objects: new Map<Hash, HashedObject>(),
-                                          literals: new Map<Hash, Literal>() };
+        let context : Context = { objects: new Map<Hash, HashedObject>(),
+            literals: new Map<Hash, Literal>() };
 
-                return this.loadFromLiteral(loaded, context);
-            }
-        });
+        return this.loadWithContext(hash, context);
     }
 
-    async loadFromLiteral(literal: Literal, context: Context) : Promise<HashedObject> {
+    private async loadWithContext(hash: Hash, context: Context) : Promise<HashedObject | undefined> {
+
+        let literal = await this.loadLiteral(hash);
+
+        if (literal === undefined) {
+            return undefined;
+        }
+
+        return this.loadLiteralWithContext(literal, context);
+    }
+
+    private async loadLiteralWithContext(literal: Literal, context: Context) : Promise<HashedObject> {
 
         context.literals.set(literal.hash, literal);
 
@@ -178,7 +190,7 @@ class Store {
         
         for (let packed of searchResults.items) {
 
-            let obj = await this.loadFromLiteral(this.unpackLiteral(packed), context);
+            let obj = await this.loadLiteralWithContext(this.unpackLiteral(packed), context);
             objects.push(obj);
         }
 
