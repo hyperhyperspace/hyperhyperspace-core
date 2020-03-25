@@ -32,7 +32,7 @@ class HashedObject {
     }
 
     getAuthors() {
-        return this.authors.elements();
+        return this.authors;
     }
 
     hash() {
