@@ -1,8 +1,5 @@
 import { HashedObject } from './HashedObject';
 import { MutationOp } from './MutationOp';
-import { RNGImpl } from 'crypto/random';
-
-
 
 // concepts: - mutable object
 //           - mutation operation
@@ -72,27 +69,19 @@ it could be nice if this terminal object could be an operation itself, maybe? ag
 
 */
 
-const BITS_FOR_ID = 128;
-
 abstract class MutableObject extends HashedObject {
 
-    id          : string;
     _unsavedOps : Array<MutationOp>;
 
     constructor() {
         super();
 
         //TODO: use b64 here
-        this.id   = new RNGImpl().randomHexString(BITS_FOR_ID);
         this._unsavedOps = [];
     }
 
     abstract validate(op: MutationOp): boolean;
     abstract mutate(op: MutationOp): void;
-
-    setId(id: string) {
-        this.id = id;
-    }
 
     apply(op: MutationOp) : void {
 

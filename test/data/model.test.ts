@@ -1,6 +1,7 @@
 import { HashedObject, HashedSet, Hash, Literal, Serialization } from 'data/model';
 
 import { SomethingHashed, createHashedObjects } from './env/SomethingHashed';
+import { OverrideIds } from './env/OverrideIds';
 
 describe('Data model', () => {
     test( 'Basic types', () => {
@@ -50,5 +51,16 @@ describe('Data model', () => {
         a.reference = undefined;
 
         expect(a.equals(a2)).toBeFalsy();
+    });
+
+    test('Id override', () => {
+
+        let a = new OverrideIds('hello, world!', true);
+        let b = new OverrideIds('hello, world!', true);
+        let c = new OverrideIds('hello, world!', false);
+
+        expect(a.equals(b)).toBeTruthy();
+        expect(a.equals(c)).toBeFalsy();
+
     });
 });

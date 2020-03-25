@@ -3,12 +3,16 @@ import { HashedSet } from './HashedSet';
 import { Identity } from 'data/identity/Identity';
 import { HashReference } from './HashReference';
 import { __spreadArrays } from 'tslib';
+import { RNGImpl } from 'crypto/random';
+import { HashNamespace } from './HashNamespace';
 
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
 type Context = { objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal> };
 type LiteralContext = { hash: Hash, context: Context };
+
+const BITS_FOR_ID = 128;
 
 class HashedObject {
 
@@ -17,6 +21,7 @@ class HashedObject {
         this.knownClasses.set(name, clazz);
     }
 
+    private id?     : string;
     private authors : HashedSet<Identity>;
 
     constructor() {
@@ -27,12 +32,45 @@ class HashedObject {
         
     }
 
+    getId() : (string | undefined) {
+        return this.id;
+    }
+
+    setId(id: string) {
+        this.id = id;
+    }
+
+    setRandomId() {
+        this.id = new RNGImpl().randomHexString(BITS_FOR_ID);
+    }
+
     addAuthor(author: Identity) {
         this.authors.add(author);
     }
 
     getAuthors() {
         return this.authors;
+    }
+
+    overrideChildrenId() : void {
+        for (const fieldName of Object.keys(this)) {
+            if (fieldName.length > 0 && fieldName[0] !== '_') {
+                let value = (this as any)[fieldName];
+                if (value instanceof HashedObject) {
+                    this.overrideIdForPath(fieldName, value);
+                }
+            }
+        }
+    }
+
+    overrideIdForPath(path: string, target: HashedObject) : void {
+        let parentId = this.getId();
+
+        if (parentId === undefined) {
+            throw new Error("Can't override a child's Id because parent's Id is unset");
+        }
+
+        target.setId(HashNamespace.generateIdForPath(parentId, path));
     }
 
     hash() {
