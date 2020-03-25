@@ -99,6 +99,15 @@ class HashedObject {
         return this.hash() === another.hash();
     }
 
+    clone() : this {
+        let lc = this.toLiteralContext();
+        lc.context.objects = new Map<Hash, HashedObject>();
+
+        let clone = HashedObject.fromLiteralContext(lc) as this;
+
+        return clone;
+    }
+
     static shouldLiteralizeField(something: any) {
 
         if (something === null) {

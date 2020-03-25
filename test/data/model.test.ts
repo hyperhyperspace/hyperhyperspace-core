@@ -43,11 +43,7 @@ describe('Data model', () => {
 
         let a: SomethingHashed = os.a;
 
-        let a_literal = a.toLiteralContext();
-
-        a_literal.context.objects = new Map<Hash, HashedObject>();
-
-        let a2 = HashedObject.fromLiteralContext(a_literal);
+        let a2 = a.clone();
 
         expect(a.equals(a2)).toBeTruthy();
 
