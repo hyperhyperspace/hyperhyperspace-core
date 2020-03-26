@@ -80,6 +80,8 @@ abstract class MutableObject extends HashedObject {
         this._unsavedOps = [];
     }
 
+    abstract currentState(): HashedObject;
+
     abstract validate(op: MutationOp): boolean;
     abstract mutate(op: MutationOp): void;
 
