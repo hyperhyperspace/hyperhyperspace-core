@@ -3,6 +3,11 @@ import { MutationOp } from 'data/model/MutationOp';
 
 
 class HasId extends MutableObject {
+
+    currentState(): HashedObject {
+        throw new Error("Method not implemented.");
+    }
+    
     constructor() {
         super();
         this.setRandomId();

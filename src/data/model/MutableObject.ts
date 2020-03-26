@@ -75,8 +75,7 @@ abstract class MutableObject extends HashedObject {
 
     constructor() {
         super();
-
-        //TODO: use b64 here
+        
         this._unsavedOps = [];
     }
 

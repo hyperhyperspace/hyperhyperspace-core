@@ -1,7 +1,7 @@
 import { Store, IdbBackend } from 'data/storage';
 import { HashedObject } from 'data/model';
 
-import { SomethingHashed, createHashedObjects } from './env/SomethingHashed';
+import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
 
 
 describe('Storage', () => {

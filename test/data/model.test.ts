@@ -1,7 +1,7 @@
 import { HashedObject, HashedSet, Hash, Literal, Serialization } from 'data/model';
 
-import { SomethingHashed, createHashedObjects } from './env/SomethingHashed';
-import { OverrideIds } from './env/OverrideIds';
+import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
+import { OverrideIds } from './types/OverrideIds';
 
 describe('Data model', () => {
     test( 'Basic types', () => {
