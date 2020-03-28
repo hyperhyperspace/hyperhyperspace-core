@@ -52,7 +52,7 @@ describe('Identity', () => {
 
         let info = { type: 'person', name: 'Eric', last: 'Hobsbawm'};
 
-        let id = Identity.create(info, keyPair);
+        let id = Identity.fromKeyPair(info, keyPair);
 
         let literal1 = id.toLiteralContext();
 

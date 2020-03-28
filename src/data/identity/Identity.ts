@@ -7,11 +7,15 @@ class Identity extends HashedObject {
 
     static className = 'hss/Identity';
 
-    static create(info: object, keyPair: RSAKeyPair) : Identity {
+    static fromKeyPair(info: object, keyPair: RSAKeyPair) : Identity {
+        return Identity.fromPublicKey(info, keyPair.makePublicKey());
+    }
+
+    static fromPublicKey(info: object, publicKey: RSAPublicKey) {
         let id = new Identity();
 
         id.info = info;
-        id.publicKey = keyPair.makePublicKey();
+        id.publicKey = publicKey;
         
         return id;
     }
