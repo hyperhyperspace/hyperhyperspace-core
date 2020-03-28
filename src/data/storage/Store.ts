@@ -3,6 +3,7 @@ import { HashedObject, MutableObject, Literal, Dependency, Context, LiteralCont
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Identity } from 'data/identity/Identity';
+import { MutationOp } from 'data/model/MutationOp';
 
 
 type PackedLiteral = { hash : Hash, value: any, signatures : Array<[Hash, string]>,
@@ -72,7 +73,14 @@ class Store {
 
         let packed = await this.packLiteral(literal, context);
         
-        await this.backend.store(packed);
+        let prevOps = undefined;
+        let obj = context.objects.get(hash);
+        if (obj instanceof MutationOp) {
+            prevOps = Array.from((obj as MutationOp).getPrevOps()).map((op:MutationOp) => op.hash());
+        }
+
+
+        await this.backend.store(packed, prevOps);
     }
     
     /*async pack(object: HashedObject) {
@@ -195,6 +203,18 @@ class Store {
         }
 
         return {objects: objects, start: searchResults.start, end: searchResults.end};    
+    }
+
+    async loadTerminalOps(hash: Hash) : Promise<Array<MutationOp>> {
+        let terminalOpHashes = await this.backend.loadTerminalOps(hash);
+        let terminalOps : Array<MutationOp> = [];
+
+        for (const opHash of terminalOpHashes) {
+            let op = await this.load(opHash)
+            terminalOps.push(op as MutationOp);
+        }
+
+        return terminalOps;
     }
 }
 

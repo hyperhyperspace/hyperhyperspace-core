@@ -12,9 +12,15 @@ type IdbStorageFormat = {
     timestamp: string
 }
 
+type IdbTerminalOpsFormat = {
+    mutableHash: Hash,
+    terminalOpHashes: Array<Hash>
+}
+
 class IdbBackend implements Backend {
 
     static readonly OBJ_STORE = 'object_store';
+    static readonly TERMINAL_OPS_STORE = 'terminal_ops_store';
 
     static readonly CLASS_IDX_KEY = 'class';
     static readonly CLASS_TIMESTAMP_IDX_KEY = 'class_timestamp';
@@ -38,6 +44,8 @@ class IdbBackend implements Backend {
 
                 objectStore.createIndex(IdbBackend.REFERENCES_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCES_IDX_KEY, {multiEntry: true});
                 objectStore.createIndex(IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY, {multiEntry: true});
+            
+                db.createObjectStore(IdbBackend.TERMINAL_OPS_STORE, {keyPath: 'mutableHash'});
             },
             blocked() {
               // …
@@ -51,7 +59,7 @@ class IdbBackend implements Backend {
         });
     }
 
-    async store(packed: PackedLiteral): Promise<void> {
+    async store(packed: PackedLiteral, prevOps?: Array<Hash>): Promise<void> {
 
         let idb = await this.idbPromise;
 
@@ -76,15 +84,59 @@ class IdbBackend implements Backend {
         //console.log('about to store:');
         //console.log(storable);
 
-        return idb.put(IdbBackend.OBJ_STORE, storable).then((_key : IDBValidKey) => { });
+        if (prevOps === undefined) {
+            return idb.put(IdbBackend.OBJ_STORE, storable).then((_key : IDBValidKey) => { });
+        } else {
+            let tx = idb.transaction([IdbBackend.OBJ_STORE, IdbBackend.TERMINAL_OPS_STORE]);
+
+
+            return tx.objectStore(IdbBackend.TERMINAL_OPS_STORE).get(storable.packed.hash)
+                     .then(async (terminalOps : (IdbTerminalOpsFormat | undefined)) => {
+
+                if (terminalOps === undefined) {
+                    terminalOps = { mutableHash: storable.packed.hash, terminalOpHashes: []};
+                }
+                for (const hash of prevOps) {
+                    let idx = terminalOps.terminalOpHashes.indexOf(hash);
+                    if (idx >= 0) {
+                        delete terminalOps.terminalOpHashes[idx];
+                    }
+                }
+                if (terminalOps.terminalOpHashes.indexOf(storable.packed.hash) < 0) {
+                    terminalOps.terminalOpHashes.push(storable.packed.hash);
+                }
+
+                await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE).put(terminalOps);
+                await tx.objectStore(IdbBackend.OBJ_STORE).put(storable);
+
+                return;
+            });
+
+
+
+
+
+        }
+
+        
 
     }
     
-    async load(hash: string): Promise<PackedLiteral | undefined> {
+    async load(hash: Hash): Promise<PackedLiteral | undefined> {
 
         let idb = await this.idbPromise;
 
-        return idb.get(IdbBackend.OBJ_STORE, hash).then((storable: IdbStorageFormat | undefined) => (storable?.packed)) as Promise<PackedLiteral | undefined>;
+        return idb.get(IdbBackend.OBJ_STORE, hash)
+                  .then((storable: IdbStorageFormat | undefined) => 
+                     (storable?.packed)) as Promise<PackedLiteral | undefined>;
+    }
+
+    async loadTerminalOps(hash: Hash) : Promise<Array<Hash>> {
+        let idb = await this.idbPromise;
+
+        return idb.get(IdbBackend.TERMINAL_OPS_STORE, hash)
+                  .then((terminalOps: IdbTerminalOpsFormat | undefined) =>
+                      (terminalOps === undefined? [] : terminalOps.terminalOpHashes));
     }
 
     async searchByClass(className: string, params?: BackendSearchParams): Promise<BackendSearchResults> {

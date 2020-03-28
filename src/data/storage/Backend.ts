@@ -6,8 +6,10 @@ type BackendSearchResults = {items : Array<PackedLiteral>, start?: string, end?:
 
 interface Backend {
 
-    store(packed : PackedLiteral) : Promise<void>;
+    store(packed : PackedLiteral, prevOps?: Array<Hash>) : Promise<void>;
     load(hash: Hash) : Promise<PackedLiteral | undefined>;
+
+    loadTerminalOps(hash: Hash) : Promise<Array<Hash>>;
 
     searchByClass(className: string, params? : BackendSearchParams) : Promise<BackendSearchResults>;
     searchByReference(referringClassName: string, referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;

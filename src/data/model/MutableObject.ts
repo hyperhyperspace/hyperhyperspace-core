@@ -80,6 +80,9 @@ abstract class MutableObject extends HashedObject {
     }
 
     abstract currentState(): HashedObject;
+    
+    abstract subscribeToCurrentState(callback: ((mutable: MutableObject, state: HashedObject) => void)): void;
+    abstract unsubscribeFromCurrentState(callback: ((mutable: MutableObject, state: HashedObject) => void)): void;
 
     abstract validate(op: MutationOp): boolean;
     abstract mutate(op: MutationOp): void;
