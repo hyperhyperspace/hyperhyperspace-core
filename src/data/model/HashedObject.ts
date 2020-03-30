@@ -11,15 +11,9 @@ import { MutableObject } from './MutableObject';
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
-type ObjectContext  = { objects: Map<Hash, HashedObject> };
+type ObjectContext  = { rootHash?: Hash, objects: Map<Hash, HashedObject> };
 type LiteralContext = { rootHash?: Hash, literals: Map<Hash, Literal> };
 type Context = ObjectContext & LiteralContext;
-
-//type Context = { objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal> };
-
-
-
-//type DeliteralizationContext = { hash: Hash, context: Context };
 
 type MutableContext = Map<Hash, MutableObject>;
 
