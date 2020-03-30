@@ -18,19 +18,24 @@ class HashedSet<T> {
 
     hashedElements : Map<Hash, T>;
 
-    constructor() {
+    constructor(init?: IterableIterator<T>) {
         this.hashedElements = new Map();
+        if (init !== undefined) {
+            for (const member of init) {
+                this.add(member);
+            }
+        }
     }
 
     add(element: T) {
         this.hashedElements.set(HashedSet.hash(element), element);
     }
 
-    remove(element: T) {
+    remove(element: T) : boolean {
         return this.removeByHash(HashedSet.hash(element));
     }
 
-    removeByHash(hash: string) {
+    removeByHash(hash: Hash) : boolean {
         return this.hashedElements.delete(hash);
     }
 

@@ -5,12 +5,16 @@ import { HashReference } from './HashReference';
 import { __spreadArrays } from 'tslib';
 import { RNGImpl } from 'crypto/random';
 import { HashNamespace } from './HashNamespace';
+import { Store } from 'data/storage/Store';
+import { MutableObject } from './MutableObject';
 
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
 type Context = { objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal> };
 type LiteralContext = { hash: Hash, context: Context };
+
+type MutableContext = Map<Hash, MutableObject>;
 
 const BITS_FOR_ID = 128;
 
@@ -23,6 +27,9 @@ class HashedObject {
 
     private id?     : string;
     private authors : HashedSet<Identity>;
+
+    private _store?   : Store;
+    private _mutableContext? : MutableContext;
 
     constructor() {
         this.authors = new HashedSet<Identity>();
@@ -145,6 +152,19 @@ class HashedObject {
         let clone = HashedObject.fromLiteralContext(lc) as this;
 
         return clone;
+    }
+
+    attachTo(store: Store, mutableContext?: MutableContext) {
+        this._store = store;
+        
+        if (mutableContext === undefined) {
+            mutableContext = new Map();
+        }
+
+        this._mutableContext = mutableContext;
+
+        this._store;
+        this._mutableContext;
     }
 
     static shouldLiteralizeField(something: any) {

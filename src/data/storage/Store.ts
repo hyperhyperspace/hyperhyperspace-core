@@ -37,16 +37,16 @@ class Store {
     private async saveOperations(mutable: MutableObject) : Promise<void> {
 
 
-        let op = mutable.takeNextOpToSave();
+        let op = mutable.dequeueOpToSave();
         
         while (op !== undefined) {
             try {
                 await this.save(op);
             } catch (e) {
-                mutable.returnNextOpToSave(op);
+                mutable.requeueOpToSave(op);
                 throw e;
             }
-            op = mutable.takeNextOpToSave();
+            op = mutable.dequeueOpToSave();
         }
     }
 
@@ -110,7 +110,7 @@ class Store {
     async load(hash: Hash) : Promise<HashedObject | undefined> {
 
         let context : Context = { objects: new Map<Hash, HashedObject>(),
-            literals: new Map<Hash, Literal>() };
+                                  literals: new Map<Hash, Literal>() };
 
         return this.loadWithContext(hash, context);
     }
@@ -134,7 +134,8 @@ class Store {
             if (dependency.type === 'literal') {
                 if (context.literals.get(dependency.hash) === undefined) {
                     let depLiteral = await this.loadLiteral(dependency.hash);
-                    context.literals.set(dependency.hash, depLiteral as Literal);
+                    this.loadLiteralWithContext(depLiteral as Literal, context);
+                    //context.literals.set(dependency.hash, depLiteral as Literal);
                 }
             }
         }

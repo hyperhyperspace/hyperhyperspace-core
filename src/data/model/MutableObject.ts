@@ -1,5 +1,6 @@
 import { HashedObject } from './HashedObject';
 import { MutationOp } from './MutationOp';
+import { Hash } from './Hashing';
 
 // concepts: - mutable object
 //           - mutation operation
@@ -69,6 +70,8 @@ it could be nice if this terminal object could be an operation itself, maybe? ag
 
 */
 
+type StateCallback = (mutable: Hash, state: HashedObject) => void;
+
 abstract class MutableObject extends HashedObject {
 
     _unsavedOps : Array<MutationOp>;
@@ -81,8 +84,8 @@ abstract class MutableObject extends HashedObject {
 
     abstract currentState(): HashedObject;
     
-    abstract subscribeToCurrentState(callback: ((mutable: MutableObject, state: HashedObject) => void)): void;
-    abstract unsubscribeFromCurrentState(callback: ((mutable: MutableObject, state: HashedObject) => void)): void;
+    abstract subscribeToCurrentState(callback: StateCallback): void;
+    abstract unsubscribeFromCurrentState(callback: StateCallback): boolean;
 
     abstract validate(op: MutationOp): boolean;
     abstract mutate(op: MutationOp): void;
@@ -93,11 +96,12 @@ abstract class MutableObject extends HashedObject {
             throw new Error ('Invalid op ' + op.hash() + 'attempted for ' + this.hash());
         } else {
             this.mutate(op);
-            this._unsavedOps.push(op);
+            //TODO: if this op was read from our storage, don't enqueue it.
+            this.enqueueOpToSave(op);
         }
     }
 
-    takeNextOpToSave() {
+    dequeueOpToSave() : MutationOp | undefined {
         if (this._unsavedOps.length > 0) {
             return this._unsavedOps.shift();
         } else {
@@ -105,10 +109,14 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    returnNextOpToSave(op: MutationOp) {
+    requeueOpToSave(op: MutationOp) : void {
         this._unsavedOps.unshift(op);
+    }
+
+    protected enqueueOpToSave(op: MutationOp) : void {
+        this._unsavedOps.push(op);
     }
 
 }
 
-export { MutableObject }
+export { MutableObject, StateCallback }
