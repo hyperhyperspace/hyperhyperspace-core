@@ -11,8 +11,15 @@ import { MutableObject } from './MutableObject';
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
-type Context = { objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal> };
-type LiteralContext = { hash: Hash, context: Context };
+type ObjectContext  = { objects: Map<Hash, HashedObject> };
+type LiteralContext = { rootHash?: Hash, literals: Map<Hash, Literal> };
+type Context = ObjectContext & LiteralContext;
+
+//type Context = { objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal> };
+
+
+
+//type DeliteralizationContext = { hash: Hash, context: Context };
 
 type MutableContext = Map<Hash, MutableObject>;
 
@@ -82,7 +89,7 @@ class HashedObject {
     }
 
     hash() {
-        return this.toLiteralContext().hash;
+        return this.toLiteralContext().rootHash as Hash;
     }
 
     createReference() : HashReference {
@@ -93,16 +100,17 @@ class HashedObject {
         return 'HashedObject';
     }
 
-    toLiteralContext() : LiteralContext {
+    toLiteralContext() : LiteralContext /*DeliteralizationContext*/ {
 
-         let context = { objects: new Map(), literals: new Map() } as Context
+        let literalContext: LiteralContext = { literals: new Map() };
+        //let context = { objects: new Map(), literals: new Map() } as Context
 
-         let hash = this.literalizeInContext(context, '');
+        literalContext.rootHash = this.literalizeInContext(literalContext, '');
 
-         return {hash: hash, context: context };
+        return literalContext;
     }
 
-    literalizeInContext(context: Context, path: string) : Hash {
+    literalizeInContext(context: LiteralContext, path: string) : Hash {
         
         let fields = {} as any;
         let dependencies = new Set<Dependency>();
@@ -135,7 +143,7 @@ class HashedObject {
 
         let literal: Literal = { hash: hash, value: value, authors: authors , dependencies: dependencies };
 
-        context.objects.set(hash, this);
+        //context.objects.set(hash, this);
         context.literals.set(hash, literal);
 
         return hash;
@@ -147,7 +155,7 @@ class HashedObject {
 
     clone() : this {
         let lc = this.toLiteralContext();
-        lc.context.objects = new Map<Hash, HashedObject>();
+        //lc.context.objects = new Map<Hash, HashedObject>();
 
         let clone = HashedObject.fromLiteralContext(lc) as this;
 
@@ -186,7 +194,7 @@ class HashedObject {
         }
     }
 
-    static literalizeField(fieldPath: string, something: any, context?: Context) : { value: any, dependencies : Set<Dependency> }  {
+    static literalizeField(fieldPath: string, something: any, context?: LiteralContext) : { value: any, dependencies : Set<Dependency> }  {
 
         let typ = typeof(something);
 
@@ -262,18 +270,34 @@ class HashedObject {
     }
 
 
-    static fromLiteralContext(literalContext: LiteralContext ) : HashedObject {
-        let context = literalContext.context;
+    static fromLiteralContext(literalContext: LiteralContext /*DeliteralizationContext*/ ) : HashedObject {
+        let context = { rootHash: literalContext.rootHash, 
+                        literals: literalContext.literals, 
+                        objects:  new Map()};
 
-        let literal = context.literals.get(literalContext.hash);
-        
-        if (literal === undefined) {
-            throw new Error('Literal with hash ' + literalContext.hash + ' is missing from deliteralization context');
+        return HashedObject.fromContext(context);
+    }
+
+    static fromContext(context: Context) : HashedObject {
+
+        if (context.rootHash === undefined) {
+            throw new Error('Asked to retrieve object from context but context.rootHash is missing');
         }
 
-        HashedObject.deliteralizeInContext(literal, context);
+        let obj = context.objects.get(context.rootHash);
 
-        return context.objects.get(literalContext.hash) as HashedObject;
+        if (obj === undefined) {
+            let literal = context.literals.get(context.rootHash);
+            if (literal === undefined) {
+                throw new Error('Literal with hash ' + context.rootHash + ' is missing from deliteralization context');
+            }
+
+            HashedObject.deliteralizeInContext(literal, context);
+
+            obj = context.objects.get(context.rootHash) as HashedObject;
+        }
+
+        return obj;
     }
 
     static deliteralizeInContext(literal: Literal, context: Context) : void {
@@ -477,4 +501,4 @@ class HashedObject {
 
 HashedObject.registerClass('HashedObject', HashedObject);
 
-export { HashedObject, Literal, Dependency, LiteralContext, Context };
+export { HashedObject, Literal, Dependency, Context, LiteralContext, ObjectContext };

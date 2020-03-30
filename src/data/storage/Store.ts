@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, MutableObject, Literal, Dependency, Context, LiteralContext } from 'data/model.ts';
+import { HashedObject, MutableObject, Literal, Dependency, Context } from 'data/model.ts';
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Identity } from 'data/identity/Identity';
@@ -22,8 +22,8 @@ class Store {
     async save(object: HashedObject) : Promise<void>{
 
         let literalContext = object.toLiteralContext();
-        let hash    = literalContext.hash;
-        let context = literalContext.context;
+        let hash    = literalContext.rootHash as Hash;
+        let context = { rootHash: hash, literals: literalContext.literals, objects: new Map() };
 
         let saving = this.saveWithContext(hash, context);
 
@@ -134,16 +134,17 @@ class Store {
             if (dependency.type === 'literal') {
                 if (context.literals.get(dependency.hash) === undefined) {
                     let depLiteral = await this.loadLiteral(dependency.hash);
-                    this.loadLiteralWithContext(depLiteral as Literal, context);
-                    //context.literals.set(dependency.hash, depLiteral as Literal);
+                    
+                    // NO NEED to this.loadLiteralWithContext(depLiteral as Literal, context)
+                    // because all transitive deps are in object deps.
+                    context.literals.set(dependency.hash, depLiteral as Literal);
                 }
             }
         }
 
-        let lc: LiteralContext = { hash: literal.hash, context: context };
-                                    
+        let newContext = { rootHash: literal.hash, objects: context.objects, literals: context.literals };
 
-        return HashedObject.fromLiteralContext(lc);
+        return HashedObject.fromContext(newContext);
     }
 
     async loadByClass(className: string, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
