@@ -1,5 +1,5 @@
 import { ReversibleObject } from 'data/model/ReversibleObject';
-import { TerminalOpSet } from 'data/model/state/TerminalOpSet'; 
+import { TerminalOpState } from 'data/model/state/TerminalOpState'; 
 import { HashedObject } from 'data/model/HashedObject';
 import { Identity } from 'data/identity/Identity';
 import { StateCallback } from 'data/model/MutableObject';
@@ -13,14 +13,19 @@ import { UndoOp } from 'data/model/UndoOp';
 // of its usage.
 
 class RoleSet extends ReversibleObject {
-
-    _state: TerminalOpSet;
+    
     owner?: Identity;
+
+    _state: TerminalOpState;
 
     constructor(owner: Identity) {
         super();
         this.owner = owner;
-        this._state = TerminalOpSet.initialState(this);
+        this._state = TerminalOpState.initialState(this);
+    }
+
+    loadState(): Promise<void> {
+        throw new Error("Method not implemented.");
     }
 
     currentState(): HashedObject {
@@ -28,18 +33,18 @@ class RoleSet extends ReversibleObject {
     }
 
     subscribeToCurrentState(callback: StateCallback): void {
-        this._state.subscribeToCurrentState(callback);
+        this._state.watchCurrentState(callback);
     }
 
     unsubscribeFromCurrentState(callback: StateCallback): boolean {
-        return this._state.unsubscribeFromCurrentState(callback);
+        return this._state.removeCurrentStateWatch(callback);
     }
 
-    validate(op: import("../model/MutationOp").MutationOp): boolean {
+    async validate(op: import("../model/MutationOp").MutationOp): Promise<boolean> {
         throw new Error("Method not implemented.");
     }
 
-    mutate(op: MutationOp): void {
+    async mutate(op: MutationOp): Promise<boolean> {
         throw new Error("Method not implemented.");
     }
 

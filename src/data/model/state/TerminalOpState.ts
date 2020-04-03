@@ -5,7 +5,7 @@ import { HashReference } from '../HashReference';
 import { MutableObject, StateCallback } from '../MutableObject';
 
 
-class TerminalOpSet extends HashedObject {
+class TerminalOpState extends HashedObject {
 
     mutable?: HashReference;
     terminalOps?: HashedSet<MutationOp>;
@@ -24,11 +24,11 @@ class TerminalOpSet extends HashedObject {
         this._callbacks = new Set();
     }
 
-    static initialState(mutable: MutableObject) : TerminalOpSet {
-        return new TerminalOpSet(mutable, new HashedSet());
+    static initialState(mutable: MutableObject) : TerminalOpState {
+        return new TerminalOpState(mutable, new HashedSet());
     }
 
-    addOp(op: MutationOp) {
+    updateState(op: MutationOp) {
 
         let changed = false;
 
@@ -51,14 +51,14 @@ class TerminalOpSet extends HashedObject {
        return this.clone();
     }
 
-    subscribeToCurrentState(callback: StateCallback): void {
+    watchCurrentState(callback: StateCallback): void {
         this._callbacks.add(callback);
     }
 
-    unsubscribeFromCurrentState(callback: StateCallback): boolean {
+    removeCurrentStateWatch(callback: StateCallback): boolean {
         return this._callbacks.delete(callback);
     }
 
 }
 
-export { TerminalOpSet };
+export { TerminalOpState };

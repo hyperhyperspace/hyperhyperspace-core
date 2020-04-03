@@ -1,26 +1,27 @@
 import { Hash } from '../Hashing';
 import { MutableObject, StateCallback } from '../MutableObject';
 
-class CurrentState {
+class SharedState {
 
-    private mutables : Map<Hash, MutableObject>;
+    private mutables   : Map<Hash, MutableObject>;
 
-    // callbacks used to monitor the CurrentState mutables
+    // callback used to monitor the mutables currently in this SharedState,
+    // passed to every mutable in the map above.
     private mutableStateCallback : StateCallback;
     
-    // callbacks to be called upon state changes
-    private currentStateCallbacks : Set<StateCallback>;
+    // callbacks to be called when any of the mutables above informs a state change.
+    private sharedStateCallbacks : Set<StateCallback>;
 
     constructor() {
         this.mutables = new Map();
 
         this.mutableStateCallback = (hash: Hash) => {
-            for (const callback of this.currentStateCallbacks) {
+            for (const callback of this.sharedStateCallbacks) {
                 callback(hash);
             }
         };
 
-        this.currentStateCallbacks = new Set();
+        this.sharedStateCallbacks = new Set();
     }
 
     add(mutable: MutableObject) : void {
@@ -48,8 +49,12 @@ class CurrentState {
     }
 
     watchState(callback: StateCallback) {
-        this.currentStateCallbacks.add(callback);
+        this.sharedStateCallbacks.add(callback);
+    }
+
+    removeStateWatch(callback: StateCallback) : boolean {
+        return this.sharedStateCallbacks.delete(callback);
     }
 }
 
-export { CurrentState }
+export { SharedState }

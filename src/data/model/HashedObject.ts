@@ -6,7 +6,7 @@ import { __spreadArrays } from 'tslib';
 import { RNGImpl } from 'crypto/random';
 import { HashNamespace } from './HashNamespace';
 import { Store } from 'data/storage/Store';
-import { CurrentState } from './state/CurrentState';
+import { SharedState } from './state/SharedState';
 
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
@@ -37,7 +37,7 @@ class HashedObject {
 
     private   _store?        : Store;
     private   _storedHash?   : Hash;
-    protected _currentState? : CurrentState;
+    protected _sharedState? : SharedState;
 
 
     constructor() {
@@ -193,8 +193,16 @@ class HashedObject {
         return clone;
     }
 
+    setSharedState(sharedState: SharedState) : void {
+        this._sharedState = sharedState;
+    }
+
+    getSharedState() : SharedState | undefined {
+        return this._sharedState;
+    }
+
     initSharedState() {
-        this._currentState = new CurrentState();
+        this._sharedState = new SharedState();
     }
 
     static shouldLiteralizeField(something: any) {

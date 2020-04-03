@@ -1,2 +1,2 @@
-export { CurrentState } from './state/CurrentState';
-export { TerminalOpSet } from './state/TerminalOpSet';
+export { SharedState } from './state/SharedState';
+export { TerminalOpState } from './state/TerminalOpState';

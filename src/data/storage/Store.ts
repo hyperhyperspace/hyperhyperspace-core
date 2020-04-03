@@ -3,7 +3,7 @@ import { HashedObject, MutableObject, Literal, Dependency, Context } from 'data
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Identity } from 'data/identity/Identity';
-import { CurrentState } from 'data/model/state';
+import { SharedState } from 'data/model/state';
 
 import { MultiMap } from 'util/multimap';
 
@@ -180,12 +180,20 @@ class Store {
         return this.loadWithContext(hash, context);
     }
 
-    async loadWithCurrentState(hash: Hash, currentState: CurrentState) : Promise<HashedObject | undefined> {
+    async loadWithSharedState(hash: Hash, sharedState: SharedState) : Promise<HashedObject | undefined> {
         
-        let context : Context = { objects: currentState.getAll(),
+        let context : Context = { objects: sharedState.getAll(),
                                   literals: new Map<Hash, Literal>() };
 
-        return this.loadWithContext(hash, context);
+        let loadedObject = this.loadWithContext(hash, context);
+
+        for (const object of context.objects.values()) {
+            if (object.getSharedState() === undefined) {
+                object.setSharedState(sharedState);
+            }
+        }
+
+        return loadedObject;
     }
 
     private async loadWithContext(hash: Hash, context: Context) : Promise<HashedObject | undefined> {

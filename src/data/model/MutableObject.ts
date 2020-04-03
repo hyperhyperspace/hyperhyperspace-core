@@ -27,12 +27,21 @@ abstract class MutableObject extends HashedObject {
         };
     }
 
+    abstract async loadState() : Promise<void>;
     abstract currentState(): HashedObject;
     abstract async validate(op: MutationOp): Promise<boolean>;
     abstract async mutate(op: MutationOp): Promise<boolean>;
 
     async applyOpFromStore(hash: Hash) {
-        let op = await this.getStore().load(hash) as MutationOp;
+        let op: MutationOp;
+        let state = this.getSharedState();
+
+        if (state === undefined) {
+            op = await this.getStore().load(hash) as MutationOp;
+        } else {
+            op = await this.getStore().loadWithSharedState(hash, state) as MutationOp;
+        }
+        
         await this.applyOp(op);
     }
 
