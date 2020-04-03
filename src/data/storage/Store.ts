@@ -3,11 +3,14 @@ import { HashedObject, MutableObject, Literal, Dependency, Context } from 'data
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Identity } from 'data/identity/Identity';
-import { MutationOp } from 'data/model/MutationOp';
+import { CurrentState } from 'data/model/state';
+
+import { MultiMap } from 'util/multimap';
 
 
+type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 type PackedLiteral = { hash : Hash, value: any, signatures : Array<[Hash, string]>,
-                       dependencies: Array<Dependency> };
+                       dependencies: Array<Dependency>, flags: Array<PackedFlag> };
 
 type LoadParams = BackendSearchParams;
 
@@ -15,8 +18,16 @@ class Store {
 
     private backend : Backend;
 
+    private classCallbacks : MultiMap<string, (match: Hash) => void>;
+    private referencesCallbacks : MultiMap<string, (match: Hash) => void>;
+    private classReferencesCallbacks : MultiMap<string, (match: Hash) => void>;
+
     constructor(backend : Backend) {
         this.backend = backend;
+
+        this.classCallbacks = new MultiMap();
+        this.referencesCallbacks = new MultiMap();
+        this.classReferencesCallbacks = new MultiMap();
     }
 
     async save(object: HashedObject) : Promise<void>{
@@ -25,13 +36,13 @@ class Store {
         let hash    = literalContext.rootHash as Hash;
         let context = { rootHash: hash, literals: literalContext.literals, objects: new Map() };
 
-        let saving = this.saveWithContext(hash, context);
+        await this.saveWithContext(hash, context);
+
+        object.setStore(this);
 
         if (object instanceof MutableObject) {
-            saving = saving.then(() => this.saveOperations(object));
+            await this.saveOperations(object);
         }
-
-        return saving;
     }
 
     private async saveOperations(mutable: MutableObject) : Promise<void> {
@@ -60,7 +71,7 @@ class Store {
         }
 
         let literal = context.literals.get(hash);
-        
+
         if (literal === undefined) {
             throw new Error('Hash ' + hash + ' is missing from context received for saving');
         }
@@ -73,16 +84,66 @@ class Store {
 
         let packed = await this.packLiteral(literal, context);
         
+        /*
         let prevOps = undefined;
         let obj = context.objects.get(hash);
         if (obj instanceof MutationOp) {
             prevOps = Array.from((obj as MutationOp).getPrevOps()).map((op:MutationOp) => op.hash());
         }
+        */
 
 
-        await this.backend.store(packed, prevOps);
+        await this.backend.store(packed);
+
+        // after the backend has stored the object, fire callbacks:
+        this.fireCallbacks(literal);
     }
     
+
+    private fireCallbacks(literal: Literal) {
+
+        // fire watched classes callbacks
+        for (const key of this.classCallbacks.keys()) {
+            let className = Store.classForkey(key);
+
+            if (literal.value['_class'] === className) {
+                for (const callback of this.classCallbacks.get(key)) {
+                    callback(literal.hash);
+                }
+            }
+        }
+
+        // fire watched references callbacks
+        for (const key of this.referencesCallbacks.keys()) {
+            let reference = Store.referenceForKey(key);
+
+            for (const dep of literal.dependencies) {
+                if (dep.path === reference.path && dep.hash === reference.hash) {
+                    for (const callback of this.referencesCallbacks.get(key)) {
+                        callback(literal.hash);
+                    }
+                }
+            }
+        }
+
+        // fire watched class+reference pair callbacks
+        for (const key of this.classReferencesCallbacks.keys()) {
+            let classReference = Store.classReferenceForKey(key);
+
+            if (classReference.className === literal.value['_class']) {
+                for (const dep of literal.dependencies) {
+                    if (dep.path === classReference.path && dep.hash === dep.hash) {
+                        for (const callback of this.classReferencesCallbacks.get(key)) {
+                            callback(literal.hash);
+                        }
+                    }
+                }    
+            }
+
+        }
+
+    }
+
     /*async pack(object: HashedObject) {
         let packed = await this.packLiteral(object.toLiteral());
 
@@ -104,7 +165,11 @@ class Store {
             packed.signatures.push([author.hash(), key.sign(packed.hash)]);
         }
 
-        packed.dependencies = Array.from(literal.dependencies);        return packed;
+        packed.dependencies = Array.from(literal.dependencies);
+        
+        packed.flags = literal.value['_flags'];
+        
+        return packed;
     }
 
     async load(hash: Hash) : Promise<HashedObject | undefined> {
@@ -115,36 +180,54 @@ class Store {
         return this.loadWithContext(hash, context);
     }
 
-    private async loadWithContext(hash: Hash, context: Context) : Promise<HashedObject | undefined> {
+    async loadWithCurrentState(hash: Hash, currentState: CurrentState) : Promise<HashedObject | undefined> {
+        
+        let context : Context = { objects: currentState.getAll(),
+                                  literals: new Map<Hash, Literal>() };
 
-        let literal = await this.loadLiteral(hash);
-
-        if (literal === undefined) {
-            return undefined;
-        }
-
-        return this.loadLiteralWithContext(literal, context);
+        return this.loadWithContext(hash, context);
     }
 
-    private async loadLiteralWithContext(literal: Literal, context: Context) : Promise<HashedObject> {
+    private async loadWithContext(hash: Hash, context: Context) : Promise<HashedObject | undefined> {
 
-        context.literals.set(literal.hash, literal);
+        let obj = context.objects.get(hash);
 
-        for (let dependency of literal.dependencies) {
-            if (dependency.type === 'literal') {
-                if (context.literals.get(dependency.hash) === undefined) {
-                    let depLiteral = await this.loadLiteral(dependency.hash);
-                    
-                    // NO NEED to this.loadLiteralWithContext(depLiteral as Literal, context)
-                    // because all transitive deps are in object deps.
-                    context.literals.set(dependency.hash, depLiteral as Literal);
+        if (obj === undefined) {
+
+            // load object's literal and its dependencies' literals into the context, if necessary
+
+            let literal = context.literals.get(hash);
+            if (literal === undefined) {
+                literal = await this.loadLiteral(hash);
+
+                if (literal === undefined) {
+                    return undefined;
+                }
+
+                context.literals.set(literal.hash, literal);
+            }
+
+            for (let dependency of literal.dependencies) {
+                if (dependency.type === 'literal') {
+                    if (context.objects.get(dependency.hash)  === undefined && 
+                        context.literals.get(dependency.hash) === undefined) {
+
+                        // NO NEED to this.loadLiteralWithContext(depLiteral as Literal, context)
+                        // because all transitive deps are in object deps.
+
+                        let depLiteral = await this.loadLiteral(dependency.hash);                            
+                        context.literals.set(dependency.hash, depLiteral as Literal);
+                    }
                 }
             }
+
+            // use the context to create the object from all the loaded literals
+
+            let newContext = { rootHash: literal.hash, objects: context.objects, literals: context.literals };
+            obj = HashedObject.fromContext(newContext);
         }
 
-        let newContext = { rootHash: literal.hash, objects: context.objects, literals: context.literals };
-
-        return HashedObject.fromContext(newContext);
+        return obj;
     }
 
     async loadByClass(className: string, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
@@ -155,9 +238,16 @@ class Store {
 
     }
 
-    async loadByReference(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+    async loadByReference(referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
 
-        let searchResults = await this.backend.searchByReference(referringClassName, referringPath, referencedHash, params);
+        let searchResults = await this.backend.searchByReference(referringPath, referencedHash, params);
+
+        return this.unpackSearchResults(searchResults);
+    }
+
+    async loadByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+
+        let searchResults = await this.backend.searchByReferencingClass(referringClassName, referringPath, referencedHash, params);
 
         return this.unpackSearchResults(searchResults);
     }
@@ -187,6 +277,7 @@ class Store {
         literal.value = packed.value;
         literal.dependencies = new Set<Dependency>(packed.dependencies);
         literal.authors = packed.signatures.map((sig: [Hash, string]) => sig[0]);
+        literal.value['_flags'] = packed.flags;
 
         return literal;
     }
@@ -200,23 +291,79 @@ class Store {
         
         for (let packed of searchResults.items) {
 
-            let obj = await this.loadLiteralWithContext(this.unpackLiteral(packed), context);
+            context.literals.set(packed.hash, this.unpackLiteral(packed));
+
+            let obj = await this.loadWithContext(packed.hash, context) as HashedObject;
             objects.push(obj);
         }
 
         return {objects: objects, start: searchResults.start, end: searchResults.end};    
     }
 
-    async loadTerminalOps(hash: Hash) : Promise<Array<MutationOp>> {
-        let terminalOpHashes = await this.backend.loadTerminalOps(hash);
-        let terminalOps : Array<MutationOp> = [];
+    async loadTerminalOpsForMutable(hash: Hash) : Promise<Array<Hash> | undefined> {
+        let info = await this.backend.loadTerminalOpsForMutable(hash);
 
-        for (const opHash of terminalOpHashes) {
-            let op = await this.load(opHash)
-            terminalOps.push(op as MutationOp);
-        }
+        return info;
+    }
 
-        return terminalOps;
+    watchClass(className: string, callback: (match: Hash) => void) {
+        const key = Store.keyForClass(className);
+        this.classCallbacks.add(key, callback);
+    }
+
+    watchReferences(referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) {
+        const key = Store.keyForReference(referringPath, referencedHash);
+        this.referencesCallbacks.add(key, callback);
+    }
+
+    watchClassReferences(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) {
+        const key = Store.keyForClassReference(referringClassName, referringPath, referencedHash);
+        this.classReferencesCallbacks.add(key, callback);
+    }
+
+    removeClassWatch(className: string, callback: (match: Hash) => void) : boolean {
+        const key = Store.keyForClass(className);
+        return this.classCallbacks.remove(key, callback);
+    }
+
+    removeReferencesWatch(referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) : boolean {
+        const key = Store.keyForReference(referringPath, referencedHash);
+        return this.referencesCallbacks.remove(key, callback);
+    }
+
+    removeClassReferencesWatch(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) : boolean {
+        const key = Store.keyForClassReference(referringClassName, referringPath, referencedHash);
+        return this.classReferencesCallbacks.remove(key, callback);
+    }
+
+    private static keyForClass(className: string) {
+        return className;
+    }
+
+    private static keyForReference(referringPath: string, referencedHash: Hash) {
+        return referringPath + '#' + referencedHash;
+    }
+
+    private static keyForClassReference(referringClassName: string, referringPath: string, referencedHash: Hash) {
+        return referringClassName + '->' + referringPath + '#' + referencedHash;
+    }
+
+    private static classForkey(key: string) {
+        return key;
+    }
+
+    private static referenceForKey(key: string) {
+        let parts = key.split('#');
+        return { path: parts[0], hash: parts[1] };
+    }
+
+    private static classReferenceForKey(key: string) {
+        let parts = key.split('->');
+        let className = parts[0];
+        let result = Store.referenceForKey(parts[1]) as any;
+        result['className'] = className;
+
+        return result as {className: string, path: string, hash: Hash};
     }
 }
 

@@ -6,7 +6,7 @@ import { __spreadArrays } from 'tslib';
 import { RNGImpl } from 'crypto/random';
 import { HashNamespace } from './HashNamespace';
 import { Store } from 'data/storage/Store';
-import { MutableObject } from './MutableObject';
+import { CurrentState } from './state/CurrentState';
 
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
@@ -15,9 +15,15 @@ type ObjectContext  = { rootHash?: Hash, objects: Map<Hash, HashedObject> };
 type LiteralContext = { rootHash?: Hash, literals: Map<Hash, Literal> };
 type Context = ObjectContext & LiteralContext;
 
-type MutableContext = Map<Hash, MutableObject>;
-
 const BITS_FOR_ID = 128;
+
+
+/* HashedObject: Base class for objects than need to be storable in the
+                 Hyper Hyper Space global content-addressed database.
+
+ Defines how an object will be serialized, hashed, who it was authored by,
+ whether it needs an id (randomized or derived from a parent object's id)
+ and how it should be attached to a given store & context. */
 
 class HashedObject {
 
@@ -29,8 +35,10 @@ class HashedObject {
     private id?     : string;
     private authors : HashedSet<Identity>;
 
-    private _store?   : Store;
-    private _mutableContext? : MutableContext;
+    private   _store?        : Store;
+    private   _storedHash?   : Hash;
+    protected _currentState? : CurrentState;
+
 
     constructor() {
         this.authors = new HashedSet<Identity>();
@@ -82,6 +90,32 @@ class HashedObject {
         target.setId(HashNamespace.generateIdForPath(parentId, path));
     }
 
+    setStore(store: Store) : void {
+        this._store = store;
+    }
+
+    getStore() : Store {
+
+        if (this._store === undefined) {
+            throw new Error('Attempted to get store within an unstored object.')
+        }
+
+        return this._store as Store;
+    }
+
+    setStoredHash(hash: Hash) {
+        this._storedHash = hash;
+    }
+
+    getStoredHash() {
+        
+        if (this._storedHash === undefined) {
+            throw new Error('Attempted to get stored hash within an unstored object.');
+        }
+
+        return this._storedHash as Hash;
+    }
+
     hash() {
         return this.toLiteralContext().rootHash as Hash;
     }
@@ -104,7 +138,7 @@ class HashedObject {
         return literalContext;
     }
 
-    literalizeInContext(context: LiteralContext, path: string) : Hash {
+    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
         
         let fields = {} as any;
         let dependencies = new Set<Dependency>();
@@ -125,10 +159,13 @@ class HashedObject {
             }
         }
         
+        if (flags === undefined) { flags = []; }
+
         let value = {
-            _type: 'hashed_object', 
-            _class: this.getClassName(),
-            _fields : fields
+            _type   : 'hashed_object', 
+            _class  : this.getClassName(),
+            _fields : fields,
+            _flags  : flags
         };
 
         let hash = Hashing.forValue(value);
@@ -156,17 +193,8 @@ class HashedObject {
         return clone;
     }
 
-    attachTo(store: Store, mutableContext?: MutableContext) {
-        this._store = store;
-        
-        if (mutableContext === undefined) {
-            mutableContext = new Map();
-        }
-
-        this._mutableContext = mutableContext;
-
-        this._store;
-        this._mutableContext;
+    initSharedState() {
+        this._currentState = new CurrentState();
     }
 
     static shouldLiteralizeField(something: any) {
@@ -275,48 +303,33 @@ class HashedObject {
     static fromContext(context: Context) : HashedObject {
 
         if (context.rootHash === undefined) {
-            throw new Error('Asked to retrieve object from context but context.rootHash is missing');
+            throw new Error("Can't recreate object from context because its rootHash is missing");
         }
 
-        let obj = context.objects.get(context.rootHash);
+        HashedObject.deliteralizeInContext(context.rootHash, context);
 
-        if (obj === undefined) {
-            let literal = context.literals.get(context.rootHash);
-            if (literal === undefined) {
-                throw new Error('Literal with hash ' + context.rootHash + ' is missing from deliteralization context');
-            }
-
-            HashedObject.deliteralizeInContext(literal, context);
-
-            obj = context.objects.get(context.rootHash) as HashedObject;
-        }
-
-        return obj;
+        return context.objects.get(context.rootHash) as HashedObject;
     }
 
-    static deliteralizeInContext(literal: Literal, context: Context) : void {
+    // deliteralizeInContext: take the literal with the given hash from the context,
+    //                        recreate the object and insert it into the context
+    //                        (be smart and only do it if it hasn't been done already)
 
-        let hashedObject = context.objects.get(literal.hash);
+    static deliteralizeInContext(hash: Hash, context: Context) : void {
+
+        let hashedObject = context.objects.get(hash);
 
         if (hashedObject !== undefined) {
             return;
         }
 
-        const value = literal.value;
+        let literal = context.literals.get(hash);
 
-        for (const dep of literal.dependencies) {
-            if (dep.type === 'literal') {
-                let depHashedObject = context.objects.get(dep.hash);
-                if (depHashedObject === undefined) {
-                    let depLiteral = context.literals.get(dep.hash);
-                    if (depLiteral === undefined) {
-                        throw new Error('Literal with hash ' + literal.hash + ' has missing dependency ' + dep.hash + ' in deliteralization context');
-                    }
-                    HashedObject.deliteralizeInContext(depLiteral, context);
-                    depHashedObject = context.objects.get(dep.hash) as HashedObject;
-                }
-            }   
+        if (literal === undefined) {
+            throw new Error("Can't deliteralize object with hash " + hash + " because its literal is missing from the received context");
         }
+
+        const value = literal.value;
 
         // all the dependencies have been delieralized in the context
 
@@ -325,8 +338,6 @@ class HashedObject {
         }
         
         let constr = HashedObject.knownClasses.get(value['_class']);
-
-        
 
         if (constr === undefined) {
             hashedObject = new HashedObject();
@@ -376,15 +387,10 @@ class HashedObject {
                     something = new HashReference(value['_hash'], value['_class']);
                 } else if (value['_type'] === 'hashed_object_dependency') {
                     let hash = value['_hash'];
-                    let literal = context.literals.get(hash);
 
-                    if (literal === undefined) {
-                        throw new Error('Literal ' + hash + ' is missing in deliteralization context' );
-                    }
-
-                    HashedObject.deliteralizeInContext(literal, context);
-
+                    HashedObject.deliteralizeInContext(hash, context);
                     something = context.objects.get(hash) as HashedObject;
+
                 } else if (value['_type'] === 'hashed_object') {
                     throw new Error("Attempted to deliteralize embedded hashed object in literal (a hash reference should be used instead)");
                 } else {

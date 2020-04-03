@@ -42,7 +42,7 @@ class TerminalOpSet extends HashedObject {
 
         if (changed) {
             for (const callback of this._callbacks) {
-                callback((this.mutable as HashReference).hash, this.currentState());
+                callback((this.mutable as HashReference).hash);
             }
         }
     }

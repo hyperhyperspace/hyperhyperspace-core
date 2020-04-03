@@ -36,7 +36,8 @@ describe('Storage', () => {
 
         await store.save(a);
 
-        let result = await store.loadByReference(SomethingHashed.CLASS_NAME, 'reference', b.hash());
+        
+        let result = await store.loadByReferencingClass(SomethingHashed.CLASS_NAME, 'reference', b.hash());
 
         let a2 = result.objects[0];
 
@@ -46,7 +47,7 @@ describe('Storage', () => {
 
         expect(hashedThings.objects[0].hash()).toEqual(b.hash());
         expect(hashedThings.objects[1].hash()).toEqual(a.hash());
-
+        
     });
 
     test( 'Indexeddb-based reference-based load miss', async () => {
@@ -59,7 +60,7 @@ describe('Storage', () => {
 
         await store.save(a);
 
-        let result = await store.loadByReference(SomethingHashed.CLASS_NAME, 'non-existent-path', b.hash());
+        let result = await store.loadByReferencingClass(SomethingHashed.CLASS_NAME, 'non-existent-path', b.hash());
 
         expect(result.objects.length).toEqual(0);
     });

@@ -7,27 +7,28 @@ import { Hash } from 'data/model/Hashing';
 import { openDB, IDBPDatabase } from 'idb';
 
 type IdbStorageFormat = {
-    packed: PackedLiteral,
-    indexes: any,
-    timestamp: string
+    packed    : PackedLiteral,
+    indexes   : any,
+    timestamp : string,
+    sequence  : number
 }
 
 type IdbTerminalOpsFormat = {
-    mutableHash: Hash,
-    terminalOpHashes: Array<Hash>
-}
+    mutableHash : Hash,
+    terminalOps : Array<Hash>
+};
 
 class IdbBackend implements Backend {
 
-    static readonly OBJ_STORE = 'object_store';
+    static readonly META_STORE = 'meta_store';
+    static readonly OBJ_STORE  = 'object_store';
     static readonly TERMINAL_OPS_STORE = 'terminal_ops_store';
 
-    static readonly CLASS_IDX_KEY = 'class';
-    static readonly CLASS_TIMESTAMP_IDX_KEY = 'class_timestamp';
+    static readonly CLASS_SEQUENCE_IDX_KEY = 'class_sequence';
 
-    static readonly REFERENCES_IDX_KEY = 'references';
-    static readonly REFERENCE_TIMESTAMPS_IDX_KEY = 'reference_timestamps';
+    static readonly REFERENCES_SEQUENCE_IDX_KEY = 'references_sequence';
 
+    static readonly REFERENCING_CLASS_SEQUENCE_IDX_KEY = 'referencing_class_sequence';
 
     name: string;
     idbPromise: Promise<IDBPDatabase>;
@@ -37,15 +38,15 @@ class IdbBackend implements Backend {
 
         this.idbPromise = openDB(name, 1, {
             upgrade(db, _oldVersion, _newVersion, _transaction) {
-                var objectStore = db.createObjectStore(IdbBackend.OBJ_STORE, {keyPath: 'packed.hash'});
 
-                objectStore.createIndex(IdbBackend.CLASS_IDX_KEY + '_idx', 'indexes.' + IdbBackend.CLASS_IDX_KEY);
-                objectStore.createIndex(IdbBackend.CLASS_TIMESTAMP_IDX_KEY + '_idx', 'indexes.' + IdbBackend.CLASS_TIMESTAMP_IDX_KEY);
+                let objectStore = db.createObjectStore(IdbBackend.OBJ_STORE, {keyPath: 'packed.hash'});
 
-                objectStore.createIndex(IdbBackend.REFERENCES_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCES_IDX_KEY, {multiEntry: true});
-                objectStore.createIndex(IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY, {multiEntry: true});
-            
+                objectStore.createIndex(IdbBackend.CLASS_SEQUENCE_IDX_KEY + '_idx', 'indexes.' + IdbBackend.CLASS_SEQUENCE_IDX_KEY);
+                objectStore.createIndex(IdbBackend.REFERENCES_SEQUENCE_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCES_SEQUENCE_IDX_KEY, {multiEntry: true});
+                objectStore.createIndex(IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY, {multiEntry: true});
+
                 db.createObjectStore(IdbBackend.TERMINAL_OPS_STORE, {keyPath: 'mutableHash'});
+                db.createObjectStore(IdbBackend.META_STORE, { keyPath: 'name'});
             },
             blocked() {
               // …
@@ -59,7 +60,11 @@ class IdbBackend implements Backend {
         });
     }
 
-    async store(packed: PackedLiteral, prevOps?: Array<Hash>): Promise<void> {
+    getName() {
+        return this.name;
+    }
+
+    async store(packed: PackedLiteral): Promise<void> {
 
         let idb = await this.idbPromise;
 
@@ -71,56 +76,60 @@ class IdbBackend implements Backend {
 
         storable.timestamp = new Date().getTime().toString();
 
-        IdbBackend.assignIdxValue(storable, IdbBackend.CLASS_IDX_KEY, storable.packed.value._class);
-        IdbBackend.assignIdxValue(storable, IdbBackend.CLASS_TIMESTAMP_IDX_KEY, storable.packed.value._class, {timestamp: true});
+        let stores = [IdbBackend.OBJ_STORE, IdbBackend.META_STORE];
+
+        const isOp = packed.flags.indexOf('op') >= 0;
+
+        if (isOp) { stores.push(IdbBackend.TERMINAL_OPS_STORE); }
+
+        let tx = idb.transaction(stores, 'readwrite');
+
+        let seqInfo = await tx.objectStore(IdbBackend.META_STORE).get('current_object_sequence');
+        if (seqInfo === undefined) {
+            seqInfo = { name: 'current_object_sequence', value: 0 };
+        }
+
+        storable.sequence = seqInfo.value;
+        seqInfo.value = seqInfo.value + 1;
+
+        IdbBackend.assignIdxValue(storable, IdbBackend.CLASS_SEQUENCE_IDX_KEY, storable.packed.value._class, {sequence: true});
 
         for (let i=0; i<packed.dependencies.length; i++) {
-            let reference = packed.dependencies[i].className + '.' + packed.dependencies[i].path + '#' + packed.dependencies[i].hash;
-            IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCES_IDX_KEY, reference, {multi: true});
-            IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY, reference, {timestamp: true, multi: true});
+            let reference = packed.dependencies[i].path + '#' + packed.dependencies[i].hash;
+            IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCES_SEQUENCE_IDX_KEY, reference, {sequence: true, multi: true});
+            let referencingClass = packed.dependencies[i].className + '.' + packed.dependencies[i].path + '#' + packed.dependencies[i].hash;
+            IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY, referencingClass, {sequence: true, multi: true});
         }
 
-        
-        //console.log('about to store:');
-        //console.log(storable);
-
-        if (prevOps === undefined) {
-            return idb.put(IdbBackend.OBJ_STORE, storable).then((_key : IDBValidKey) => { });
-        } else {
-            let tx = idb.transaction([IdbBackend.OBJ_STORE, IdbBackend.TERMINAL_OPS_STORE]);
 
 
-            return tx.objectStore(IdbBackend.TERMINAL_OPS_STORE).get(storable.packed.hash)
-                     .then(async (terminalOps : (IdbTerminalOpsFormat | undefined)) => {
+        if (isOp) {
+            let terminalOpsInfo = (await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE)
+                                          .get(storable.packed.value['target']['_hash'])) as IdbTerminalOpsFormat | undefined;
 
-                if (terminalOps === undefined) {
-                    terminalOps = { mutableHash: storable.packed.hash, terminalOpHashes: []};
-                }
-                for (const hash of prevOps) {
-                    let idx = terminalOps.terminalOpHashes.indexOf(hash);
+            if (terminalOpsInfo === undefined) {
+                terminalOpsInfo = { mutableHash: storable.packed.value['target']['_hash'], terminalOps: [storable.packed.hash] };
+            } else {
+                for (const hash of storable.packed.value['prevOps']['_hashes'] as Array<Hash>) {
+                    let idx = terminalOpsInfo.terminalOps.indexOf(hash);
                     if (idx >= 0) {
-                        delete terminalOps.terminalOpHashes[idx];
+                        delete terminalOpsInfo.terminalOps[idx];
                     }
                 }
-                if (terminalOps.terminalOpHashes.indexOf(storable.packed.hash) < 0) {
-                    terminalOps.terminalOpHashes.push(storable.packed.hash);
+                if (terminalOpsInfo.terminalOps.indexOf(storable.packed.hash) < 0) { // this should always be true
+                    terminalOpsInfo.terminalOps.push(storable.packed.hash);
                 }
+            }
 
-                await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE).put(terminalOps);
-                await tx.objectStore(IdbBackend.OBJ_STORE).put(storable);
-
-                return;
-            });
-
-
-
-
-
+            await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE).put(terminalOpsInfo);
         }
 
-        
+        await tx.objectStore(IdbBackend.META_STORE).put(seqInfo);
+        await tx.objectStore(IdbBackend.OBJ_STORE).put(storable); 
 
     }
+        
+    
     
     async load(hash: Hash): Promise<PackedLiteral | undefined> {
 
@@ -131,20 +140,23 @@ class IdbBackend implements Backend {
                      (storable?.packed)) as Promise<PackedLiteral | undefined>;
     }
 
-    async loadTerminalOps(hash: Hash) : Promise<Array<Hash>> {
+    async loadTerminalOpsForMutable(hash: Hash) : Promise<Array<Hash> | undefined> {
         let idb = await this.idbPromise;
 
-        return idb.get(IdbBackend.TERMINAL_OPS_STORE, hash)
-                  .then((terminalOps: IdbTerminalOpsFormat | undefined) =>
-                      (terminalOps === undefined? [] : terminalOps.terminalOpHashes));
+        return idb.get(IdbBackend.TERMINAL_OPS_STORE, hash);
     }
 
     async searchByClass(className: string, params?: BackendSearchParams): Promise<BackendSearchResults> {
-        return this.searchByIndex(IdbBackend.CLASS_TIMESTAMP_IDX_KEY + '_idx', className, params);
+        return this.searchByIndex(IdbBackend.CLASS_SEQUENCE_IDX_KEY + '_idx', className, params);
     }
 
-    async searchByReference(referringClassName: string, referringPath: string, referencedHash: Hash, params?: BackendSearchParams): Promise<BackendSearchResults> {
-        return this.searchByIndex(IdbBackend.REFERENCE_TIMESTAMPS_IDX_KEY + '_idx', 
+    async searchByReference(referringPath: string, referencedHash: Hash, params?: BackendSearchParams): Promise<BackendSearchResults> {
+        return this.searchByIndex(IdbBackend.REFERENCES_SEQUENCE_IDX_KEY + '_idx', 
+                                  referringPath + '#' + referencedHash, params);
+    }
+
+    async searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: BackendSearchParams): Promise<BackendSearchResults> {
+        return this.searchByIndex(IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY + '_idx', 
                                   referringClassName + '.' + referringPath + '#' + referencedHash, params);
     }
 
@@ -181,7 +193,7 @@ class IdbBackend implements Backend {
         searchResults.start = undefined;
         searchResults.end   = undefined;
 
-        let ingestCursor = async () => {
+        //let ingestCursor = async () => {
       
             var cursor = await idb.transaction([IdbBackend.OBJ_STORE], 'readonly').objectStore(IdbBackend.OBJ_STORE).index(index).openCursor(range, direction);
       
@@ -199,16 +211,16 @@ class IdbBackend implements Backend {
                 
                 cursor = await cursor.continue();
             }
-        }
+        //}
 
-        await ingestCursor();
+        //await ingestCursor();
         
         return searchResults;
     }
 
-    private static assignIdxValue(storable: IdbStorageFormat, key: string, value: string, params?:{timestamp?: boolean, multi?: boolean}) {
-        if (params !== undefined && params.timestamp !== undefined && params.timestamp) {
-            value = IdbBackend.addTimestampToValue(value, storable.timestamp);
+    private static assignIdxValue(storable: IdbStorageFormat, key: string, value: string, params?:{sequence?: boolean, multi?: boolean}) {
+        if (params !== undefined && params.sequence !== undefined && params.sequence) {
+            value = IdbBackend.addSequenceToValue(value, storable.sequence);
         }
 
         if (params !== undefined && params.multi !== undefined && params.multi) {
@@ -223,8 +235,8 @@ class IdbBackend implements Backend {
         }
     }
 
-    private static addTimestampToValue(value: string, timestamp: string) {
-        return value + '_' + timestamp;
+    private static addSequenceToValue(value: string, sequence: number) {
+        return value + '_' + sequence.toString(16).padStart(16, '0');
     }
 }
 

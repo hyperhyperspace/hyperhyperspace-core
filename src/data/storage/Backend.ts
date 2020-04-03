@@ -4,15 +4,20 @@ import { Hash } from 'data/model/Hashing';
 type BackendSearchParams = {order?: string, start?: string, limit?: number};
 type BackendSearchResults = {items : Array<PackedLiteral>, start?: string, end?: string };
 
+//type MutableObjectInfo = { hash: Hash, nextOpSeqNumber: number, terminalOps: Array<Hash> };
+
 interface Backend {
 
-    store(packed : PackedLiteral, prevOps?: Array<Hash>) : Promise<void>;
+    getName() : string;
+
+    store(packed : PackedLiteral) : Promise<void>;
     load(hash: Hash) : Promise<PackedLiteral | undefined>;
 
-    loadTerminalOps(hash: Hash) : Promise<Array<Hash>>;
+    loadTerminalOpsForMutable(hash: Hash) : Promise<Array<Hash> | undefined>;
 
     searchByClass(className: string, params? : BackendSearchParams) : Promise<BackendSearchResults>;
-    searchByReference(referringClassName: string, referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
+    searchByReference(referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
+    searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
 }
 
 export { Backend, BackendSearchParams, BackendSearchResults }

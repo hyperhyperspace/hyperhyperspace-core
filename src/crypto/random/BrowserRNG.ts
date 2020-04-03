@@ -18,22 +18,18 @@ class BrowserRNG implements RNG {
             length = length - step;
         }
 
-        result = result + this.pad((getRandomValues(new Uint8Array(1))[0]).toString(16), 2).substring(2-length, 2);
+        result = result + this.randomHex8bitsWord().substring(2-length, 2);
 
         return result;
     }
     
     private randomHex8bitsWord() {
-        return this.pad((getRandomValues(new Uint8Array(1))[0]).toString(16), 2)
+
+        let result = (getRandomValues(new Uint8Array(1))[0]).toString(16);
+
+        return result.padStart(2, '0');
     }
 
-    private pad = (xs: string, n: number) => {
-        while (xs.length < n) {
-          xs = '0' + xs;
-        }
-    
-        return xs;
-    }
 }
 
 export { BrowserRNG };

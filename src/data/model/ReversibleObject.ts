@@ -1,6 +1,8 @@
 import { MutableObject } from './MutableObject'
 import { MutationOp } from './MutationOp'
 import { UndoOp } from './UndoOp';
+import { LiteralContext } from './HashedObject';
+import { Hash } from './Hashing';
 
 
 // A mutable object that can undo operations after they have
@@ -21,6 +23,18 @@ abstract class ReversibleObject extends MutableObject {
         } else {
             super.apply(op);
         }
+    }
+
+    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
+
+        if (flags === undefined) {
+            flags = [];
+        }
+
+        flags.push('reversible');
+
+        return super.literalizeInContext(context, path, flags);
+
     }
 
 }

@@ -2,6 +2,8 @@ import { MutationOp } from './MutationOp';
 import { HashedSet } from './HashedSet';
 import { MutableObject } from './MutableObject';
 import { ReversibleOp } from './ReversibleOp';
+import { LiteralContext } from './HashedObject';
+import { Hash } from './Hashing';
 
 
 class UndoOp extends MutationOp {
@@ -26,6 +28,18 @@ class UndoOp extends MutationOp {
 
     getTargetOp() : MutationOp {
         return this.targetOp as MutationOp;
+    }
+
+    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
+
+        if (flags === undefined) {
+            flags = [];
+        }
+
+        flags.push('undo');
+
+        return super.literalizeInContext(context, path, flags);
+
     }
 
 }
