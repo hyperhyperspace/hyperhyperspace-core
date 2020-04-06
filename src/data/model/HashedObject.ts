@@ -6,14 +6,15 @@ import { __spreadArrays } from 'tslib';
 import { RNGImpl } from 'crypto/random';
 import { HashNamespace } from './HashNamespace';
 import { Store } from 'data/storage/Store';
-import { SharedState } from './state/SharedState';
+//import { SharedState } from './state/SharedState';
 
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
+type SharedContext  = { rootHash?: Hash, shared: Map<Hash, HashedObject> };
 type ObjectContext  = { rootHash?: Hash, objects: Map<Hash, HashedObject> };
 type LiteralContext = { rootHash?: Hash, literals: Map<Hash, Literal> };
-type Context = ObjectContext & LiteralContext;
+type Context = ObjectContext & LiteralContext & Partial<SharedContext>;
 
 const BITS_FOR_ID = 128;
 
@@ -23,7 +24,8 @@ const BITS_FOR_ID = 128;
 
  Defines how an object will be serialized, hashed, who it was authored by,
  whether it needs an id (randomized or derived from a parent object's id)
- and how it should be attached to a given store & context. */
+ and which objects should be preloaded when loading operations that mutate
+ this object and its subobjects. */
 
 class HashedObject {
 
@@ -35,9 +37,9 @@ class HashedObject {
     private id?     : string;
     private authors : HashedSet<Identity>;
 
-    private   _store?        : Store;
-    private   _storedHash?   : Hash;
-    protected _sharedState? : SharedState;
+    private _store?         : Store;
+    private _storedHash?    : Hash;
+    private _sharedContext? : SharedContext;
 
 
     constructor() {
@@ -193,16 +195,17 @@ class HashedObject {
         return clone;
     }
 
-    setSharedState(sharedState: SharedState) : void {
-        this._sharedState = sharedState;
+    addDerivedField(fieldName: string, object: HashedObject) {
+        object.setId(Hashing.forValue('#' + this.getId() + '.' + fieldName));
+        (this as any)[fieldName] = object;
     }
 
-    getSharedState() : SharedState | undefined {
-        return this._sharedState;
+    setSharedContext(sharedContext: SharedContext) : void {
+        this._sharedContext = sharedContext;
     }
 
-    initSharedState() {
-        this._sharedState = new SharedState();
+    getSharedContext() : SharedContext | undefined {
+        return this._sharedContext;
     }
 
     static shouldLiteralizeField(something: any) {
@@ -331,6 +334,14 @@ class HashedObject {
             return;
         }
 
+        // check if we can extract the object from the shared context
+        let sharedObject = context.shared?.get(hash);
+
+        if (sharedObject !== undefined) {
+            context.objects.set(hash, sharedObject);
+            return;
+        }
+
         let literal = context.literals.get(hash);
 
         if (literal === undefined) {
@@ -359,6 +370,10 @@ class HashedObject {
             }
         }
 
+        if (context.shared !== undefined) {
+            hashedObject.setSharedContext({ shared: context.shared });
+        }
+        
         hashedObject.init();
 
         context.objects.set(literal.hash, hashedObject);
@@ -509,4 +524,4 @@ class HashedObject {
 
 HashedObject.registerClass('HashedObject', HashedObject);
 
-export { HashedObject, Literal, Dependency, Context, LiteralContext, ObjectContext };
+export { HashedObject, Literal, Dependency, Context, SharedContext, LiteralContext, ObjectContext };

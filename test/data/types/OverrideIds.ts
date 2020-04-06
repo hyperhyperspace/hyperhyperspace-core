@@ -22,11 +22,15 @@ class HasId extends MutableObject {
         this.setRandomId();
     }  
 
-    mutate(_op: MutationOp) {
-
+    async loadState() {
+        
     }
 
-    validate(_op: MutationOp) {
+    async mutate(_op: MutationOp) : Promise<boolean> {
+        throw new Error();
+    }
+
+    async validate(_op: MutationOp) : Promise<boolean> {
         return false;
     }
 }

@@ -1,9 +1,8 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, MutableObject, Literal, Dependency, Context } from 'data/model.ts';
+import { HashedObject, MutableObject, Literal, Dependency, SharedContext, Context } from 'data/model.ts';
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Identity } from 'data/identity/Identity';
-import { SharedState } from 'data/model/state';
 
 import { MultiMap } from 'util/multimap';
 
@@ -48,16 +47,17 @@ class Store {
     private async saveOperations(mutable: MutableObject) : Promise<void> {
 
 
-        let op = mutable.dequeueOpToSave();
+        let op = mutable.nextOpToSave();
         
         while (op !== undefined) {
             try {
                 await this.save(op);
+                
             } catch (e) {
-                mutable.requeueOpToSave(op);
+                mutable.failedToSaveOp(op);
                 throw e;
             }
-            op = mutable.dequeueOpToSave();
+            op = mutable.nextOpToSave();
         }
     }
 
@@ -172,28 +172,13 @@ class Store {
         return packed;
     }
 
-    async load(hash: Hash) : Promise<HashedObject | undefined> {
+    async load(hash: Hash, sharedContext?: SharedContext) : Promise<HashedObject | undefined> {
 
-        let context : Context = { objects: new Map<Hash, HashedObject>(),
+        let context : Context = { shared: sharedContext?.shared,
+                                  objects: new Map<Hash, HashedObject>(),
                                   literals: new Map<Hash, Literal>() };
 
         return this.loadWithContext(hash, context);
-    }
-
-    async loadWithSharedState(hash: Hash, sharedState: SharedState) : Promise<HashedObject | undefined> {
-        
-        let context : Context = { objects: sharedState.getAll(),
-                                  literals: new Map<Hash, Literal>() };
-
-        let loadedObject = this.loadWithContext(hash, context);
-
-        for (const object of context.objects.values()) {
-            if (object.getSharedState() === undefined) {
-                object.setSharedState(sharedState);
-            }
-        }
-
-        return loadedObject;
     }
 
     private async loadWithContext(hash: Hash, context: Context) : Promise<HashedObject | undefined> {
@@ -217,7 +202,8 @@ class Store {
 
             for (let dependency of literal.dependencies) {
                 if (dependency.type === 'literal') {
-                    if (context.objects.get(dependency.hash)  === undefined && 
+                    if (context.shared?.get(dependency.hash) === undefined &&
+                        context.objects.get(dependency.hash)  === undefined && 
                         context.literals.get(dependency.hash) === undefined) {
 
                         // NO NEED to this.loadLiteralWithContext(depLiteral as Literal, context)

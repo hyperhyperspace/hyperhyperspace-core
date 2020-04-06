@@ -34,13 +34,8 @@ abstract class MutableObject extends HashedObject {
 
     async applyOpFromStore(hash: Hash) {
         let op: MutationOp;
-        let state = this.getSharedState();
 
-        if (state === undefined) {
-            op = await this.getStore().load(hash) as MutationOp;
-        } else {
-            op = await this.getStore().loadWithSharedState(hash, state) as MutationOp;
-        }
+        op = await this.getStore().load(hash, this.getSharedContext()) as MutationOp;
         
         await this.applyOp(op);
     }
@@ -76,7 +71,7 @@ abstract class MutableObject extends HashedObject {
 
     }
 
-    dequeueOpToSave() : MutationOp | undefined {
+    nextOpToSave() : MutationOp | undefined {
         if (this._unsavedOps.length > 0) {
             return this._unsavedOps.shift();
         } else {
@@ -84,7 +79,11 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    requeueOpToSave(op: MutationOp) : void {
+    informSavedOp(_op: MutationOp) {
+
+    }
+
+    failedToSaveOp(op: MutationOp) : void {
         this._unsavedOps.unshift(op);
     }
 
@@ -110,6 +109,10 @@ abstract class MutableObject extends HashedObject {
         } else {
             this.getStore().removeReferencesWatch('target', this.getStoredHash(), this._opCallback);
         }
+    }
+
+    publishNewState() {
+
     }
 
     watchState(callback: StateCallback) : void {

@@ -1,5 +1,5 @@
 import { ReversibleObject } from 'data/model/ReversibleObject';
-import { TerminalOpState } from 'data/model/state/TerminalOpState'; 
+import { TerminalOpState } from 'data/model/state/TerminalOpsState.ts'; 
 import { HashedObject } from 'data/model/HashedObject';
 import { Identity } from 'data/identity/Identity';
 import { StateCallback } from 'data/model/MutableObject';
