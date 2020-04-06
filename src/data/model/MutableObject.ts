@@ -35,7 +35,7 @@ abstract class MutableObject extends HashedObject {
     async applyOpFromStore(hash: Hash) {
         let op: MutationOp;
 
-        op = await this.getStore().load(hash, this.getSharedContext()) as MutationOp;
+        op = await this.getStore().load(hash, this.getAliasingContext()) as MutationOp;
         
         await this.applyOp(op);
     }

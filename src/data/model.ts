@@ -1,4 +1,4 @@
-export { HashedObject, Literal, Dependency, SharedContext, ObjectContext, LiteralContext, Context } from './model/HashedObject';
+export { HashedObject, Literal, Dependency, AliasingContext, ObjectContext, LiteralContext, Context } from './model/HashedObject';
 export { MutableObject } from './model/MutableObject';
 export { MutationOp } from './model/MutationOp';
 export { HashReference } from './model/HashReference';

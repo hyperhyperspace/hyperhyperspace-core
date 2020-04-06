@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, MutableObject, Literal, Dependency, SharedContext, Context } from 'data/model.ts';
+import { HashedObject, MutableObject, Literal, Dependency, AliasingContext, Context } from 'data/model.ts';
 import { Hash } from 'data/model/Hashing';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Identity } from 'data/identity/Identity';
@@ -172,11 +172,15 @@ class Store {
         return packed;
     }
 
-    async load(hash: Hash, sharedContext?: SharedContext) : Promise<HashedObject | undefined> {
+    async load(hash: Hash, aliasingContext?: AliasingContext) : Promise<HashedObject | undefined> {
 
-        let context : Context = { shared: sharedContext?.shared,
+        let context : Context = { aliased: aliasingContext?.aliased,
                                   objects: new Map<Hash, HashedObject>(),
                                   literals: new Map<Hash, Literal>() };
+
+        if (context.aliased === undefined) {
+            context.aliased = new Map();
+        }
 
         return this.loadWithContext(hash, context);
     }
@@ -202,7 +206,7 @@ class Store {
 
             for (let dependency of literal.dependencies) {
                 if (dependency.type === 'literal') {
-                    if (context.shared?.get(dependency.hash) === undefined &&
+                    if (context.aliased?.get(dependency.hash) === undefined &&
                         context.objects.get(dependency.hash)  === undefined && 
                         context.literals.get(dependency.hash) === undefined) {
 

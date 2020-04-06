@@ -11,10 +11,10 @@ import { Store } from 'data/storage/Store';
 type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
-type SharedContext  = { rootHash?: Hash, shared: Map<Hash, HashedObject> };
-type ObjectContext  = { rootHash?: Hash, objects: Map<Hash, HashedObject> };
-type LiteralContext = { rootHash?: Hash, literals: Map<Hash, Literal> };
-type Context = ObjectContext & LiteralContext & Partial<SharedContext>;
+type AliasingContext  = { rootHash?: Hash, aliased: Map<Hash, HashedObject> };
+type ObjectContext    = { rootHash?: Hash, objects: Map<Hash, HashedObject> };
+type LiteralContext   = { rootHash?: Hash, literals: Map<Hash, Literal> };
+type Context = ObjectContext & LiteralContext & Partial<AliasingContext>;
 
 const BITS_FOR_ID = 128;
 
@@ -37,9 +37,9 @@ class HashedObject {
     private id?     : string;
     private authors : HashedSet<Identity>;
 
-    private _store?         : Store;
-    private _storedHash?    : Hash;
-    private _sharedContext? : SharedContext;
+    private _store?           : Store;
+    private _storedHash?      : Hash;
+    private _aliasingContext? : AliasingContext;
 
 
     constructor() {
@@ -200,12 +200,12 @@ class HashedObject {
         (this as any)[fieldName] = object;
     }
 
-    setSharedContext(sharedContext: SharedContext) : void {
-        this._sharedContext = sharedContext;
+    setAliasingContext(aliasingContext: AliasingContext) : void {
+        this._aliasingContext = aliasingContext;
     }
 
-    getSharedContext() : SharedContext | undefined {
-        return this._sharedContext;
+    getAliasingContext() : AliasingContext | undefined {
+        return this._aliasingContext;
     }
 
     static shouldLiteralizeField(something: any) {
@@ -335,7 +335,7 @@ class HashedObject {
         }
 
         // check if we can extract the object from the shared context
-        let sharedObject = context.shared?.get(hash);
+        let sharedObject = context.aliased?.get(hash);
 
         if (sharedObject !== undefined) {
             context.objects.set(hash, sharedObject);
@@ -370,8 +370,8 @@ class HashedObject {
             }
         }
 
-        if (context.shared !== undefined) {
-            hashedObject.setSharedContext({ shared: context.shared });
+        if (context.aliased !== undefined) {
+            hashedObject.setAliasingContext({ aliased: context.aliased });
         }
         
         hashedObject.init();
@@ -524,4 +524,4 @@ class HashedObject {
 
 HashedObject.registerClass('HashedObject', HashedObject);
 
-export { HashedObject, Literal, Dependency, Context, SharedContext, LiteralContext, ObjectContext };
+export { HashedObject, Literal, Dependency, Context, AliasingContext, LiteralContext, ObjectContext };
