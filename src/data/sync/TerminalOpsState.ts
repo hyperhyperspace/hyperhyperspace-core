@@ -1,7 +1,6 @@
 import { HashedObject } from "data/model/HashedObject";
 import { Hash } from 'data/model/Hashing';
 import { HashedSet } from 'data/model/HashedSet';
-import { MutationOp } from 'data/model/MutationOp';
 
 
 class TerminalOpsState extends HashedObject {

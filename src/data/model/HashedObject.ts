@@ -130,6 +130,32 @@ class HashedObject {
         return 'HashedObject';
     }
 
+    equals(another: HashedObject) {
+        return this.hash() === another.hash();
+    }
+
+    clone() : this {
+        let lc = this.toLiteralContext();
+        //lc.context.objects = new Map<Hash, HashedObject>();
+
+        let clone = HashedObject.fromLiteralContext(lc) as this;
+
+        return clone;
+    }
+
+    addDerivedField(fieldName: string, object: HashedObject) {
+        object.setId(Hashing.forValue('#' + this.getId() + '.' + fieldName));
+        (this as any)[fieldName] = object;
+    }
+
+    setAliasingContext(aliasingContext: AliasingContext) : void {
+        this._aliasingContext = aliasingContext;
+    }
+
+    getAliasingContext() : AliasingContext | undefined {
+        return this._aliasingContext;
+    }
+
     toLiteralContext() : LiteralContext /*DeliteralizationContext*/ {
 
         let literalContext: LiteralContext = { literals: new Map() };
@@ -180,32 +206,6 @@ class HashedObject {
         context.literals.set(hash, literal);
 
         return hash;
-    }
-
-    equals(another: HashedObject) {
-        return this.hash() === another.hash();
-    }
-
-    clone() : this {
-        let lc = this.toLiteralContext();
-        //lc.context.objects = new Map<Hash, HashedObject>();
-
-        let clone = HashedObject.fromLiteralContext(lc) as this;
-
-        return clone;
-    }
-
-    addDerivedField(fieldName: string, object: HashedObject) {
-        object.setId(Hashing.forValue('#' + this.getId() + '.' + fieldName));
-        (this as any)[fieldName] = object;
-    }
-
-    setAliasingContext(aliasingContext: AliasingContext) : void {
-        this._aliasingContext = aliasingContext;
-    }
-
-    getAliasingContext() : AliasingContext | undefined {
-        return this._aliasingContext;
     }
 
     static shouldLiteralizeField(something: any) {

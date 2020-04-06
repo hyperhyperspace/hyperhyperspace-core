@@ -1,35 +1,29 @@
 import { HashedObject, LiteralContext } from './HashedObject';
 import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
-
-type StateCallback = (mutable: Hash) => void;
+import { TerminalOpsSyncAgent } from 'data/sync/TerminalOpsSyncAgent';
 
 abstract class MutableObject extends HashedObject {
 
-    _unsavedOps : Array<MutationOp>;
+    _acceptedMutationOpClasses : Array<string>;
 
-    _lastReportedState?: HashedObject;
-    _stateCallbacks: Set<StateCallback>;
+    _unsavedOps : Array<MutationOp>;
 
     _opCallback : (hash: Hash) => void;
 
 
-    constructor() {
+    constructor(acceptedOpClasses : Array<string>) {
         super();
         
-        this._unsavedOps = [];
+        this._acceptedMutationOpClasses = acceptedOpClasses;
 
-        this._lastReportedState = undefined;
-        this._stateCallbacks    = new Set();
+        this._unsavedOps = [];
 
         this._opCallback = (hash: Hash) => {
             this.applyOpFromStore(hash);
         };
     }
 
-    abstract async loadState() : Promise<void>;
-    abstract currentState(): HashedObject;
-    abstract async validate(op: MutationOp): Promise<boolean>;
     abstract async mutate(op: MutationOp): Promise<boolean>;
 
     async applyOpFromStore(hash: Hash) {
@@ -37,38 +31,17 @@ abstract class MutableObject extends HashedObject {
 
         op = await this.getStore().load(hash, this.getAliasingContext()) as MutationOp;
         
-        await this.applyOp(op);
+        await this.mutate(op);
     }
 
     async applyNewOp(op: MutationOp) : Promise<void> {
 
-        if (!this.validate(op)) {
+        if (this.shouldAcceptMutationOp(op)) {
             throw new Error ('Invalid op ' + op.hash() + 'attempted for ' + this.hash());
         } else {
-            await this.applyOp(op);
+            await this.mutate(op);
             this.enqueueOpToSave(op);
         }
-    }
-
-    private async applyOp(op: MutationOp) {
-       
-        let mutated = await this.mutate(op);
-
-        if (mutated) {
-
-            let newState = this.currentState();
-
-            if (  this._lastReportedState === undefined ||
-                  !this._lastReportedState.equals(newState)) {
-    
-                for (const callback of this._stateCallbacks) {
-                    callback(this.getStoredHash());
-                }
-    
-            }
-    
-        }
-
     }
 
     nextOpToSave() : MutationOp | undefined {
@@ -77,10 +50,6 @@ abstract class MutableObject extends HashedObject {
         } else {
             return undefined;
         }
-    }
-
-    informSavedOp(_op: MutationOp) {
-
     }
 
     failedToSaveOp(op: MutationOp) : void {
@@ -111,18 +80,14 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    publishNewState() {
-
+    shouldAcceptMutationOp(op: MutationOp) {
+        return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
-    watchState(callback: StateCallback) : void {
-        this._stateCallbacks.add(callback);
-    }
-
-    removeStateWatch(callback: StateCallback) : boolean {
-        return this._stateCallbacks.delete(callback);
+    getSyncAgent() {
+        return new TerminalOpsSyncAgent(this.getStoredHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 
 }
 
-export { MutableObject, StateCallback }
+export { MutableObject }

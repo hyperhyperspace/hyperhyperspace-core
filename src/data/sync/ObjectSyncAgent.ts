@@ -15,8 +15,8 @@ interface ObjectSyncAgent {
 
     // invoke callback whenever this object's local state has changed,
     // indicating the object's own hash (so the callback can be shared).
-    watchStoredState(callback: ((objectHash: Hash) => void)) : void;
-    removeStoredStateWatch(callback: ((objectHash: Hash) => void)) : boolean;
+    addStoredStateChangeCallback(callback: ((objectHash: Hash) => void)) : void;
+    removeStoredStateChangeCallback(callback: ((objectHash: Hash) => void)) : boolean;
 
 
 
@@ -26,7 +26,7 @@ interface ObjectSyncAgent {
 
     // indicate whether a remote object is a valid mutation for the object we
     // are wathing.
-    shouldAcceptMutation(object: HashedObject) : Promise<boolean>;
+    shouldAcceptMutationOp(object: HashedObject) : boolean;
 }
 
 export { ObjectSyncAgent }

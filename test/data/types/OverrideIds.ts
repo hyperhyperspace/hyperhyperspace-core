@@ -1,24 +1,11 @@
 import { HashedObject, MutableObject } from "data/model";
 import { MutationOp } from 'data/model/MutationOp';
-import { StateCallback } from 'data/model/MutableObject';
 
 
 class HasId extends MutableObject {
 
-    subscribeToCurrentState(_callback: StateCallback): void {
-        throw new Error("Method not implemented.");
-    }
-
-    unsubscribeFromCurrentState(_callback: StateCallback): boolean {
-        throw new Error("Method not implemented.");
-    }
-
-    currentState(): HashedObject {
-        throw new Error("Method not implemented.");
-    }
-
     constructor() {
-        super();
+        super([]);
         this.setRandomId();
     }  
 

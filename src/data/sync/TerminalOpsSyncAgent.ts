@@ -11,21 +11,20 @@ class TerminalOpsSyncAgent implements ObjectSyncAgent {
 
     objectHash: Hash;
     store: Store;
-    acceptMutation: (mutation: HashedObject) => Promise<boolean>;
+    acceptedMutationOpClasses: Array<String>;
 
     opCallback: (opHash: Hash) => void;
 
     storedStateChangeCallbacks: Set<StoredStateChangeCallback>;
 
-    constructor(objectHash: Hash, store: Store, acceptMutation : (mutation: HashedObject) => Promise<boolean>) {
+    constructor(objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>) {
         this.objectHash = objectHash;
         this.store = store;
-        this.acceptMutation = acceptMutation;
+        this.acceptedMutationOpClasses = acceptedMutationOpClasses;
         this.storedStateChangeCallbacks = new Set();
         this.opCallback = async (opHash: Hash) => {
-            let op = await this.store.load(opHash);
-            let valid = await this.acceptMutation(op as MutationOp);
-            if (valid) {
+            let op = await this.store.load(opHash) as MutationOp;
+            if (this.shouldAcceptMutationOp(op)) {
                 for (const callback of this.storedStateChangeCallbacks) {
                     callback(this.objectHash);
                 }    
@@ -85,8 +84,8 @@ class TerminalOpsSyncAgent implements ObjectSyncAgent {
         return missingOps;
     }
 
-    shouldAcceptMutation(object: HashedObject): Promise<boolean> {
-        return this.acceptMutation(object as MutationOp);
+    shouldAcceptMutationOp(object: HashedObject): boolean {
+        return this.acceptedMutationOpClasses.indexOf(object.getClassName()) >= 0;
     }
     
 }
