@@ -1,7 +1,7 @@
 import { PackedLiteral } from 'data/storage/Store';
 import { Hash } from 'data/model/Hashing';
 
-type BackendSearchParams = {order?: string, start?: string, limit?: number};
+type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, limit?: number};
 type BackendSearchResults = {items : Array<PackedLiteral>, start?: string, end?: string };
 
 //type MutableObjectInfo = { hash: Hash, nextOpSeqNumber: number, terminalOps: Array<Hash> };
@@ -13,7 +13,7 @@ interface Backend {
     store(packed : PackedLiteral) : Promise<void>;
     load(hash: Hash) : Promise<PackedLiteral | undefined>;
 
-    loadTerminalOpsForMutable(hash: Hash) : Promise<Array<Hash> | undefined>;
+    loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined>;
 
     searchByClass(className: string, params? : BackendSearchParams) : Promise<BackendSearchResults>;
     searchByReference(referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;

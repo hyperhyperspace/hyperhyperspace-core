@@ -6,7 +6,6 @@ import { Identity } from 'data/identity/Identity';
 
 import { MultiMap } from 'util/multimap';
 
-
 type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 type PackedLiteral = { hash : Hash, value: any, signatures : Array<[Hash, string]>,
                        dependencies: Array<Dependency>, flags: Array<PackedFlag> };
@@ -298,7 +297,9 @@ class Store {
         return {objects: objects, start: searchResults.start, end: searchResults.end};    
     }
 
-    async loadTerminalOpsForMutable(hash: Hash) : Promise<Array<Hash> | undefined> {
+    async loadTerminalOpsForMutable(hash: Hash) 
+            : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined> {
+        
         let info = await this.backend.loadTerminalOpsForMutable(hash);
 
         return info;

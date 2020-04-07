@@ -16,6 +16,7 @@ type IdbStorageFormat = {
 type IdbTerminalOpsFormat = {
     mutableHash : Hash,
     terminalOps : Array<Hash>
+    lastOp      : Hash;
 };
 
 class IdbBackend implements Backend {
@@ -108,7 +109,11 @@ class IdbBackend implements Backend {
                                           .get(storable.packed.value['target']['_hash'])) as IdbTerminalOpsFormat | undefined;
 
             if (terminalOpsInfo === undefined) {
-                terminalOpsInfo = { mutableHash: storable.packed.value['target']['_hash'], terminalOps: [storable.packed.hash] };
+                terminalOpsInfo = { 
+                    mutableHash: storable.packed.value['target']['_hash'], 
+                    terminalOps: [storable.packed.hash],
+                    lastOp: storable.packed.hash
+                 };
             } else {
                 for (const hash of storable.packed.value['prevOps']['_hashes'] as Array<Hash>) {
                     let idx = terminalOpsInfo.terminalOps.indexOf(hash);
@@ -119,6 +124,7 @@ class IdbBackend implements Backend {
                 if (terminalOpsInfo.terminalOps.indexOf(storable.packed.hash) < 0) { // this should always be true
                     terminalOpsInfo.terminalOps.push(storable.packed.hash);
                 }
+                terminalOpsInfo.lastOp = storable.packed.hash;
             }
 
             await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE).put(terminalOpsInfo);
@@ -140,7 +146,7 @@ class IdbBackend implements Backend {
                      (storable?.packed)) as Promise<PackedLiteral | undefined>;
     }
 
-    async loadTerminalOpsForMutable(hash: Hash) : Promise<Array<Hash> | undefined> {
+    async loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined> {
         let idb = await this.idbPromise;
 
         return idb.get(IdbBackend.TERMINAL_OPS_STORE, hash);
@@ -185,7 +191,7 @@ class IdbBackend implements Backend {
         }
 
         const range = IDBKeyRange.bound(range_start, range_end, true, true);
-        const direction = order === 'asc' ? 'next' : 'prev';
+        const direction = order === 'desc' ? 'prev' : 'next';
 
         let searchResults = {} as BackendSearchResults;
 

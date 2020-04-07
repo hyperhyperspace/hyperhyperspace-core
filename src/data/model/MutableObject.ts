@@ -2,12 +2,13 @@ import { HashedObject, LiteralContext } from './HashedObject';
 import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { TerminalOpsSyncAgent } from 'data/sync/TerminalOpsSyncAgent';
+import { HashReference } from './HashReference';
 
 abstract class MutableObject extends HashedObject {
 
-    _acceptedMutationOpClasses : Array<string>;
-
-    _unsavedOps : Array<MutationOp>;
+    readonly _acceptedMutationOpClasses : Array<string>;
+    _unsavedOps  : Array<MutationOp>;
+    _terminalOps : Map<Hash, HashReference>;
 
     _opCallback : (hash: Hash) => void;
 
@@ -16,8 +17,8 @@ abstract class MutableObject extends HashedObject {
         super();
         
         this._acceptedMutationOpClasses = acceptedOpClasses;
-
-        this._unsavedOps = [];
+        this._unsavedOps  = [];
+        this._terminalOps = new Map();
 
         this._opCallback = (hash: Hash) => {
             this.applyOpFromStore(hash);
@@ -25,6 +26,88 @@ abstract class MutableObject extends HashedObject {
     }
 
     abstract async mutate(op: MutationOp): Promise<boolean>;
+
+    async loadAllOpsFromStore(batchSize?: number) {
+        if (batchSize === undefined) {
+            batchSize = 50;
+        }
+
+        let results = await this.getStore()
+                                .loadByReference(
+                                    'target', 
+                                    this.getStoredHash(), 
+                                    {
+                                        order: 'asc',
+                                        limit: batchSize
+                                    });
+
+        while (results.objects.length > 0) {
+
+            for (const obj of results.objects) {
+                const op = obj as MutationOp;
+                await this.apply(op);
+                for (const ref of op.getPrevOps()) {
+                    this._terminalOps.delete(ref.hash);
+                }
+                this._terminalOps.set(op.getStoredHash(), op.createReference());
+            }
+
+            results = await this.getStore()
+                                .loadByReference(
+                                    'target', 
+                                    this.getStoredHash(), 
+                                    {
+                                        order: 'asc',
+                                        limit: batchSize,
+                                        start: results.end
+                                    });
+        }
+    }
+
+    async loadLastOpsFromStore(count: number, start?: string) {
+
+        let lastOp: Hash | undefined = undefined;
+
+        if (start === undefined) {
+            let terminalOpInfo = await this.getStore().loadTerminalOpsForMutable(this.getStoredHash());
+
+            this._terminalOps = new Map();
+
+            if (terminalOpInfo !== undefined) {
+                lastOp = terminalOpInfo.lastOp;
+                for (const terminalOpHash of terminalOpInfo.terminalOps) {
+                    let terminalOp = await this.getStore().load(terminalOpHash) as HashedObject;
+                    this._terminalOps.set(terminalOpHash, terminalOp.createReference());
+                }
+            }
+        }
+
+        let params: any = { order: 'desc', limit: count };
+        
+        if (start !== undefined) { params.start = start };
+
+        let results = await this.getStore()
+                                .loadByReference(
+                                    'target', 
+                                    this.getStoredHash(), 
+                                    params);
+        
+        for (const obj of results.objects) {
+            let op = obj as MutationOp;
+
+            if (lastOp !== undefined) {
+                if (lastOp === op.getStoredHash()) {
+                    lastOp === undefined;
+                }
+            }
+
+            if (lastOp === undefined && this.shouldAcceptMutationOp(op)) {
+                this.apply(op);
+            }
+        }
+
+    }
+
 
     async applyOpFromStore(hash: Hash) {
         let op: MutationOp;
