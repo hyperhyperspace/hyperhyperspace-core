@@ -13,15 +13,15 @@ abstract class ReversibleObject extends MutableObject {
     // do as if op had never happened.
     abstract reverseMutation(op: UndoOp) : void;
 
-    // should this undo op go through?
-    abstract validateUndo(op: UndoOp) : boolean;
+    constructor(acceptedOpClasses : Array<string>) {
+        super(acceptedOpClasses.concat([UndoOp.className]));
+    }
 
-    apply(op: MutationOp) : void {
+    protected async apply(op: MutationOp) : Promise<void> {
         if (op instanceof UndoOp) {
-            this.reverseMutation(op);
-            this.enqueueOpToSave(op);
+            await this.reverseMutation(op);
         } else {
-            super.apply(op);
+            await this.mutate(op);
         }
     }
 
@@ -34,7 +34,6 @@ abstract class ReversibleObject extends MutableObject {
         flags.push('reversible');
 
         return super.literalizeInContext(context, path, flags);
-
     }
 
 }

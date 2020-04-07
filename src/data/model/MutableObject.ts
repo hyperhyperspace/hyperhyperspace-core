@@ -31,7 +31,7 @@ abstract class MutableObject extends HashedObject {
 
         op = await this.getStore().load(hash, this.getAliasingContext()) as MutationOp;
         
-        await this.mutate(op);
+        await this.apply(op);
     }
 
     async applyNewOp(op: MutationOp) : Promise<void> {
@@ -39,9 +39,13 @@ abstract class MutableObject extends HashedObject {
         if (this.shouldAcceptMutationOp(op)) {
             throw new Error ('Invalid op ' + op.hash() + 'attempted for ' + this.hash());
         } else {
-            await this.mutate(op);
+            await this.apply(op);
             this.enqueueOpToSave(op);
         }
+    }
+
+    protected async apply(op: MutationOp) : Promise<void> {
+        await this.mutate(op);
     }
 
     nextOpToSave() : MutationOp | undefined {

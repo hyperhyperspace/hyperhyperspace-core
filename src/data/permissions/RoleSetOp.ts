@@ -8,6 +8,7 @@ type RoleSetAction = 'grant-role'|'revoke-role'|'use-role'|'grant-admin'|'revoke
 
 class RoleSetOp extends ReversibleOp {
 
+    static className = 'hhs/RoleSetOp';
 
     action?: RoleSetAction;
     role?: string;
@@ -16,6 +17,10 @@ class RoleSetOp extends ReversibleOp {
         super(target, prevOps, dependsUpon);
         this.action = action;
         this.role   = role;
+    }
+
+    getClassName() {
+        return RoleSetOp.className;
     }
 
     getAction() {
@@ -30,4 +35,4 @@ class RoleSetOp extends ReversibleOp {
 
 }
 
-export { RoleSetOp as CustomCapabilityOp };
+export { RoleSetOp };

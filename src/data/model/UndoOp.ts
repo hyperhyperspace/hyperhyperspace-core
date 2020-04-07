@@ -7,6 +7,9 @@ import { Hash } from './Hashing';
 
 
 class UndoOp extends MutationOp {
+
+    static className = 'hhs/UndoOp';
+
     targetOp?: ReversibleOp;
     cascadeOf?: UndoOp;
 
@@ -28,6 +31,10 @@ class UndoOp extends MutationOp {
 
     getTargetOp() : MutationOp {
         return this.targetOp as MutationOp;
+    }
+
+    getClassName() {
+        return UndoOp.className;
     }
 
     literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
