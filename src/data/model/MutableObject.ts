@@ -4,19 +4,26 @@ import { Hash } from './Hashing';
 import { TerminalOpsSyncAgent } from 'data/sync/TerminalOpsSyncAgent';
 import { HashReference } from './HashReference';
 
+type LoadStrategy = 'none'|'full'|'lazy';
+
 abstract class MutableObject extends HashedObject {
 
     readonly _acceptedMutationOpClasses : Array<string>;
-    _unsavedOps  : Array<MutationOp>;
-    _terminalOps : Map<Hash, HashReference>;
+    readonly _loadStrategy              : LoadStrategy;
+
+    _boundToStore  : boolean;
+    _unsavedOps    : Array<MutationOp>;
+    _terminalOps   : Map<Hash, HashReference>;
 
     _opCallback : (hash: Hash) => void;
 
 
-    constructor(acceptedOpClasses : Array<string>) {
+    constructor(acceptedOpClasses : Array<string>, load: LoadStrategy = 'full') {
         super();
         
         this._acceptedMutationOpClasses = acceptedOpClasses;
+        this._loadStrategy = load;
+        this._boundToStore = false;
         this._unsavedOps  = [];
         this._terminalOps = new Map();
 
@@ -27,10 +34,40 @@ abstract class MutableObject extends HashedObject {
 
     abstract async mutate(op: MutationOp): Promise<boolean>;
 
-    async loadAllOpsFromStore(batchSize?: number) {
-        if (batchSize === undefined) {
-            batchSize = 50;
+    bindToStore() {
+        this.getStore().watchReferences('target', this.getStoredHash(), this._opCallback);
+        this._boundToStore = true;
+    }
+
+    unbindFromStore() {
+        this.getStore().removeReferencesWatch('target', this.getStoredHash(), this._opCallback);
+        this._boundToStore = false;
+    }
+
+
+    async loadFromStore(limit?: number, start?: string) {
+        if (this._loadStrategy === 'none') {
+            throw new Error("Trying to load operations from store, but load strategy was set to 'none'");
+        } else if (this._loadStrategy === 'full') {
+
+            if (limit !== undefined) {
+                throw new Error("Trying to load " + limit + " operations from store, but load strategy was set to 'full' - you should use 'lazy' instead");
+            }
+
+            if (start !== undefined) {
+                throw new Error("Trying to load operations from store starting at " + start + " but load strategy was set to 'full' - you should use 'lazy' instead");
+            }
+
+            await this.loadAllOpsFromStore();
+        } else if (this._loadStrategy === 'lazy') {
+            await this.loadLastOpsFromStore(limit, start);
         }
+
+    }
+
+    async loadAllOpsFromStore() {
+        
+        let batchSize = 50;
 
         let results = await this.getStore()
                                 .loadByReference(
@@ -64,7 +101,7 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    async loadLastOpsFromStore(count: number, start?: string) {
+    async loadLastOpsFromStore(limit?: number, start?: string) {
 
         let lastOp: Hash | undefined = undefined;
 
@@ -82,7 +119,7 @@ abstract class MutableObject extends HashedObject {
             }
         }
 
-        let params: any = { order: 'desc', limit: count };
+        let params: any = { order: 'desc', limit: limit };
         
         if (start !== undefined) { params.start = start };
 
