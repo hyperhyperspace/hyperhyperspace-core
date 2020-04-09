@@ -1,4 +1,4 @@
-import { HashedObject, LiteralContext } from './HashedObject';
+import { HashedObject, Context } from './HashedObject';
 import { MutableObject } from './MutableObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
@@ -30,7 +30,7 @@ abstract class MutationOp extends HashedObject {
         this.prevOps = new HashedSet(prevOps);
     }
 
-    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
+    literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
         if (flags === undefined) {
             flags = [];

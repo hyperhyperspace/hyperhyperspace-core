@@ -1,7 +1,7 @@
 import { MutableObject } from './MutableObject'
 import { MutationOp } from './MutationOp'
 import { UndoOp } from './UndoOp';
-import { LiteralContext } from './HashedObject';
+import { Context } from './HashedObject';
 import { Hash } from './Hashing';
 
 
@@ -25,7 +25,7 @@ abstract class ReversibleObject extends MutableObject {
         }
     }
 
-    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
+    literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
         if (flags === undefined) {
             flags = [];

@@ -5,7 +5,7 @@ import { HashedObject } from 'data/model/HashedObject';
 // given a hash for an object, derive its state from the local store & inform
 // via a callback whenever that state has changed.
 
-interface ObjectSyncAgent {
+interface ObjectStateAgent {
     
     // get the hash of the object that is being observerd by this instance.
     getObjectHash(): Hash;
@@ -29,4 +29,4 @@ interface ObjectSyncAgent {
     shouldAcceptMutationOp(object: HashedObject) : boolean;
 }
 
-export { ObjectSyncAgent }
+export { ObjectStateAgent }

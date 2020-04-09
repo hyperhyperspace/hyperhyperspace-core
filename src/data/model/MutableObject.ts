@@ -1,9 +1,10 @@
-import { HashedObject, LiteralContext } from './HashedObject';
+import { HashedObject, Context } from './HashedObject';
 import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
-import { TerminalOpsSyncAgent } from 'data/sync/TerminalOpsSyncAgent';
+import { TerminalOpsStateAgent } from 'data/state/TerminalOpsStateAgent';
 import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
+import { ObjectStateAgent } from 'data/state/ObjectStateAgent';
 
 type LoadStrategy = 'none'|'full'|'lazy';
 
@@ -246,7 +247,7 @@ abstract class MutableObject extends HashedObject {
         this._unsavedOps.push(op);
     }
 
-    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
+    literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
         if (flags === undefined) {
             flags = [];
@@ -262,8 +263,8 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
-    getSyncAgent() {
-        return new TerminalOpsSyncAgent(this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
+    getSyncAgent() : ObjectStateAgent {
+        return new TerminalOpsStateAgent(this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 
 }

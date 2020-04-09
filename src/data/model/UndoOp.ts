@@ -1,7 +1,7 @@
 import { MutationOp } from './MutationOp';
 import { MutableObject } from './MutableObject';
 import { ReversibleOp } from './ReversibleOp';
-import { LiteralContext } from './HashedObject';
+import { Context } from './HashedObject';
 import { Hash } from './Hashing';
 
 
@@ -40,7 +40,7 @@ class UndoOp extends MutationOp {
         return this.targetOp as MutationOp;
     }
 
-    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
+    literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
         if (flags === undefined) {
             flags = [];

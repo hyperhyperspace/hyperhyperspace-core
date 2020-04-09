@@ -1,13 +1,13 @@
 import { Store } from 'data/storage/Store';
 import { TerminalOpsState } from './TerminalOpsState';
-import { ObjectSyncAgent } from './ObjectSyncAgent';
+import { ObjectStateAgent } from './ObjectStateAgent';
 import { Hash } from 'data/model/Hashing';
 import { HashedObject } from 'data/model/HashedObject';
 import { MutationOp } from 'data/model/MutationOp';
 
 type StoredStateChangeCallback = (objectHash: string) => void;
 
-class TerminalOpsSyncAgent implements ObjectSyncAgent {
+class TerminalOpsStateAgent implements ObjectStateAgent {
 
     objectHash: Hash;
     store: Store;
@@ -90,4 +90,4 @@ class TerminalOpsSyncAgent implements ObjectSyncAgent {
     
 }
 
-export { TerminalOpsSyncAgent };
+export { TerminalOpsStateAgent };
