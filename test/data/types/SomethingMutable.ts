@@ -1,33 +1,45 @@
-import { MutableObject, MutationOp } from "data/model";
+import { MutableObject, MutationOp, Hash } from 'data/model';
 
 class SomethingMutable extends MutableObject {
 
-    _operations: Set<MutationOp>;
+    static className = 'hhs-test/SomethingMutable';
+
+    _operations: Map<Hash, MutationOp>;
 
     constructor() {
-        super([Mutation.className]);
-        this._operations = new Set();
+        super([SomeMutation.className]);
+
+        this.setRandomId();
+
+        this._operations = new Map();
+    }
+
+    getClassName() {
+        return SomethingMutable.className;
     }
 
     async mutate(_op: MutationOp): Promise<boolean> {
-        this._operations.add(_op);
+        this._operations.set(_op.hash(), _op);
 
         return true;
     }
 
     getOperations() : Set<MutationOp>{
-        return new Set(this._operations);
+        return new Set(this._operations.values());
     }
 
-    addOperation(payload: string) {
-        let op = new Mutation(this);
+    async testOperation(payload: string) {
+        let op = new SomeMutation(this);
         op.payload = payload;
+        await this.applyNewOp(op);
     }
 
 }
 
-class Mutation extends MutationOp {
-    static className = 'hhs-test/Mutation';
+SomethingMutable.registerClass(SomethingMutable.className, SomethingMutable);
+
+class SomeMutation extends MutationOp {
+    static className = 'hhs-test/SomeMutation';
 
     payload?: string;
 
@@ -36,8 +48,10 @@ class Mutation extends MutationOp {
     }
 
     getClassName() {
-        return Mutation.className;
+        return SomeMutation.className;
     }
 }
+
+SomeMutation.registerClass(SomeMutation.className, SomeMutation);
 
 export { SomethingMutable }

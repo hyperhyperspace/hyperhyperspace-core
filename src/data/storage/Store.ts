@@ -16,9 +16,9 @@ class Store {
 
     private backend : Backend;
 
-    private classCallbacks : MultiMap<string, (match: Hash) => void>;
-    private referencesCallbacks : MultiMap<string, (match: Hash) => void>;
-    private classReferencesCallbacks : MultiMap<string, (match: Hash) => void>;
+    private classCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
+    private referencesCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
+    private classReferencesCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
 
     constructor(backend : Backend) {
         this.backend = backend;
@@ -29,7 +29,6 @@ class Store {
     }
 
     async save(object: HashedObject) : Promise<void>{
-
         let literalContext = object.toLiteralContext();
         let hash    = literalContext.rootHash as Hash;
         let context = { rootHash: hash, literals: literalContext.literals, objects: new Map() };
@@ -39,24 +38,7 @@ class Store {
         object.setStore(this);
 
         if (object instanceof MutableObject) {
-            await this.saveOperations(object);
-        }
-    }
-
-    private async saveOperations(mutable: MutableObject) : Promise<void> {
-
-
-        let op = mutable.nextOpToSave();
-        
-        while (op !== undefined) {
-            try {
-                await this.save(op);
-                
-            } catch (e) {
-                mutable.failedToSaveOp(op);
-                throw e;
-            }
-            op = mutable.nextOpToSave();
+            await object.saveQueuedOps();
         }
     }
 
@@ -82,24 +64,15 @@ class Store {
         }
 
         let packed = await this.packLiteral(literal, context);
-        
-        /*
-        let prevOps = undefined;
-        let obj = context.objects.get(hash);
-        if (obj instanceof MutationOp) {
-            prevOps = Array.from((obj as MutationOp).getPrevOps()).map((op:MutationOp) => op.hash());
-        }
-        */
-
 
         await this.backend.store(packed);
 
         // after the backend has stored the object, fire callbacks:
-        this.fireCallbacks(literal);
+        await this.fireCallbacks(literal);
     }
     
 
-    private fireCallbacks(literal: Literal) {
+    private async fireCallbacks(literal: Literal) : Promise<void> {
 
         // fire watched classes callbacks
         for (const key of this.classCallbacks.keys()) {
@@ -107,7 +80,7 @@ class Store {
 
             if (literal.value['_class'] === className) {
                 for (const callback of this.classCallbacks.get(key)) {
-                    callback(literal.hash);
+                    await callback(literal.hash);
                 }
             }
         }
@@ -119,7 +92,7 @@ class Store {
             for (const dep of literal.dependencies) {
                 if (dep.path === reference.path && dep.hash === reference.hash) {
                     for (const callback of this.referencesCallbacks.get(key)) {
-                        callback(literal.hash);
+                        await callback(literal.hash);
                     }
                 }
             }
@@ -133,7 +106,7 @@ class Store {
                 for (const dep of literal.dependencies) {
                     if (dep.path === classReference.path && dep.hash === dep.hash) {
                         for (const callback of this.classReferencesCallbacks.get(key)) {
-                            callback(literal.hash);
+                            await callback(literal.hash);
                         }
                     }
                 }    
@@ -222,6 +195,7 @@ class Store {
 
             let newContext = { rootHash: literal.hash, objects: context.objects, literals: context.literals };
             obj = HashedObject.fromContext(newContext);
+            obj.setStore(this);
         }
 
         return obj;
@@ -305,32 +279,32 @@ class Store {
         return info;
     }
 
-    watchClass(className: string, callback: (match: Hash) => void) {
+    watchClass(className: string, callback: (match: Hash) => Promise<void>) {
         const key = Store.keyForClass(className);
         this.classCallbacks.add(key, callback);
     }
 
-    watchReferences(referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) {
+    watchReferences(referringPath: string, referencedHash: Hash, callback: (match: Hash) => Promise<void>) {
         const key = Store.keyForReference(referringPath, referencedHash);
         this.referencesCallbacks.add(key, callback);
     }
 
-    watchClassReferences(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) {
+    watchClassReferences(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => Promise<void>) {
         const key = Store.keyForClassReference(referringClassName, referringPath, referencedHash);
         this.classReferencesCallbacks.add(key, callback);
     }
 
-    removeClassWatch(className: string, callback: (match: Hash) => void) : boolean {
+    removeClassWatch(className: string, callback: (match: Hash) => Promise<void>) : boolean {
         const key = Store.keyForClass(className);
         return this.classCallbacks.remove(key, callback);
     }
 
-    removeReferencesWatch(referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) : boolean {
+    removeReferencesWatch(referringPath: string, referencedHash: Hash, callback: (match: Hash) => Promise<void>) : boolean {
         const key = Store.keyForReference(referringPath, referencedHash);
         return this.referencesCallbacks.remove(key, callback);
     }
 
-    removeClassReferencesWatch(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => void) : boolean {
+    removeClassReferencesWatch(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => Promise<void>) : boolean {
         const key = Store.keyForClassReference(referringClassName, referringPath, referencedHash);
         return this.classReferencesCallbacks.remove(key, callback);
     }

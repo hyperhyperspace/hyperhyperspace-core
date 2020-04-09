@@ -18,8 +18,12 @@ class MutationOp extends HashedObject {
         return this.target as MutableObject;
     }
 
-    getPrevOps() : IterableIterator<HashReference> {
-        return (this.prevOps as HashedSet<HashReference>).elements();
+    setTarget(target: MutableObject) {
+        this.target = target;
+    }
+
+    getPrevOps() : IterableIterator<HashReference> | undefined {
+        return this.prevOps?.elements();
     }
 
     setPrevOps(prevOps: IterableIterator<HashReference>) {

@@ -105,17 +105,18 @@ class IdbBackend implements Backend {
 
 
         if (isOp) {
+            
             let terminalOpsInfo = (await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE)
-                                          .get(storable.packed.value['target']['_hash'])) as IdbTerminalOpsFormat | undefined;
+                                          .get(storable.packed.value._fields['target']['_hash'])) as IdbTerminalOpsFormat | undefined;
 
             if (terminalOpsInfo === undefined) {
                 terminalOpsInfo = { 
-                    mutableHash: storable.packed.value['target']['_hash'], 
+                    mutableHash: storable.packed.value._fields['target']['_hash'], 
                     terminalOps: [storable.packed.hash],
                     lastOp: storable.packed.hash
                  };
             } else {
-                for (const hash of storable.packed.value['prevOps']['_hashes'] as Array<Hash>) {
+                for (const hash of storable.packed.value._fields['prevOps']['_hashes'] as Array<Hash>) {
                     let idx = terminalOpsInfo.terminalOps.indexOf(hash);
                     if (idx >= 0) {
                         delete terminalOpsInfo.terminalOps[idx];

@@ -38,7 +38,7 @@ class HashedObject {
     private authors : HashedSet<Identity>;
 
     private _store?           : Store;
-    private _storedHash?      : Hash;
+    private _lastHash?        : Hash;
     private _aliasingContext? : AliasingContext;
 
 
@@ -92,6 +92,10 @@ class HashedObject {
         target.setId(HashNamespace.generateIdForPath(parentId, path));
     }
 
+    hasStore() : boolean {
+        return this._store !== undefined;
+    }
+
     setStore(store: Store) : void {
         this._store = store;
     }
@@ -105,17 +109,21 @@ class HashedObject {
         return this._store as Store;
     }
 
-    setStoredHash(hash: Hash) {
-        this._storedHash = hash;
+    hasLastHash() {
+        return this._lastHash !== undefined;
     }
 
-    getStoredHash() {
+    setLastHash(hash: Hash) {
+        this._lastHash = hash;
+    }
+
+    getLastHash() {
         
-        if (this._storedHash === undefined) {
+        if (this._lastHash === undefined) {
             throw new Error('Attempted to get stored hash within an unstored object.');
         }
 
-        return this._storedHash as Hash;
+        return this._lastHash as Hash;
     }
 
     hash() {
@@ -204,6 +212,8 @@ class HashedObject {
 
         //context.objects.set(hash, this);
         context.literals.set(hash, literal);
+
+        this.setLastHash(hash);
 
         return hash;
     }
@@ -374,9 +384,11 @@ class HashedObject {
             hashedObject.setAliasingContext({ aliased: context.aliased });
         }
         
+        hashedObject.setLastHash(hash);
+
         hashedObject.init();
 
-        context.objects.set(literal.hash, hashedObject);
+        context.objects.set(hash, hashedObject);
     }
 
     static deliteralizeField(value: any, context: Context) : any  {

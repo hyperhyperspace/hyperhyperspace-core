@@ -2,7 +2,7 @@ import { HashedObject, HashedSet, HashReference } from 'data/model';
 
 class SomethingHashed extends HashedObject {
 
-    static readonly CLASS_NAME = 'SomethingHashed';
+    static readonly className = 'SomethingHashed';
 
     name?: string;
     amount?: number;
@@ -15,11 +15,11 @@ class SomethingHashed extends HashedObject {
     }
 
     getClassName() {
-        return SomethingHashed.CLASS_NAME;
+        return SomethingHashed.className;
     }
 }
 
-HashedObject.registerClass(SomethingHashed.CLASS_NAME, SomethingHashed);
+HashedObject.registerClass(SomethingHashed.className, SomethingHashed);
 
 let createHashedObjects = () => {
     let a = new SomethingHashed();

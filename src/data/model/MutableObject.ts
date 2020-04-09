@@ -3,6 +3,7 @@ import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { TerminalOpsSyncAgent } from 'data/sync/TerminalOpsSyncAgent';
 import { HashReference } from './HashReference';
+import { Store } from 'data/storage/Store';
 
 type LoadStrategy = 'none'|'full'|'lazy';
 
@@ -13,9 +14,9 @@ abstract class MutableObject extends HashedObject {
 
     _boundToStore  : boolean;
     _unsavedOps    : Array<MutationOp>;
-    _terminalOps   : Map<Hash, HashReference>;
+    _prevOpsForUnsavedOps : Set<Hash>;
 
-    _opCallback : (hash: Hash) => void;
+    _opCallback : (hash: Hash) => Promise<void>;
 
 
     constructor(acceptedOpClasses : Array<string>, load: LoadStrategy = 'full') {
@@ -25,27 +26,31 @@ abstract class MutableObject extends HashedObject {
         this._loadStrategy = load;
         this._boundToStore = false;
         this._unsavedOps  = [];
-        this._terminalOps = new Map();
+        this._prevOpsForUnsavedOps = new Set();
 
-        this._opCallback = (hash: Hash) => {
-            this.applyOpFromStore(hash);
+        this._opCallback = async (hash: Hash) => {
+            await this.applyOpFromStore(hash);
         };
     }
 
     abstract async mutate(op: MutationOp): Promise<boolean>;
 
     bindToStore() {
-        this.getStore().watchReferences('target', this.getStoredHash(), this._opCallback);
+        // NOTE: watchReferences is idempotent
+        this.getStore().watchReferences('target', this.getLastHash(), this._opCallback);
         this._boundToStore = true;
     }
 
     unbindFromStore() {
-        this.getStore().removeReferencesWatch('target', this.getStoredHash(), this._opCallback);
+        this.getStore().removeReferencesWatch('target', this.getLastHash(), this._opCallback);
         this._boundToStore = false;
     }
 
+    // TODO: if this object is bound to the store while the load takes place, we could take measures
+    //       to try to avoid loading objects twice if they arrive while the load takes place.
+    //       As it is now, the implementation should prepare for the event of an op being loaded twice.
 
-    async loadFromStore(limit?: number, start?: string) {
+    async loadFromStore(limit?: number, start?: string) : Promise<void> {
         if (this._loadStrategy === 'none') {
             throw new Error("Trying to load operations from store, but load strategy was set to 'none'");
         } else if (this._loadStrategy === 'full') {
@@ -72,7 +77,7 @@ abstract class MutableObject extends HashedObject {
         let results = await this.getStore()
                                 .loadByReference(
                                     'target', 
-                                    this.getStoredHash(), 
+                                    this.getLastHash(), 
                                     {
                                         order: 'asc',
                                         limit: batchSize
@@ -83,16 +88,12 @@ abstract class MutableObject extends HashedObject {
             for (const obj of results.objects) {
                 const op = obj as MutationOp;
                 await this.apply(op);
-                for (const ref of op.getPrevOps()) {
-                    this._terminalOps.delete(ref.hash);
-                }
-                this._terminalOps.set(op.getStoredHash(), op.createReference());
             }
 
             results = await this.getStore()
                                 .loadByReference(
                                     'target', 
-                                    this.getStoredHash(), 
+                                    this.getLastHash(), 
                                     {
                                         order: 'asc',
                                         limit: batchSize,
@@ -105,20 +106,6 @@ abstract class MutableObject extends HashedObject {
 
         let lastOp: Hash | undefined = undefined;
 
-        if (start === undefined) {
-            let terminalOpInfo = await this.getStore().loadTerminalOpsForMutable(this.getStoredHash());
-
-            this._terminalOps = new Map();
-
-            if (terminalOpInfo !== undefined) {
-                lastOp = terminalOpInfo.lastOp;
-                for (const terminalOpHash of terminalOpInfo.terminalOps) {
-                    let terminalOp = await this.getStore().load(terminalOpHash) as HashedObject;
-                    this._terminalOps.set(terminalOpHash, terminalOp.createReference());
-                }
-            }
-        }
-
         let params: any = { order: 'desc', limit: limit };
         
         if (start !== undefined) { params.start = start };
@@ -126,14 +113,14 @@ abstract class MutableObject extends HashedObject {
         let results = await this.getStore()
                                 .loadByReference(
                                     'target', 
-                                    this.getStoredHash(), 
+                                    this.getLastHash(), 
                                     params);
         
         for (const obj of results.objects) {
             let op = obj as MutationOp;
 
             if (lastOp !== undefined) {
-                if (lastOp === op.getStoredHash()) {
+                if (lastOp === op.getLastHash()) {
                     lastOp === undefined;
                 }
             }
@@ -146,7 +133,7 @@ abstract class MutableObject extends HashedObject {
     }
 
 
-    async applyOpFromStore(hash: Hash) {
+    async applyOpFromStore(hash: Hash) : Promise<void> {
         let op: MutationOp;
 
         op = await this.getStore().load(hash, this.getAliasingContext()) as MutationOp;
@@ -156,10 +143,63 @@ abstract class MutableObject extends HashedObject {
 
     async applyNewOp(op: MutationOp) : Promise<void> {
 
-        if (this.shouldAcceptMutationOp(op)) {
-            throw new Error ('Invalid op ' + op.hash() + 'attempted for ' + this.hash());
+        if (!this.shouldAcceptMutationOp(op)) {
+            throw new Error ('Invalid op ' + op.hash() + ' attempted for ' + this.hash());
         } else {
+
+            op.setTarget(this);
+
+            let prevOps = op.getPrevOps();
+
+            let terminalOps = new Set<Hash>();
+
+            if (prevOps === undefined) {
+
+                // If prevOps is missing in the received object, we'll autogenerate a set of known
+                // operations as follows: take all the terminal operations in the store (if there is
+                // an attached store), of those remove any operations that are prevOps for all the
+                // operations that are queued for storage (they are kept in this._prevOpsForUnsavedOps)
+                // and add the last operation that is queued for storage (if there were any).
+
+                // The invariant is: this._prevOpsForUnsavedOps holds all the operations that are terminal
+                // in the store (*), but already have a successor in the chain of ops queued for saving.
+
+                // (*) At the time this function was last called.
+
+                if (this.hasStore()) {
+                    const terminalOpsInfo = await this.getStore().loadTerminalOpsForMutable(op.getTarget().hash());
+                    if (terminalOpsInfo !== undefined) {
+                        for (const opHash of terminalOpsInfo.terminalOps) {
+                            terminalOps.add(opHash);
+                        }    
+                    }    
+                }
+
+                for (const opHash of this._prevOpsForUnsavedOps) {
+                    terminalOps.delete(opHash);
+                }
+
+                let terminalOpRefs = new Set<HashReference>();
+
+                for (const opHash of terminalOps) {
+                    let terminalOp = await this.getStore().load(opHash, this.getAliasingContext()) as MutationOp;
+                    terminalOpRefs.add(terminalOp.createReference());
+                }
+
+                if (this._unsavedOps.length > 0) {
+                    let last = this._unsavedOps[this._unsavedOps.length - 1];
+                    terminalOpRefs.add(last.createReference());
+                }
+                
+                op.setPrevOps(terminalOpRefs.values());
+            }            
+
             await this.apply(op);
+
+            for (let opHash of terminalOps) {
+                this._prevOpsForUnsavedOps.add(opHash);
+            }
+
             this.enqueueOpToSave(op);
         }
     }
@@ -168,16 +208,38 @@ abstract class MutableObject extends HashedObject {
         await this.mutate(op);
     }
 
-    nextOpToSave() : MutationOp | undefined {
-        if (this._unsavedOps.length > 0) {
-            return this._unsavedOps.shift();
-        } else {
-            return undefined;
-        }
-    }
 
-    failedToSaveOp(op: MutationOp) : void {
-        this._unsavedOps.unshift(op);
+    async saveQueuedOps(store?: Store) : Promise<boolean> {
+
+        if (store === undefined) {
+            store = this.getStore();
+        }
+
+        if (this._unsavedOps.length === 0) {
+            return false;
+        } else {
+            while (this._unsavedOps.length > 0) {
+
+                let op = this._unsavedOps.shift() as MutationOp;
+                
+                try {
+                    await store.save(op);
+                } catch (e) {
+                    this._unsavedOps.unshift(op);
+                    throw e;
+                }
+                
+                let prevOps = op.getPrevOps();
+                if (prevOps !== undefined) {
+                    for (const prevOp of prevOps) {
+                        this._prevOpsForUnsavedOps.delete(prevOp.hash);
+                    }
+                }
+            }
+
+            return true;
+        }
+
     }
 
     protected enqueueOpToSave(op: MutationOp) : void {
@@ -196,20 +258,12 @@ abstract class MutableObject extends HashedObject {
 
     }
 
-    autoLoadFromStore(value: boolean) {
-        if (value) {
-            this.getStore().watchReferences('target', this.getStoredHash(), this._opCallback);
-        } else {
-            this.getStore().removeReferencesWatch('target', this.getStoredHash(), this._opCallback);
-        }
-    }
-
     shouldAcceptMutationOp(op: MutationOp) {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
     getSyncAgent() {
-        return new TerminalOpsSyncAgent(this.getStoredHash(), this.getStore(), this._acceptedMutationOpClasses);
+        return new TerminalOpsSyncAgent(this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 
 }
