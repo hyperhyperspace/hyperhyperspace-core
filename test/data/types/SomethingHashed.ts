@@ -17,6 +17,10 @@ class SomethingHashed extends HashedObject {
     getClassName() {
         return SomethingHashed.className;
     }
+
+    init() {
+        
+    }
 }
 
 HashedObject.registerClass(SomethingHashed.className, SomethingHashed);

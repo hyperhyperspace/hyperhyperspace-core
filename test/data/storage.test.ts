@@ -1,8 +1,8 @@
 import { Store, IdbBackend } from 'data/storage';
-import { HashedObject, HashedSet } from 'data/model';
+import { HashedObject, HashedSet, HashReference } from 'data/model';
 
 import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
-import { SomethingMutable } from './types/SomethingMutable';
+import { SomethingMutable, SomeMutation } from './types/SomethingMutable';
 
 
 describe('Storage', () => {
@@ -82,7 +82,7 @@ describe('Storage', () => {
 
         let sm2 = await store.load(hash) as SomethingMutable;
 
-        await sm2.loadFromStore();
+        await sm2.loadOperations();
 
         let hs = new HashedSet(sm._operations.keys());
         let hs2 = new HashedSet(sm2._operations.keys());
@@ -132,4 +132,54 @@ describe('Storage', () => {
         }
 
     });
+
+    test('Indexeddb-based mutation op automatic prevOp generation', async () => {
+
+        let store = new Store(new IdbBackend('test-storage-backend'));
+
+        let sm = new SomethingMutable();
+        await sm.testOperation('hello');
+
+        await store.save(sm);
+
+        let hash = sm.getLastHash();
+        let sm2 = await store.load(hash) as SomethingMutable;
+        await sm2.testOperation('another');
+        await store.save(sm2);
+        
+        await sm.testOperation('world');
+        await sm.testOperation('!');
+        await store.save(sm);
+        
+
+        let sm3 = await store.load(hash) as SomethingMutable;
+        await sm3.loadOperations();
+
+        let world: SomeMutation|undefined = undefined;
+
+        for (const op of sm3._operations.values()) {
+            const mut = op as SomeMutation;
+
+            if (mut.payload === 'world') {
+                world = mut;
+            }
+        }
+
+        expect(world !== undefined).toBeTruthy();
+        if (world !== undefined) {
+            expect(world.prevOps?.toArrays().elements.length === 2);
+            let another = false;
+            let hello   = false;
+            for (const opRef of (world.prevOps as HashedSet<HashReference>).toArrays().elements) {
+                let op = sm3._operations.get(opRef.hash);
+                another = another || op?.payload === 'another';
+                hello   = hello   || op?.payload === 'hello'
+            } 
+
+            expect(another).toBeTruthy();
+            expect(hello).toBeTruthy();
+        }
+        
+    });
+
 });

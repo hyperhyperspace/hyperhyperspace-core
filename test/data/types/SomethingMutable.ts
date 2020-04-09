@@ -4,7 +4,7 @@ class SomethingMutable extends MutableObject {
 
     static className = 'hhs-test/SomethingMutable';
 
-    _operations: Map<Hash, MutationOp>;
+    _operations: Map<Hash, SomeMutation>;
 
     constructor() {
         super([SomeMutation.className]);
@@ -16,6 +16,10 @@ class SomethingMutable extends MutableObject {
 
     getClassName() {
         return SomethingMutable.className;
+    }
+
+    init() {
+
     }
 
     async mutate(_op: MutationOp): Promise<boolean> {
@@ -50,8 +54,12 @@ class SomeMutation extends MutationOp {
     getClassName() {
         return SomeMutation.className;
     }
+
+    init() {
+        
+    }
 }
 
 SomeMutation.registerClass(SomeMutation.className, SomeMutation);
 
-export { SomethingMutable }
+export { SomethingMutable, SomeMutation }

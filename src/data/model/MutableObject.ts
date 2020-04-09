@@ -50,7 +50,7 @@ abstract class MutableObject extends HashedObject {
     //       to try to avoid loading objects twice if they arrive while the load takes place.
     //       As it is now, the implementation should prepare for the event of an op being loaded twice.
 
-    async loadFromStore(limit?: number, start?: string) : Promise<void> {
+    async loadOperations(limit?: number, start?: string) : Promise<void> {
         if (this._loadStrategy === 'none') {
             throw new Error("Trying to load operations from store, but load strategy was set to 'none'");
         } else if (this._loadStrategy === 'full') {

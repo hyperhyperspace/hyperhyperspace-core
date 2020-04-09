@@ -27,7 +27,7 @@ const BITS_FOR_ID = 128;
  and which objects should be preloaded when loading operations that mutate
  this object and its subobjects. */
 
-class HashedObject {
+abstract class HashedObject {
 
     static knownClasses = new Map<string, new () => HashedObject>();
     static registerClass(name: string, clazz: new () => HashedObject) {
@@ -46,9 +46,9 @@ class HashedObject {
         this.authors = new HashedSet<Identity>();
     } 
 
-    init() {
-        
-    }
+    abstract getClassName() : string;
+
+    abstract init() : void;
 
     getId() : (string | undefined) {
         return this.id;
@@ -132,10 +132,6 @@ class HashedObject {
 
     createReference() : HashReference {
         return new HashReference(this.hash(), this.getClassName());
-    }
-
-    getClassName() {
-        return 'HashedObject';
     }
 
     equals(another: HashedObject) {
@@ -369,7 +365,7 @@ class HashedObject {
         let constr = HashedObject.knownClasses.get(value['_class']);
 
         if (constr === undefined) {
-            hashedObject = new HashedObject();
+            throw new Error("A local implementation of class '" + value['_class'] + "' is necessary to deliteralize " + literal.hash);
         } else {
             hashedObject = new constr();
         }
@@ -533,7 +529,5 @@ class HashedObject {
     }
 
 }
-
-HashedObject.registerClass('HashedObject', HashedObject);
 
 export { HashedObject, Literal, Dependency, Context, AliasingContext, LiteralContext, ObjectContext };

@@ -4,7 +4,7 @@ import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 
-class MutationOp extends HashedObject {
+abstract class MutationOp extends HashedObject {
 
     target?  : MutableObject;
     prevOps? : HashedSet<HashReference>;

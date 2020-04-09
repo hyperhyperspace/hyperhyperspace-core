@@ -34,7 +34,6 @@ class RSAKeyPair extends HashedObject {
     }
 
     init() {
-        super.init();
         this._rsa = new RSAImpl();
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey(), this.getPrivateKey());
     }

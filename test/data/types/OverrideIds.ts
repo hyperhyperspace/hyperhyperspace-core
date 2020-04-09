@@ -9,6 +9,14 @@ class HasId extends MutableObject {
         this.setRandomId();
     }  
 
+    getClassName() {
+        return 'hhs-test/HasId';
+    }
+
+    init() {
+
+    }
+
     async loadState() {
         
     }
@@ -36,6 +44,14 @@ class OverrideIds extends HashedObject {
         this.two = new HasId();
 
         if (override) { this.overrideChildrenId(); }
+    }
+
+    getClassName() {
+        return 'hhs-test/OverrideIds';
+    }
+
+    init() {
+        
     }
 
 }
