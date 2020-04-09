@@ -160,17 +160,27 @@ abstract class HashedObject {
         return this._aliasingContext;
     }
 
-    toLiteralContext() : LiteralContext /*DeliteralizationContext*/ {
+    toLiteralContext(aliasingContext?: AliasingContext) : LiteralContext /*DeliteralizationContext*/ {
 
-        let literalContext: LiteralContext = { literals: new Map() };
-        //let context = { objects: new Map(), literals: new Map() } as Context
+        let context = this.toContext(aliasingContext);
 
-        literalContext.rootHash = this.literalizeInContext(literalContext, '');
-
-        return literalContext;
+        return { rootHash: context.rootHash, literals: context.literals };
     }
 
-    literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
+    toContext(aliasingContext?: AliasingContext) : Context {
+
+        let context: Context = {
+            literals: new Map(),
+            objects: new Map(),
+            aliased: aliasingContext?.aliased
+        };
+
+        context.rootHash = this.literalizeInContext(context, '');
+
+        return context;
+    }
+
+    literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
         
         let fields = {} as any;
         let dependencies = new Set<Dependency>();
@@ -206,7 +216,12 @@ abstract class HashedObject {
 
         let literal: Literal = { hash: hash, value: value, authors: authors , dependencies: dependencies };
 
-        //context.objects.set(hash, this);
+        if (context.aliased?.get(hash) !== undefined) {
+            context.objects.set(hash, context.aliased.get(hash) as HashedObject);
+        } else {
+            context.objects.set(hash, this);
+        }
+        
         context.literals.set(hash, literal);
 
         this.setLastHash(hash);
@@ -233,7 +248,7 @@ abstract class HashedObject {
         }
     }
 
-    static literalizeField(fieldPath: string, something: any, context?: LiteralContext) : { value: any, dependencies : Set<Dependency> }  {
+    static literalizeField(fieldPath: string, something: any, context?: Context) : { value: any, dependencies : Set<Dependency> }  {
 
         let typ = typeof(something);
 

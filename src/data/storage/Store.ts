@@ -29,13 +29,11 @@ class Store {
     }
 
     async save(object: HashedObject) : Promise<void>{
-        let literalContext = object.toLiteralContext();
-        let hash    = literalContext.rootHash as Hash;
-        let context = { rootHash: hash, literals: literalContext.literals, objects: new Map() };
+        let context = object.toContext();
+        let hash    = context.rootHash as Hash;
+        //let context = { rootHash: hash, literals: literalContext.literals, objects: new Map() };
 
         await this.saveWithContext(hash, context);
-
-        object.setStore(this);
 
         if (object instanceof MutableObject) {
             await object.saveQueuedOps();
@@ -44,6 +42,9 @@ class Store {
 
     private async saveWithContext(hash: Hash, context: Context) : Promise<void> {
 
+        // TODO: we could keep a set of hashes already saved by previous calls to
+        //       saveWithContext in this same recursion, and skip them without
+        //       having to call this.load(hash).
 
         let loaded = await this.load(hash);
 
@@ -66,6 +67,12 @@ class Store {
         let packed = await this.packLiteral(literal, context);
 
         await this.backend.store(packed);
+
+        let object = context.objects.get(literal.hash) as HashedObject;
+
+        if ( !object.hasStore() ) {
+            object.setStore(this);
+        }
 
         // after the backend has stored the object, fire callbacks:
         await this.fireCallbacks(literal);
