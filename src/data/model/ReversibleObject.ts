@@ -11,7 +11,7 @@ import { Hash } from './Hashing';
 abstract class ReversibleObject extends MutableObject {
     
     // do as if op had never happened.
-    abstract reverseMutation(op: UndoOp) : void;
+    abstract reverseMutation(op: UndoOp) : Promise<void>;
 
     constructor(acceptedOpClasses : Array<string>) {
         super(acceptedOpClasses.concat([UndoOp.className]));
