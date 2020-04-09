@@ -247,12 +247,6 @@ class Store {
        
     }
 
-    /*async unpack(packed: PackedLiteral, context: Context) : Promise<HashedObject> {
-        let unpacked = await this.unpackLiteral(packed);
-
-        return HashedObject.fromLiteral(unpacked);
-    }*/
-
     private unpackLiteral(packed: PackedLiteral) : Literal {
         let literal = {} as Literal;
 

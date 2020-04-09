@@ -3,15 +3,15 @@ import { HashedSet } from './HashedSet';
 import { MutableObject } from './MutableObject';
 
 
-class ReversibleOp extends MutationOp {
+abstract class ReversibleOp extends MutationOp {
     
     // dependsUpon: if any of this operations is undone, 
     //              undo this op as well.
 
     dependsUpon?: HashedSet<ReversibleOp>;
 
-    constructor(target?: MutableObject, prevOps?: HashedSet<MutationOp>, dependsUpon?: HashedSet<ReversibleOp>) {
-        super(target, prevOps);
+    constructor(target?: MutableObject, dependsUpon?: HashedSet<ReversibleOp>) {
+        super(target);
 
         this.dependsUpon = dependsUpon;
     }

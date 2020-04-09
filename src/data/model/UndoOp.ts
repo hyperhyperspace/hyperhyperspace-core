@@ -1,5 +1,4 @@
 import { MutationOp } from './MutationOp';
-import { HashedSet } from './HashedSet';
 import { MutableObject } from './MutableObject';
 import { ReversibleOp } from './ReversibleOp';
 import { LiteralContext } from './HashedObject';
@@ -14,7 +13,7 @@ class UndoOp extends MutationOp {
     cascadeOf?: UndoOp;
 
     constructor(target?: MutableObject, targetOp?: ReversibleOp, cascadeOf?: UndoOp) {
-        super(target, targetOp === undefined? undefined : new HashedSet([targetOp].values()));
+        super(target);
 
         if (targetOp instanceof UndoOp) {
             throw new Error("And undo op can't be undone this way, please just re-issue the original op");
@@ -29,12 +28,16 @@ class UndoOp extends MutationOp {
         }
     }
 
-    getTargetOp() : MutationOp {
-        return this.targetOp as MutationOp;
-    }
-
     getClassName() {
         return UndoOp.className;
+    }
+
+    init() {
+
+    }
+
+    getTargetOp() : MutationOp {
+        return this.targetOp as MutationOp;
     }
 
     literalizeInContext(context: LiteralContext, path: string, flags?: Array<string>) : Hash {
