@@ -195,7 +195,12 @@ class Store {
 
             let newContext = { rootHash: literal.hash, objects: context.objects, literals: context.literals };
             obj = HashedObject.fromContext(newContext);
-            obj.setStore(this);
+
+            for (const ctxObj of context.objects.values()) {
+                if (!ctxObj.hasStore()) {
+                    ctxObj.setStore(this);
+                }
+            }
         }
 
         return obj;
@@ -272,7 +277,7 @@ class Store {
     }
 
     async loadTerminalOpsForMutable(hash: Hash) 
-            : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined> {
+            : Promise<{lastOp?: Hash, terminalOps: Array<Hash>} | undefined> {
         
         let info = await this.backend.loadTerminalOpsForMutable(hash);
 

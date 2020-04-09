@@ -13,7 +13,7 @@ class TerminalOpsSyncAgent implements ObjectSyncAgent {
     store: Store;
     acceptedMutationOpClasses: Array<String>;
 
-    opCallback: (opHash: Hash) => void;
+    opCallback: (opHash: Hash) => Promise<void>;
 
     storedStateChangeCallbacks: Set<StoredStateChangeCallback>;
 
@@ -45,13 +45,13 @@ class TerminalOpsSyncAgent implements ObjectSyncAgent {
     }
 
     async getStoredState(): Promise<HashedObject> {
-        let terminalOpHashes = await this.store.loadTerminalOpsForMutable(this.objectHash);
+        let terminalOpsInfo = await this.store.loadTerminalOpsForMutable(this.objectHash);
 
-        if (terminalOpHashes === undefined) {
-            terminalOpHashes = [];
+        if (terminalOpsInfo === undefined) {
+            terminalOpsInfo = {terminalOps: []};
         }
 
-        return TerminalOpsState.create(this.objectHash, terminalOpHashes);
+        return TerminalOpsState.create(this.objectHash, terminalOpsInfo.terminalOps);
     }
 
     addStoredStateChangeCallback(callback: (objectHash: string) => void): void {

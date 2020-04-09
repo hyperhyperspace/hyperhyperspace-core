@@ -5,6 +5,8 @@ import { HashedSet } from 'data/model/HashedSet';
 
 class TerminalOpsState extends HashedObject {
     
+    static className = 'hhs/TerminalOpsState';
+
     objectHash?  : Hash;
     terminalOps? : HashedSet<Hash>;
 
@@ -17,6 +19,14 @@ class TerminalOpsState extends HashedObject {
 
         this.objectHash = objectHash;
         this.terminalOps = new HashedSet<Hash>(new Set(terminalOps).values());
+    }
+
+    getClassName() {
+        return TerminalOpsState.className;
+    }
+
+    init() {
+
     }
 }
 
