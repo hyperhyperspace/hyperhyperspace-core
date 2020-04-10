@@ -1,6 +1,6 @@
-import { WebRTCConnection } from 'peer/net';
+import { WebRTCConnection } from 'net/transport';
 
-import { LinkupManager, LinkupAddress } from 'peer/net';
+import { LinkupManager, LinkupAddress } from 'net/linkup';
 
 
 

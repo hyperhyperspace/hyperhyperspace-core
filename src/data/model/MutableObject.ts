@@ -1,10 +1,10 @@
 import { HashedObject, Context } from './HashedObject';
 import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
-import { TerminalOpsStateAgent } from 'data/state/TerminalOpsStateAgent';
 import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
-import { ObjectStateAgent } from 'data/state/ObjectStateAgent';
+import { ObjectStateAgent } from 'agents/state/ObjectStateAgent';
+import { TerminalOpsStateAgent } from 'agents/state/TerminalOpsStateAgent';
 
 type LoadStrategy = 'none'|'full'|'lazy';
 
