@@ -4,7 +4,6 @@ import { Identity } from 'data/identity/Identity';
 import { HashReference } from './HashReference';
 import { __spreadArrays } from 'tslib';
 import { RNGImpl } from 'crypto/random';
-import { HashNamespace } from './HashNamespace';
 import { Store } from 'data/storage/Store';
 //import { SharedState } from './state/SharedState';
 
@@ -89,7 +88,7 @@ abstract class HashedObject {
             throw new Error("Can't override a child's Id because parent's Id is unset");
         }
 
-        target.setId(HashNamespace.generateIdForPath(parentId, path));
+        target.setId(HashedObject.generateIdForPath(parentId, path));
     }
 
     hasStore() : boolean {
@@ -454,6 +453,10 @@ abstract class HashedObject {
         for (const childDep of childDeps) {
             parentDeps.add(childDep);
         }
+    }
+
+    private static generateIdForPath(parentId: string, path: string) {
+        return Hashing.forValue('#' + parentId + '.' + path);
     }
 
     // the following only for pretty printing.
