@@ -7,7 +7,7 @@ import { RNGImpl } from 'crypto/random';
 import { Store } from 'data/storage/Store';
 //import { SharedState } from './state/SharedState';
 
-type Literal           = { hash: Hash, value: any, authors: Array<Hash>, dependencies: Set<Dependency> }
+type Literal           = { hash: Hash, value: any, author?: Hash, dependencies: Set<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
 type AliasingContext  = { rootHash?: Hash, aliased: Map<Hash, HashedObject> };
@@ -34,7 +34,7 @@ abstract class HashedObject {
     }
 
     private id?     : string;
-    private authors : HashedSet<Identity>;
+    private author? : Identity;
 
     private _store?           : Store;
     private _lastHash?        : Hash;
@@ -42,7 +42,7 @@ abstract class HashedObject {
 
 
     constructor() {
-        this.authors = new HashedSet<Identity>();
+
     } 
 
     abstract getClassName() : string;
@@ -62,12 +62,12 @@ abstract class HashedObject {
         this.id = new RNGImpl().randomHexString(BITS_FOR_ID);
     }
 
-    addAuthor(author: Identity) {
-        this.authors.add(author);
+    setAuthor(author: Identity) {
+        this.author = author;
     }
 
-    getAuthors() {
-        return this.authors;
+    getAuthor() {
+        return this.author;
     }
 
     overrideChildrenId() : void {
@@ -211,9 +211,13 @@ abstract class HashedObject {
 
         let hash = Hashing.forValue(value);
         
-        let authors = value['_fields']['authors']['_hashes'] as Array<Hash>;
+        
 
-        let literal: Literal = { hash: hash, value: value, authors: authors , dependencies: dependencies };
+        let literal: Literal = { hash: hash, value: value, dependencies: dependencies };
+
+        if (value['_fields']['author'] !== undefined) {
+            literal.author = value['_fields']['author']['hash'];
+        }
 
         if (context.aliased?.get(hash) !== undefined) {
             context.objects.set(hash, context.aliased.get(hash) as HashedObject);

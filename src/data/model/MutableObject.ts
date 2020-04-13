@@ -3,8 +3,8 @@ import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
-import { ObjectStateAgent } from 'agents/state/ObjectStateAgent';
-import { TerminalOpsStateAgent } from 'agents/state/TerminalOpsStateAgent';
+import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
+import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
 type LoadStrategy = 'none'|'full'|'lazy';
 

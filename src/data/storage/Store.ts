@@ -7,7 +7,7 @@ import { Identity } from 'data/identity/Identity';
 import { MultiMap } from 'util/multimap';
 
 type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
-type PackedLiteral = { hash : Hash, value: any, signatures : Array<[Hash, string]>,
+type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
                        dependencies: Array<Dependency>, flags: Array<PackedFlag> };
 
 type LoadParams = BackendSearchParams;
@@ -134,14 +134,13 @@ class Store {
 
         packed.hash  = literal.hash;
         packed.value = literal.value;
-        packed.signatures = [];
-
-        for (const authorHash of literal.authors) {
-
-            let author = context.objects.get(authorHash) as Identity;
+        
+        if (literal.author !== undefined) {
+            packed.author = literal.author;
+            let author = context.objects.get(literal.author) as Identity;
             let keyHash = author.getKeyPairHash();
             let key     = await (this.load(keyHash) as Promise<RSAKeyPair>);
-            packed.signatures.push([author.hash(), key.sign(packed.hash)]);
+            packed.signature = key.sign(packed.hash);
         }
 
         packed.dependencies = Array.from(literal.dependencies);
@@ -253,7 +252,9 @@ class Store {
         literal.hash = packed.hash;
         literal.value = packed.value;
         literal.dependencies = new Set<Dependency>(packed.dependencies);
-        literal.authors = packed.signatures.map((sig: [Hash, string]) => sig[0]);
+        if (packed.author !== undefined) {
+            literal.author = packed.author;
+        }
         literal.value['_flags'] = packed.flags;
 
         return literal;
@@ -283,6 +284,31 @@ class Store {
         let info = await this.backend.loadTerminalOpsForMutable(hash);
 
         return info;
+    }
+
+    async loadClosure(init: Set<Hash>, next: (obj: HashedObject) => Set<Hash>, aliasingContext?: AliasingContext | undefined) : Promise<Set<Hash>> {
+
+        let closure = new Set<Hash>();
+        let pending = new Set<Hash>(init);
+
+
+        
+        while (pending.size > 0) {
+            let {done, value} = pending.values().next(); done;
+            pending.delete(value);
+            closure.add(value);
+
+            let obj = await this.load(value, aliasingContext) as HashedObject;
+            let children = next(obj);
+
+            for (const hash of children.values()) {
+                if (!closure.has(hash)) {
+                    pending.add(hash);
+                }
+            }
+        }
+
+        return closure;
     }
 
     watchClass(className: string, callback: (match: Hash) => Promise<void>) {
