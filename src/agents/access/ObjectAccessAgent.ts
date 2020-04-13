@@ -4,7 +4,7 @@
 // receive state updates.
 
 import { Hash } from 'data/model';
-import { ObjectAccessRequest } from './ObjcetAccessRequest';
+import { ObjectAccessRequest } from './ObjectAccessRequest';
 
 interface ObjectAccessAgent {
 
