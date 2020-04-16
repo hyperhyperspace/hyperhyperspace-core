@@ -27,7 +27,7 @@ class WebRTCConnection {
     gatheredICE  : boolean;
 
     readyCallback   : (conn: WebRTCConnection) => void;
-    messageCallback : ((data: any) => void) | null;
+    messageCallback : ((data: any, conn:WebRTCConnection) => void) | null;
 
     incomingMessages : any[];
 
@@ -56,7 +56,7 @@ class WebRTCConnection {
             WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' received message from ' + this.remoteAddress?.linkupId + ' on call ' + this.callId);
             WebRTCConnection.logger.trace('message is ' + ev.data);
             if (this.messageCallback != null) {
-                this.messageCallback(ev.data);
+                this.messageCallback(ev.data, this);
             } else {
                 this.incomingMessages.push(ev);
             }
@@ -115,13 +115,13 @@ class WebRTCConnection {
         return this.channel !== undefined && this.channel.readyState === 'open';
     }
 
-    setMessageCallback(messageCallback: (message:any) => void) {
+    setMessageCallback(messageCallback: (message: any, conn: WebRTCConnection) => void) {
         this.messageCallback = messageCallback;
 
         if (messageCallback != null) {
             while (this.incomingMessages.length > 0) {
                 var ev = this.incomingMessages.shift();
-                messageCallback(ev.data);
+                messageCallback(ev.data, this);
             }
         }
     }

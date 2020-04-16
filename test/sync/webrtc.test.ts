@@ -23,7 +23,7 @@ describe('Single-host WebRTC Connection', () => {
                 expect(sender.linkupId).toEqual(address1.linkupId);
                 expect(conn.getCallId()).toEqual(theCallId);
             });
-            conn2.setMessageCallback((message: any) => {
+            conn2.setMessageCallback((message: any, _conn: WebRTCConnection) => {
                 expect(message).toEqual("hola");
                 conn2.send("chau");
             });

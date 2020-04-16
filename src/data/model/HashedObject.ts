@@ -274,14 +274,9 @@ abstract class HashedObject {
                 }
             } else if (something instanceof HashedSet) {
                 let hset = something as HashedSet<any>;
-                let arrays = hset.toArrays();
-                let hashes = arrays.hashes;
-                let child = HashedObject.literalizeField(fieldPath, arrays.elements, context);
-                let elements = child.value;
-                HashedObject.collectChildDeps(dependencies, child.dependencies);
-
-                value = {_type: 'hashed_set', _hashes: hashes, _elements: elements};
-
+                let hsetLiteral = hset.literalize(fieldPath, context);
+                value = hsetLiteral.value;
+                HashedObject.collectChildDeps(dependencies, hsetLiteral.dependencies);
             } else { // not a set nor an array
 
                 if (something instanceof HashReference) {
@@ -427,11 +422,7 @@ abstract class HashedObject {
                 }
             } else {
                 if (value['_type'] === 'hashed_set') {
-                    let hashes = value['_hashes'];
-                    let elements = HashedObject.deliteralizeField(value['_elements'], context);
-                    
-                    something = new HashedSet();
-                    something.fromArrays(hashes, elements);
+                    something = HashedSet.deliteralize(value, context);
                 } else if (value['_type'] === 'hashed_object_reference') {
                     something = new HashReference(value['_hash'], value['_class']);
                 } else if (value['_type'] === 'hashed_object_dependency') {
