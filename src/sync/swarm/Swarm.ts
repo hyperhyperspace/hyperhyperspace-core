@@ -1,10 +1,11 @@
 import { WebRTCConnection } from 'sync/transport/WebRTCConnection';
-import { Hash, HashedObject, HashedSet } from 'data/model';
+import { Hash, HashedSet } from 'data/model';
 import { Agent } from './Agent';
 import { Peer } from './Peer';
 import { LinkupManager } from 'sync/linkup/LinkupManager';
 import { LinkupAddress } from 'sync/linkup/LinkupAddress';
 import { RNGImpl } from 'crypto/random';
+import { Logger, LogLevel } from 'util/logging';
 
 type Endpoint = string;
 
@@ -23,6 +24,8 @@ enum EventType {
     LocalPeerRemoval   = 'local-peer-removal',
     LocalConnectionReady  = 'local-connection-ready',
     LocalConnectionClosed = 'local-connection-closed',
+
+    RemoteAddressListening = 'remote-address-listening',
 
     RemoteAgentAdditions = 'remote-agent-additions',
     RemoteAgentRemovals  = 'remote-agent-removals'
@@ -70,12 +73,13 @@ const PeerValidationTimeout = 20;
 
 class Swarm {
 
-    root          : HashedObject;
+    static logger = new Logger(Swarm.name, LogLevel.INFO);
+
     rootHash      : Hash;
 
-    localAddress  : LinkupAddress;
-    localEndpoint : Endpoint;
-    localPeer?    : Peer;
+    localAddress?  : LinkupAddress;
+    localEndpoint? : Endpoint;
+    localPeer?     : Peer;
     
     linkupManager : LinkupManager;
 
@@ -98,13 +102,9 @@ class Swarm {
 
     intervalRef : any;
 
-    constructor(root: HashedObject, localAddress: LinkupAddress, linkupManager: LinkupManager) {
+    constructor(rootHash: Hash, linkupManager = new LinkupManager()) {
 
-        this.root        = root;
-        this.rootHash    = root.hash();
-
-        this.localAddress  = localAddress;
-        this.localEndpoint = localAddress.url();
+        this.rootHash    = rootHash;
 
         this.linkupManager = linkupManager;
 
@@ -118,17 +118,22 @@ class Swarm {
         this.connectionInfo = new Map(); 
 
         this.messageCallback = (data: any, conn: WebRTCConnection) => {
+
+            Swarm.logger.trace('Peer ' + this.localPeer?.getId() + ' received message: ' + data);
+
             const callId = conn.getCallId(); 
             const connInfo = this.connectionInfo.get(callId);
+
+            const message = JSON.parse(data);
 
             if (connInfo !== undefined) {
                 const status = connInfo.status;
 
                 
-                if (data.callId !== undefined) {
+                if (message.callId !== undefined) {
                     
                     // plain message, not peer to peer yet.
-                    const msg = data as Message;
+                    const msg = message as Message;
 
                     if (msg.callId === conn.getCallId()) {
                         this.receiveMessage(msg);
@@ -139,7 +144,7 @@ class Swarm {
                     // has completed peer to peer validation.
 
                     const peerId = connInfo.peerId as PeerId;
-                    const msg    = data as ControlMessage;
+                    const msg    = message as ControlMessage;
 
                     if (peerId === msg.source && this.localPeer?.getId() === msg.destination) {
                         
@@ -176,7 +181,7 @@ class Swarm {
                 };
                 this.connectionInfo.set(callId, connInfo);
                 if (conn === undefined) {
-                    conn = new WebRTCConnection(linkupManager, this.localAddress, sender, callId, this.connectionReadyCallback);
+                    conn = new WebRTCConnection(linkupManager, this.localAddress as LinkupAddress, sender, callId, this.connectionReadyCallback);
                 }
                 conn.setMessageCallback(this.messageCallback);
                 conn.answer(message);
@@ -222,8 +227,28 @@ class Swarm {
 
     }
 
+    init(address: LinkupAddress, peer: Peer) {
+
+        this.localAddress = address;
+        this.localEndpoint = address.url();
+        this.localPeer = peer;
+
+        this.linkupManager.listenForQueryResponses(this.localAddress.linkupId, (linkupId: string, addresses: Array<LinkupAddress>) => {
+
+            if (linkupId === this.localAddress?.linkupId) {
+                for (const address of addresses) {
+                    this.sendLocalEvent({type: EventType.RemoteAddressListening, content: address.url()});
+                }
+            }
+
+        });
+
+        Swarm.logger.debug('Initialized swarm ' + this.rootHash + ' for peer ' + this.localPeer.getId());
+        this.start();
+    }
+
     start() {
-        this.linkupManager.listenForMessagesNewCall(this.localAddress, this.newConnectionRequestCallback);
+        this.linkupManager.listenForMessagesNewCall(this.localAddress as LinkupAddress, this.newConnectionRequestCallback);
         this.intervalRef = setInterval(this.doHousekeeping, HouseKeepingInterval * 1000);
     }
 
@@ -245,9 +270,14 @@ class Swarm {
 
         this.connectionInfo.set(callId, { remoteEndpoint: endpoint, callId: callId, status: ConnectionStatus.Establishment, timestamp: Date.now()});
 
-        let conn = new WebRTCConnection(this.linkupManager, this.localAddress, remoteAddress, callId, this.connectionReadyCallback);
+        let conn = new WebRTCConnection(this.linkupManager, this.localAddress as LinkupAddress, remoteAddress, callId, this.connectionReadyCallback);
+
+
+        conn.setMessageCallback(this.messageCallback);
 
         this.connections.set(callId, conn);
+
+        conn.open('swarm-comms-channel');
 
     }
 
@@ -262,6 +292,14 @@ class Swarm {
         conn.close();
 
         this.connectionCloseCleanup(callId);
+    }
+
+    queryForListeningAddresses(addresses: Array<LinkupAddress>) {
+        this.linkupManager.queryForListeningAddresses(this.localAddress?.linkupId as string, addresses);
+    }
+
+    getConnectionEndpoint(callId: CallId) {
+       return this.connectionInfo.get(callId)?.remoteEndpoint;
     }
 
     private connectionCloseCleanup(callId: CallId) {
@@ -479,6 +517,11 @@ class Swarm {
 
     registerAgent(agent: Agent) {
         this.agents.set(agent.getId(), agent);
+
+        this.localAgentSet.add(agent.getId());
+
+        agent.ready(this);
+
         this.sendLocalEvent({type: EventType.LocalAgentAddition, content: agent.getId()})
 
         let delta = { additions: [agent.getId()], removals: [], hash: this.localAgentSet.hash() };
@@ -497,6 +540,8 @@ class Swarm {
         this.sendLocalEvent({type: EventType.LocalAgentRemoval, content: id});
         this.agents.delete(id);
 
+        this.localAgentSet.removeByHash(id);
+
         let delta = { additions: [], removals: [id], hash: this.localAgentSet.hash() };
 
         for (const peer of this.peers.values()) {
@@ -514,6 +559,12 @@ class Swarm {
 
     registerPeer(peer: Peer) {
         this.peers.set(peer.getId(), peer);
+
+        const info  = this.connectionInfo.get(peer.getCallId() as CallId) as ConnectionInfo;
+        
+        info.status = ConnectionStatus.PeerReady;
+        info.peerId = peer.getId();
+
         this.sendLocalEvent({type: EventType.LocalPeerAddition, content: peer.getId()});
 
         this.sendAgentSet(peer.getId());
@@ -521,6 +572,11 @@ class Swarm {
 
     deregisterPeer(peer: Peer) {
         this.deregisterPeerById(peer.getId());
+
+        const info  = this.connectionInfo.get(peer.getCallId() as CallId) as ConnectionInfo;
+        
+        info.status = ConnectionStatus.PeerValidation;
+        info.peerId = undefined;
     }
 
     deregisterPeerById(id: string) {
@@ -533,6 +589,9 @@ class Swarm {
     }
 
     sendLocalEvent(ev: Event) {
+        
+        Swarm.logger.debug('Swarm ' + this.rootHash + ' for peer ' + this.localPeer?.getId() + ' sending event ' + ev.type + ' with content ' + ev.content);
+
         for (const agent of this.agents.values()) {
             agent.receiveLocalEvent(ev);
         }
@@ -595,9 +654,21 @@ class Swarm {
             throw new Error("Connection to peer '" + message.destination + "' is not operational at this time, sorry.");
         }
 
-        conn.send(message);
+        let data = JSON.stringify(message);
+
+        Swarm.logger.debug('Sending message from ' + this.localPeer.getId() + ': ' + data );
+
+        conn.send(data);
     }
 
+    shutdown() {
+        this.linkupManager.shutdown();
+        for (const conn of this.connections.values()) {
+            this.connectionInfo.delete(conn.getCallId());
+            this.connections.delete(conn.getCallId());
+            conn.close();
+        }
+    }
 }
 
 export { Swarm, CallId, Endpoint, Event, EventType, Message, PeerMessage };

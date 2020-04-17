@@ -3,7 +3,8 @@ import { Logger, LogLevel } from 'util/logging';
 import { LinkupAddress } from './LinkupAddress';
 
 type NewCallMessageCallback = (sender: LinkupAddress, callId: string, message: any) => void;
-type MessageCallback    = (message: any) => void;
+type MessageCallback        = (message: any) => void;
+type LinkupIdQueryCallback  = (sender: string, matches: Array<LinkupAddress>) => void;
 
 class LinkupServerConnection {
 
@@ -15,6 +16,8 @@ class LinkupServerConnection {
 
     newCallMessageCallbacks : Map<string, Set<NewCallMessageCallback>>;
     messageCallbacks        : Map<string, Map<string, Set<MessageCallback>>>;
+
+    linkupAddressQueryCallback? : LinkupIdQueryCallback;
 
     linkupIdsToListen : Set<string>;
 
@@ -88,6 +91,10 @@ class LinkupServerConnection {
         this.setUpListenerIfNew(recipient.linkupId);
     }
 
+    listenForLinkupAddressQueries(callback: LinkupIdQueryCallback) {
+        this.linkupAddressQueryCallback = callback;
+    }
+
     sendMessage(sender: LinkupAddress, recipient: LinkupAddress, callId: string, data: any) {
 
         if (recipient.serverURL !== this.serverURL) {
@@ -100,14 +107,40 @@ class LinkupServerConnection {
         }
 
         var message = {
-                    'action':   'send',
-                    'linkupId': recipient.linkupId,
-                    'callId':   callId,
-                    'data':     data,
-                    'replyServerUrl': sender.serverURL,
-                    'replyLinkupId':  sender.linkupId,
+                    'action'         :  'send',
+                    'linkupId'       :  recipient.linkupId,
+                    'callId'         :  callId,
+                    'data'           :  data,
+                    'replyServerUrl' :  sender.serverURL,
+                    'replyLinkupId'  :  sender.linkupId,
                   };
         
+        this.enqueueAndSend(JSON.stringify(message));
+    }
+
+    sendListeningAddressesQuery(senderLinkupId: string, addresses: Array<LinkupAddress>) {
+
+        let linkupIds = new Array<string>();
+
+        for (const address of addresses) {
+            if (address.serverURL !== this.serverURL) {
+                let e = new Error('Trying to send an address query for ' + 
+                                  address.serverURL + 
+                                  ' but this is a connection to ' +
+                                  this.serverURL);
+                LinkupServerConnection.logger.error(e);
+                throw e;
+            }
+
+            linkupIds.push(address.linkupId);
+        }
+        
+        var message = {
+            'action'        : 'query',
+            'linkupIds'     : linkupIds,
+            'replyLinkupId' : senderLinkupId
+        };
+
         this.enqueueAndSend(JSON.stringify(message));
     }
 
@@ -160,6 +193,21 @@ class LinkupServerConnection {
                             if (!found) {
                                 LinkupServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId);
                             }
+                        }
+                    } else if (message['action'] === 'query-reply') {
+
+                        const sender = message['linkupId'];
+                        const hits   = message['hits'];
+                        
+                        let callback = this.linkupAddressQueryCallback;
+
+                        if (callback !== undefined) {
+                            let matchingLinkupAddresses = new Array<LinkupAddress>();
+                            for (const linkupId of hits) {
+                                matchingLinkupAddresses.push(new LinkupAddress(this.serverURL, linkupId));
+                            }
+
+                            callback(sender, matchingLinkupAddresses);
                         }
                     } else {
                         LinkupServerConnection.logger.info('received unknown message on ' + this.serverURL + ': ' + ev.data);
@@ -219,6 +267,10 @@ class LinkupServerConnection {
         this.emptyMessageQueue();
     }
 
+    close() {
+        this.ws?.close();
+    }
+
 }
 
-export { LinkupServerConnection, NewCallMessageCallback as CallCallback, MessageCallback };
+export { LinkupServerConnection, NewCallMessageCallback as CallCallback, MessageCallback, LinkupIdQueryCallback };

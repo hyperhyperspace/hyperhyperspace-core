@@ -10,7 +10,7 @@ describe('Single-host WebRTC Connection', () => {
         let linkupManager2 = new LinkupManager();
 
         //let linkupServer2 = 'wss://mypeer.net:443';
-        let linkupServer1 = 'ws://localhost:8765';
+        let linkupServer1 = 'ws://localhost:3002';
 
         let address1 = new LinkupAddress(linkupServer1, 'addressOne_C');
         let address2 = new LinkupAddress(linkupServer1, 'addressTwo_C');

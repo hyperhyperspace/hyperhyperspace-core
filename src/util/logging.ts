@@ -31,7 +31,8 @@ class Logger {
     if (level >= this.level) {
       let className = 'Not within class';
       if (this.className) className = this.className;
-      console.log('[' + className + ']: ' + msg);
+      const d = new Date();
+      console.log('[' + className + ' ' + d.getHours() + ':' + d.getMinutes() + ' ' + d.getSeconds() + '.' + d.getMilliseconds().toString().padStart(3, '0') + ']: ' + msg);
     }
   }
 }

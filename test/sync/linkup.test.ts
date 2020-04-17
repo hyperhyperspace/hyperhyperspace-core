@@ -5,8 +5,8 @@ describe('Single-host LinkupManager', () => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
-        let address1 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:8765', 'addressOne_A');
-        let address2 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:8765', 'addressTwo_A');
+        let address1 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:3002', 'addressOne_A');
+        let address2 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:3002', 'addressTwo_A');
 
         let callId = 'DUMMY_CALL_ID_TEST_A';
         let message = 'MESSAGE';
@@ -34,8 +34,8 @@ describe('Single-host LinkupManager', () => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
-        let address1 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:8765', 'addressOne_B');
-        let address2 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:8765', 'addressTwo_B');
+        let address1 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:3002', 'addressOne_B');
+        let address2 = new LinkupAddress(/*'wss://mypeer.net:443'*/'ws://localhost:3002', 'addressTwo_B');
 
         let callId =  'DUMMY_CALL_ID_TEST_B';
         let message = 'MESSAGE';
