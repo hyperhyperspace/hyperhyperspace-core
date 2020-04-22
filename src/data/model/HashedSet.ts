@@ -3,19 +3,6 @@ import { HashedObject, Context, Dependency } from './HashedObject';
 
 class HashedSet<T> {
 
-    static hash(element: any) : Hash {
-
-        let hash: Hash;
-
-        if (element instanceof HashedObject) {
-            hash = (element as HashedObject).hash();
-        } else {
-            hash = Hashing.forValue(HashedObject.literalizeField('', element).value);
-        }
-
-        return hash;
-    }
-
     hashedElements : Map<Hash, T>;
 
     constructor(init?: IterableIterator<T>) {
@@ -28,11 +15,11 @@ class HashedSet<T> {
     }
 
     add(element: T) {
-        this.hashedElements.set(HashedSet.hash(element), element);
+        this.hashedElements.set(HashedObject.hashElement(element), element);
     }
 
     remove(element: T) : boolean {
-        return this.removeByHash(HashedSet.hash(element));
+        return this.removeByHash(HashedObject.hashElement(element));
     }
 
     removeByHash(hash: Hash) : boolean {
@@ -40,14 +27,14 @@ class HashedSet<T> {
     }
 
     has(element: T) {
-        return this.hasByHash(HashedSet.hash(element));
+        return this.hasByHash(HashedObject.hashElement(element));
     }
 
     hasByHash(hash: string) {
         return this.hashedElements.has(hash);
     }
 
-    elements() : IterableIterator<T> {
+    values() : IterableIterator<T> {
         return this.hashedElements.values();
     }
 
@@ -64,9 +51,9 @@ class HashedSet<T> {
         return {hashes: hashes, elements: elements as T[]};
     }
 
-    fromArrays(hashes: string[], elements: any[]) {
-        for (let i=0; i<hashes.length; i++) {
-            this.hashedElements.set(hashes[i], elements[i]);
+    fromArrays(_hashes: string[], elements: any[]) {
+        for (let i=0; i<elements.length; i++) {
+            this.add(elements[i]);
         }
     }
 
@@ -79,7 +66,7 @@ class HashedSet<T> {
         let result = hashes.length === anotherHashes.length;
 
         for(let i=0; result && i<hashes.length; i++) {
-            result = hashes[i] === anotherHashes[i];
+            result = result && hashes[i] === anotherHashes[i];
         }
 
         return result;
@@ -88,8 +75,7 @@ class HashedSet<T> {
     //literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
     literalize(path='', context?: Context) : { value: any, dependencies : Set<Dependency> }  {
-
-                
+           
         let dependencies = new Set<Dependency>();
 
         let arrays = this.toArrays();

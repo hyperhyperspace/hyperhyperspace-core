@@ -2,6 +2,7 @@ import { HashedObject, HashedSet, Hash, Literal, Serialization } from 'data/mode
 
 import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
 import { OverrideIds } from './types/OverrideIds';
+import { HashedMap } from 'data/model/HashedMap';
 
 describe('Data model', () => {
     test( 'Basic types', () => {
@@ -35,6 +36,31 @@ describe('Data model', () => {
         
         expect(set1.has('five')).toBeTruthy();
         expect(set1.has('seven')).toBeFalsy();
+    });
+
+    test('Hashed maps', () => {
+
+        const map1 = new HashedMap();
+        const map2 = new HashedMap();
+
+        const items = [['a', 'five'], ['b', 'three']];
+
+        for (let item of items) {
+            map1.set(item[0], item[1]);
+            map2.set(item[0], item[1]);
+        }
+
+        expect(map1.equals(map2)).toBeTruthy();
+
+        map1.set('a', 'nonsense');
+
+        expect(map1.equals(map2)).toBeFalsy();
+
+        const literal1 = map2.literalize();
+
+        const map3 = HashedMap.deliteralize(literal1.value, { literals: new Map(), objects: new Map()});
+
+        expect(map2.equals(map3)).toBeTruthy();
     });
 
     test('HashedObject subclasses', () => {

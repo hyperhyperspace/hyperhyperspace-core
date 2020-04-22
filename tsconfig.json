@@ -1,21 +1,14 @@
 {
-  "include": ["src", "types", "test", "poly/node"],
+  "include": ["src", "types"],
   "compilerOptions": {
-    "target": "es5",
-    "downlevelIteration": true,
     "module": "esnext",
     "lib": ["dom", "esnext"],
     "importHelpers": true,
     "declaration": true,
     "sourceMap": true,
-    "rootDir": "./",
+    "rootDir": "./src",
+    "downlevelIteration": true,
     "strict": true,
-    "noImplicitAny": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true,
-    "strictPropertyInitialization": true,
-    "noImplicitThis": true,
-    "alwaysStrict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
@@ -23,7 +16,7 @@
     "moduleResolution": "node",
     "baseUrl": "./",
     "paths": {
-      "*": ["src/*", "node_modules/*", "types/*", "poly/node/*"]
+      "*": ["src/*", "node_modules/*", "src/poly/node/*"]
     },
     "jsx": "react",
     "esModuleInterop": true

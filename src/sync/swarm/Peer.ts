@@ -1,10 +1,11 @@
 import { CallId, Endpoint } from './Swarm';
 
+type PeerId  = string;
 
 interface Peer {
-    getId() : string;
+    getId() : PeerId;
     getCallId() : CallId;
     getEndpoint() : Endpoint;
 }
 
-export { Peer };
+export { Peer, PeerId };

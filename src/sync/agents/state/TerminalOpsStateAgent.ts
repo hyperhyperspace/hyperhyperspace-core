@@ -73,7 +73,7 @@ class TerminalOpsStateAgent implements ObjectStateAgent {
         let missingOps = [];
 
         if (receivedOps !== undefined) {
-            for (const opHash of receivedOps?.elements()) {
+            for (const opHash of receivedOps?.values()) {
                 let op = await this.store.load(opHash);
                 if (op === undefined) {
                     missingOps.push(opHash);

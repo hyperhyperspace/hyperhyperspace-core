@@ -1,7 +1,9 @@
 import { Swarm, Event, Message, PeerMessage } from 'sync/swarm';
 
+type AgentId = string;
+
 interface Agent {
-    getId() : string;
+    getId() : AgentId;
 
     ready(swarm: Swarm) : void;
 
@@ -10,4 +12,4 @@ interface Agent {
     receivePeerMessage(message: PeerMessage) : void;
 }
 
-export { Agent };
+export { Agent, AgentId };

@@ -1,7 +1,7 @@
-import { WebRTCConnection } from 'sync/transport/WebRTCConnection';
+import { WebRTCConnection } from '../transport/WebRTCConnection';
 import { Hash, HashedSet } from 'data/model';
-import { Agent } from './Agent';
-import { Peer } from './Peer';
+import { Agent, AgentId } from './Agent';
+import { Peer, PeerId } from './Peer';
 import { LinkupManager } from 'sync/linkup/LinkupManager';
 import { LinkupAddress } from 'sync/linkup/LinkupAddress';
 import { RNGImpl } from 'crypto/random';
@@ -10,8 +10,6 @@ import { Logger, LogLevel } from 'util/logging';
 type Endpoint = string;
 
 type CallId  = string;
-type PeerId  = string;
-type AgentId = string;
 
 type Event = { type: EventType, content: any};
 
@@ -75,7 +73,7 @@ class Swarm {
 
     static logger = new Logger(Swarm.name, LogLevel.INFO);
 
-    rootHash      : Hash;
+    topic      : string;
 
     localAddress?  : LinkupAddress;
     localEndpoint? : Endpoint;
@@ -102,9 +100,9 @@ class Swarm {
 
     intervalRef : any;
 
-    constructor(rootHash: Hash, linkupManager = new LinkupManager()) {
+    constructor(topic: string, linkupManager = new LinkupManager()) {
 
-        this.rootHash    = rootHash;
+        this.topic    = topic;
 
         this.linkupManager = linkupManager;
 
@@ -227,6 +225,8 @@ class Swarm {
 
     }
 
+    // Swarm init, start, stop, shutdown
+
     init(address: LinkupAddress, peer: Peer) {
 
         this.localAddress = address;
@@ -243,41 +243,77 @@ class Swarm {
 
         });
 
-        Swarm.logger.debug('Initialized swarm ' + this.rootHash + ' for peer ' + this.localPeer.getId());
+        Swarm.logger.debug('Initialized swarm ' + this.topic + ' for peer ' + this.localPeer.getId());
         this.start();
     }
 
     start() {
+        
         this.linkupManager.listenForMessagesNewCall(this.localAddress as LinkupAddress, this.newConnectionRequestCallback);
-        this.intervalRef = setInterval(this.doHousekeeping, HouseKeepingInterval * 1000);
+        this.intervalRef = window.setInterval(this.doHousekeeping, HouseKeepingInterval * 1000);
     }
 
     stop() {
         // TODO: add 'unlisten' to LinkupManager
 
         if (this.intervalRef !== undefined) {
-            clearInterval(this.intervalRef);
+            window.clearInterval(this.intervalRef);
             this.intervalRef = undefined;
-        } 
-        
+        }    
     }
+
+    shutdown() {
+        this.linkupManager.shutdown();
+        this.stop();
+        for (const conn of this.connections.values()) {
+            this.connectionInfo.delete(conn.getCallId());
+            this.connections.delete(conn.getCallId());
+            conn.close();
+        }
+    }
+
+    // Connection management: connect-disconnect, find out which addresses are online
+    //                        at the moment, recover the endpoint for a current callId.
 
     connect(endpoint: Endpoint) {
 
-        const remoteAddress = LinkupAddress.fromURL(endpoint);
 
-        const callId = new RNGImpl().randomHexString(BITS_FOR_CALL_ID);
+        /*
+        let est = 0;
+        let val = 0;
+        let ok  = 0;
 
-        this.connectionInfo.set(callId, { remoteEndpoint: endpoint, callId: callId, status: ConnectionStatus.Establishment, timestamp: Date.now()});
+        for (const info of this.connectionInfo.values()) {
+            if (info.status === ConnectionStatus.Establishment) {
+                est = est + 1;
+            } else if (info.status === ConnectionStatus.PeerValidation) {
+                val = val + 1;
+            } else if (info.status === ConnectionStatus.PeerReady) {
+                ok = ok + 1;
+            }
+        }
 
-        let conn = new WebRTCConnection(this.linkupManager, this.localAddress as LinkupAddress, remoteAddress, callId, this.connectionReadyCallback);
+        console.log('stats: established='+est+' in validation='+val+' validated='+ok);
+        */
+
+        if (this.getCallIdForEndpoint(endpoint) === undefined) {
+
+            const remoteAddress = LinkupAddress.fromURL(endpoint);
+
+            const callId = new RNGImpl().randomHexString(BITS_FOR_CALL_ID);
+
+            this.connectionInfo.set(callId, { remoteEndpoint: endpoint, callId: callId, status: ConnectionStatus.Establishment, timestamp: Date.now()});
+
+            let conn = new WebRTCConnection(this.linkupManager, this.localAddress as LinkupAddress, remoteAddress, callId, this.connectionReadyCallback);
 
 
-        conn.setMessageCallback(this.messageCallback);
+            conn.setMessageCallback(this.messageCallback);
 
-        this.connections.set(callId, conn);
+            this.connections.set(callId, conn);
 
-        conn.open('swarm-comms-channel');
+            conn.open('swarm-comms-channel');
+
+        }
 
     }
 
@@ -301,6 +337,163 @@ class Swarm {
     getConnectionEndpoint(callId: CallId) {
        return this.connectionInfo.get(callId)?.remoteEndpoint;
     }
+
+    getCallIdForEndpoint(endpoint: Endpoint) {
+
+        let callId = undefined;
+
+        for (const connInfo of this.connectionInfo.values()) {
+            if (connInfo.remoteEndpoint === endpoint) {
+                callId = connInfo.callId;
+            }
+        }
+
+        return callId;
+    }
+
+
+    // Sends a raw message, even if no peer has been configured for that connection.
+    // Meant to be used in peer authentication & set up.
+
+    sendMessage(message: Message) {
+
+        if (message.source !== this.localEndpoint) {
+            throw new Error('Attempted to send message from endpoint ' + message.source + ' but local endpoint is ' + this.localEndpoint);
+        }
+
+        let conn = this.connections.get(message.callId);
+
+        if (conn === undefined) {
+            throw new Error('Attempted to send message through callId ' + message.callId + ' but there is no such call at the moment.');
+        }
+
+        let connInfo = this.connectionInfo.get(message.callId);
+
+        if (connInfo?.remoteEndpoint !== message.destination) {
+            throw new Error('Attempted to send a message to endpoint ' + message.destination + ' through call ' + message.callId + ', but that is connected to ' + connInfo?.remoteEndpoint + ' instead.');
+        }
+
+        conn.send(message);
+
+    }
+
+
+    // peer management: local peer, (de)register peers bound to current connections,
+    //                  get connected peers (also, which run a given agent)
+
+    getLocalPeer() : Peer {
+        return this.localPeer as Peer;
+    }
+
+    setLocalPeer(peer: Peer) {
+        this.localPeer = peer;
+    }
+
+    registerConnectedPeer(peer: Peer) {
+        this.peers.set(peer.getId(), peer);
+
+        const info  = this.connectionInfo.get(peer.getCallId() as CallId) as ConnectionInfo;
+        
+        info.status = ConnectionStatus.PeerReady;
+        info.peerId = peer.getId();
+
+        this.sendLocalEvent({type: EventType.LocalPeerAddition, content: peer.getId()});
+
+        this.sendAgentSet(peer.getId());
+    }
+
+    deregisterConnectedPeer(peer: Peer) {
+        this.deregisterConnectedPeerById(peer.getId());
+
+        const info  = this.connectionInfo.get(peer.getCallId() as CallId) as ConnectionInfo;
+        
+        info.status = ConnectionStatus.PeerValidation;
+        info.peerId = undefined;
+    }
+
+    deregisterConnectedPeerById(id: PeerId) {
+        this.sendLocalEvent({type: EventType.LocalPeerRemoval, content: id});
+        this.peers.delete(id);
+    }
+
+    getConnectedPeer(id: PeerId) {
+        return this.peers.get(id);
+    }
+
+    getConnectedPeersIdSet() : Set<PeerId> {
+        return new Set(this.peers.keys());
+    }
+
+    getConnectedPeersWithAgent(agentId: AgentId) : Array<PeerId> {
+        let peers = new Array<PeerId>();
+
+        for (let peerId of this.peers.keys()) {
+            let agentSet = this.remoteAgentSets.get(peerId);
+
+            if (agentSet?.has(agentId)) {
+                peers.push(peerId);
+            }
+        }
+
+        return peers;
+    }
+
+    // locally running agent set management
+
+    registerLocalAgent(agent: Agent) {
+        this.agents.set(agent.getId(), agent);
+
+        this.localAgentSet.add(agent.getId());
+
+        agent.ready(this);
+
+        this.sendLocalEvent({type: EventType.LocalAgentAddition, content: agent.getId()})
+
+        let delta = { additions: [agent.getId()], removals: [], hash: this.localAgentSet.hash() };
+
+        for (const peer of this.peers.values()) {
+            this.sendAgentSetChange(peer.getId(), delta);
+        }
+
+    }
+
+    deregisterLocalAgent(agent: Agent) {
+        this.deregisterLocalAgentById(agent.getId());
+    }
+
+    deregisterLocalAgentById(id: AgentId) {
+        this.sendLocalEvent({type: EventType.LocalAgentRemoval, content: id});
+        this.agents.delete(id);
+
+        this.localAgentSet.removeByHash(id);
+
+        let delta = { additions: [], removals: [id], hash: this.localAgentSet.hash() };
+
+        for (const peer of this.peers.values()) {
+            this.sendAgentSetChange(peer.getId(), delta);
+        }
+    }
+
+    getLocalAgent(id: AgentId) {
+        return this.agents.get(id);
+    }
+
+    getLocalAgentIdSet() {
+        return new Set<AgentId>(this.agents.keys());
+    }
+
+
+    // send an event that will be received by all local agents
+
+    sendLocalEvent(ev: Event) {
+
+        Swarm.logger.trace('Swarm ' + this.topic + ' for peer ' + this.localPeer?.getId() + ' sending event ' + ev.type + ' with content ' + ev.content);
+
+        for (const agent of this.agents.values()) {
+            agent.receiveLocalEvent(ev);
+        }
+    }
+
 
     private connectionCloseCleanup(callId: CallId) {
         this.connectionInfo.delete(callId);
@@ -384,7 +577,7 @@ class Swarm {
             source: this.localPeer?.getId() as PeerId,
             destination: destination,
             type: ControlMessageType.SendAgentSet,
-            content: Array.from(this.localAgentSet.elements())
+            content: Array.from(this.localAgentSet.values())
         } as ControlMessage;
 
         this.sendControlMessage(msg);
@@ -404,7 +597,7 @@ class Swarm {
             }
         }
 
-        for (const agentId of oldAgentSet.elements()) {
+        for (const agentId of oldAgentSet.values()) {
             if (!newAgentSet.has(agentId)) {
                 removals.push(agentId);
             }
@@ -424,7 +617,6 @@ class Swarm {
         this.sendControlMessage(msg);
 
     }
-
 
     private receiveAgentSetChange(peerId: PeerId, delta: {additions: Array<AgentId>, removals: Array<AgentId>, hash: Hash}) {
 
@@ -501,102 +693,6 @@ class Swarm {
         return agentSet;
     }
 
-    getPeersWithAgent(agentId: AgentId) : Array<PeerId> {
-        let peers = new Array<PeerId>();
-
-        for (let peerId of this.peers.keys()) {
-            let agentSet = this.remoteAgentSets.get(peerId);
-
-            if (agentSet?.has(agentId)) {
-                peers.push(peerId);
-            }
-        }
-
-        return peers;
-    }
-
-    registerAgent(agent: Agent) {
-        this.agents.set(agent.getId(), agent);
-
-        this.localAgentSet.add(agent.getId());
-
-        agent.ready(this);
-
-        this.sendLocalEvent({type: EventType.LocalAgentAddition, content: agent.getId()})
-
-        let delta = { additions: [agent.getId()], removals: [], hash: this.localAgentSet.hash() };
-
-        for (const peer of this.peers.values()) {
-            this.sendAgentSetChange(peer.getId(), delta);
-        }
-
-    }
-
-    deregisterAgent(agent: Agent) {
-        this.deregisterAgentById(agent.getId());
-    }
-
-    deregisterAgentById(id: string) {
-        this.sendLocalEvent({type: EventType.LocalAgentRemoval, content: id});
-        this.agents.delete(id);
-
-        this.localAgentSet.removeByHash(id);
-
-        let delta = { additions: [], removals: [id], hash: this.localAgentSet.hash() };
-
-        for (const peer of this.peers.values()) {
-            this.sendAgentSetChange(peer.getId(), delta);
-        }
-    }
-
-    getAgent(id: string) {
-        return this.agents.get(id);
-    }
-
-    setLocalPeer(peer: Peer) {
-        this.localPeer = peer;
-    }
-
-    registerPeer(peer: Peer) {
-        this.peers.set(peer.getId(), peer);
-
-        const info  = this.connectionInfo.get(peer.getCallId() as CallId) as ConnectionInfo;
-        
-        info.status = ConnectionStatus.PeerReady;
-        info.peerId = peer.getId();
-
-        this.sendLocalEvent({type: EventType.LocalPeerAddition, content: peer.getId()});
-
-        this.sendAgentSet(peer.getId());
-    }
-
-    deregisterPeer(peer: Peer) {
-        this.deregisterPeerById(peer.getId());
-
-        const info  = this.connectionInfo.get(peer.getCallId() as CallId) as ConnectionInfo;
-        
-        info.status = ConnectionStatus.PeerValidation;
-        info.peerId = undefined;
-    }
-
-    deregisterPeerById(id: string) {
-        this.sendLocalEvent({type: EventType.LocalPeerRemoval, content: id});
-        this.peers.delete(id);
-    }
-
-    getPeer(id: string) {
-        return this.peers.get(id);
-    }
-
-    sendLocalEvent(ev: Event) {
-        
-        Swarm.logger.debug('Swarm ' + this.rootHash + ' for peer ' + this.localPeer?.getId() + ' sending event ' + ev.type + ' with content ' + ev.content);
-
-        for (const agent of this.agents.values()) {
-            agent.receiveLocalEvent(ev);
-        }
-    }
-
     sendPeerMessage(message: PeerMessage) {
         let controlMessage = {
             source: message.sourceId,
@@ -606,27 +702,6 @@ class Swarm {
         } as ControlMessage;
 
         this.sendControlMessage(controlMessage);
-    }
-
-    sendMessage(message: Message) {
-        if (message.source !== this.localEndpoint) {
-            throw new Error('Attempted to send message from endpoint ' + message.source + ' but local endpoint is ' + this.localEndpoint);
-        }
-
-        let conn = this.connections.get(message.callId);
-
-        if (conn === undefined) {
-            throw new Error('Attempted to send message through callId ' + message.callId + ' but there is no such call at the moment.');
-        }
-
-        let connInfo = this.connectionInfo.get(message.callId);
-
-        if (connInfo?.remoteEndpoint !== message.destination) {
-            throw new Error('Attempted to send a message to endpoint ' + message.destination + ' through call ' + message.callId + ', but that is connected to ' + connInfo?.remoteEndpoint + ' instead.');
-        }
-
-        conn.send(message);
-
     }
 
     private sendControlMessage(message: ControlMessage) {
@@ -659,15 +734,6 @@ class Swarm {
         Swarm.logger.debug('Sending message from ' + this.localPeer.getId() + ': ' + data );
 
         conn.send(data);
-    }
-
-    shutdown() {
-        this.linkupManager.shutdown();
-        for (const conn of this.connections.values()) {
-            this.connectionInfo.delete(conn.getCallId());
-            this.connections.delete(conn.getCallId());
-            conn.close();
-        }
     }
 }
 

@@ -4,12 +4,14 @@
 
 import { Agent, Swarm, Event, EventType, CallId, Message, PeerMessage, Endpoint } from "sync/swarm";
 import { LinkupAddress } from 'sync/linkup';
-import { TestPeer } from './TestPeer';
+import { TestPeer } from '../swarm/TestPeer';
 
 
 const LINKUP_SERVER = 'ws://localhost:3002';
 
 class TestPeerControlAgent implements Agent {
+
+    static Id = 'test-peer-control';
 
     localId: string;
 
@@ -41,23 +43,32 @@ class TestPeerControlAgent implements Agent {
 
 
     getId(): string {
-        return 'test-peer-control';
+        return TestPeerControlAgent.Id;
     }
 
     ready(swarm: Swarm): void {
         this.swarm = swarm;
         swarm.init(this.localAddress, this.localPeer);
 
+        let remotes:LinkupAddress[] = [];
         for (const remoteId of this.remoteIds) {
-            swarm.queryForListeningAddresses([new LinkupAddress(LINKUP_SERVER, remoteId)]);
+            remotes.push(new LinkupAddress(LINKUP_SERVER, remoteId))
         }
 
+        swarm.queryForListeningAddresses(remotes);
     }
 
     receiveLocalEvent(ev: Event): void {
         
         if (ev.type === EventType.RemoteAddressListening) {
-            this.swarm?.connect(ev.content as Endpoint);
+
+            let endpoint = ev.content as Endpoint;
+
+            if (this.swarm?.getCallIdForEndpoint(endpoint) === undefined) {
+                this.swarm?.connect(endpoint); 
+            }
+
+            
         }
 
         if (ev.type === EventType.LocalConnectionReady) {
@@ -66,12 +77,13 @@ class TestPeerControlAgent implements Agent {
             if (endpoint !== undefined) {
                 let address = LinkupAddress.fromURL(endpoint);
 
-                let peerIdx = this.remoteIds.indexOf(address.linkupId);
+                //let peerIdx = this.remoteIds.indexOf(address.linkupId);
 
-                if (peerIdx >= 0) {
+                //if (peerIdx >= 0) {
                     let peer = new TestPeer(address.linkupId, endpoint, ev.content as CallId);
-                    this.swarm?.registerPeer(peer);
-                }
+                    peer;
+                    this.swarm?.registerConnectedPeer(peer);
+                //}
             }
 
         }

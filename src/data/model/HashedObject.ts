@@ -5,6 +5,7 @@ import { HashReference } from './HashReference';
 import { __spreadArrays } from 'tslib';
 import { RNGImpl } from 'crypto/random';
 import { Store } from 'data/storage/Store';
+import { HashedMap } from './HashedMap';
 //import { SharedState } from './state/SharedState';
 
 type Literal           = { hash: Hash, value: any, author?: Hash, dependencies: Set<Dependency> }
@@ -166,6 +167,19 @@ abstract class HashedObject {
         return { rootHash: context.rootHash, literals: context.literals };
     }
 
+    toLiteral(aliasingContext?: AliasingContext) {
+        let literals: any = { }
+
+        let ctx = this.toLiteralContext(aliasingContext);
+
+        for (const [hash, literal] of ctx.literals.entries()) {
+            literals[hash] = literal;
+        }
+
+        return { hash: ctx.rootHash, literals: literals };
+
+    }
+
     toContext(aliasingContext?: AliasingContext) : Context {
 
         let context: Context = {
@@ -273,11 +287,16 @@ abstract class HashedObject {
                     }
                 }
             } else if (something instanceof HashedSet) {
-                let hset = something as HashedSet<any>;
-                let hsetLiteral = hset.literalize(fieldPath, context);
+                const hset = something as HashedSet<any>;
+                const hsetLiteral = hset.literalize(fieldPath, context);
                 value = hsetLiteral.value;
                 HashedObject.collectChildDeps(dependencies, hsetLiteral.dependencies);
-            } else { // not a set nor an array
+            } else if (something instanceof HashedMap) {
+                const hmap = something as HashedMap<any, any>;
+                const hmapLiteral = hmap.literalize(fieldPath, context);
+                value = hmapLiteral.value;
+                HashedObject.collectChildDeps(dependencies, hmapLiteral.dependencies);
+            } else { // not a set, map or array
 
                 if (something instanceof HashReference) {
                     let reference = something as HashReference;
@@ -328,6 +347,17 @@ abstract class HashedObject {
                         objects:  new Map()};
 
         return HashedObject.fromContext(context);
+    }
+
+    static fromLiteral(lit: {hash: Hash, literals: any}) : HashedObject {
+        let ctx:LiteralContext = { rootHash: lit.hash, literals: new Map()};
+
+        for (const [hash, literal] of Object.entries(lit.literals)) {
+            ctx.literals.set(hash, literal as any);
+        }
+
+        return HashedObject.fromLiteralContext(ctx);
+
     }
 
     static fromContext(context: Context) : HashedObject {
@@ -423,6 +453,8 @@ abstract class HashedObject {
             } else {
                 if (value['_type'] === 'hashed_set') {
                     something = HashedSet.deliteralize(value, context);
+                } else if (value['_type'] === 'hashed_map') { 
+                    something = HashedMap.deliteralize(value, context);
                 } else if (value['_type'] === 'hashed_object_reference') {
                     something = new HashReference(value['_hash'], value['_class']);
                 } else if (value['_type'] === 'hashed_object_dependency') {
@@ -452,6 +484,19 @@ abstract class HashedObject {
 
     private static generateIdForPath(parentId: string, path: string) {
         return Hashing.forValue('#' + parentId + '.' + path);
+    }
+
+    static hashElement(element: any) : Hash {
+
+        let hash: Hash;
+
+        if (element instanceof HashedObject) {
+            hash = (element as HashedObject).hash();
+        } else {
+            hash = Hashing.forValue(HashedObject.literalizeField('', element).value);
+        }
+
+        return hash;
     }
 
     // the following only for pretty printing.

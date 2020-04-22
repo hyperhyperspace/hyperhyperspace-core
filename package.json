@@ -1,19 +1,21 @@
 {
-  "name": "hyper-hyper-space",
   "version": "0.1.0",
   "license": "MIT",
-  "author": "Santiago Bazerque",
   "main": "dist/index.js",
-  "module": "dist/hyper-hyper-space.esm.js",
   "typings": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
+  "engines": {
+    "node": ">=10"
+  },
   "scripts": {
     "start": "tsdx watch",
     "build": "tsdx build",
     "test": "tsdx test",
-    "lint": "tsdx lint"
+    "lint": "tsdx lint",
+    "prepare": "tsdx build"
   },
   "peerDependencies": {},
   "husky": {
@@ -27,30 +29,27 @@
     "singleQuote": true,
     "trailingComma": "es5"
   },
+  "name": "hyper-hyper-space",
+  "author": "Santiago Bazerque",
+  "module": "dist/hyper-hyper-space.esm.js",
   "devDependencies": {
-    "@types/jest": "^24.0.23",
-    "core-js-bundle": "^3.6.4",
     "fake-indexeddb": "^3.0.0",
-    "husky": "^3.1.0",
-    "tsdx": "^0.11.0",
-    "tslib": "^1.10.0",
-    "typescript": "^3.7.3"
+    "husky": "^4.2.5",
+    "tsdx": "^0.13.2",
+    "tslib": "^1.11.1",
+    "typescript": "^3.8.3"
   },
   "dependencies": {
-    "@types/node": "^13.5.0",
+    "@types/node": "^13.13.2",
     "chacha-js": "^2.1.1",
     "get-random-values": "^1.2.0",
-    "idb": "^5.0.1",
+    "idb": "^5.0.2",
     "jsencrypt": "^3.0.0-rc.1",
-    "jshashes": "^1.0.7",
-    "wrtc": "^0.4.1"
+    "jshashes": "^1.0.8",
+    "wrtc": "^0.4.4"
   },
   "jest": {
     "verbose": true,
-    "modulePaths": [
-      "<rootDir>/src/",
-      "<rootDir>/poly/node/",
-      "<rootDir>/node_modules/**"
-    ]
+    "modulePaths": [ "<rootDir>/src", "<rootDir>/src/poly/node", "<rootDir>/node_modules/**" ]
   }
 }

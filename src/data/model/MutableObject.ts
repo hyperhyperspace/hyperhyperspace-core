@@ -3,8 +3,8 @@ import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
-import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
-import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
+//import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
+//import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
 type LoadStrategy = 'none'|'full'|'lazy';
 
@@ -263,9 +263,9 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
-    getSyncAgent() : ObjectStateAgent {
-        return new TerminalOpsStateAgent(this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
-    }
+    //getSyncAgent() : ObjectStateAgent {
+    //    return new TerminalOpsStateAgent(this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
+    //}
 
 }
 

@@ -23,7 +23,7 @@ abstract class MutationOp extends HashedObject {
     }
 
     getPrevOps() : IterableIterator<HashReference> | undefined {
-        return this.prevOps?.elements();
+        return this.prevOps?.values();
     }
 
     setPrevOps(prevOps: IterableIterator<HashReference>) {
