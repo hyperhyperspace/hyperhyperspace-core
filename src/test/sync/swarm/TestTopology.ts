@@ -92,6 +92,28 @@ class TestTopology {
         return swarms;
     }
 
+    static async waitForPeers(swarms: Swarm[], peerCount: number) : Promise<boolean> {
+        let syncDone = false;
+
+        let count=0;
+        while (!syncDone && count<200) {
+            //console.log('waiting for sync (' + count + ')');
+            count++;
+            await new Promise(r => setTimeout(r, 50));
+
+            syncDone = true;
+            for (let i=0; /*syncDone &&*/ i<swarms.length; i++) {
+                //console.log(swarms[i].getLocalPeer().getId());
+                //console.log('peers: (' + swarms[i].getConnectedPeersIdSet().size + ')');
+                //console.log(swarms[i].getConnectedPeersIdSet());
+                syncDone = syncDone && swarms[i].getConnectedPeersWithAgent(TestPeerControlAgent.Id).length === peerCount;
+            }
+
+        }
+
+        return syncDone;
+    }
+
 }
 
 export { TestTopology }

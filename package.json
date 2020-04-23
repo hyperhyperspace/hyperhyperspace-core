@@ -50,6 +50,10 @@
   },
   "jest": {
     "verbose": true,
-    "modulePaths": [ "<rootDir>/src", "<rootDir>/src/poly/node", "<rootDir>/node_modules/**" ]
+    "modulePaths": [
+      "<rootDir>/src",
+      "<rootDir>/src/poly/node",
+      "<rootDir>/node_modules/**"
+    ]
   }
 }

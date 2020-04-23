@@ -149,20 +149,7 @@ describe('Basic swarming', () => {
         const size=4;
         let swarms = TestTopology.clique(size);
 
-        let syncDone = false;
-
-        let count=0;
-        while (!syncDone && count<200) {
-            //console.log('waiting for sync (' + count + ')');
-            count++;
-            await new Promise(r => setTimeout(r, 50));
-
-            syncDone = true;
-            for (let i=0; syncDone && i<size; i++) {
-                syncDone = syncDone && swarms[i].getConnectedPeersWithAgent(TestPeerControlAgent.Id).length === size - 1;
-            }
-
-        }
+        const syncDone = await TestTopology.waitForPeers(swarms, size-1);
 
         expect(syncDone).toBeTruthy();
 
@@ -174,6 +161,23 @@ describe('Basic swarming', () => {
 
     }, 20000);
 
+    test('4-peer ring agent set sync', async (done) => {
+
+
+        const size=4;
+        let swarms = TestTopology.ring(size);
+
+        const syncDone = await TestTopology.waitForPeers(swarms, 2);
+
+        expect(syncDone).toBeTruthy();
+
+        for (const swarm of swarms) {
+            swarm.shutdown();
+        }
+
+        done();
+
+    }, 20000);
 
 
 });

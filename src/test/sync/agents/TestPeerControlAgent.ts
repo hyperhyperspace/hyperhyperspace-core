@@ -56,6 +56,23 @@ class TestPeerControlAgent implements Agent {
         }
 
         swarm.queryForListeningAddresses(remotes);
+        
+        setInterval(() => {
+
+            let missing = false;
+
+            for (const addr of remotes) {
+                if (swarm.getCallIdForEndpoint(addr.url()) === undefined) {
+                    missing = true;
+                    break;
+                }
+            }
+
+
+            if ( missing ) {
+                swarm.queryForListeningAddresses(remotes);
+            }
+        }, 1500);
     }
 
     receiveLocalEvent(ev: Event): void {

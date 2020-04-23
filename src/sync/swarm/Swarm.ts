@@ -72,6 +72,7 @@ const PeerValidationTimeout = 20;
 class Swarm {
 
     static logger = new Logger(Swarm.name, LogLevel.INFO);
+    static connLogger = new Logger(Swarm.name + ' conn', LogLevel.INFO);
 
     topic      : string;
 
@@ -221,6 +222,17 @@ class Swarm {
                 }
 
             }
+
+            for (const callId of toCleanUp) {
+
+                try {
+                    this.connections.get(callId)?.close();
+                } catch (e) {
+                    //
+                }
+
+                this.connectionCloseCleanup(callId);
+            }
         };
 
     }
@@ -236,9 +248,12 @@ class Swarm {
         this.linkupManager.listenForQueryResponses(this.localAddress.linkupId, (linkupId: string, addresses: Array<LinkupAddress>) => {
 
             if (linkupId === this.localAddress?.linkupId) {
+                Swarm.connLogger.log(linkupId + ' received listening notice of ' + addresses.map((l:LinkupAddress) => l.url()), LogLevel.DEBUG);
                 for (const address of addresses) {
                     this.sendLocalEvent({type: EventType.RemoteAddressListening, content: address.url()});
                 }
+            } else {
+                Swarm.connLogger.log('received wrongly addressed listenForQueryResponse message, was meant for ' + linkupId + ' but was received by ' +this.localAddress?.linkupId, LogLevel.WARNING);
             }
 
         });
@@ -296,6 +311,8 @@ class Swarm {
         console.log('stats: established='+est+' in validation='+val+' validated='+ok);
         */
 
+       Swarm.connLogger.log(this.localPeer?.getId() + ' is asking for connection to ' + endpoint, LogLevel.DEBUG);
+
         if (this.getCallIdForEndpoint(endpoint) === undefined) {
 
             const remoteAddress = LinkupAddress.fromURL(endpoint);
@@ -331,6 +348,9 @@ class Swarm {
     }
 
     queryForListeningAddresses(addresses: Array<LinkupAddress>) {
+
+        Swarm.connLogger.log(this.localPeer?.getId() + ' asking if any is online: ' + addresses.map((l: LinkupAddress) => l.url()), LogLevel.DEBUG);
+
         this.linkupManager.queryForListeningAddresses(this.localAddress?.linkupId as string, addresses);
     }
 
