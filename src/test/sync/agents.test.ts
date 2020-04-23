@@ -34,7 +34,7 @@ let buildSwarms = (peers: number, peersPerSwarm: number, agents: number, agentsP
         let swarm = new Swarm(topic);
 
         swarm.registerLocalAgent(peerControl);
-        //swarm.registerLocalAgent(new StateGossipAgent());
+        swarm.registerLocalAgent(new StateGossipAgent());
         new StateGossipAgent();
 
         let peerAgentIds = agentIds.slice();
@@ -43,7 +43,7 @@ let buildSwarms = (peers: number, peersPerSwarm: number, agents: number, agentsP
         for(let j=0; j<agentsPerPeer; j++) {
             let agent = new LinearStateAgent(peerAgentIds[j]);
             agent;
-            //swarm.registerLocalAgent(agent);
+            swarm.registerLocalAgent(agent);
         }
 
         swarms.push(swarm);
@@ -57,17 +57,15 @@ let buildSwarms = (peers: number, peersPerSwarm: number, agents: number, agentsP
 describe('Agents', () => {
     test('Gossip agent in small swarm', async (done) => {
 
-        if (Math.floor(Math.random()) > 100) {
-
-        const swarmCount = 5;
-        const peersPerSwarm = 3;
-        const agentCount = 10;
-        const agentsPerSwarm = 8;
+        const swarmCount = 4;
+        const peersPerSwarm = 4;
+        const agentCount = 3;
+        const agentsPerSwarm = 3;
 
         let creation = buildSwarms(swarmCount, peersPerSwarm, agentCount, agentsPerSwarm);
 
 
-        console.log('built swarms');
+        //console.log('built swarms');
 
         let swarms = creation.swarms;
         let agentIds = creation.agentIds;
@@ -76,18 +74,10 @@ describe('Agents', () => {
         let seq1:Array<[number, string]> = [[10, 'a'], [10, 'b'], [3, 'three']]
         let seq2:Array<[number, string]> = [[11, 'eleven'], [10, 'ten'], [9, 'nine']];
 
-        //let agent = swarms[0].getLocalAgent(agentIds[0]) as LinearStateAgent;
-
-        //agent.setMessage('hello');
-
-
-
         await new Promise(r => { window.setTimeout(() => { r() }, 1000);  });
 
-
-        console.log('done first wait');
+        //console.log('done first wait');
         
-
         let seqs = [seq0, seq1, seq2];
         let witness: Array<LinearStateAgent> = [];
         let results: Array<[number, string]> = [[2, 'two'], [10, 'b'], [11, 'eleven']];
@@ -96,7 +86,7 @@ describe('Agents', () => {
 
             let agentId = agentIds[i];
 
-            console.log('testing squence ' + i + ' for agent ' + agentId);
+            //console.log('testing squence ' + i + ' for agent ' + agentId);
 
             let seq = seqs[i];
 
@@ -104,10 +94,10 @@ describe('Agents', () => {
             for (let j=0; c<4 && j<swarmCount; j++) {
                 let agent=swarms[j].getLocalAgent(agentId) as LinearStateAgent;
                 if (agent !== undefined) {
-                    console.log('found ' + c + 'th agent for agentId ' + agentId);
+                    //console.log('found ' + c + 'th agent for agentId ' + agentId);
                     if (c<3) {
                         seq
-                        //agent.setMessage(seq[c][1], seq[c][0]);
+                        agent.setMessage(seq[c][1], seq[c][0]);
                     } else {
                         witness.push(agent);
                     }
@@ -116,12 +106,12 @@ describe('Agents', () => {
             }
         }
 
-        console.log('waiting for state to propagete');
+        //console.log('waiting for state to propagete');
 
         let finished = false;
         let checks = 0;
         while (! finished && checks < 10) {
-            console.log('tick ' + checks);
+            //console.log('tick ' + checks);
             
             await new Promise(r => { window.setTimeout( r, 50); });
 
@@ -133,12 +123,12 @@ describe('Agents', () => {
                 finished = finished && witness[c].seq === results[c][0];
                 finished = finished && witness[c].message === results[c][1];
             }
-            console.log('ended tick ' + checks);
+            //console.log('ended tick ' + checks);
             checks = checks + 1;
             
         }
 
-        console.log('done waiting');
+        //console.log('done waiting');
 
         for (let c=0; c<3; c++) {
 
@@ -151,7 +141,7 @@ describe('Agents', () => {
         for (const swarm of swarms) {
             swarm.shutdown();
         }
-        }
+        
         done();
     
 

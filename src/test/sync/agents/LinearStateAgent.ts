@@ -3,6 +3,7 @@ import { Swarm, Event, Message, PeerMessage } from 'sync/swarm';
 import { HashedObject, Hash } from 'data/model';
 import { StateGossipAgent } from 'sync/agents/state/StateGossipAgent';
 import { PeerId } from 'sync/swarm/Peer';
+import { Logger, LogLevel } from 'util/logging';
 
 
 class LinearState extends HashedObject {
@@ -55,6 +56,8 @@ HashedObject.registerClass(LinearState.className, LinearState);
 
 class LinearStateAgent implements StateAgent {
 
+    static logger = new Logger(LinearState.name, LogLevel.INFO);
+
     static createId(id: string) {
         return 'linear-state-agent-' + id;
     }
@@ -82,13 +85,20 @@ class LinearStateAgent implements StateAgent {
 
     setMessage(message: string, seq?: number) {
 
-        console.log('message=' + message + ', seq=' + seq);
+        
 
-        if (seq !== undefined && this.seq !== undefined && seq < this.seq) {
+        if ((this.seq !== undefined && seq === undefined) || (seq !== undefined && this.seq !== undefined && seq < this.seq)) {
+            LinearStateAgent.logger.debug('\nignoring: message=' + message + ', seq=' + seq + '\n' + 
+                        'at state: message=' + this.message + ', seq=' + this.seq);
             return;
-        } else if (seq === this.seq && this.message !== undefined && this.message.localeCompare(message) <= 0) {
+        } else if (seq === this.seq && this.message !== undefined && this.message.localeCompare(message) >= 0) {
+            LinearStateAgent.logger.debug('\nignoring: message=' + message + ', seq=' + seq + '\n' + 
+                        'at state: message=' + this.message + ', seq=' + this.seq);
             return;
         }
+
+        LinearStateAgent.logger.debug('\naccepting: message=' + message + ', seq=' + seq + '\n' + 
+                    'at state:  message=' + this.message + ', seq=' + this.seq);
 
         if (seq === undefined) {
             if (this.seq === undefined) {
@@ -107,6 +117,8 @@ class LinearStateAgent implements StateAgent {
         }
 
         this.state = new LinearState(this.seq, this.message)
+
+        
 
         this.gossipAgent?.localAgentStateUpdate(this.getId(), this.state);
     }
