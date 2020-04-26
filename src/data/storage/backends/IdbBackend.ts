@@ -1,13 +1,13 @@
 require('indexeddbpoly');
 
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { PackedLiteral } from 'data/storage/Store';
+import { Literal } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { openDB, IDBPDatabase } from 'idb';
 
 type IdbStorageFormat = {
-    packed    : PackedLiteral,
+    literal    : Literal,
     indexes   : any,
     timestamp : string,
     sequence  : number
@@ -40,7 +40,7 @@ class IdbBackend implements Backend {
         this.idbPromise = openDB(name, 1, {
             upgrade(db, _oldVersion, _newVersion, _transaction) {
 
-                let objectStore = db.createObjectStore(IdbBackend.OBJ_STORE, {keyPath: 'packed.hash'});
+                let objectStore = db.createObjectStore(IdbBackend.OBJ_STORE, {keyPath: 'literal.hash'});
 
                 objectStore.createIndex(IdbBackend.CLASS_SEQUENCE_IDX_KEY + '_idx', 'indexes.' + IdbBackend.CLASS_SEQUENCE_IDX_KEY);
                 objectStore.createIndex(IdbBackend.REFERENCES_SEQUENCE_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCES_SEQUENCE_IDX_KEY, {multiEntry: true});
@@ -65,13 +65,13 @@ class IdbBackend implements Backend {
         return this.name;
     }
 
-    async store(packed: PackedLiteral): Promise<void> {
+    async store(literal: Literal): Promise<void> {
 
         let idb = await this.idbPromise;
 
         let storable = {} as IdbStorageFormat;
 
-        storable.packed = packed;
+        storable.literal = literal;
                 
         storable.indexes = {} as any;
 
@@ -79,7 +79,7 @@ class IdbBackend implements Backend {
 
         let stores = [IdbBackend.OBJ_STORE, IdbBackend.META_STORE];
 
-        const isOp = packed.flags.indexOf('op') >= 0;
+        const isOp = literal.value['_flags'].indexOf('op') >= 0;
 
         if (isOp) { stores.push(IdbBackend.TERMINAL_OPS_STORE); }
 
@@ -93,12 +93,12 @@ class IdbBackend implements Backend {
         storable.sequence = seqInfo.value;
         seqInfo.value = seqInfo.value + 1;
 
-        IdbBackend.assignIdxValue(storable, IdbBackend.CLASS_SEQUENCE_IDX_KEY, storable.packed.value._class, {sequence: true});
+        IdbBackend.assignIdxValue(storable, IdbBackend.CLASS_SEQUENCE_IDX_KEY, storable.literal.value._class, {sequence: true});
 
-        for (let i=0; i<packed.dependencies.length; i++) {
-            let reference = packed.dependencies[i].path + '#' + packed.dependencies[i].hash;
+        for (const dep of literal.dependencies) {
+            let reference = dep.path + '#' + dep.hash;
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCES_SEQUENCE_IDX_KEY, reference, {sequence: true, multi: true});
-            let referencingClass = packed.dependencies[i].className + '.' + packed.dependencies[i].path + '#' + packed.dependencies[i].hash;
+            let referencingClass = dep.className + '.' + dep.path + '#' + dep.hash;
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY, referencingClass, {sequence: true, multi: true});
         }
 
@@ -107,25 +107,25 @@ class IdbBackend implements Backend {
         if (isOp) {
             
             let terminalOpsInfo = (await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE)
-                                          .get(storable.packed.value._fields['target']['_hash'])) as IdbTerminalOpsFormat | undefined;
+                                          .get(storable.literal.value._fields['target']['_hash'])) as IdbTerminalOpsFormat | undefined;
 
             if (terminalOpsInfo === undefined) {
                 terminalOpsInfo = { 
-                    mutableHash: storable.packed.value._fields['target']['_hash'], 
-                    terminalOps: [storable.packed.hash],
-                    lastOp: storable.packed.hash
+                    mutableHash: storable.literal.value._fields['target']['_hash'], 
+                    terminalOps: [storable.literal.hash],
+                    lastOp: storable.literal.hash
                  };
             } else {
-                for (const hash of storable.packed.value._fields['prevOps']['_hashes'] as Array<Hash>) {
+                for (const hash of storable.literal.value._fields['prevOps']['_hashes'] as Array<Hash>) {
                     let idx = terminalOpsInfo.terminalOps.indexOf(hash);
                     if (idx >= 0) {
                         delete terminalOpsInfo.terminalOps[idx];
                     }
                 }
-                if (terminalOpsInfo.terminalOps.indexOf(storable.packed.hash) < 0) { // this should always be true
-                    terminalOpsInfo.terminalOps.push(storable.packed.hash);
+                if (terminalOpsInfo.terminalOps.indexOf(storable.literal.hash) < 0) { // this should always be true
+                    terminalOpsInfo.terminalOps.push(storable.literal.hash);
                 }
-                terminalOpsInfo.lastOp = storable.packed.hash;
+                terminalOpsInfo.lastOp = storable.literal.hash;
             }
 
             await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE).put(terminalOpsInfo);
@@ -138,13 +138,13 @@ class IdbBackend implements Backend {
         
     
     
-    async load(hash: Hash): Promise<PackedLiteral | undefined> {
+    async load(hash: Hash): Promise<Literal | undefined> {
 
         let idb = await this.idbPromise;
 
         return idb.get(IdbBackend.OBJ_STORE, hash)
                   .then((storable: IdbStorageFormat | undefined) => 
-                     (storable?.packed)) as Promise<PackedLiteral | undefined>;
+                     (storable?.literal)) as Promise<Literal | undefined>;
     }
 
     async loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined> {
@@ -196,7 +196,7 @@ class IdbBackend implements Backend {
 
         let searchResults = {} as BackendSearchResults;
 
-        searchResults.items = [] as Array<PackedLiteral>;
+        searchResults.items = [] as Array<Literal>;
         searchResults.start = undefined;
         searchResults.end   = undefined;
 
@@ -210,7 +210,7 @@ class IdbBackend implements Backend {
                 
                 let storable = cursor.value as IdbStorageFormat;
                 
-                searchResults.items.push(storable.packed);
+                searchResults.items.push(storable.literal);
                 if (searchResults.start === undefined) {
                     searchResults.start = cursor.key.toString();
                 }

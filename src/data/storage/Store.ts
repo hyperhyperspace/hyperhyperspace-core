@@ -1,14 +1,14 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, MutableObject, Literal, Dependency, AliasingContext, Context } from 'data/model.ts';
+import { HashedObject, MutableObject, Literal, AliasingContext, Context } from 'data/model.ts';
 import { Hash } from 'data/model/Hashing';
-import { RSAKeyPair } from 'data/identity/RSAKeyPair';
-import { Identity } from 'data/identity/Identity';
 
 import { MultiMap } from 'util/multimap';
+import { IdentityProvider } from 'data/identity/IdentityProvider';
+import { StoreIdentityProvider } from './StoreIdentityProvider';
 
-type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
-type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
-                       dependencies: Array<Dependency>, flags: Array<PackedFlag> };
+//type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
+//type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
+//                       dependencies: Array<Dependency>, flags: Array<PackedFlag> };
 
 type LoadParams = BackendSearchParams;
 
@@ -28,10 +28,19 @@ class Store {
         this.classReferencesCallbacks = new MultiMap();
     }
 
-    async save(object: HashedObject) : Promise<void>{
+    async signAndSave(object: HashedObject) : Promise<void> {
+        return this.save(object, true);
+    }
+
+    async save(object: HashedObject, sign=false) : Promise<void>{
         let context = object.toContext();
-        let hash    = context.rootHash as Hash;
+        let hash    = context.rootHashes[0] as Hash;
         //let context = { rootHash: hash, literals: literalContext.literals, objects: new Map() };
+
+        if (sign) {
+            let ip: IdentityProvider = new StoreIdentityProvider(this);
+            ip.signLiteralContext(context);
+        }
 
         await this.saveWithContext(hash, context);
 
@@ -64,9 +73,7 @@ class Store {
             }
         }
 
-        let packed = await this.packLiteral(literal, context);
-
-        await this.backend.store(packed);
+        await this.backend.store(literal);
 
         let object = context.objects.get(literal.hash) as HashedObject;
 
@@ -129,6 +136,7 @@ class Store {
         return packed;
     }*/
 
+    /*
     private async packLiteral(literal: Literal, context: Context) {
         let packed = {} as PackedLiteral;
 
@@ -149,12 +157,13 @@ class Store {
         
         return packed;
     }
+    */
 
     async load(hash: Hash, aliasingContext?: AliasingContext) : Promise<HashedObject | undefined> {
 
-        let context : Context = { aliased: aliasingContext?.aliased,
-                                  objects: new Map<Hash, HashedObject>(),
-                                  literals: new Map<Hash, Literal>() };
+        let context = new Context();
+
+        context.aliased = aliasingContext?.aliased;
 
         if (context.aliased === undefined) {
             context.aliased = new Map();
@@ -173,7 +182,7 @@ class Store {
 
             let literal = context.literals.get(hash);
             if (literal === undefined) {
-                literal = await this.loadLiteral(hash);
+                literal = await this.backend.load(hash);// loadLiteral(hash);
 
                 if (literal === undefined) {
                     return undefined;
@@ -191,7 +200,7 @@ class Store {
                         // NO NEED to this.loadLiteralWithContext(depLiteral as Literal, context)
                         // because all transitive deps are in object deps.
 
-                        let depLiteral = await this.loadLiteral(dependency.hash);                            
+                        let depLiteral = await this.backend.load(dependency.hash);// loadLiteral(dependency.hash);                            
                         context.literals.set(dependency.hash, depLiteral as Literal);
                     }
                 }
@@ -199,8 +208,7 @@ class Store {
 
             // use the context to create the object from all the loaded literals
 
-            let newContext = { rootHash: literal.hash, objects: context.objects, literals: context.literals };
-            obj = HashedObject.fromContext(newContext);
+            obj = HashedObject.fromContext(context, literal.hash);
 
             for (const ctxObj of context.objects.values()) {
                 if (!ctxObj.hasStore()) {
@@ -216,7 +224,7 @@ class Store {
 
         let searchResults = await this.backend.searchByClass(className, params);
 
-        return this.unpackSearchResults(searchResults);
+        return this.loadSearchResults(searchResults);
 
     }
 
@@ -224,29 +232,30 @@ class Store {
 
         let searchResults = await this.backend.searchByReference(referringPath, referencedHash, params);
 
-        return this.unpackSearchResults(searchResults);
+        return this.loadSearchResults(searchResults);
     }
 
     async loadByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
 
         let searchResults = await this.backend.searchByReferencingClass(referringClassName, referringPath, referencedHash, params);
 
-        return this.unpackSearchResults(searchResults);
+        return this.loadSearchResults(searchResults);
     }
 
-    private async loadLiteral(hash: Hash) : Promise<Literal | undefined> {
+    /*private async loadLiteral(hash: Hash) : Promise<Literal | undefined> {
 
         let packed = await this.backend.load(hash);
         
         if (packed === undefined) {
             return undefined;
         } else {
+
             return this.unpackLiteral(packed);
         }
        
-    }
+    }*/
 
-    private unpackLiteral(packed: PackedLiteral) : Literal {
+    /*private unpackLiteral(packed: PackedLiteral) : Literal {
         let literal = {} as Literal;
 
         literal.hash = packed.hash;
@@ -258,20 +267,19 @@ class Store {
         literal.value['_flags'] = packed.flags;
 
         return literal;
-    }
+    }*/
 
-    private async unpackSearchResults(searchResults: BackendSearchResults) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+    private async loadSearchResults(searchResults: BackendSearchResults) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
 
-        let context : Context = { objects: new Map<Hash, HashedObject>(),
-                                  literals: new Map<Hash, Literal>() };
+        let context = new Context();
 
         let objects = [] as Array<HashedObject>;
         
-        for (let packed of searchResults.items) {
+        for (let literal of searchResults.items) {
 
-            context.literals.set(packed.hash, this.unpackLiteral(packed));
+            context.literals.set(literal.hash, literal);
 
-            let obj = await this.loadWithContext(packed.hash, context) as HashedObject;
+            let obj = await this.loadWithContext(literal.hash, context) as HashedObject;
             objects.push(obj);
         }
 
@@ -291,8 +299,6 @@ class Store {
         let closure = new Set<Hash>();
         let pending = new Set<Hash>(init);
 
-
-        
         while (pending.size > 0) {
             let {done, value} = pending.values().next(); done;
             pending.delete(value);
@@ -372,4 +378,4 @@ class Store {
     }
 }
 
-export { Store, PackedLiteral };
+export { Store };

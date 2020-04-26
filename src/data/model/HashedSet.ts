@@ -72,8 +72,6 @@ class HashedSet<T> {
         return result;
     }
 
-    //literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
-
     literalize(path='', context?: Context) : { value: any, dependencies : Set<Dependency> }  {
            
         let dependencies = new Set<Dependency>();

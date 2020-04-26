@@ -26,7 +26,9 @@ class TerminalOpsState extends HashedObject {
     }
 
     init() {
-
+        if (this.objectHash === undefined || this.terminalOps === undefined) {
+            throw new Error("Missing fields in TerminalOpsState");
+        }
     }
 }
 

@@ -1,20 +1,25 @@
-import { Hashing, Hash } from './Hashing';
-import { HashedSet } from './HashedSet';
-import { Identity } from 'data/identity/Identity';
-import { HashReference } from './HashReference';
-import { __spreadArrays } from 'tslib';
 import { RNGImpl } from 'crypto/random';
-import { Store } from 'data/storage/Store';
-import { HashedMap } from './HashedMap';
-//import { SharedState } from './state/SharedState';
 
-type Literal           = { hash: Hash, value: any, author?: Hash, dependencies: Set<Dependency> }
+import { Identity } from '../identity/Identity';
+import { Store } from '../storage/Store';
+
+import { Hashing, Hash } from './Hashing';
+
+import { HashedSet } from './HashedSet';
+import { HashReference } from './HashReference';
+import { HashedMap } from './HashedMap';
+
+import { Context, LiteralContext } from './Context';
+
+import { __spreadArrays } from 'tslib';
+
+type Literal           = { hash: Hash, value: any, author?: Hash, signature?: string, dependencies: Array<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
-type AliasingContext  = { rootHash?: Hash, aliased: Map<Hash, HashedObject> };
-type ObjectContext    = { rootHash?: Hash, objects: Map<Hash, HashedObject> };
-type LiteralContext   = { rootHash?: Hash, literals: Map<Hash, Literal> };
-type Context = ObjectContext & LiteralContext & Partial<AliasingContext>;
+type AliasingContext  = { aliased: Map<Hash, HashedObject> };
+//type ObjectContext    = { rootHashes: Array<Hash>, objects: Map<Hash, HashedObject> };
+//type LiteralContext   = { rootHashes: Array<Hash>, literals: Map<Hash, Literal> };
+//type Context = { rootHashes: Array<Hash>, objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal>, aliased?: Map<Hash, HashedObject> };  //ObjectContext & Partial<AliasingContext>;
 
 const BITS_FOR_ID = 128;
 
@@ -40,7 +45,6 @@ abstract class HashedObject {
     private _store?           : Store;
     private _lastHash?        : Hash;
     private _aliasingContext? : AliasingContext;
-
 
     constructor() {
 
@@ -127,7 +131,7 @@ abstract class HashedObject {
     }
 
     hash() {
-        return this.toLiteralContext().rootHash as Hash;
+        return this.toContext().rootHashes[0] as Hash;
     }
 
     createReference() : HashReference {
@@ -139,10 +143,11 @@ abstract class HashedObject {
     }
 
     clone() : this {
-        let lc = this.toLiteralContext();
-        //lc.context.objects = new Map<Hash, HashedObject>();
+        let c = this.toContext();
+        
+        c.objects = new Map<Hash, HashedObject>();
 
-        let clone = HashedObject.fromLiteralContext(lc) as this;
+        let clone = HashedObject.fromContext(c) as this;
 
         return clone;
     }
@@ -160,35 +165,31 @@ abstract class HashedObject {
         return this._aliasingContext;
     }
 
-    toLiteralContext(aliasingContext?: AliasingContext) : LiteralContext /*DeliteralizationContext*/ {
+    toLiteralContext(context?: Context) : LiteralContext {
 
-        let context = this.toContext(aliasingContext);
-
-        return { rootHash: context.rootHash, literals: context.literals };
-    }
-
-    toLiteral(aliasingContext?: AliasingContext) {
-        let literals: any = { }
-
-        let ctx = this.toLiteralContext(aliasingContext);
-
-        for (const [hash, literal] of ctx.literals.entries()) {
-            literals[hash] = literal;
+        if (context === undefined) {
+            context = new Context();
         }
 
-        return { hash: ctx.rootHash, literals: literals };
+        this.toContext(context);
 
+        return context.toLiteralContext();
     }
 
-    toContext(aliasingContext?: AliasingContext) : Context {
+    toLiteral() {
+        let context = this.toContext();
 
-        let context: Context = {
-            literals: new Map(),
-            objects: new Map(),
-            aliased: aliasingContext?.aliased
-        };
+        return context.literals.get(context.rootHashes[0]);
+    }
 
-        context.rootHash = this.literalizeInContext(context, '');
+    toContext(context?: Context) : Context {
+
+        if (context === undefined) {
+            context = new Context();
+        }
+        
+        let hash = this.literalizeInContext(context, '');
+        context.rootHashes.push(hash);
 
         return context;
     }
@@ -227,7 +228,7 @@ abstract class HashedObject {
         
         
 
-        let literal: Literal = { hash: hash, value: value, dependencies: dependencies };
+        let literal: Literal = { hash: hash, value: value, dependencies: Array.from(dependencies) };
 
         if (value['_fields']['author'] !== undefined) {
             literal.author = value['_fields']['author']['hash'];
@@ -341,34 +342,39 @@ abstract class HashedObject {
     }
 
 
-    static fromLiteralContext(literalContext: LiteralContext /*DeliteralizationContext*/ ) : HashedObject {
-        let context = { rootHash: literalContext.rootHash, 
-                        literals: literalContext.literals, 
-                        objects:  new Map()};
+    static fromLiteralContext(literalContext: LiteralContext, hash?: Hash) : HashedObject {
+
+        let context = new Context();
+        context.fromLiteralContext(literalContext);
+
+        return HashedObject.fromContext(context, hash);
+    }
+
+    
+    static fromLiteral(literal: Literal) : HashedObject {
+
+        let context = new Context();
+        context.rootHashes.push(literal.hash);
+        context.literals.set(literal.hash, literal);
 
         return HashedObject.fromContext(context);
-    }
-
-    static fromLiteral(lit: {hash: Hash, literals: any}) : HashedObject {
-        let ctx:LiteralContext = { rootHash: lit.hash, literals: new Map()};
-
-        for (const [hash, literal] of Object.entries(lit.literals)) {
-            ctx.literals.set(hash, literal as any);
-        }
-
-        return HashedObject.fromLiteralContext(ctx);
 
     }
 
-    static fromContext(context: Context) : HashedObject {
+    static fromContext(context: Context, hash?: Hash) : HashedObject {
 
-        if (context.rootHash === undefined) {
-            throw new Error("Can't recreate object from context because its rootHash is missing");
+        if (hash === undefined) {
+            if (context.rootHashes.length === 0) {
+                throw new Error('Cannot deliteralize object because the hash was not provided, and there are no hashes in its literal representation.');
+            } else if (context.rootHashes.length > 1) {
+                throw new Error('Cannot deliteralize object because the hash was not provided, and there are more than one hashes in its literal representation.');
+            }
+            hash = context.rootHashes[0];
         }
 
-        HashedObject.deliteralizeInContext(context.rootHash, context);
+        HashedObject.deliteralizeInContext(hash, context);
 
-        return context.objects.get(context.rootHash) as HashedObject;
+        return context.objects.get(hash) as HashedObject;
     }
 
     // deliteralizeInContext: take the literal with the given hash from the context,
@@ -588,4 +594,4 @@ abstract class HashedObject {
 
 }
 
-export { HashedObject, Literal, Dependency, Context, AliasingContext, LiteralContext, ObjectContext };
+export { HashedObject, Literal, Dependency, Context, AliasingContext, LiteralContext };

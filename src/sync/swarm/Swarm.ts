@@ -713,7 +713,7 @@ class Swarm {
         return agentSet;
     }
 
-    sendPeerMessage(message: PeerMessage) {
+    async sendPeerMessage(message: PeerMessage) {
         let controlMessage = {
             source: message.sourceId,
             destination: message.destinationId,
