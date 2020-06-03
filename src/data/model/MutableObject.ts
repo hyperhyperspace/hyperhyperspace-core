@@ -3,12 +3,15 @@ import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
+import { Logger, LogLevel } from 'util/logging';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
 type LoadStrategy = 'none'|'full'|'lazy';
 
 abstract class MutableObject extends HashedObject {
+
+    static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     readonly _acceptedMutationOpClasses : Array<string>;
     readonly _loadStrategy              : LoadStrategy;
@@ -34,7 +37,7 @@ abstract class MutableObject extends HashedObject {
         };
     }
 
-    abstract async mutate(op: MutationOp): Promise<boolean>;
+    abstract async mutate(op: MutationOp): Promise<void>;
 
     bindToStore() {
         // NOTE: watchReferences is idempotent
@@ -156,6 +159,11 @@ abstract class MutableObject extends HashedObject {
 
             if (prevOps === undefined) {
 
+
+                MutableObject.prevOpsComputationLog.debug(
+                    () => 'automatically generating prev ops, target is ' + op.getTarget().hash()
+                );
+
                 // If prevOps is missing in the received object, we'll autogenerate a set of known
                 // operations as follows: take all the terminal operations in the store (if there is
                 // an attached store), of those remove any operations that are prevOps for all the
@@ -176,11 +184,16 @@ abstract class MutableObject extends HashedObject {
                     }    
                 }
 
+                MutableObject.prevOpsComputationLog.trace('fetched ops from attached store (if any): ' + Array.from(terminalOps));
+                MutableObject.prevOpsComputationLog.trace('prev ops covered by unsaved ops (if any): ' + Array.from(this._prevOpsForUnsavedOps));
+                
                 for (const opHash of this._prevOpsForUnsavedOps) {
                     terminalOps.delete(opHash);
                 }
 
-                let terminalOpRefs = new Set<HashReference>();
+                MutableObject.prevOpsComputationLog.trace('remaining ops from attached store:        ' + Array.from(terminalOps))
+
+                let terminalOpRefs = new Set<HashReference<MutationOp>>();
 
                 for (const opHash of terminalOps) {
                     let terminalOp = await this.getStore().load(opHash, this.getAliasingContext()) as MutationOp;
@@ -188,11 +201,18 @@ abstract class MutableObject extends HashedObject {
                 }
 
                 if (this._unsavedOps.length > 0) {
+
                     let last = this._unsavedOps[this._unsavedOps.length - 1];
-                    terminalOpRefs.add(last.createReference());
+                    let lastRef = last.createReference()
+                    MutableObject.prevOpsComputationLog.trace('adding last unsaved op:                    ' + lastRef.hash);
+                    
+                    terminalOpRefs.add(lastRef);
                 }
                 
+                MutableObject.prevOpsComputationLog.trace('resulting generated prev ops:              ' + Array.from(terminalOpRefs).map((ref:HashReference<MutationOp>) => ref.hash));
                 op.setPrevOps(terminalOpRefs.values());
+
+                MutableObject.prevOpsComputationLog.debug(() => 'op ' + op.hash() + ' generated prev ops: ' + Array.from(terminalOpRefs).map((ref:HashReference<MutationOp>) => ref.hash))
             }            
 
             await this.apply(op);
@@ -214,6 +234,8 @@ abstract class MutableObject extends HashedObject {
 
         if (store === undefined) {
             store = this.getStore();
+        } else {
+            this.setStore(store);
         }
 
         if (this._unsavedOps.length === 0) {

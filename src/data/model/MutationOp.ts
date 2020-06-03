@@ -7,7 +7,7 @@ import { HashReference } from './HashReference';
 abstract class MutationOp extends HashedObject {
 
     target?  : MutableObject;
-    prevOps? : HashedSet<HashReference>;
+    prevOps? : HashedSet<HashReference<MutationOp>>;
 
     constructor(target?: MutableObject) {
         super();
@@ -22,11 +22,11 @@ abstract class MutationOp extends HashedObject {
         this.target = target;
     }
 
-    getPrevOps() : IterableIterator<HashReference> | undefined {
+    getPrevOps() : IterableIterator<HashReference<MutationOp>> | undefined {
         return this.prevOps?.values();
     }
 
-    setPrevOps(prevOps: IterableIterator<HashReference>) {
+    setPrevOps(prevOps: IterableIterator<HashReference<MutationOp>>) {
         this.prevOps = new HashedSet(prevOps);
     }
 

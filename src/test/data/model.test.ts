@@ -1,4 +1,4 @@
-import { HashedObject, HashedSet, Hash, Literal, Serialization } from 'data/model';
+import { HashedObject, HashedSet, Serialization, Context } from 'data/model';
 
 import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
 import { OverrideIds } from './types/OverrideIds';
@@ -8,7 +8,7 @@ describe('Data model', () => {
     test( 'Basic types', () => {
         
         const original = ['hello', 1.0, false, 2.5, 'bye', true];
-        const context = { objects : new Map<Hash, HashedObject>(), literals: new Map<Hash, Literal>() }
+        const context = new Context();
         const literalization  = HashedObject.literalizeField('original', original, context);
         const reconstructed = HashedObject.deliteralizeField(literalization.value, context);
 
@@ -58,7 +58,7 @@ describe('Data model', () => {
 
         const literal1 = map2.literalize();
 
-        const map3 = HashedMap.deliteralize(literal1.value, { literals: new Map(), objects: new Map()});
+        const map3 = HashedMap.deliteralize(literal1.value, new Context());
 
         expect(map2.equals(map3)).toBeTruthy();
     });

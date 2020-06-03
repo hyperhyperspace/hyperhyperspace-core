@@ -1,9 +1,11 @@
-import { IdentityProvider } from 'data/identity/IdentityProvider';
-import { Identity } from 'data/identity/Identity';
-import { RSAKeyPair } from 'data/identity/RSAKeyPair';
+import { LiteralContext, Context } from '../model/Context';
+import { Literal, HashedObject } from '../model/HashedObject';
+
+import { IdentityProvider } from '../identity/IdentityProvider';
+import { Identity } from '../identity/Identity';
+import { RSAKeyPair } from '../identity/RSAKeyPair';
 
 import { Store } from './Store';
-import { Literal, LiteralContext } from 'data/model/HashedObject';
 
 
 
@@ -30,13 +32,16 @@ class StoreIdentityProvider implements IdentityProvider {
 
     }
 
-    async signLiteral(literal: Literal): Promise<void> {
+    async signLiteral(literal: Literal, author?: HashedObject): Promise<void> {
         if (literal.author !== undefined && literal.signature === undefined) {
-            let obj = this.store.load(literal.author);
-            if (obj === undefined) {
+            if (author === undefined) {
+                author = await this.store.load(literal.author);
+            }
+            
+            if (author === undefined) {
                 throw new Error('Trying to sign literal for object ' + literal.hash + ' but could not find its author (identity ' + literal.author + ').');
-            } else if (obj instanceof Identity) {
-                literal.signature = await this.signText(literal.hash, obj as Identity);
+            } else if (author instanceof Identity) {
+                literal.signature = await this.signText(literal.hash, author as Identity);
             } else {
                 throw new Error('Trying to sign literal for object ' + literal.hash + ' but its author ' + literal.author + ' is not an instance of Identity.');
             }
@@ -46,6 +51,18 @@ class StoreIdentityProvider implements IdentityProvider {
     async signLiteralContext(literalContext: LiteralContext): Promise<void> {
         for (const hash of literalContext.rootHashes) {
             await this.signLiteral(literalContext.literals[hash] as Literal);
+        }
+    }
+    
+    async signContext(context: Context) {
+        for (const hash of context.rootHashes) {
+            
+            let literal = context.literals.get(hash) as Literal;
+            if (literal.author !== undefined) {
+                let author = context.objects.get(literal.author);
+                await this.signLiteral(literal, author);
+            }
+            
         }
     }
 }

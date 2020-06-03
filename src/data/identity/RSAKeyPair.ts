@@ -3,6 +3,15 @@ import { HashedObject } from 'data/model/HashedObject';
 import { RSAPublicKey } from './RSAPublicKey';
 import { Hashing } from 'data/model/Hashing';
 
+// Note: this classs uses a custom hash function that omits the private key,
+//       using only the public part, thus allowing a public key to generate
+//       the hash of its corresponding key-pair.
+
+//       Since only the public key is verified by the hash, we also self-sign
+//       the private key, a signature that can be verified using the public
+//       key (that was hashed).
+
+
 class RSAKeyPair extends HashedObject {
 
     static className = 'hhs/RSAKeyPair';
@@ -19,13 +28,15 @@ class RSAKeyPair extends HashedObject {
         keyPair.format = format;
         keyPair.publicKey = publicKey;
         keyPair.privateKey = privateKey;
-        keyPair.init();
+        keyPair.initRSA();
+        keyPair.selfSign();
         return keyPair;
     }
 
     format?: string;
     publicKey?: string;
     privateKey?: string;
+    privateKeySignature?: string;
 
     _rsa?: RSA;
 
@@ -34,16 +45,31 @@ class RSAKeyPair extends HashedObject {
     }
 
     init() {
+        this.initRSA();
+        if (!this.checkSelfSignature()) {
+            throw new Error("Self signature check failed for private key");
+        }
+    }
+
+    private initRSA() {
         this._rsa = new RSAImpl();
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey(), this.getPrivateKey());
+    }
+
+    private selfSign() {
+        this.privateKeySignature = this._rsa?.sign(this.privateKey as string);
+    }
+
+    private checkSelfSignature() {
+        return this.makePublicKey().verify(this.privateKey as string, this.privateKeySignature as string);
     }
 
     getClassName() {
         return RSAKeyPair.className;
     }
 
-    hash() {
-        return RSAKeyPair.hashPublicKeyPart(this.format as string, this.publicKey as string);
+    customHash(seed?: string) {
+        return RSAKeyPair.hashPublicKeyPart(this.format as string, this.publicKey as string, seed);
     }
 
     getFormat(): string {
@@ -78,8 +104,8 @@ class RSAKeyPair extends HashedObject {
         return this._rsa?.decrypt(cypherText);
     }
 
-    static hashPublicKeyPart(format: string, publicKey: string) {
-        return Hashing.forValue({'_type': 'custom_hashed_object', '_class': RSAKeyPair.className, '_contents': {'format' : format, 'publicKey': publicKey}});
+    static hashPublicKeyPart(format: string, publicKey: string, seed?: string) {
+        return Hashing.forValue({'_type': 'custom_hashed_object', '_class': RSAKeyPair.className, '_contents': {'format' : format, 'publicKey': publicKey}}, seed);
     }
 }
 

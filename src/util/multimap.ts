@@ -18,7 +18,7 @@ class MultiMap<K, V> {
         s.add(value);
     }
 
-    remove(key: K, value: V) : boolean {
+    delete(key: K, value: V) : boolean {
         let s = this.inner.get(key);
 
         if (s === undefined) {

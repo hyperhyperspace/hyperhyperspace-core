@@ -7,7 +7,7 @@ class SomethingHashed extends HashedObject {
     name?: string;
     amount?: number;
     things?: HashedSet<any>;
-    reference?: HashReference;
+    reference?: HashReference<any>;
 
     constructor() {
         super();

@@ -1,5 +1,5 @@
 import { Store, IdbBackend } from 'data/storage';
-import { HashedObject, HashedSet, HashReference } from 'data/model';
+import { HashedObject, HashedSet, HashReference, MutationOp } from 'data/model';
 
 import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
 import { SomethingMutable, SomeMutation } from './types/SomethingMutable';
@@ -138,9 +138,8 @@ describe('Storage', () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
 
         let sm = new SomethingMutable();
-        await sm.testOperation('hello');
-
         await store.save(sm);
+        await sm.testOperation('hello');
 
         let hash = sm.getLastHash();
         let sm2 = await store.load(hash) as SomethingMutable;
@@ -167,13 +166,13 @@ describe('Storage', () => {
 
         expect(world !== undefined).toBeTruthy();
         if (world !== undefined) {
-            expect(world.prevOps?.toArrays().elements.length === 2);
+            expect(world.prevOps?.toArrays().elements.length === 2).toBeTruthy();
             let another = false;
             let hello   = false;
-            for (const opRef of (world.prevOps as HashedSet<HashReference>).toArrays().elements) {
+            for (const opRef of (world.prevOps as HashedSet<HashReference<MutationOp>>).toArrays().elements) {
                 let op = sm3._operations.get(opRef.hash);
                 another = another || op?.payload === 'another';
-                hello   = hello   || op?.payload === 'hello'
+                hello   = hello   || op?.payload === 'hello';
             } 
 
             expect(another).toBeTruthy();

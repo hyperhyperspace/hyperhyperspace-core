@@ -3,8 +3,8 @@ import { HashedObject, MutableObject, Literal, AliasingContext, Context } from 
 import { Hash } from 'data/model/Hashing';
 
 import { MultiMap } from 'util/multimap';
-import { IdentityProvider } from 'data/identity/IdentityProvider';
-import { StoreIdentityProvider } from './StoreIdentityProvider';
+import { Identity } from 'data/identity/Identity';
+import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
@@ -28,25 +28,70 @@ class Store {
         this.classReferencesCallbacks = new MultiMap();
     }
 
-    async signAndSave(object: HashedObject) : Promise<void> {
-        return this.save(object, true);
-    }
+    // save & saveWithContext: the saving of operations is not recursive, you can't save all
+    //                         operations in a mutable object that was referenced in one of
+    //       (* note 1)        this object's dependencies. You need to call save explicitly
+    //                         on the mutable object whose operations you want saved.
 
-    async save(object: HashedObject, sign=false) : Promise<void>{
+    async save(object: HashedObject) : Promise<void>{
         let context = object.toContext();
         let hash    = context.rootHashes[0] as Hash;
-        //let context = { rootHash: hash, literals: literalContext.literals, objects: new Map() };
 
-        if (sign) {
-            let ip: IdentityProvider = new StoreIdentityProvider(this);
-            ip.signLiteralContext(context);
+        let missing = await this.findMissingReferencesWithContext(hash, context);
+
+        if (missing.size > 0) {
+            throw new Error('Cannot save object ' + hash + ' because the following references are missing: ' + Array.from(missing) + '.');
         }
 
         await this.saveWithContext(hash, context);
 
         if (object instanceof MutableObject) {
-            await object.saveQueuedOps();
+            await object.saveQueuedOps(); // see (* note 1) above
         }
+
+    }
+
+    async findMissingReferencesWithContext(hash: Hash, context: Context, expectedClassName? : string): Promise<Set<Hash>> {
+
+        let literal = context.literals.get(hash);
+
+        if (literal === undefined) {
+            return new Set([hash]);
+        }
+
+        if (expectedClassName !== undefined && literal.value['_class'] !== expectedClassName) {
+            throw new Error('Referenced depency ' + hash + ' was found in the store with type ' + literal.value['_class'] + ' but was declared as being ' + expectedClassName + '.')
+        }
+
+        let missing = new Set<Hash>();
+
+        for (let dependency of literal.dependencies) {
+
+            let depHash = dependency.hash;
+
+            let dep = context.literals.get(depHash);
+
+            if (dep === undefined) {
+                let storedDep = await this.load(depHash);
+
+                if (storedDep === undefined) {
+                    missing.add(depHash);
+                } else {
+                    if (storedDep.getClassName() !== dependency.className) {
+                        throw new Error('Referenced depency ' + dependency.hash + ' was found in the store with type ' + storedDep.getClassName() + ' but was declared as being ' + dependency.className + ' on path ' + dependency.path + '.');
+                    }
+                }
+            } else {
+                let depMissing = await this.findMissingReferencesWithContext(dependency.hash, context, dependency.className);
+                
+                for (const missingHash of depMissing) {
+                    missing.add(missingHash);
+                }
+            }
+        }
+
+        return missing;
+
     }
 
     private async saveWithContext(hash: Hash, context: Context) : Promise<void> {
@@ -57,32 +102,32 @@ class Store {
 
         let loaded = await this.load(hash);
 
-        if (loaded !== undefined) {
-            return Promise.resolve();
-        }
-
-        let literal = context.literals.get(hash);
-
-        if (literal === undefined) {
-            throw new Error('Hash ' + hash + ' is missing from context received for saving');
-        }
-
-        for (let dependency of literal.dependencies) {
-            if (dependency.type === 'literal') {
-                await this.saveWithContext(dependency.hash, context);
-            }
-        }
-
-        await this.backend.store(literal);
-
-        let object = context.objects.get(literal.hash) as HashedObject;
-
+        let object = context.objects.get(hash) as HashedObject;
+        
         if ( !object.hasStore() ) {
             object.setStore(this);
         }
 
-        // after the backend has stored the object, fire callbacks:
-        await this.fireCallbacks(literal);
+        if (loaded === undefined) {        
+
+            let literal = context.literals.get(hash);
+
+            if (literal === undefined) {
+                throw new Error('Hash ' + hash + ' is missing from context received for saving');
+            }
+
+            for (let dependency of literal.dependencies) {
+                if (dependency.type === 'literal') {
+                    await this.saveWithContext(dependency.hash, context);
+                }
+            }
+
+            await this.backend.store(literal);
+
+            // after the backend has stored the object, fire callbacks:
+            await this.fireCallbacks(literal);
+        }
+
     }
     
 
@@ -159,6 +204,10 @@ class Store {
     }
     */
 
+    async loadLiteral(hash: Hash) {
+        return this.backend.load(hash);
+    }
+
     async load(hash: Hash, aliasingContext?: AliasingContext) : Promise<HashedObject | undefined> {
 
         let context = new Context();
@@ -213,6 +262,16 @@ class Store {
             for (const ctxObj of context.objects.values()) {
                 if (!ctxObj.hasStore()) {
                     ctxObj.setStore(this);
+                }
+            }
+
+            if (obj instanceof Identity) {
+                const id = obj as Identity;
+                if (!id.hasKeyPair()) {
+                    let kp = await this.load(id.getKeyPairHash());
+                    if (kp !== undefined && kp instanceof RSAKeyPair) {
+                        id.addKeyPair(kp);
+                    }
                 }
             }
         }
@@ -334,17 +393,17 @@ class Store {
 
     removeClassWatch(className: string, callback: (match: Hash) => Promise<void>) : boolean {
         const key = Store.keyForClass(className);
-        return this.classCallbacks.remove(key, callback);
+        return this.classCallbacks.delete(key, callback);
     }
 
     removeReferencesWatch(referringPath: string, referencedHash: Hash, callback: (match: Hash) => Promise<void>) : boolean {
         const key = Store.keyForReference(referringPath, referencedHash);
-        return this.referencesCallbacks.remove(key, callback);
+        return this.referencesCallbacks.delete(key, callback);
     }
 
     removeClassReferencesWatch(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => Promise<void>) : boolean {
         const key = Store.keyForClassReference(referringClassName, referringPath, referencedHash);
-        return this.classReferencesCallbacks.remove(key, callback);
+        return this.classReferencesCallbacks.delete(key, callback);
     }
 
     private static keyForClass(className: string) {

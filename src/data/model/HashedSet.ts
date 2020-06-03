@@ -91,6 +91,10 @@ class HashedSet<T> {
         return Hashing.forValue(this.literalize().value);
     }
 
+    size() {
+        return this.hashedElements.size;
+    }
+
     static deliteralize(value: any, context: Context) : HashedSet<any> {
         
         if (value['_type'] !== 'hashed_set') {

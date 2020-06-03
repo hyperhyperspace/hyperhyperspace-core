@@ -5,6 +5,7 @@ import { Literal } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { openDB, IDBPDatabase } from 'idb';
+import { Logger, LogLevel } from 'util/logging';
 
 type IdbStorageFormat = {
     literal    : Literal,
@@ -20,6 +21,9 @@ type IdbTerminalOpsFormat = {
 };
 
 class IdbBackend implements Backend {
+
+    static terminalOpsStorageLog = new Logger(IdbBackend.name, LogLevel.INFO);
+
 
     static readonly META_STORE = 'meta_store';
     static readonly OBJ_STORE  = 'object_store';
@@ -106,25 +110,45 @@ class IdbBackend implements Backend {
 
         if (isOp) {
             
+            const mutableHash = storable.literal.value._fields['target']['_hash'];
+
+            // FIXME: we could expose a static method in HashedSet to get the element array in the 
+            //        literalized representation, and maybe another static method in HashedReference
+            //        to get the hashed from the literalized ref?
+
+            const prevOpHashes =  storable.literal.value._fields['prevOps']['_elements']
+                                    .map((elmtValue: {_hash: Hash}) => elmtValue['_hash']) as Array<Hash>;
+
+            IdbBackend.terminalOpsStorageLog.debug('updating stored last ops for ' + mutableHash + 
+                                                   ' on arrival of ' + storable.literal.hash + 
+                                                   ' with prevOps ' + prevOpHashes);
+            
             let terminalOpsInfo = (await tx.objectStore(IdbBackend.TERMINAL_OPS_STORE)
-                                          .get(storable.literal.value._fields['target']['_hash'])) as IdbTerminalOpsFormat | undefined;
+                                           .get(mutableHash)) as IdbTerminalOpsFormat | undefined;
 
             if (terminalOpsInfo === undefined) {
+                IdbBackend.terminalOpsStorageLog.trace('found no stored last ops, setting last ops to [' + storable.literal.hash + ']');
                 terminalOpsInfo = { 
-                    mutableHash: storable.literal.value._fields['target']['_hash'], 
+                    mutableHash: mutableHash, 
                     terminalOps: [storable.literal.hash],
                     lastOp: storable.literal.hash
                  };
             } else {
-                for (const hash of storable.literal.value._fields['prevOps']['_hashes'] as Array<Hash>) {
+                IdbBackend.terminalOpsStorageLog.trace('stored last ops are: ' + terminalOpsInfo.terminalOps);
+                
+                IdbBackend.terminalOpsStorageLog.trace('removing new op last ops which are ' + prevOpHashes);
+                for (const hash of prevOpHashes) {
                     let idx = terminalOpsInfo.terminalOps.indexOf(hash);
                     if (idx >= 0) {
-                        delete terminalOpsInfo.terminalOps[idx];
+                        terminalOpsInfo.terminalOps.splice(idx, 1);
                     }
                 }
+
                 if (terminalOpsInfo.terminalOps.indexOf(storable.literal.hash) < 0) { // this should always be true
                     terminalOpsInfo.terminalOps.push(storable.literal.hash);
                 }
+                
+                IdbBackend.terminalOpsStorageLog.debug('final last ops after added new op if necessary:' + terminalOpsInfo.terminalOps);
                 terminalOpsInfo.lastOp = storable.literal.hash;
             }
 

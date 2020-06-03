@@ -42,12 +42,16 @@ abstract class HashedObject {
     private id?     : string;
     private author? : Identity;
 
+    
+    private _signOnLiteraliz  : boolean;
     private _store?           : Store;
     private _lastHash?        : Hash;
+    private _lastSignature?   : string;
+
     private _aliasingContext? : AliasingContext;
 
     constructor() {
-
+        this._signOnLiteraliz = false;
     } 
 
     abstract getClassName() : string;
@@ -68,11 +72,32 @@ abstract class HashedObject {
     }
 
     setAuthor(author: Identity) {
+        if (!author.hasKeyPair()) {
+            throw new Error('Trying to set the author of an object, but the received identity does not have an attached key pair to sign it.');
+        }
+
         this.author = author;
+        this._signOnLiteraliz = true;
     }
 
     getAuthor() {
         return this.author;
+    }
+
+    hasLastSignature() : boolean {
+        return this._lastSignature !== undefined;
+    }
+
+    setLastSignature(signature: string) : void {
+        this._lastSignature = signature;
+    }
+
+    getLastSignature() : string {
+        if (this._lastSignature === undefined) {
+            throw new Error('Attempted to retrieve last signature for unsigned object');
+        }
+
+        return this._lastSignature;
     }
 
     overrideChildrenId() : void {
@@ -130,16 +155,40 @@ abstract class HashedObject {
         return this._lastHash as Hash;
     }
 
-    hash() {
-        return this.toContext().rootHashes[0] as Hash;
+    hash(seed?: string) {
+
+        let hash = this.customHash(seed);
+
+        if (hash === undefined) {
+            let context = this.toContext();
+            if (seed === undefined) {
+                hash = context.rootHashes[0] as Hash;
+            } else {
+                let literal = context.literals.get(context.rootHashes[0]) as Literal;
+                hash = Hashing.forValue(literal.value, seed);
+            }
+            
+        }
+
+        if (seed === undefined) { 
+            this._lastHash = hash;
+        }
+
+        return hash;
     }
 
-    createReference() : HashReference {
+    customHash(seed?: string) : Hash | undefined {
+        seed;
+        return undefined;
+    }
+
+    createReference() : HashReference<this> {
         return new HashReference(this.hash(), this.getClassName());
     }
 
-    equals(another: HashedObject) {
-        return this.hash() === another.hash();
+    equals(another: HashedObject | undefined) {
+
+        return another !== undefined && this.hash() === another.hash();
     }
 
     clone() : this {
@@ -224,15 +273,29 @@ abstract class HashedObject {
             _flags  : flags
         };
 
-        let hash = Hashing.forValue(value);
-        
-        
+        let hash = this.customHash();
+
+        if (hash === undefined) {
+            hash = Hashing.forValue(value)
+        }
 
         let literal: Literal = { hash: hash, value: value, dependencies: Array.from(dependencies) };
 
-        if (value['_fields']['author'] !== undefined) {
-            literal.author = value['_fields']['author']['hash'];
+        if (this.author !== undefined) {
+            literal.author = value['_fields']['author']['_hash'];
         }
+
+        if (this._signOnLiteraliz) {
+            literal.signature = this.author?.sign(hash);
+        } else {
+            if (this.author !== undefined) {
+                if (this.hasLastSignature() && this.author.verify(hash, this.getLastSignature())) {
+                    literal.signature = this.getLastSignature();
+                }
+            }
+        }
+
+        
 
         if (context.aliased?.get(hash) !== undefined) {
             context.objects.set(hash, context.aliased.get(hash) as HashedObject);
@@ -300,7 +363,7 @@ abstract class HashedObject {
             } else { // not a set, map or array
 
                 if (something instanceof HashReference) {
-                    let reference = something as HashReference;
+                    let reference = something as HashReference<any>;
 
                     let dependency : Dependency = { path: fieldPath, hash: reference.hash, className: reference.className, type: 'reference'};
                     dependencies.add(dependency);
@@ -317,6 +380,8 @@ abstract class HashedObject {
 
                     let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClassName(), type: 'literal'};
                     dependencies.add(dependency);
+
+                    HashedObject.collectChildDeps(dependencies, new Set((context.literals.get(hash) as Literal).dependencies));
 
                     value = { _type: 'hashed_object_dependency', _hash: hash };
                 } else {
@@ -432,6 +497,20 @@ abstract class HashedObject {
         hashedObject.setLastHash(hash);
 
         hashedObject.init();
+
+
+        // check object signature if author is present
+        if (hashedObject.author !== undefined) {
+            if (literal.signature === undefined) {
+                throw new Error('Singature is missing for object ' + hash);
+            }
+
+            if (!hashedObject.author.verify(hash, literal.signature)) {
+                throw new Error('Invalid signature for obejct ' + hash);
+            }
+
+            hashedObject.setLastSignature(literal.signature);
+        }
 
         context.objects.set(hash, hashedObject);
     }

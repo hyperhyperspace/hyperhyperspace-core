@@ -1,6 +1,8 @@
+import { HashedObject } from '../model/HashedObject';
+
 import { RSAKeyPair } from './RSAKeyPair';
 import { RSAPublicKey } from './RSAPublicKey';
-import { HashedObject } from 'data/model/HashedObject';
+
 
 
 class Identity extends HashedObject {
@@ -8,7 +10,9 @@ class Identity extends HashedObject {
     static className = 'hss/Identity';
 
     static fromKeyPair(info: object, keyPair: RSAKeyPair) : Identity {
-        return Identity.fromPublicKey(info, keyPair.makePublicKey());
+        let id = Identity.fromPublicKey(info, keyPair.makePublicKey());
+        id.addKeyPair(keyPair);
+        return id;
     }
 
     static fromPublicKey(info: object, publicKey: RSAPublicKey) {
@@ -22,6 +26,8 @@ class Identity extends HashedObject {
 
     info?: object;
     publicKey?: RSAPublicKey;
+
+    _keyPair?: RSAKeyPair;
 
     constructor() {
         super();
@@ -51,6 +57,36 @@ class Identity extends HashedObject {
 
     getKeyPairHash() {
         return this.getPublicKey().getKeyPairHash();
+    }
+
+    addKeyPair(keyPair: RSAKeyPair) {
+        if (keyPair.hash() !== this.getKeyPairHash()) {
+            throw new Error('Trying to add key pair to identity, but it does not match identity public key');
+        }
+
+        this._keyPair = keyPair;
+    }
+
+    hasKeyPair() {
+        return this._keyPair !== undefined;
+    }
+
+    sign(text: string) {
+
+        if (this._keyPair === undefined) {
+            throw new Error('Trying to sign using Identity object, but no keyPair has been loaded');
+        }
+
+        return this._keyPair.sign(text);
+    }
+
+    decrypt(text: string) {
+
+        if (this._keyPair === undefined) {
+            throw new Error('Trying to decrypt using Identity object, but no keyPair has been loaded');
+        }
+
+        return this._keyPair.decrypt(text);
     }
 
 }
