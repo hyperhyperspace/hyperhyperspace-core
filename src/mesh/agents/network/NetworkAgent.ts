@@ -1,35 +1,21 @@
-import { WebRTCConnection } from '../transport/WebRTCConnection';
-import { Agent, AgentId } from './Agent';
-import { LinkupManager } from '../linkup/LinkupManager';
-import { LinkupAddress } from '../linkup/LinkupAddress';
-import { RNGImpl } from 'crypto/random';
+import { Agent, AgentId } from '../../base/Agent';
+import { Event, Network } from '../../base/Service';
 import { Logger, LogLevel } from 'util/logging';
+import { LinkupAddress } from 'net/linkup/LinkupAddress';
+import { LinkupManager } from 'net/linkup/LinkupManager';
+import { WebRTCConnection } from 'net/transport/WebRTCConnection';
+import { RNGImpl } from 'crypto/random';
 
 type Endpoint = string;
 
 type ConnectionId  = string;
 
-type Event = { type: string, content: any };
-
 const BITS_FOR_CONN_ID = 128;
 
 enum NetworkEventType {
-    AgentSetChange          = 'agent-set-change',
     ConnectionStatusChange  = 'connection-status-change',
     RemoteAddressListening  = 'remote-address-listening',
-};
-
-enum AgentSetChange {
-    Addition = 'addition',
-    Removal  = 'removal'
-};
-
-type AgentSetChangeEvent = {
-    type: NetworkEventType.AgentSetChange,
-    content: {
-        change: AgentSetChange,
-        agentId: AgentId
-    }
+    MessageReceived         = 'message-received'
 };
 
 enum ConnectionStatus {
@@ -56,7 +42,18 @@ type RemoteAddressListeningEvent = {
     }
 }
 
-type Message = { connectionId: ConnectionId, source: Endpoint, destination: Endpoint, agentId: AgentId, content: any }
+type MessageReceivedEvent = {
+    type: NetworkEventType.MessageReceived,
+    content: Message
+}
+
+type Message = {
+    connectionId: ConnectionId, 
+    source: Endpoint, 
+    destination: Endpoint, 
+    agentId: AgentId, 
+    content: any 
+};
 
 type ConnectionInfo = { 
     localEndpoint: Endpoint,
@@ -73,17 +70,21 @@ const TickInterval = 5;
 
 const ConnectionEstablishmentTimeout = 10;
 
-class Network {
 
-    static logger = new Logger(Network.name, LogLevel.INFO);
-    static connLogger = new Logger(Network.name + ' conn', LogLevel.INFO);
-    static messageLogger = new Logger(Network.name + ' msg', LogLevel.INFO);
+class NetworkAgent implements Agent {
+
+    static AgentId = 'network-agent';
+
+    static logger = new Logger(NetworkAgent.name, LogLevel.INFO);
+    static connLogger = new Logger(NetworkAgent.name + ' conn', LogLevel.INFO);
+    static messageLogger = new Logger(NetworkAgent.name + ' msg', LogLevel.INFO);
     
+    pod?: Network;
+
     linkupManager : LinkupManager;
 
     listening   : Set<Endpoint>;
     connections : Map<ConnectionId, WebRTCConnection>;
-    agents      : Map<string, Agent>;
 
     connectionInfo : Map<ConnectionId, ConnectionInfo>;
     deferredInitialMessages : Map<ConnectionId, any>;
@@ -98,20 +99,25 @@ class Network {
 
     intervalRef : any;
 
+
+
+    getAgentId(): string {
+        return NetworkAgent.AgentId;
+    }
+
     constructor(linkupManager = new LinkupManager()) {
 
         this.linkupManager = linkupManager;
 
         this.listening   = new Set();
         this.connections = new Map();
-        this.agents      = new Map();
 
         this.connectionInfo          = new Map();
         this.deferredInitialMessages = new Map();
 
         this.messageCallback = (data: any, conn: WebRTCConnection) => {
 
-            Network.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getCallId())?.localEndpoint + ' received message: ' + data);
+            NetworkAgent.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getCallId())?.localEndpoint + ' received message: ' + data);
 
             const connectionId = conn.getCallId(); 
             const connInfo = this.connectionInfo.get(connectionId);
@@ -150,7 +156,7 @@ class Network {
                         status          : ConnectionStatus.Ready
                     }
                 };
-                this.broadcastLocalEvent(ev);
+                this.pod?.broadcastLocalEvent(ev);
             }
         }
 
@@ -189,7 +195,7 @@ class Network {
                             }
                         }
 
-                        this.broadcastLocalEvent(ev);
+                        this.pod?.broadcastLocalEvent(ev);
                     }
 
                 }          
@@ -232,7 +238,7 @@ class Network {
             }
         };
 
-        this.intervalRef = window.setInterval(this.tick, TickInterval * 1000);
+        
 
     }
 
@@ -275,7 +281,7 @@ class Network {
         this.linkupManager.listenForQueryResponses(endpoint, (ep: string, addresses: Array<LinkupAddress>) => {
 
             if (this.listening.has(ep)) {
-                Network.connLogger.debug(ep + ' received listening notice of ' + addresses.map((l:LinkupAddress) => l.url()));
+                NetworkAgent.connLogger.debug(ep + ' received listening notice of ' + addresses.map((l:LinkupAddress) => l.url()));
                 for (const address of addresses) {
 
                     let ev: RemoteAddressListeningEvent = {
@@ -285,15 +291,15 @@ class Network {
                         }
                     };
 
-                    this.broadcastLocalEvent(ev);
+                    this.pod?.broadcastLocalEvent(ev);
                 }
             } else {
-                Network.connLogger.debug('received wrongly addressed listenForQueryResponse message, was meant for ' + ep + ' which is not listening in this network node.');
+                NetworkAgent.connLogger.debug('received wrongly addressed listenForQueryResponse message, was meant for ' + ep + ' which is not listening in this network node.');
             }
 
         });
 
-        Network.logger.debug('Listening for endpoint ' + endpoint);
+        NetworkAgent.logger.debug('Listening for endpoint ' + endpoint);
         this.linkupManager.listenForMessagesNewCall(address, this.newConnectionRequestCallback);
     }
 
@@ -334,7 +340,7 @@ class Network {
         console.log('stats: established='+est+' in validation='+val+' validated='+ok);
         */
 
-        Network.connLogger.debug(local + ' is asking for connection to ' + remote);
+        NetworkAgent.connLogger.debug(local + ' is asking for connection to ' + remote);
 
         const localAddress  = LinkupAddress.fromURL(local);
         const remoteAddress = LinkupAddress.fromURL(remote);
@@ -399,13 +405,13 @@ class Network {
 
         let connInfo = this.connectionInfo.get(id);
 
-        Network.connLogger.debug('connection ' + id + ' is being released by agent ' + requestedBy + ' on ' + connInfo?.localEndpoint);
+        NetworkAgent.connLogger.debug('connection ' + id + ' is being released by agent ' + requestedBy + ' on ' + connInfo?.localEndpoint);
 
         connInfo?.requestedBy.delete(requestedBy);
 
         if (connInfo?.requestedBy.size === 0) {
 
-            Network.connLogger.debug('connection ' + id + ' is no longer being used on ' + connInfo?.localEndpoint + ', closing');
+            NetworkAgent.connLogger.debug('connection ' + id + ' is no longer being used on ' + connInfo?.localEndpoint + ', closing');
 
             conn.close();
 
@@ -432,12 +438,12 @@ class Network {
 
     queryForListeningAddresses(source: LinkupAddress, targets: Array<LinkupAddress>) {
 
-        Network.connLogger.log(source.url() + ' asking if any is online: ' + targets.map((l: LinkupAddress) => l.url()), LogLevel.DEBUG);
+        NetworkAgent.connLogger.log(source.url() + ' asking if any is online: ' + targets.map((l: LinkupAddress) => l.url()), LogLevel.DEBUG);
 
         if (this.listening.has(source.url())) {
             this.linkupManager.queryForListeningAddresses(source.url(), targets);
         } else {
-            throw new Error('Looking for onlina targets for endpoint ' + source.url() + ' but that endpoint is not listening on this network.');
+            throw new Error('Looking for online targets for endpoint ' + source.url() + ' but that endpoint is not listening on this network.');
         }
 
         
@@ -500,66 +506,6 @@ class Network {
 
     }
 
-
-
-    // locally running agent set management
-
-    registerLocalAgent(agent: Agent) {
-        this.agents.set(agent.getAgentId(), agent);
-
-
-        agent.ready(this);
-
-        const ev: AgentSetChangeEvent = {
-            type: NetworkEventType.AgentSetChange,
-            content: {
-                agentId: agent.getAgentId(),
-                change: AgentSetChange.Addition
-            }
-        }
-
-        this.broadcastLocalEvent(ev)
-    }
-
-    deregisterLocalAgent(agent: Agent) {
-        this.deregisterLocalAgentById(agent.getAgentId());
-    }
-
-    deregisterLocalAgentById(id: AgentId) {
-
-        const ev: AgentSetChangeEvent = {
-            type: NetworkEventType.AgentSetChange,
-            content: {
-                agentId: id,
-                change: AgentSetChange.Removal
-            }
-        }
-
-        this.broadcastLocalEvent(ev);
-        this.agents.delete(id);
-    }
-
-    getLocalAgent(id: AgentId) {
-        return this.agents.get(id);
-    }
-
-    getLocalAgentIdSet() {
-        return new Set<AgentId>(this.agents.keys());
-    }
-
-
-    // send an event that will be received by all local agents
-
-    broadcastLocalEvent(ev: Event) {
-
-        Network.logger.trace('Network sending event ' + ev.type + ' with content ' + JSON.stringify(ev.content));
-
-        for (const agent of this.agents.values()) {
-            agent.receiveLocalEvent(ev);
-        }
-    }
-
-
     private connectionCloseCleanup(id: ConnectionId) {
 
         let connInfo = this.connectionInfo.get(id) as ConnectionInfo;
@@ -574,7 +520,7 @@ class Network {
             }
         }
 
-        this.broadcastLocalEvent(ev);
+        this.pod?.broadcastLocalEvent(ev);
 
         this.connectionInfo.delete(id);
         this.connections.delete(id);
@@ -583,12 +529,27 @@ class Network {
 
     }
 
+    ready(pod: Network): void {
+        this.pod = pod;
+        this.intervalRef = window.setInterval(this.tick, TickInterval * 1000);
+    }
+
+    receiveLocalEvent(ev: Event): void {
+        ev;
+    }
+
     private receiveMessage(msg: Message) {
 
-        let agent = this.agents.get(msg.agentId);
-        agent?.receiveMessage(msg.connectionId, msg.source, msg.destination, msg.content);
+        let ev: MessageReceivedEvent = {
+            type: NetworkEventType.MessageReceived,
+            content: msg
+        };
+
+        const agent = this.pod?.getLocalAgent(msg.agentId);
+        if (agent !== undefined) {
+            agent.receiveLocalEvent(ev);
+        }
     }
-    
 }
 
-export { Network, ConnectionId, Endpoint, Event, NetworkEventType, ConnectionStatusChangeEvent, ConnectionStatus, AgentSetChangeEvent, AgentSetChange, RemoteAddressListeningEvent, Message };
+export { NetworkAgent, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent, Endpoint }

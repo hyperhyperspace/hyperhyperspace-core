@@ -1,6 +1,6 @@
 
-import { WebRTCConnection } from 'mesh/transport';
-import { LinkupManager, LinkupAddress } from 'mesh/linkup';
+import { WebRTCConnection } from 'net/transport';
+import { LinkupManager, LinkupAddress } from 'net/linkup';
 
 describe('Transports', () => {
 

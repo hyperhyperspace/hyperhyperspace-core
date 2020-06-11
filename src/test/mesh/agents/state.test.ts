@@ -24,7 +24,7 @@ describe('State sync', () => {
         }
 
         for (const swarm of swarms) {
-            const swarmControl = swarm.getLocalAgent(SwarmControlAgent.agentIdForTopic(topic)) as SwarmControlAgent;
+            const swarmControl = swarm.getLocalAgent(SwarmControlAgent.agentIdForSwarm(topic)) as SwarmControlAgent;
             const gossip = new StateGossipAgent(topic, swarmControl);
             swarm.registerLocalAgent(gossip);
             for (let i=0; i<objCount; i++) {
@@ -91,9 +91,9 @@ describe('State sync', () => {
                 expect(witness[c].message).toEqual(results[c][1])
             }
     
-            for (const swarm of swarms) {
-                swarm.shutdown();
-            }
+            //for (const swarm of swarms) {
+            //    swarm.shutdown();
+            //}
         }
 
         done();
@@ -103,17 +103,17 @@ describe('State sync', () => {
 
         const size = 3;
         
-        let topic = new RNGImpl().randomHexString(64);
+        let swarmId = new RNGImpl().randomHexString(64);
 
-        let swarms = TestSwarm.generate(topic, size, size, size-1);
+        let swarms = TestSwarm.generate(swarmId, size, size, size-1);
 
         let stores : Array<Store> = [];
         
         for (let i=0; i<size; i++) {
-            const swarmControl = swarms[i].getLocalAgent(SwarmControlAgent.agentIdForTopic(topic)) as SwarmControlAgent;
+            const swarmControl = swarms[i].getLocalAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
             const store = new Store(new IdbBackend('store-for-peer-' + swarmControl.getLocalPeer().endpoint));
             stores.push(store);
-            let gossip = new StateGossipAgent(topic, swarmControl);
+            let gossip = new StateGossipAgent(swarmId, swarmControl);
             
             swarms[i].registerLocalAgent(gossip);
         }
@@ -129,7 +129,7 @@ describe('State sync', () => {
         await stores[0].save(s);
 
         for (let i=0; i<size; i++) {
-            const swarmControl = swarms[i].getLocalAgent(SwarmControlAgent.agentIdForTopic(topic)) as SwarmControlAgent;
+            const swarmControl = swarms[i].getLocalAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
             let agent = new TerminalOpsSyncAgent(swarmControl, s.hash(), stores[i], MutableSet.opClasses);
             //agent;
             swarms[i].registerLocalAgent(agent);

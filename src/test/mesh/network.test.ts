@@ -1,7 +1,8 @@
 
 import { RNGImpl } from 'crypto/random';
-import { Network } from 'mesh/network';
+import { Network } from 'mesh/base/Service';
 import { TestConnectionAgent } from './mock/TestConnectionAgent';
+import { NetworkAgent } from 'mesh/agents/network';
 
 let linkupServer = 'ws://localhost:3002';
 
@@ -11,7 +12,11 @@ describe('Basic networking', () => {
 
 
         let n1 = new Network();
+        let na1 = new NetworkAgent();
+        n1.registerLocalAgent(na1);
         let n2 = new Network();
+        let na2 = new NetworkAgent();
+        n2.registerLocalAgent(na2);
 
         let name1 = new RNGImpl().randomHexString(64);
         let name2 = new RNGImpl().randomHexString(64);

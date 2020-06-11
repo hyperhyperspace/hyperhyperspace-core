@@ -1,7 +1,7 @@
 import { Hash, HashedObject } from 'data/model';
 
-import { Agent } from '../../network/Agent';
-import { Endpoint } from '../../network/Network';
+import { Agent } from '../../base/Agent';
+import { Endpoint } from '../network/NetworkAgent';
 
 interface StateAgent extends Agent {
     

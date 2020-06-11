@@ -1,7 +1,10 @@
-import { Agent, AgentId }             from '../../network/Agent';
-import { Network, ConnectionId, Event, 
+import { Agent, AgentId } from '../../base/Agent';
+
+import { Network, Event } from '../../base/Service';
+
+import { NetworkAgent, ConnectionId, 
          NetworkEventType, ConnectionStatusChangeEvent, 
-         ConnectionStatus, Endpoint } from '../../network/Network';
+         ConnectionStatus, MessageReceivedEvent, Endpoint } from '../network/NetworkAgent';
 
 import { RNGImpl }      from 'crypto/random';
 import { HMACImpl }     from 'crypto/hmac';
@@ -287,7 +290,7 @@ class SecureConnectionAgent implements Agent {
     remoteIdentities : Map<string, ConnectionSecuredForSending>;
     localIdentities  : Map<string, ConnectionSecuredForReceiving>;
 
-    network?: Network;
+    pod?: Network;
 
     constructor() {
 
@@ -299,8 +302,8 @@ class SecureConnectionAgent implements Agent {
         return SecureConnectionAgent.Id;
     }
 
-    ready(network: Network): void {
-        this.network = network;
+    ready(pod: Network): void {
+        this.pod = pod;
     }
 
     receiveLocalEvent(ev: Event): void {
@@ -319,6 +322,9 @@ class SecureConnectionAgent implements Agent {
                 }
                 
             }
+        } else if (ev.type === NetworkEventType.MessageReceived) {
+            let msgEv = ev as MessageReceivedEvent;
+            this.receiveMessage(msgEv.content.connectionId , msgEv.content.source, msgEv.content.destination, msgEv.content.content);
         }
     }
 
@@ -351,7 +357,7 @@ class SecureConnectionAgent implements Agent {
 
     secureForSending(connId: ConnectionId, remoteIdentityHash: Hash, remoteIdentity?: Identity, timeout=DEFAULT_TIMEOUT) {
     
-        let connInfo = this.network?.getConnectionInfo(connId);
+        let connInfo = this.getNetworkAgent().getConnectionInfo(connId);
 
         if (connInfo?.status !== ConnectionStatus.Closed) {
 
@@ -427,7 +433,7 @@ class SecureConnectionAgent implements Agent {
                 hmac: hmac
             };
 
-            this.network?.sendMessage(connId, SecureConnectionAgent.Id, secureMessage);
+            this.getNetworkAgent().sendMessage(connId, SecureConnectionAgent.Id, secureMessage);
         } else {
             throw new Error('Connection ' + connId + ' still has not verified both sender ' + sender + ' and recipient ' + recipient + '.');
         }
@@ -560,7 +566,7 @@ class SecureConnectionAgent implements Agent {
 
                     if (secureMessage.hmac === hmac) {
                         
-                        let agent = this.network?.getLocalAgent(secureMessagePayload.agentId);
+                        let agent = this.pod?.getLocalAgent(secureMessagePayload.agentId);
                         if (agent !== undefined) {
 
                             let event: SecureMessageReceivedEvent = { 
@@ -599,7 +605,7 @@ class SecureConnectionAgent implements Agent {
             }
         };
 
-        this.network?.broadcastLocalEvent(ev);
+        this.pod?.broadcastLocalEvent(ev);
 
     }
 
@@ -664,7 +670,7 @@ class SecureConnectionAgent implements Agent {
     }
     
     private sendControlMessage(connId: ConnectionId, content: ControlMessage) {
-        this.network?.sendMessage(connId, SecureConnectionAgent.Id, content);
+        this.getNetworkAgent().sendMessage(connId, SecureConnectionAgent.Id, content);
     }
 
     private getOrCreateConnectionSecuredForSending(connId: ConnectionId, identityHash: Hash): ConnectionSecuredForSending {
@@ -740,6 +746,10 @@ class SecureConnectionAgent implements Agent {
             }
         }
 
+    }
+
+    private getNetworkAgent() {
+        return (this.pod as Network).getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
 }

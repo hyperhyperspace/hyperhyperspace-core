@@ -1,12 +1,14 @@
-import { Network, Endpoint, ConnectionId, Event, NetworkEventType, 
-        ConnectionStatusChangeEvent, ConnectionStatus } from 'mesh/network';
-import { Agent } from 'mesh/agents';
+import { Endpoint, ConnectionId, NetworkEventType, 
+        ConnectionStatusChangeEvent, ConnectionStatus, NetworkAgent, MessageReceivedEvent } from 'mesh/agents/network';
+import { Network, Event } from 'mesh/network';
+import { Agent } from 'mesh/network';
 import { MultiMap } from 'util/multimap';
 
 
 class TestConnectionAgent implements Agent {
 
     network?: Network;
+    networkAgent?: NetworkAgent;
     connecting: MultiMap<Endpoint, Endpoint>;                     // local -> remotes
     established: Map<Endpoint, MultiMap<Endpoint, ConnectionId>>; // local -> remote -> connections
     receivedMessages: Map<Endpoint, MultiMap<Endpoint, string>>;  // local -> remote -> messages
@@ -23,16 +25,17 @@ class TestConnectionAgent implements Agent {
 
     ready(network: Network): void {
         this.network = network;
+        this.networkAgent = network.getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
     expectConnection(source: Endpoint, destination: Endpoint) {
         this.connecting.add(destination, source);
-        this.network?.listen(destination);
+        this.networkAgent?.listen(destination);
     }
 
     connect(source: Endpoint, destination: Endpoint) {
         this.connecting.add(source, destination);
-        this.network?.connect(source, destination, this.getAgentId());
+        this.networkAgent?.connect(source, destination, this.getAgentId());
     }
 
     isConnected(local: Endpoint, remote: Endpoint) {
@@ -43,8 +46,8 @@ class TestConnectionAgent implements Agent {
     send(local: Endpoint, remote: Endpoint, message: string): boolean {
         if (this.isConnected(local, remote)) {
             for (let connId of (this.established.get(local) as MultiMap<Endpoint, ConnectionId>).get(remote)) {
-                if (this.network?.connectionIsReady(connId)) {
-                    this.network?.sendMessage(connId, this.getAgentId(), message);
+                if (this.networkAgent?.connectionIsReady(connId)) {
+                    this.networkAgent?.sendMessage(connId, this.getAgentId(), message);
                     
                     return true;
                 }
@@ -72,7 +75,7 @@ class TestConnectionAgent implements Agent {
             if (connEv.content.status === ConnectionStatus.Received) {
                 let remotes = this.connecting.get(connEv.content.localEndpoint);
                 if (remotes?.has(connEv.content.remoteEndpoint)) {
-                    this.network?.acceptConnection(connEv.content.connId, this.getAgentId());
+                    this.networkAgent?.acceptConnection(connEv.content.connId, this.getAgentId());
                 }
             } else if (connEv.content.status === ConnectionStatus.Ready) {
                 if (this.connecting.get(connEv.content.localEndpoint).has(connEv.content.remoteEndpoint)) {
@@ -90,6 +93,9 @@ class TestConnectionAgent implements Agent {
             } else if (connEv.content.status === ConnectionStatus.Closed) {
                 this.established.get(connEv.content.localEndpoint)?.delete(connEv.content.remoteEndpoint, connEv.content.connId);
             }
+        } else if (ev.type === NetworkEventType.MessageReceived) {
+            let msgEv = ev as MessageReceivedEvent;
+            this.receiveMessage(msgEv.content.connectionId , msgEv.content.source, msgEv.content.destination, msgEv.content.content);
         }
     }
 

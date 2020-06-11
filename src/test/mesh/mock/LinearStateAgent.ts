@@ -1,5 +1,6 @@
 import { StateAgent } from 'mesh/agents/state/StateAgent';
-import { Network, Event, Endpoint } from 'mesh/network';
+import { Endpoint } from 'mesh/agents/network';
+import { Network, Event } from 'mesh/network';
 import { HashedObject, Hash } from 'data/model';
 import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
@@ -62,6 +63,7 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
         return 'linear-state-agent-' + id;
     }
 
+    topic:string;
     id: string;
 
     swarm?: Network;
@@ -75,6 +77,7 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
 
     constructor(id: string, swarmControl: SwarmControlAgent) {
         super(swarmControl);
+        this.topic = swarmControl.swarmId;
         this.id = id;
         this.prevStates = new Set();
     }
@@ -127,7 +130,7 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
 
     ready(swarm: Network): void {
         this.swarm = swarm;
-        this.gossipAgent = swarm.getLocalAgent(StateGossipAgent.Id) as StateGossipAgent;
+        this.gossipAgent = swarm.getLocalAgent(StateGossipAgent.idForTopic(this.topic)) as StateGossipAgent;
     }
 
     receiveLocalEvent(ev: Event): void {

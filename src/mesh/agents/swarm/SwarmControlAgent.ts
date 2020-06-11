@@ -5,11 +5,12 @@ import { SecureConnectionAgent, SecureConnectionEventType, ConnectionIdentityAut
     IdentityLocation, IdentityAuthStatus, SecureMessageReceivedEvent } from '../security/SecureConnectionAgent';
 
 
-import { Agent, AgentId } from '../../network/Agent';
-import { Network, Endpoint, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, 
-         Event, ConnectionStatusChangeEvent, ConnectionStatus } from '../../network/Network';
+import { Agent, AgentId } from '../../base/Agent';
+import { NetworkAgent, Endpoint, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, 
+         ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent } from '../network/NetworkAgent';
 
-import { LinkupAddress } from '../../linkup/LinkupAddress';
+import { Network, Event } from '../../base/Service';
+import { LinkupAddress } from 'net/linkup/LinkupAddress';
 
 import { Hash } from 'data/model';
 import { Identity } from 'data/identity';
@@ -43,7 +44,7 @@ enum PeerControlAgentMessageType  {
 type PeeringOfferMessage = {
     type: PeerControlAgentMessageType.PeeringOffer,
     content: { 
-        topic: string,
+        swarmId: string,
         localIdentityHash: Hash
     }
 };
@@ -51,7 +52,7 @@ type PeeringOfferMessage = {
 type PeeringOfferReplyMessage = {
     type: PeerControlAgentMessageType.PeeringOfferReply,
     content: {
-        topic: string,
+        swarmId: string,
         accepted: boolean,
         localIdentityHash: Hash
     }
@@ -70,7 +71,7 @@ enum SecureMessageTypes {
 
 type PeerMessage = { 
     type: SecureMessageTypes.PeerMessage,
-    topic: string,
+    swarmId: string,
     agentId: AgentId, 
     content: any
 }
@@ -80,7 +81,7 @@ type PeerMessage = {
 // these messages are used to agree on a connection to use and safely close the others.
 type ConnectionSelectionMessage = {
     type: SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection,
-    topic: string
+    swarmId: string
 }
 
 type SecureMessage = PeerMessage | ConnectionSelectionMessage;
@@ -100,7 +101,7 @@ type Stats = {
 
 class SwarmControlAgent implements Agent {
 
-    topic: string;
+    swarmId: string;
     localPeer: Peer;
 
     peerSource: PeerSource;
@@ -119,8 +120,8 @@ class SwarmControlAgent implements Agent {
     tick: () => Promise<void>;
     tickTimerRef: any;
 
-    constructor(topic: string, localPeer: Peer, peerSource: PeerSource, params?: Partial<Params>) {
-        this.topic = topic;
+    constructor(swarmId: string, localPeer: Peer, peerSource: PeerSource, params?: Partial<Params>) {
+        this.swarmId = swarmId;
         this.localPeer = localPeer;
         
         this.peerSource = peerSource;
@@ -152,11 +153,11 @@ class SwarmControlAgent implements Agent {
     }
 
     getAgentId(): string {
-        return SwarmControlAgent.agentIdForTopic(this.topic);
+        return SwarmControlAgent.agentIdForSwarm(this.swarmId);
     }
 
     getTopic(): string {
-        return this.topic;
+        return this.swarmId;
     }
 
     getLocalPeer(): Peer {
@@ -171,18 +172,18 @@ class SwarmControlAgent implements Agent {
 
     private async init() {
 
-        const network = this.network as Network;
+        const networkAgent = this.getNetworkAgent();
 
-        this.getNetwork().listen(this.localPeer.endpoint);
+        networkAgent.listen(this.localPeer.endpoint);
 
-        for(const ci of network.getAllConnectionsInfo()) {
+        for(const ci of this.getNetworkAgent().getAllConnectionsInfo()) {
             if (ci.localEndpoint === this.localPeer.endpoint && 
-                this.getNetwork().checkConnection(ci.connId)) {
+                this.getNetworkAgent().checkConnection(ci.connId)) {
 
                 let peer = await this.peerSource.getPeerForEndpoint(ci.remoteEndpoint);
 
                 if (this.shouldConnectToPeer(peer)) {
-                    this.getNetwork().acceptConnection(ci.connId, this.getAgentId());
+                    this.getNetworkAgent().acceptConnection(ci.connId, this.getAgentId());
                     let pc = this.addPeerConnection(ci.connId, peer as Peer, PeerConnectionStatus.OfferSent);
                     
                     this.sendOffer(pc);
@@ -231,7 +232,7 @@ class SwarmControlAgent implements Agent {
 
             let peerMsg: PeerMessage = {
                 type: SecureMessageTypes.PeerMessage,
-                topic: this.topic,
+                swarmId: this.swarmId,
                 agentId: agentId,
                 content: content
             };
@@ -278,7 +279,7 @@ class SwarmControlAgent implements Agent {
         //   2. are not ready, and the connection timeout has elapsed
         for (const pc of Array.from(this.connections.values())) {
             if (pc.status === PeerConnectionStatus.Ready) {
-                if (!this.getNetwork().checkConnection(pc.connId)) {
+                if (!this.getNetworkAgent().checkConnection(pc.connId)) {
                     this.removePeerConnection(pc.connId);
                 }
             } else {                
@@ -292,7 +293,7 @@ class SwarmControlAgent implements Agent {
         // Remove connection attempt timestamps that are too old to make a difference.
         // (i.e. peerConnectionAttemptInterval has already elapsed and we can try to reconnect)
         for (const [endpoint, timestamp] of Array.from(this.connectionAttemptTimestamps.entries())) {
-            if (now > timestamp + this.params.peerConnectionAttemptInterval * 1000) {
+            if (now > timestamp + 500 /*this.params.peerConnectionAttemptInterval * 1000*/) { // FIXME
                 this.connectionAttemptTimestamps.delete(endpoint);
             }
         };
@@ -343,7 +344,7 @@ class SwarmControlAgent implements Agent {
                 this.onlineQueryTimestamps.set(endpoint, now);
             }
 
-            this.getNetwork().queryForListeningAddresses(
+            this.getNetworkAgent().queryForListeningAddresses(
                                 LinkupAddress.fromURL(this.localPeer.endpoint), 
                                 endpoints.map((ep: Endpoint) => LinkupAddress.fromURL(ep)));
         }
@@ -364,7 +365,7 @@ class SwarmControlAgent implements Agent {
     
                 // And in that case, if it is still working.
                 if (chosenConnId !== undefined &&
-                    this.getNetwork().checkConnection(chosenConnId)) {
+                    this.getNetworkAgent().checkConnection(chosenConnId)) {
                         
                     chosenConnId = undefined;
                     this.chosenForDeduplication.delete(endpoint);
@@ -379,7 +380,7 @@ class SwarmControlAgent implements Agent {
                     for (const connId of connIds) {
                         let pc = this.connections.get(connId);
                         if (pc !== undefined && pc.status === PeerConnectionStatus.Ready && 
-                            this.getNetwork().checkConnection(connId)) {
+                            this.getNetworkAgent().checkConnection(connId)) {
                             
                             ready.push(connId);
                         }
@@ -417,7 +418,7 @@ class SwarmControlAgent implements Agent {
     private sendConnectionSelectionMessage(chosenConnId: ConnectionId, endpoint: Endpoint, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection)) {
         let connSelectionMsg: ConnectionSelectionMessage = {
             type: type,
-            topic: this.topic,
+            swarmId: this.swarmId,
         };
 
         let secureConnAgent = this.getSecureConnAgent();
@@ -441,7 +442,7 @@ class SwarmControlAgent implements Agent {
         if (allConnIds !== undefined) {
             for (const connId of allConnIds) {
                 if (connId !== chosenConnId) {
-                    this.getNetwork().releaseConnection(connId, this.getAgentId());
+                    this.getNetworkAgent().releaseConnection(connId, this.getAgentId());
                     this.removePeerConnection(connId);
                 }
             }
@@ -462,7 +463,7 @@ class SwarmControlAgent implements Agent {
 
                 if (pc !== undefined && 
                     pc.status === PeerConnectionStatus.Ready && 
-                    this.network?.checkConnection(connId)) {
+                    this.getNetworkAgent().checkConnection(connId)) {
                         return connId;
                 }
 
@@ -591,7 +592,7 @@ class SwarmControlAgent implements Agent {
         let peer = await this.peerSource.getPeerForEndpoint(ep);
 
         if (this.shouldConnectToPeer(peer)) {
-            let connId = this.getNetwork().connect(this.localPeer.endpoint, (peer as Peer).endpoint, this.getAgentId());
+            let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as Peer).endpoint, this.getAgentId());
             this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.Connecting);
             this.connectionAttemptTimestamps.set(ep, Date.now());
         }
@@ -603,7 +604,7 @@ class SwarmControlAgent implements Agent {
             let peer = await this.peerSource.getPeerForEndpoint(remote);
 
             if (this.shouldAcceptPeerConnection(peer)) {
-                this.getNetwork().acceptConnection(connId, this.getAgentId());
+                this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
                 this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.ReceivingConnection);
             }
         }
@@ -623,7 +624,7 @@ class SwarmControlAgent implements Agent {
         }
     }
 
-    private async onReceivingOffer(connId: ConnectionId, source: Endpoint, destination: Endpoint, topic: string, remoteIdentityHash: Hash) {
+    private async onReceivingOffer(connId: ConnectionId, source: Endpoint, destination: Endpoint, swarmId: string, remoteIdentityHash: Hash) {
         
         let reply  = false;
         let accept = false;
@@ -644,7 +645,7 @@ class SwarmControlAgent implements Agent {
             } else {
                 if (peer !== undefined && 
                     peer.identityHash === remoteIdentityHash &&
-                    this.topic === topic) {
+                    this.swarmId === swarmId) {
                     
                     // OK, we don't want to accept, but this is, in principle, a valid peer.
                     // Send a rejection below.
@@ -656,7 +657,7 @@ class SwarmControlAgent implements Agent {
 
         // OK, we had previous state - if everything checks up, accept.
         if (pc !== undefined) {
-            if (topic === this.topic &&
+            if (swarmId === this.swarmId &&
                 pc.status === PeerConnectionStatus.WaitingForOffer &&
                 source === pc.peer.endpoint &&
                 destination === this.localPeer.endpoint &&
@@ -690,15 +691,15 @@ class SwarmControlAgent implements Agent {
             
         } else {
             this.removePeerConnection(connId);
-            this.getNetwork().releaseConnectionIfExists(connId, this.getAgentId());
+            this.getNetworkAgent().releaseConnectionIfExists(connId, this.getAgentId());
         }
     }
 
-    private onReceivingOfferReply(connId: ConnectionId, source: Endpoint, destination: Endpoint, topic: string, remoteIdentityHash: Hash, accepted: boolean) {
+    private onReceivingOfferReply(connId: ConnectionId, source: Endpoint, destination: Endpoint, swarmId: string, remoteIdentityHash: Hash, accepted: boolean) {
         let pc = this.connections.get(connId);
 
         if (pc !== undefined &&
-            topic === this.topic &&
+            swarmId === this.swarmId &&
             pc.status === PeerConnectionStatus.OfferSent &&
             source === pc.peer.endpoint &&
             destination === this.localPeer.endpoint && 
@@ -736,37 +737,37 @@ class SwarmControlAgent implements Agent {
         let message: PeeringOfferMessage = {
             type: PeerControlAgentMessageType.PeeringOffer,
             content: {
-                topic: this.topic,
+                swarmId: this.swarmId,
                 localIdentityHash: this.localPeer.identityHash
             }
         };
 
-        this.network?.sendMessage(pc.connId, this.getAgentId(), message);
+        this.getNetworkAgent().sendMessage(pc.connId, this.getAgentId(), message);
     }
 
     private sendOfferReply(connId: ConnectionId, accept: boolean) {
         let message: PeeringOfferReplyMessage = {
             type: PeerControlAgentMessageType.PeeringOfferReply,
             content: {
-                 topic: this.topic,
+                 swarmId: this.swarmId,
                  localIdentityHash: this.localPeer.identityHash,
                  accepted: accept
             }
         };
 
-        this.network?.sendMessage(connId, this.getAgentId(), message);
+        this.getNetworkAgent().sendMessage(connId, this.getAgentId(), message);
     }
 
     // handle of peer message reception
 
-    private onPeerMessage(connId: ConnectionId, sender: Hash, recipient: Hash, topic: string, agentId: AgentId, message: any) {
+    private onPeerMessage(connId: ConnectionId, sender: Hash, recipient: Hash, swarmId: string, agentId: AgentId, message: any) {
         let pc = this.connections.get(connId);
 
-        if (topic === this.topic &&
+        if (swarmId === this.swarmId &&
             pc !== undefined && pc.status === PeerConnectionStatus.Ready &&
             pc.peer.identityHash === sender && this.localPeer.identityHash === recipient) {
 
-            let agent = this.getNetwork().getLocalAgent(agentId);
+            let agent = this.getLocalAgent(agentId);
 
             if (agent !== undefined && (agent as any).receivePeerMessage !== undefined) {
                 let peeringAgent = agent as SwarmAgent;
@@ -780,16 +781,16 @@ class SwarmControlAgent implements Agent {
     // them to agree on a connection to use, and safely close the rest.
 
     
-    private onConnectionSelection(connId: ConnectionId, sender: Hash, recipient: Hash, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection), topic: string) {
+    private onConnectionSelection(connId: ConnectionId, sender: Hash, recipient: Hash, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection), swarmId: string) {
         
-        connId; sender; recipient; type; topic;
+        connId; sender; recipient; type; swarmId;
 
         let pc = this.connections.get(connId);
 
         // If connId represents an acceptable option (a working connection in Ready state):
         if (pc !== undefined && 
             pc.status === PeerConnectionStatus.Ready &&
-            this.getNetwork().checkConnection(connId)) {
+            this.getNetworkAgent().checkConnection(connId)) {
 
             let accept = false;
 
@@ -860,10 +861,13 @@ class SwarmControlAgent implements Agent {
             let payload: SecureMessage = secMsgEv.content.payload;
 
             if (payload.type === SecureMessageTypes.PeerMessage) {
-                this.onPeerMessage(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.topic, payload.agentId, payload.content);
+                this.onPeerMessage(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.swarmId, payload.agentId, payload.content);
             } else if (payload.type === SecureMessageTypes.ChooseConnection || payload.type === SecureMessageTypes.ConfirmChosenConnection) {
-                this.onConnectionSelection(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.type, payload.topic);
+                this.onConnectionSelection(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.type, payload.swarmId);
             }
+        } else if (ev.type === NetworkEventType.MessageReceived) {
+            let msgEv = ev as MessageReceivedEvent;
+            this.receiveMessage(msgEv.content.connectionId , msgEv.content.source, msgEv.content.destination, msgEv.content.content);
         }
     }
 
@@ -874,31 +878,31 @@ class SwarmControlAgent implements Agent {
         if (message.type === PeerControlAgentMessageType.PeeringOffer) {
             let offer = (content as PeeringOfferMessage).content;
 
-            this.onReceivingOffer(connId, source, destination, offer.topic, offer.localIdentityHash);
+            this.onReceivingOffer(connId, source, destination, offer.swarmId, offer.localIdentityHash);
         } else if (message.type === PeerControlAgentMessageType.PeeringOfferReply) {
             let offerReply = (content as PeeringOfferReplyMessage).content;
 
-            this.onReceivingOfferReply(connId, source, destination, offerReply.topic, offerReply.localIdentityHash, offerReply.accepted);
+            this.onReceivingOfferReply(connId, source, destination, offerReply.swarmId, offerReply.localIdentityHash, offerReply.accepted);
         }
 
     }
 
     // shorthand functions
 
-    private getNetwork() {
-        return this.network as Network;
+    private getNetworkAgent() {
+        return this.network?.getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
     private getLocalAgent(agentId: AgentId) {
-        return this.getNetwork().getLocalAgent(agentId) as Agent;
+        return this.network?.getLocalAgent(agentId) as Agent;
     }
 
     private getSecureConnAgent() {
         return this.getLocalAgent(SecureConnectionAgent.Id) as SecureConnectionAgent;
     }
 
-    static agentIdForTopic(topic: string) {
-        return 'swarm-control-for-topic-' + topic;
+    static agentIdForSwarm(swarmId: string) {
+        return 'swarm-control-for-' + swarmId;
     }
 
 }

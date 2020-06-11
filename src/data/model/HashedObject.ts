@@ -76,8 +76,11 @@ abstract class HashedObject {
             throw new Error('Trying to set the author of an object, but the received identity does not have an attached key pair to sign it.');
         }
 
-        this.author = author;
-        this._signOnLiteraliz = true;
+        if (!author.equals(this.author)) {
+            this.author = author;
+            this._signOnLiteraliz = true;
+        }
+        
     }
 
     getAuthor() {
@@ -567,7 +570,7 @@ abstract class HashedObject {
         }
     }
 
-    private static generateIdForPath(parentId: string, path: string) {
+    static generateIdForPath(parentId: string, path: string) {
         return Hashing.forValue('#' + parentId + '.' + path);
     }
 

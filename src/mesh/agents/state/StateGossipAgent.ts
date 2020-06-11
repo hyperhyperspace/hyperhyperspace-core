@@ -2,9 +2,9 @@ import { StateAgent } from '../state/StateAgent';
 import { SwarmAgent } from '../swarm/SwarmAgent';
 import { SecureMessageReceivedEvent, SecureConnectionEventType } from '../security/SecureConnectionAgent';
 
-import { Network, Event, AgentSetChangeEvent, AgentSetChange } from '../../network';
-import { AgentId } from '../../network/Agent';
-import { NetworkEventType, Endpoint } from '../../network/Network';
+import { Network, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../base/Service';
+import { AgentId } from '../../base/Agent';
+import { Endpoint } from '../network/NetworkAgent';
 //import { PeerId } from '../../network/Peer';
 
 import { HashedMap } from 'data/model/HashedMap';
@@ -50,12 +50,23 @@ type GossipParams = {
 
 type PeerState = Map<AgentId, Hash>;
 
+enum GossipEventTypes {
+    AgentStateUpdate = 'agent-state-update'
+};
+
+type AgentStateUpdateEvent = {
+    type: GossipEventTypes.AgentStateUpdate,
+    content: { agentId: AgentId, state: HashedObject }
+}
+
 class StateGossipAgent extends SwarmAgent {
+
+    static idForTopic(topic: string) {
+        return 'state-gossip-agent-for-' + topic;
+    }
 
     static peerMessageLog = new Logger(StateGossipAgent.name, LogLevel.INFO);
     static controlLog      = new Logger(StateGossipAgent.name, LogLevel.INFO);
-
-    static Id = 'state-gossip-agent';
 
     // tunable working parameters
 
@@ -71,7 +82,7 @@ class StateGossipAgent extends SwarmAgent {
 
     topic: string;
 
-    network?: Network;
+    pod?: Network;
 
     localState: PeerState;
 
@@ -90,17 +101,16 @@ class StateGossipAgent extends SwarmAgent {
     }
 
     getAgentId(): string {
-        return StateGossipAgent.Id;
+        return StateGossipAgent.idForTopic(this.topic);
     }
 
     getNetwork() : Network {
-        return this.network as Network;
+        return this.pod as Network;
     }
 
-    ready(network: Network): void {
-        this.network = network;
-        
-        
+    ready(pod: Network): void {
+        this.pod = pod;
+        StateGossipAgent.controlLog.debug('Agent ready');
     }
 
     localAgentStateUpdate(agentId: AgentId, state: HashedObject) {
@@ -130,13 +140,16 @@ class StateGossipAgent extends SwarmAgent {
     }
 
     receiveLocalEvent(ev: Event): void {
-        if (ev.type = NetworkEventType.AgentSetChange) {
-            let changeEv = ev as AgentSetChangeEvent
+
+        if (ev.type === AgentPodEventType.AgentSetChange) {
+            
+            let changeEv = ev as AgentSetChangeEvent;
 
             if (changeEv.content.change === AgentSetChange.Removal) {
                 this.dropAgentState(changeEv.content.agentId);
             }   
         } else if (ev.type === SecureConnectionEventType.SecureMessageReceived) {
+            
             let secMsgEv = ev as SecureMessageReceivedEvent;
 
             // TODO: validate if the secure message comes from who it should,
@@ -145,6 +158,11 @@ class StateGossipAgent extends SwarmAgent {
             let gossipMsg = secMsgEv.content.payload as GossipMessage;
 
             this.receiveGossip(secMsgEv.content.sender, gossipMsg);
+        } else if (ev.type === GossipEventTypes.AgentStateUpdate) {
+            
+            let updateEv = ev as AgentStateUpdateEvent;
+
+            this.localAgentStateUpdate(updateEv.content.agentId, updateEv.content.state);
         }
     }
 
@@ -264,10 +282,6 @@ class StateGossipAgent extends SwarmAgent {
         return (cache !== undefined) && cache.indexOf(state) >= 0;
     }
 
-    receiveMessage(connId: string, source: string, destination: string, content: any): void {
-        connId; source; destination; content;
-    }
-
     sendFullSate(ep: Endpoint) {
         let fullStateMessage: SendFullStateMessage = { 
             type  : GossipType.SendFullState,
@@ -372,4 +386,4 @@ class StateGossipAgent extends SwarmAgent {
 
 }
 
-export { StateGossipAgent };
+export { StateGossipAgent, AgentStateUpdateEvent, GossipEventTypes };

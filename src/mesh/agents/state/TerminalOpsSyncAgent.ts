@@ -4,9 +4,10 @@ import { HashedSet, Dependency, Literal } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 import { MutationOp } from 'data/model/MutationOp';
 
-import { Network, Endpoint } from '../../network/Network';
+import { Network } from '../../base/Service';
+import { Endpoint } from '../network/NetworkAgent';
 
-import { StateGossipAgent } from './StateGossipAgent';
+import { GossipEventTypes, AgentStateUpdateEvent } from './StateGossipAgent';
 import { StateAgent } from './StateAgent';
 import { TerminalOpsState } from './TerminalOpsState';
 import { Logger, LogLevel } from 'util/logging';
@@ -77,7 +78,6 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
     acceptedMutationOpClasses: Array<String>;
 
     network?: Network;
-    gossipAgent?: StateGossipAgent;
     store: Store;
 
     state?: TerminalOpsState;
@@ -210,7 +210,6 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
               ' (topic: ' + this.swarmControl.getTopic() + ')');
         
         this.network = network;
-        this.gossipAgent = network.getLocalAgent(StateGossipAgent.Id) as StateGossipAgent;
         this.loadStoredState();
         this.watchStoreForOps();
     }
@@ -317,7 +316,11 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
             TerminalOpsSyncAgent.controlLog.debug('Found new state ' + stateHash + ' for ' + this.objHash + ' in ' + this.swarmControl.getLocalPeer().endpoint);
             this.state = state;
             this.stateHash = stateHash;
-            this.gossipAgent?.localAgentStateUpdate(this.getAgentId(), state);
+            let stateUpdate: AgentStateUpdateEvent = {
+                type: GossipEventTypes.AgentStateUpdate,
+                content: { agentId: this.getAgentId(), state }
+            }
+            this.network?.broadcastLocalEvent(stateUpdate);
         }
 
     }

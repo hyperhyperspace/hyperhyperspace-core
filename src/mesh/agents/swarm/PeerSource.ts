@@ -1,5 +1,5 @@
-import { Endpoint } from '../../network';
-import { Peer } from './PeerControlAgent';
+import { Endpoint } from '../network/NetworkAgent';
+import { Peer } from './SwarmControlAgent';
 
 interface PeerSource {
 

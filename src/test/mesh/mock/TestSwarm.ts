@@ -1,9 +1,10 @@
-import { Network } from 'mesh/network';
+import { Network } from 'mesh/base/Service';
 import { Peer, SwarmControlAgent } from 'mesh/agents/swarm';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { TestPeerSource } from './TestPeerSource';
 import { RNGImpl } from 'crypto/random';
 import { SecureConnectionAgent } from 'mesh/agents/security/SecureConnectionAgent';
+import { NetworkAgent } from 'mesh/agents/network';
 
 
 
@@ -30,6 +31,8 @@ class TestSwarm {
 
         for (let i=0; i<activePeers; i++) {
             let network = new Network();
+            let networkAgent = new NetworkAgent();
+            network.registerLocalAgent(networkAgent);
             let secureConn = new SecureConnectionAgent();
             network.registerLocalAgent(secureConn);
             
