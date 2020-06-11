@@ -1,5 +1,5 @@
 import { Agent, AgentId } from '../../base/Agent';
-import { Event, Network } from '../../base/Service';
+import { Event, ServicePod } from '../../base/ServicePod';
 import { Logger, LogLevel } from 'util/logging';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { LinkupManager } from 'net/linkup/LinkupManager';
@@ -79,7 +79,7 @@ class NetworkAgent implements Agent {
     static connLogger = new Logger(NetworkAgent.name + ' conn', LogLevel.INFO);
     static messageLogger = new Logger(NetworkAgent.name + ' msg', LogLevel.INFO);
     
-    pod?: Network;
+    pod?: ServicePod;
 
     linkupManager : LinkupManager;
 
@@ -529,7 +529,7 @@ class NetworkAgent implements Agent {
 
     }
 
-    ready(pod: Network): void {
+    ready(pod: ServicePod): void {
         this.pod = pod;
         this.intervalRef = window.setInterval(this.tick, TickInterval * 1000);
     }

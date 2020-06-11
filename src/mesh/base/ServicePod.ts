@@ -22,9 +22,9 @@ type AgentSetChangeEvent = {
     }
 };
 
-class Network {
+class ServicePod {
 
-    static logger = new Logger(Network.name, LogLevel.INFO);
+    static logger = new Logger(ServicePod.name, LogLevel.INFO);
     
     agents      : Map<string, Agent>;
 
@@ -85,7 +85,7 @@ class Network {
 
     broadcastLocalEvent(ev: Event) {
 
-        Network.logger.trace('Network sending event ' + ev.type + ' with content ' + JSON.stringify(ev.content));
+        ServicePod.logger.trace('Network sending event ' + ev.type + ' with content ' + JSON.stringify(ev.content));
 
         for (const agent of this.agents.values()) {
             agent.receiveLocalEvent(ev);
@@ -94,4 +94,4 @@ class Network {
     
 }
 
-export { Network, Event, AgentPodEventType, AgentSetChangeEvent, AgentSetChange };
+export { ServicePod, Event, AgentPodEventType, AgentSetChangeEvent, AgentSetChange };

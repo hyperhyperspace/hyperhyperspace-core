@@ -1,6 +1,6 @@
 import { Agent, AgentId } from '../../base/Agent';
 
-import { Network, Event } from '../../base/Service';
+import { ServicePod, Event } from '../../base/ServicePod';
 
 import { NetworkAgent, ConnectionId, 
          NetworkEventType, ConnectionStatusChangeEvent, 
@@ -290,7 +290,7 @@ class SecureConnectionAgent implements Agent {
     remoteIdentities : Map<string, ConnectionSecuredForSending>;
     localIdentities  : Map<string, ConnectionSecuredForReceiving>;
 
-    pod?: Network;
+    pod?: ServicePod;
 
     constructor() {
 
@@ -302,7 +302,7 @@ class SecureConnectionAgent implements Agent {
         return SecureConnectionAgent.Id;
     }
 
-    ready(pod: Network): void {
+    ready(pod: ServicePod): void {
         this.pod = pod;
     }
 
@@ -749,7 +749,7 @@ class SecureConnectionAgent implements Agent {
     }
 
     private getNetworkAgent() {
-        return (this.pod as Network).getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
+        return (this.pod as ServicePod).getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
 }

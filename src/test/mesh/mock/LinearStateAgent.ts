@@ -1,6 +1,6 @@
 import { StateAgent } from 'mesh/agents/state/StateAgent';
 import { Endpoint } from 'mesh/agents/network';
-import { Network, Event } from 'mesh/network';
+import { ServicePod, Event } from 'mesh/services';
 import { HashedObject, Hash } from 'data/model';
 import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
@@ -66,7 +66,7 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
     topic:string;
     id: string;
 
-    swarm?: Network;
+    pod?: ServicePod;
     gossipAgent?: StateGossipAgent;
 
     seq?: number;
@@ -128,9 +128,9 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
     }
 
 
-    ready(swarm: Network): void {
-        this.swarm = swarm;
-        this.gossipAgent = swarm.getLocalAgent(StateGossipAgent.idForTopic(this.topic)) as StateGossipAgent;
+    ready(pod: ServicePod): void {
+        this.pod = pod;
+        this.gossipAgent = pod.getLocalAgent(StateGossipAgent.idForTopic(this.topic)) as StateGossipAgent;
     }
 
     receiveLocalEvent(ev: Event): void {

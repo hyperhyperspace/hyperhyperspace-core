@@ -2,7 +2,7 @@ import { StateAgent } from '../state/StateAgent';
 import { SwarmAgent } from '../swarm/SwarmAgent';
 import { SecureMessageReceivedEvent, SecureConnectionEventType } from '../security/SecureConnectionAgent';
 
-import { Network, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../base/Service';
+import { ServicePod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../base/ServicePod';
 import { AgentId } from '../../base/Agent';
 import { Endpoint } from '../network/NetworkAgent';
 //import { PeerId } from '../../network/Peer';
@@ -82,7 +82,7 @@ class StateGossipAgent extends SwarmAgent {
 
     topic: string;
 
-    pod?: Network;
+    pod?: ServicePod;
 
     localState: PeerState;
 
@@ -104,11 +104,11 @@ class StateGossipAgent extends SwarmAgent {
         return StateGossipAgent.idForTopic(this.topic);
     }
 
-    getNetwork() : Network {
-        return this.pod as Network;
+    getNetwork() : ServicePod {
+        return this.pod as ServicePod;
     }
 
-    ready(pod: Network): void {
+    ready(pod: ServicePod): void {
         this.pod = pod;
         StateGossipAgent.controlLog.debug('Agent ready');
     }

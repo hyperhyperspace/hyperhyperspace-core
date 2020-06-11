@@ -1,6 +1,6 @@
 
 import { RNGImpl } from 'crypto/random';
-import { Network } from 'mesh/base/Service';
+import { ServicePod } from 'mesh/base/ServicePod';
 import { TestConnectionAgent } from './mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 
@@ -11,10 +11,10 @@ describe('Basic networking', () => {
     test('2-node network test', async (done) => {
 
 
-        let n1 = new Network();
+        let n1 = new ServicePod();
         let na1 = new NetworkAgent();
         n1.registerLocalAgent(na1);
-        let n2 = new Network();
+        let n2 = new ServicePod();
         let na2 = new NetworkAgent();
         n2.registerLocalAgent(na2);
 

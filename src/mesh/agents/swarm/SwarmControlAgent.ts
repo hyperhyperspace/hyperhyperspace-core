@@ -9,7 +9,7 @@ import { Agent, AgentId } from '../../base/Agent';
 import { NetworkAgent, Endpoint, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, 
          ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent } from '../network/NetworkAgent';
 
-import { Network, Event } from '../../base/Service';
+import { ServicePod, Event } from '../../base/ServicePod';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 
 import { Hash } from 'data/model';
@@ -113,7 +113,7 @@ class SwarmControlAgent implements Agent {
     onlineQueryTimestamps: Map<Endpoint, number>;
     chosenForDeduplication: Map<Endpoint, ConnectionId>;
 
-    network?: Network;
+    pod?: ServicePod;
 
     params: Params;
 
@@ -164,8 +164,8 @@ class SwarmControlAgent implements Agent {
         return this.localPeer;
     }
 
-    ready(network: Network): void {
-        this.network = network;
+    ready(pod: ServicePod): void {
+        this.pod = pod;
         this.init();
     }
 
@@ -890,11 +890,11 @@ class SwarmControlAgent implements Agent {
     // shorthand functions
 
     private getNetworkAgent() {
-        return this.network?.getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
+        return this.pod?.getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
     private getLocalAgent(agentId: AgentId) {
-        return this.network?.getLocalAgent(agentId) as Agent;
+        return this.pod?.getLocalAgent(agentId) as Agent;
     }
 
     private getSecureConnAgent() {

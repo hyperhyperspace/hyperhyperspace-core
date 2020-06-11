@@ -4,7 +4,7 @@ import { HashedSet, Dependency, Literal } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 import { MutationOp } from 'data/model/MutationOp';
 
-import { Network } from '../../base/Service';
+import { ServicePod } from '../../base/ServicePod';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { GossipEventTypes, AgentStateUpdateEvent } from './StateGossipAgent';
@@ -77,7 +77,7 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
     objHash: Hash;
     acceptedMutationOpClasses: Array<String>;
 
-    network?: Network;
+    pod?: ServicePod;
     store: Store;
 
     state?: TerminalOpsState;
@@ -202,14 +202,14 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
         return 'terminal-ops-for-' + this.objHash;
     }
 
-    ready(network: Network): void {
+    ready(pod: ServicePod): void {
 
         TerminalOpsSyncAgent.controlLog.debug(
               'Starting for object ' + this.objHash + 
               ' on ep ' + this.swarmControl.getLocalPeer().endpoint + 
               ' (topic: ' + this.swarmControl.getTopic() + ')');
         
-        this.network = network;
+        this.pod = pod;
         this.loadStoredState();
         this.watchStoreForOps();
     }
@@ -320,7 +320,7 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
                 type: GossipEventTypes.AgentStateUpdate,
                 content: { agentId: this.getAgentId(), state }
             }
-            this.network?.broadcastLocalEvent(stateUpdate);
+            this.pod?.broadcastLocalEvent(stateUpdate);
         }
 
     }
