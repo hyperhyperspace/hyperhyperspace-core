@@ -1,4 +1,4 @@
-import { Network, Event } from './Pod';
+import { ServicePod, Event } from './ServicePod';
 
 type AgentId = string;
 
@@ -6,7 +6,7 @@ interface Agent {
 
     getAgentId() : AgentId;
 
-    ready(pod: Network) : void;
+    ready(pod: ServicePod) : void;
 
     receiveLocalEvent(ev: Event) : void;
 }
