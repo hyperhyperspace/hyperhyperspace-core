@@ -1,6 +1,6 @@
 import { SwarmControlAgent } from './SwarmControlAgent';
 import { Agent, AgentId } from '../../base/Agent';
-import { ServicePod, Event } from '../../base/ServicePod';
+import { AgentPod, Event } from '../../base/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { Hash } from 'data/model';
@@ -14,7 +14,7 @@ abstract class SwarmAgent implements Agent {
     }
 
     abstract getAgentId(): string;
-    abstract ready(pod: ServicePod): void;
+    abstract ready(pod: AgentPod): void;
 
     receiveLocalEvent(ev: Event): void {
         ev;

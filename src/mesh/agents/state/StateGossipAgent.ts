@@ -1,8 +1,8 @@
 import { StateAgent } from '../state/StateAgent';
 import { SwarmAgent } from '../swarm/SwarmAgent';
-import { SecureMessageReceivedEvent, SecureConnectionEventType } from '../security/SecureConnectionAgent';
+import { SecureMessageReceivedEvent, SecureNetworkEventType } from '../network/SecureNetworkAgent';
 
-import { ServicePod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../base/ServicePod';
+import { AgentPod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../base/AgentPod';
 import { AgentId } from '../../base/Agent';
 import { Endpoint } from '../network/NetworkAgent';
 //import { PeerId } from '../../network/Peer';
@@ -82,7 +82,7 @@ class StateGossipAgent extends SwarmAgent {
 
     topic: string;
 
-    pod?: ServicePod;
+    pod?: AgentPod;
 
     localState: PeerState;
 
@@ -104,11 +104,11 @@ class StateGossipAgent extends SwarmAgent {
         return StateGossipAgent.idForTopic(this.topic);
     }
 
-    getNetwork() : ServicePod {
-        return this.pod as ServicePod;
+    getNetwork() : AgentPod {
+        return this.pod as AgentPod;
     }
 
-    ready(pod: ServicePod): void {
+    ready(pod: AgentPod): void {
         this.pod = pod;
         StateGossipAgent.controlLog.debug('Agent ready');
     }
@@ -148,7 +148,7 @@ class StateGossipAgent extends SwarmAgent {
             if (changeEv.content.change === AgentSetChange.Removal) {
                 this.dropAgentState(changeEv.content.agentId);
             }   
-        } else if (ev.type === SecureConnectionEventType.SecureMessageReceived) {
+        } else if (ev.type === SecureNetworkEventType.SecureMessageReceived) {
             
             let secMsgEv = ev as SecureMessageReceivedEvent;
 
@@ -332,7 +332,7 @@ class StateGossipAgent extends SwarmAgent {
 
     private getLocalStateAgent(agentId: AgentId) {
 
-        const agent = this.getNetwork().getLocalAgent(agentId);
+        const agent = this.getNetwork().getAgent(agentId);
 
         if (agent !== undefined && 'receiveRemoteState' in agent) {
             return agent;

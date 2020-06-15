@@ -1,6 +1,6 @@
 
 import { RNGImpl } from 'crypto/random';
-import { ServicePod } from 'mesh/base/ServicePod';
+import { AgentPod } from 'mesh/base/AgentPod';
 import { TestConnectionAgent } from './mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 
@@ -11,12 +11,12 @@ describe('Basic networking', () => {
     test('2-node network test', async (done) => {
 
 
-        let n1 = new ServicePod();
+        let n1 = new AgentPod();
         let na1 = new NetworkAgent();
-        n1.registerLocalAgent(na1);
-        let n2 = new ServicePod();
+        n1.registerAgent(na1);
+        let n2 = new AgentPod();
         let na2 = new NetworkAgent();
-        n2.registerLocalAgent(na2);
+        n2.registerAgent(na2);
 
         let name1 = new RNGImpl().randomHexString(64);
         let name2 = new RNGImpl().randomHexString(64);
@@ -27,8 +27,8 @@ describe('Basic networking', () => {
         let a1 = new TestConnectionAgent();
         let a2 = new TestConnectionAgent();
 
-        n1.registerLocalAgent(a1);
-        n2.registerLocalAgent(a2);
+        n1.registerAgent(a1);
+        n2.registerAgent(a2);
 
         a1.expectConnection(ep2, ep1);
 

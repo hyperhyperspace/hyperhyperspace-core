@@ -1,6 +1,6 @@
 import { Agent, AgentId } from '../../base/Agent';
 
-import { ServicePod, Event } from '../../base/ServicePod';
+import { AgentPod, Event } from '../../base/AgentPod';
 
 import { NetworkAgent, ConnectionId, 
          NetworkEventType, ConnectionStatusChangeEvent, 
@@ -19,12 +19,12 @@ import { Logger, LogLevel } from 'util/logging';
 
 
 /*
- * SecureConnectionAgent: Verify that the other end of a connection is in possession of
- *                        a given Identity (a key pair whose public part, when joined with
- *                        some additional information, hashes to a given value) and use
- *                        the key pair to securely send a secret that can be used later to
- *                        send encrypted messages (and of course also implement the recipient
- *                        side of this exchange).
+ * SecureNetworkAgent: Verify that the other end of a connection is in possession of
+ *                     a given Identity (a key pair whose public part, when joined with
+ *                     some additional information, hashes to a given value) and use
+ *                     the key pair to securely send a secret that can be used later to
+ *                     send encrypted messages (and of course also implement the recipient
+ *                     side of this exchange).
  * 
  */
 
@@ -138,13 +138,13 @@ type SecureMessagePayload = {
     content: any
 };
 
-enum SecureConnectionEventType {
+enum SecureNetworkEventType {
     SecureMessageReceived  = 'secure-message-received',
     ConnectionIdentityAuth = 'connection-identity-auth'
 }
 
 type SecureMessageReceivedEvent = {
-    type: SecureConnectionEventType.SecureMessageReceived,
+    type: SecureNetworkEventType.SecureMessageReceived,
     content: {
         connId: ConnectionId,
         sender: Hash,
@@ -165,7 +165,7 @@ enum IdentityLocation {
 }
 
 type ConnectionIdentityAuthEvent = {
-    type: SecureConnectionEventType.ConnectionIdentityAuth,
+    type: SecureNetworkEventType.ConnectionIdentityAuth,
     content: {
         connId: ConnectionId,
         identityLocation: IdentityLocation,
@@ -281,16 +281,16 @@ class ConnectionSecuredForSending extends OneWaySecuredConnection {
 
 const DEFAULT_TIMEOUT = 15;
 
-class SecureConnectionAgent implements Agent {
+class SecureNetworkAgent implements Agent {
 
-    static logger = new Logger(SecureConnectionAgent.name, LogLevel.INFO);
+    static logger = new Logger(SecureNetworkAgent.name, LogLevel.INFO);
 
     static Id = 'secure-connection-agent';
 
     remoteIdentities : Map<string, ConnectionSecuredForSending>;
     localIdentities  : Map<string, ConnectionSecuredForReceiving>;
 
-    pod?: ServicePod;
+    pod?: AgentPod;
 
     constructor() {
 
@@ -299,10 +299,10 @@ class SecureConnectionAgent implements Agent {
     }
 
     getAgentId(): string {
-        return SecureConnectionAgent.Id;
+        return SecureNetworkAgent.Id;
     }
 
-    ready(pod: ServicePod): void {
+    ready(pod: AgentPod): void {
         this.pod = pod;
     }
 
@@ -332,7 +332,7 @@ class SecureConnectionAgent implements Agent {
 
     secureForReceiving(connId: ConnectionId, localIdentity: Identity, timeout=DEFAULT_TIMEOUT) {
         
-        SecureConnectionAgent.logger.trace(() => 'Asked to verify ' + connId + ' for receiving with ' + localIdentity.hash());
+        SecureNetworkAgent.logger.trace(() => 'Asked to verify ' + connId + ' for receiving with ' + localIdentity.hash());
 
         const identityHash = localIdentity.hash();
 
@@ -433,7 +433,7 @@ class SecureConnectionAgent implements Agent {
                 hmac: hmac
             };
 
-            this.getNetworkAgent().sendMessage(connId, SecureConnectionAgent.Id, secureMessage);
+            this.getNetworkAgent().sendMessage(connId, SecureNetworkAgent.Id, secureMessage);
         } else {
             throw new Error('Connection ' + connId + ' still has not verified both sender ' + sender + ' and recipient ' + recipient + '.');
         }
@@ -449,7 +449,7 @@ class SecureConnectionAgent implements Agent {
         let controlMessage = content as ControlMessage;
         let identityHash   = controlMessage.identityHash;
 
-        SecureConnectionAgent.logger.trace(() => 'Received message ' + JSON.stringify(content));
+        SecureNetworkAgent.logger.trace(() => 'Received message ' + JSON.stringify(content));
 
         // for id holder:
 
@@ -566,11 +566,11 @@ class SecureConnectionAgent implements Agent {
 
                     if (secureMessage.hmac === hmac) {
                         
-                        let agent = this.pod?.getLocalAgent(secureMessagePayload.agentId);
+                        let agent = this.pod?.getAgent(secureMessagePayload.agentId);
                         if (agent !== undefined) {
 
                             let event: SecureMessageReceivedEvent = { 
-                                type: SecureConnectionEventType.SecureMessageReceived,
+                                type: SecureNetworkEventType.SecureMessageReceived,
                                 content: { 
                                     connId: connId,
                                     sender: secureMessagePayload.senderIdentityHash,
@@ -582,7 +582,7 @@ class SecureConnectionAgent implements Agent {
                             agent.receiveLocalEvent(event);
                         }
                     } else {
-                        SecureConnectionAgent.logger.warning('HMAC mismatch on received message on connection ' + connId);
+                        SecureNetworkAgent.logger.warning('HMAC mismatch on received message on connection ' + connId);
                     }
                 }
                 
@@ -595,7 +595,7 @@ class SecureConnectionAgent implements Agent {
     private sendAuthEvent(connId: ConnectionId, identityLocation: IdentityLocation, identityHash: Hash, status: IdentityAuthStatus, identity?: Identity) {
 
         let ev: ConnectionIdentityAuthEvent = {
-            type: SecureConnectionEventType.ConnectionIdentityAuth,
+            type: SecureNetworkEventType.ConnectionIdentityAuth,
             content: {
                 connId: connId,
                 identityLocation: identityLocation,
@@ -605,7 +605,7 @@ class SecureConnectionAgent implements Agent {
             }
         };
 
-        this.pod?.broadcastLocalEvent(ev);
+        this.pod?.broadcastEvent(ev);
 
     }
 
@@ -621,7 +621,7 @@ class SecureConnectionAgent implements Agent {
             identity: identity.toLiteralContext()
         };
 
-        SecureConnectionAgent.logger.trace('Sending id ' + identityHash + ' on ' + connId);
+        SecureNetworkAgent.logger.trace('Sending id ' + identityHash + ' on ' + connId);
 
         this.sendControlMessage(connId, content);
     }
@@ -670,7 +670,7 @@ class SecureConnectionAgent implements Agent {
     }
     
     private sendControlMessage(connId: ConnectionId, content: ControlMessage) {
-        this.getNetworkAgent().sendMessage(connId, SecureConnectionAgent.Id, content);
+        this.getNetworkAgent().sendMessage(connId, SecureNetworkAgent.Id, content);
     }
 
     private getOrCreateConnectionSecuredForSending(connId: ConnectionId, identityHash: Hash): ConnectionSecuredForSending {
@@ -741,7 +741,7 @@ class SecureConnectionAgent implements Agent {
             }
 
             for (const k of toRemove) {
-                SecureConnectionAgent.logger.trace('Removing identity' + verifiedIdentities.get(k)?.identityHash + ' from connection ' + id + ': it is being closed.')
+                SecureNetworkAgent.logger.trace('Removing identity' + verifiedIdentities.get(k)?.identityHash + ' from connection ' + id + ': it is being closed.')
                 verifiedIdentities.delete(k);
             }
         }
@@ -749,9 +749,9 @@ class SecureConnectionAgent implements Agent {
     }
 
     private getNetworkAgent() {
-        return (this.pod as ServicePod).getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
+        return (this.pod as AgentPod).getAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
 }
 
-export { SecureConnectionAgent, SecureConnectionEventType, SecureMessageReceivedEvent, ConnectionIdentityAuthEvent, IdentityLocation, IdentityAuthStatus }
+export { SecureNetworkAgent as SecureNetworkAgent, SecureNetworkEventType, SecureMessageReceivedEvent, ConnectionIdentityAuthEvent, IdentityLocation, IdentityAuthStatus }

@@ -22,9 +22,9 @@ type AgentSetChangeEvent = {
     }
 };
 
-class ServicePod {
+class AgentPod {
 
-    static logger = new Logger(ServicePod.name, LogLevel.INFO);
+    static logger = new Logger(AgentPod.name, LogLevel.INFO);
     
     agents      : Map<string, Agent>;
 
@@ -37,7 +37,7 @@ class ServicePod {
 
     // locally running agent set management
 
-    registerLocalAgent(agent: Agent) {
+    registerAgent(agent: Agent) {
         this.agents.set(agent.getAgentId(), agent);
 
 
@@ -51,14 +51,14 @@ class ServicePod {
             }
         }
 
-        this.broadcastLocalEvent(ev)
+        this.broadcastEvent(ev)
     }
 
-    deregisterLocalAgent(agent: Agent) {
-        this.deregisterLocalAgentById(agent.getAgentId());
+    deregisterAgent(agent: Agent) {
+        this.deregisterAgentById(agent.getAgentId());
     }
 
-    deregisterLocalAgentById(id: AgentId) {
+    deregisterAgentById(id: AgentId) {
 
         const ev: AgentSetChangeEvent = {
             type: AgentPodEventType.AgentSetChange,
@@ -68,24 +68,24 @@ class ServicePod {
             }
         }
 
-        this.broadcastLocalEvent(ev);
+        this.broadcastEvent(ev);
         this.agents.delete(id);
     }
 
-    getLocalAgent(id: AgentId) {
+    getAgent(id: AgentId) {
         return this.agents.get(id);
     }
 
-    getLocalAgentIdSet() {
+    getAgentIdSet() {
         return new Set<AgentId>(this.agents.keys());
     }
 
 
     // send an event that will be received by all local agents
 
-    broadcastLocalEvent(ev: Event) {
+    broadcastEvent(ev: Event) {
 
-        ServicePod.logger.trace('Network sending event ' + ev.type + ' with content ' + JSON.stringify(ev.content));
+        AgentPod.logger.trace('Network sending event ' + ev.type + ' with content ' + JSON.stringify(ev.content));
 
         for (const agent of this.agents.values()) {
             agent.receiveLocalEvent(ev);
@@ -94,4 +94,4 @@ class ServicePod {
     
 }
 
-export { ServicePod, Event, AgentPodEventType, AgentSetChangeEvent, AgentSetChange };
+export { AgentPod, Event, AgentPodEventType, AgentSetChangeEvent, AgentSetChange };

@@ -24,12 +24,12 @@ describe('State sync', () => {
         }
 
         for (const swarm of swarms) {
-            const swarmControl = swarm.getLocalAgent(SwarmControlAgent.agentIdForSwarm(topic)) as SwarmControlAgent;
+            const swarmControl = swarm.getAgent(SwarmControlAgent.agentIdForSwarm(topic)) as SwarmControlAgent;
             const gossip = new StateGossipAgent(topic, swarmControl);
-            swarm.registerLocalAgent(gossip);
+            swarm.registerAgent(gossip);
             for (let i=0; i<objCount; i++) {
                 let agent = new LinearStateAgent(objIds[i], swarmControl);
-                swarm.registerLocalAgent(agent);
+                swarm.registerAgent(agent);
             }
         }
 
@@ -53,7 +53,7 @@ describe('State sync', () => {
             let c=0;
             for (let j=0; c<3; j++) {
                 await new Promise(r => { window.setTimeout( r, 100); });
-                let agent=swarms[j].getLocalAgent(LinearStateAgent.createId(objId)) as LinearStateAgent;
+                let agent=swarms[j].getAgent(LinearStateAgent.createId(objId)) as LinearStateAgent;
                 if (agent !== undefined) {
                     if (c<3) {
                         seq
@@ -110,12 +110,12 @@ describe('State sync', () => {
         let stores : Array<Store> = [];
         
         for (let i=0; i<size; i++) {
-            const swarmControl = swarms[i].getLocalAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
+            const swarmControl = swarms[i].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
             const store = new Store(new IdbBackend('store-for-peer-' + swarmControl.getLocalPeer().endpoint));
             stores.push(store);
             let gossip = new StateGossipAgent(swarmId, swarmControl);
             
-            swarms[i].registerLocalAgent(gossip);
+            swarms[i].registerAgent(gossip);
         }
 
         let id = TestIdentity.getFirstTestIdentity();
@@ -129,10 +129,10 @@ describe('State sync', () => {
         await stores[0].save(s);
 
         for (let i=0; i<size; i++) {
-            const swarmControl = swarms[i].getLocalAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
+            const swarmControl = swarms[i].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
             let agent = new TerminalOpsSyncAgent(swarmControl, s.hash(), stores[i], MutableSet.opClasses);
             //agent;
-            swarms[i].registerLocalAgent(agent);
+            swarms[i].registerAgent(agent);
         }
 
         await s.add(id);

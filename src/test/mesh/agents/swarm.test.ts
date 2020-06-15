@@ -11,7 +11,7 @@ describe('Swarm management', () => {
         let networks = TestSwarm.generate(swarmId, 2, 2, 1);
         networks;
 
-        let control0 = networks[0].getLocalAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
+        let control0 = networks[0].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
 
         let checks = 0;
         let stats = control0.getStats();
@@ -37,7 +37,7 @@ describe('Swarm management', () => {
         let networks = TestSwarm.generate(swarmId, 4, 4, 3);
         networks;
 
-        let control0 = networks[0].getLocalAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
+        let control0 = networks[0].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
 
         let checks = 0;
         let stats = control0.getStats();

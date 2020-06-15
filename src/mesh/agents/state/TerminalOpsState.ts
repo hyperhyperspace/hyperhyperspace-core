@@ -1,4 +1,4 @@
-import { HashedObject } from "data/model/HashedObject";
+import { HashedObject } from 'data/model/HashedObject';
 import { Hash } from 'data/model/Hashing';
 import { HashedSet } from 'data/model/HashedSet';
 

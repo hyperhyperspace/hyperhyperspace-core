@@ -1,15 +1,15 @@
 import { PeerSource } from './PeerSource';
 import { SwarmAgent } from './SwarmAgent';
 
-import { SecureConnectionAgent, SecureConnectionEventType, ConnectionIdentityAuthEvent, 
-    IdentityLocation, IdentityAuthStatus, SecureMessageReceivedEvent } from '../security/SecureConnectionAgent';
+import { SecureNetworkAgent, SecureNetworkEventType, ConnectionIdentityAuthEvent, 
+    IdentityLocation, IdentityAuthStatus, SecureMessageReceivedEvent } from '../network/SecureNetworkAgent';
 
 
 import { Agent, AgentId } from '../../base/Agent';
 import { NetworkAgent, Endpoint, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, 
          ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent } from '../network/NetworkAgent';
 
-import { ServicePod, Event } from '../../base/ServicePod';
+import { AgentPod, Event } from '../../base/AgentPod';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 
 import { Hash } from 'data/model';
@@ -113,7 +113,7 @@ class SwarmControlAgent implements Agent {
     onlineQueryTimestamps: Map<Endpoint, number>;
     chosenForDeduplication: Map<Endpoint, ConnectionId>;
 
-    pod?: ServicePod;
+    pod?: AgentPod;
 
     params: Params;
 
@@ -164,7 +164,7 @@ class SwarmControlAgent implements Agent {
         return this.localPeer;
     }
 
-    ready(pod: ServicePod): void {
+    ready(pod: AgentPod): void {
         this.pod = pod;
         this.init();
     }
@@ -845,13 +845,13 @@ class SwarmControlAgent implements Agent {
             } else if (connEv.content.status === ConnectionStatus.Ready) {
                 this.onConnectionEstablishment(connEv.content.connId, connEv.content.localEndpoint, connEv.content.remoteEndpoint);
             }
-        } else if (ev.type === SecureConnectionEventType.ConnectionIdentityAuth) {
+        } else if (ev.type === SecureNetworkEventType.ConnectionIdentityAuth) {
             let connAuth = ev as ConnectionIdentityAuthEvent;
 
             if (connAuth.content.status === IdentityAuthStatus.Accepted) {
                 this.onConnectionAuthentication(connAuth.content.connId, connAuth.content.identityHash, connAuth.content.identity as Identity, connAuth.content.identityLocation);
             }
-        } else if (ev.type === SecureConnectionEventType.SecureMessageReceived) {
+        } else if (ev.type === SecureNetworkEventType.SecureMessageReceived) {
 
             // The SecureConnectionAgent relies secure messages destined to this agent through local events.
             // Since this messages arrive through a secured connection, we know the sender is in possesion of
@@ -890,15 +890,15 @@ class SwarmControlAgent implements Agent {
     // shorthand functions
 
     private getNetworkAgent() {
-        return this.pod?.getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
+        return this.pod?.getAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
     private getLocalAgent(agentId: AgentId) {
-        return this.pod?.getLocalAgent(agentId) as Agent;
+        return this.pod?.getAgent(agentId) as Agent;
     }
 
     private getSecureConnAgent() {
-        return this.getLocalAgent(SecureConnectionAgent.Id) as SecureConnectionAgent;
+        return this.getLocalAgent(SecureNetworkAgent.Id) as SecureNetworkAgent;
     }
 
     static agentIdForSwarm(swarmId: string) {

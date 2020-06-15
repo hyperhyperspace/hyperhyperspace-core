@@ -1,13 +1,13 @@
 import { Endpoint, ConnectionId, NetworkEventType, 
         ConnectionStatusChangeEvent, ConnectionStatus, NetworkAgent, MessageReceivedEvent } from 'mesh/agents/network';
-import { ServicePod, Event } from 'mesh/services';
+import { AgentPod, Event } from 'mesh/services';
 import { Agent } from 'mesh/services';
 import { MultiMap } from 'util/multimap';
 
 
 class TestConnectionAgent implements Agent {
 
-    pod?: ServicePod;
+    pod?: AgentPod;
     networkAgent?: NetworkAgent;
     connecting: MultiMap<Endpoint, Endpoint>;                     // local -> remotes
     established: Map<Endpoint, MultiMap<Endpoint, ConnectionId>>; // local -> remote -> connections
@@ -23,9 +23,9 @@ class TestConnectionAgent implements Agent {
         return 'test-conn-agent';
     }
 
-    ready(pod: ServicePod): void {
+    ready(pod: AgentPod): void {
         this.pod = pod;
-        this.networkAgent = pod.getLocalAgent(NetworkAgent.AgentId) as NetworkAgent;
+        this.networkAgent = pod.getAgent(NetworkAgent.AgentId) as NetworkAgent;
     }
 
     expectConnection(source: Endpoint, destination: Endpoint) {

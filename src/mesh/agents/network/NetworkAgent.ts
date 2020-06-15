@@ -1,5 +1,5 @@
 import { Agent, AgentId } from '../../base/Agent';
-import { Event, ServicePod } from '../../base/ServicePod';
+import { Event, AgentPod } from '../../base/AgentPod';
 import { Logger, LogLevel } from 'util/logging';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { LinkupManager } from 'net/linkup/LinkupManager';
@@ -79,7 +79,7 @@ class NetworkAgent implements Agent {
     static connLogger = new Logger(NetworkAgent.name + ' conn', LogLevel.INFO);
     static messageLogger = new Logger(NetworkAgent.name + ' msg', LogLevel.INFO);
     
-    pod?: ServicePod;
+    pod?: AgentPod;
 
     linkupManager : LinkupManager;
 
@@ -156,7 +156,7 @@ class NetworkAgent implements Agent {
                         status          : ConnectionStatus.Ready
                     }
                 };
-                this.pod?.broadcastLocalEvent(ev);
+                this.pod?.broadcastEvent(ev);
             }
         }
 
@@ -195,7 +195,7 @@ class NetworkAgent implements Agent {
                             }
                         }
 
-                        this.pod?.broadcastLocalEvent(ev);
+                        this.pod?.broadcastEvent(ev);
                     }
 
                 }          
@@ -291,7 +291,7 @@ class NetworkAgent implements Agent {
                         }
                     };
 
-                    this.pod?.broadcastLocalEvent(ev);
+                    this.pod?.broadcastEvent(ev);
                 }
             } else {
                 NetworkAgent.connLogger.debug('received wrongly addressed listenForQueryResponse message, was meant for ' + ep + ' which is not listening in this network node.');
@@ -520,7 +520,7 @@ class NetworkAgent implements Agent {
             }
         }
 
-        this.pod?.broadcastLocalEvent(ev);
+        this.pod?.broadcastEvent(ev);
 
         this.connectionInfo.delete(id);
         this.connections.delete(id);
@@ -529,7 +529,7 @@ class NetworkAgent implements Agent {
 
     }
 
-    ready(pod: ServicePod): void {
+    ready(pod: AgentPod): void {
         this.pod = pod;
         this.intervalRef = window.setInterval(this.tick, TickInterval * 1000);
     }
@@ -545,7 +545,7 @@ class NetworkAgent implements Agent {
             content: msg
         };
 
-        const agent = this.pod?.getLocalAgent(msg.agentId);
+        const agent = this.pod?.getAgent(msg.agentId);
         if (agent !== undefined) {
             agent.receiveLocalEvent(ev);
         }

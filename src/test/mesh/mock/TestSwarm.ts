@@ -1,16 +1,16 @@
-import { ServicePod } from 'mesh/base/ServicePod';
+import { AgentPod } from 'mesh/base/AgentPod';
 import { Peer, SwarmControlAgent } from 'mesh/agents/swarm';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { TestPeerSource } from './TestPeerSource';
 import { RNGImpl } from 'crypto/random';
-import { SecureConnectionAgent } from 'mesh/agents/security/SecureConnectionAgent';
+import { SecureNetworkAgent } from 'mesh/agents/network/SecureNetworkAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 
 
 
 class TestSwarm {
     
-    static generate(topic: string, activePeers: number, totalPeers: number, peerConnCount: number): Array<ServicePod> {
+    static generate(topic: string, activePeers: number, totalPeers: number, peerConnCount: number): Array<AgentPod> {
 
         let peers = new Array<Peer>();
 
@@ -27,17 +27,17 @@ class TestSwarm {
         }
 
         let peerSource = new TestPeerSource(peers);
-        let servicePods = new Array<ServicePod>();
+        let servicePods = new Array<AgentPod>();
 
         for (let i=0; i<activePeers; i++) {
-            let servicePod = new ServicePod();
+            let servicePod = new AgentPod();
             let networkAgent = new NetworkAgent();
-            servicePod.registerLocalAgent(networkAgent);
-            let secureConn = new SecureConnectionAgent();
-            servicePod.registerLocalAgent(secureConn);
+            servicePod.registerAgent(networkAgent);
+            let secureConn = new SecureNetworkAgent();
+            servicePod.registerAgent(secureConn);
             
             let peerControl = new SwarmControlAgent(topic, peers[i], peerSource, { maxPeers: peerConnCount, minPeers: peerConnCount });
-            servicePod.registerLocalAgent(peerControl);
+            servicePod.registerAgent(peerControl);
             servicePods.push(servicePod);
         }
 
