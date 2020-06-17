@@ -3,7 +3,7 @@ import { Identity } from 'data/identity';
 import { Peer } from 'mesh/agents/peer';
 import { Endpoint } from 'mesh/agents/network';
 
-const LINKUP = 'ws://localhost:3002/sample-peer-'
+const LINKUP = 'wss://mypeer.net:443/sample-peer-'
 
 class SamplePeer extends HashedObject {
 

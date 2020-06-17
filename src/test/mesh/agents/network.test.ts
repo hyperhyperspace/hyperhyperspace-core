@@ -4,7 +4,7 @@ import { AgentPod } from 'mesh/base/AgentPod';
 import { TestConnectionAgent } from '../mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 
-let linkupServer = 'ws://localhost:3002';
+let linkupServer = 'wss://mypeer.net:443';
 
 describe('Basic networking', () => {
 

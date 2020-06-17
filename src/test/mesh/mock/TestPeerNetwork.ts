@@ -18,7 +18,7 @@ class TestPeerNetwork {
             let id = Identity.fromKeyPair({'id':'peer' + i}, RSAKeyPair.generate(512));
             
             let peer: Peer = {
-                endpoint: 'ws://localhost:3002/' + new RNGImpl().randomHexString(128),
+                endpoint: 'wss://mypeer.net:443/' + new RNGImpl().randomHexString(128),
                 identity: id,
                 identityHash: id.hash()
             };
