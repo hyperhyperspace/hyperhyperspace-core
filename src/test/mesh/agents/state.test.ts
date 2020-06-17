@@ -1,6 +1,6 @@
-import { TestSwarm } from '../mock/TestSwarm';
+import { TestPeerNetwork } from '../mock/TestPeerNetwork';
 import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
-import { SwarmControlAgent } from 'mesh/agents/swarm';
+import { PeerNetworkAgent } from 'mesh/agents/peer';
 import { Hash } from 'data/model';
 import { RNGImpl } from 'crypto/random';
 import { LinearStateAgent } from '../mock/LinearStateAgent';
@@ -11,11 +11,11 @@ import { Identity } from 'data/identity';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state/TerminalOpsSyncAgent';
 
 describe('State sync', () => {
-    test('Gossip agent in small swarm', async (done) => {
+    test('Gossip agent in small peer group', async (done) => {
 
         let topic = new RNGImpl().randomHexString(64);
 
-        let swarms = TestSwarm.generate(topic, 3, 3, 2);
+        let pods = TestPeerNetwork.generate(topic, 3, 3, 2);
 
         const objCount = 3;
         const objIds   = new Array<Hash>();
@@ -23,13 +23,13 @@ describe('State sync', () => {
             objIds.push(new RNGImpl().randomHexString(32));
         }
 
-        for (const swarm of swarms) {
-            const swarmControl = swarm.getAgent(SwarmControlAgent.agentIdForSwarm(topic)) as SwarmControlAgent;
-            const gossip = new StateGossipAgent(topic, swarmControl);
-            swarm.registerAgent(gossip);
+        for (const pod of pods) {
+            const peerNetwork = pod.getAgent(PeerNetworkAgent.agentIdForPeerNetwork(topic)) as PeerNetworkAgent;
+            const gossip = new StateGossipAgent(topic, peerNetwork);
+            pod.registerAgent(gossip);
             for (let i=0; i<objCount; i++) {
-                let agent = new LinearStateAgent(objIds[i], swarmControl);
-                swarm.registerAgent(agent);
+                let agent = new LinearStateAgent(objIds[i], peerNetwork);
+                pod.registerAgent(agent);
             }
         }
 
@@ -53,7 +53,7 @@ describe('State sync', () => {
             let c=0;
             for (let j=0; c<3; j++) {
                 await new Promise(r => { window.setTimeout( r, 100); });
-                let agent=swarms[j].getAgent(LinearStateAgent.createId(objId)) as LinearStateAgent;
+                let agent=pods[j].getAgent(LinearStateAgent.createId(objId)) as LinearStateAgent;
                 if (agent !== undefined) {
                     if (c<3) {
                         seq
@@ -91,31 +91,31 @@ describe('State sync', () => {
                 expect(witness[c].message).toEqual(results[c][1])
             }
     
-            //for (const swarm of swarms) {
-            //    swarm.shutdown();
+            //for (const pod of pods) {
+            //    pod.shutdown();
             //}
         }
 
         done();
     });
 
-    test('Terminal ops agent-based set sync in small swarm', async (done) => {
+    test('Terminal ops agent-based set sync in small peer group', async (done) => {
 
         const size = 3;
         
-        let swarmId = new RNGImpl().randomHexString(64);
+        let peerNetworkId = new RNGImpl().randomHexString(64);
 
-        let swarms = TestSwarm.generate(swarmId, size, size, size-1);
+        let pods = TestPeerNetwork.generate(peerNetworkId, size, size, size-1);
 
         let stores : Array<Store> = [];
         
         for (let i=0; i<size; i++) {
-            const swarmControl = swarms[i].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
-            const store = new Store(new IdbBackend('store-for-peer-' + swarmControl.getLocalPeer().endpoint));
+            const peerNetwork = pods[i].getAgent(PeerNetworkAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerNetworkAgent;
+            const store = new Store(new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
             stores.push(store);
-            let gossip = new StateGossipAgent(swarmId, swarmControl);
+            let gossip = new StateGossipAgent(peerNetworkId, peerNetwork);
             
-            swarms[i].registerAgent(gossip);
+            pods[i].registerAgent(gossip);
         }
 
         let id = TestIdentity.getFirstTestIdentity();
@@ -129,10 +129,10 @@ describe('State sync', () => {
         await stores[0].save(s);
 
         for (let i=0; i<size; i++) {
-            const swarmControl = swarms[i].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
-            let agent = new TerminalOpsSyncAgent(swarmControl, s.hash(), stores[i], MutableSet.opClasses);
+            const peerNetwork = pods[i].getAgent(PeerNetworkAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerNetworkAgent;
+            let agent = new TerminalOpsSyncAgent(peerNetwork, s.hash(), stores[i], MutableSet.opClasses);
             //agent;
-            swarms[i].registerAgent(agent);
+            pods[i].registerAgent(agent);
         }
 
         await s.add(id);

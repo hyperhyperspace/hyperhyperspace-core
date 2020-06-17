@@ -9,8 +9,9 @@ enum LogLevel {
 
 class Logger {
 
-    className? : string;
-    level     : LogLevel; 
+  className? : string;
+  level      : LogLevel;
+  chained?   : Logger;
 
   constructor(className?: string, level=LogLevel.INFO) {
     this.className = className;
@@ -38,8 +39,19 @@ class Logger {
       }
 
       console.log('[' + className + ' ' + d.getHours() + ':' + d.getMinutes() + ' ' + d.getSeconds() + '.' + d.getMilliseconds().toString().padStart(3, '0') + ']: ' + msg);
+    } else if (this.chained !== undefined) {
+      // in case another logger in the chain has a more verbose log level.
+      this.chained.log(msg, level);
     }
+
+    
   }
+
+  chain(logger: Logger) {
+      this.chained = logger;
+  }
+
+  
 }
 
 export { Logger, LogLevel };

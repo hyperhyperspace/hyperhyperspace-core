@@ -1,4 +1,4 @@
-import { PeerSource, Peer } from 'mesh/agents/swarm';
+import { PeerSource, Peer } from 'mesh/agents/peer';
 import { Shuffle } from 'util/shuffling';
 
 

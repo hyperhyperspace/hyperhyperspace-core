@@ -135,10 +135,10 @@ abstract class HashedObject {
     getStore() : Store {
 
         if (this._store === undefined) {
-            throw new Error('Attempted to get store within an unstored object.')
+            throw new Error('Attempted to get store within an unstored object.');
         }
 
-        return this._store as Store;
+        return this._store;
     }
 
     hasLastHash() {

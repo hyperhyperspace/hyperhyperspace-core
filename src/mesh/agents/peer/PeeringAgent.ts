@@ -1,16 +1,16 @@
-import { SwarmControlAgent } from './SwarmControlAgent';
+import { PeerNetworkAgent } from './PeerNetworkAgent';
 import { Agent, AgentId } from '../../base/Agent';
 import { AgentPod, Event } from '../../base/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { Hash } from 'data/model';
 
-abstract class SwarmAgent implements Agent {
+abstract class PeeringAgent implements Agent {
 
-    swarmControl: SwarmControlAgent;
+    peerNetwork: PeerNetworkAgent;
 
-    constructor(swarmControl: SwarmControlAgent) {
-        this.swarmControl = swarmControl;
+    constructor(peerNetwork: PeerNetworkAgent) {
+        this.peerNetwork = peerNetwork;
     }
 
     abstract getAgentId(): string;
@@ -20,16 +20,16 @@ abstract class SwarmAgent implements Agent {
         ev;
     }
     
-    getSwarmControl() {
-        return this.swarmControl;
+    getPeerControl() {
+        return this.peerNetwork;
     }
 
     sendMessageToPeer(destination: Endpoint, agentId: AgentId, content: any) : boolean {
-        return this.swarmControl.sendToPeer(destination, agentId, content);
+        return this.peerNetwork.sendToPeer(destination, agentId, content);
     }
 
     abstract receivePeerMessage(source: Endpoint, sender: Hash, recipient: Hash, content: any) : void;
 
 }
 
-export { SwarmAgent }
+export { PeeringAgent }

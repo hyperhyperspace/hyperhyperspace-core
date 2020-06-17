@@ -8,11 +8,11 @@ import { AgentPod } from '../../base/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { GossipEventTypes, AgentStateUpdateEvent } from './StateGossipAgent';
-import { StateAgent } from './StateAgent';
+import { StateSyncAgent } from './StateSyncAgent';
 import { TerminalOpsState } from './TerminalOpsState';
 import { Logger, LogLevel } from 'util/logging';
-import { SwarmAgent } from '../swarm/SwarmAgent';
-import { SwarmControlAgent } from '../swarm/SwarmControlAgent';
+import { PeeringAgent } from '../peer/PeeringAgent';
+import { PeerNetworkAgent } from '../peer/PeerNetworkAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
 
@@ -66,11 +66,15 @@ type OwnershipProof  = { hash: Hash, ownershipProofHash: Hash };
  
 type IncompleteOp = { source: Endpoint, context: Context, missingObjects: Map<Hash, ObjectRequest>, timeout: number };
 
-class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
+class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
 
     static controlLog     = new Logger(TerminalOpsSyncAgent.name, LogLevel.INFO);
     static peerMessageLog = new Logger(TerminalOpsSyncAgent.name, LogLevel.INFO);
     static opTransferLog  = new Logger(TerminalOpsSyncAgent.name, LogLevel.INFO);
+
+    static idForObjectHash(objHash: Hash) {
+        return 'terminal-ops-for-' + objHash;
+    }
 
     params: TerminalOpsSyncAgentParams;
 
@@ -95,8 +99,12 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
 
     opShippingInterval: number;
 
-    constructor(swarmControl: SwarmControlAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
-        super(swarmControl);
+    controlLog     = TerminalOpsSyncAgent.controlLog;
+    peerMessageLog = TerminalOpsSyncAgent.peerMessageLog;
+    opTransferLog  = TerminalOpsSyncAgent.opTransferLog;
+
+    constructor(peerNetwork: PeerNetworkAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
+        super(peerNetwork);
 
         if (params === undefined) {
             params = {
@@ -114,7 +122,7 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
 
         this.opCallback = async (opHash: Hash) => {
 
-            TerminalOpsSyncAgent.opTransferLog.debug('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.swarmControl.getLocalPeer().endpoint);
+            this.opTransferLog.debug('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.peerNetwork.getLocalPeer().endpoint);
 
             let op = await this.store.load(opHash) as MutationOp;
             if (this.shouldAcceptMutationOp(op)) {
@@ -199,15 +207,15 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
     }
 
     getAgentId(): string {
-        return 'terminal-ops-for-' + this.objHash;
+        return TerminalOpsSyncAgent.idForObjectHash(this.objHash);
     }
 
     ready(pod: AgentPod): void {
-
-        TerminalOpsSyncAgent.controlLog.debug(
+        
+        this.controlLog.debug(
               'Starting for object ' + this.objHash + 
-              ' on ep ' + this.swarmControl.getLocalPeer().endpoint + 
-              ' (topic: ' + this.swarmControl.getTopic() + ')');
+              ' on ep ' + this.peerNetwork.getLocalPeer().endpoint + 
+              ' (topic: ' + this.peerNetwork.getTopic() + ')');
         
         this.pod = pod;
         this.loadStoredState();
@@ -226,7 +234,7 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
 
                 let peerTerminalOpsState = state as TerminalOpsState;
                 
-                TerminalOpsSyncAgent.opTransferLog.debug(this.getSwarmControl().getLocalPeer().endpoint + ' received terminal op list from ' + sender + ': ' + Array.from(peerTerminalOpsState.terminalOps?.values() as IterableIterator<string>));
+                this.opTransferLog.debug(this.getPeerControl().getLocalPeer().endpoint + ' received terminal op list from ' + sender + ': ' + Array.from(peerTerminalOpsState.terminalOps?.values() as IterableIterator<string>));
 
                 let opsToFetch: Hash[] = [];
 
@@ -276,7 +284,7 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
             return;
         }
 
-        TerminalOpsSyncAgent.peerMessageLog.debug('terminal-ops-agent: ' + this.getSwarmControl().getLocalPeer().endpoint + ' received ' + msg.type + ' from ' + source);
+        this.peerMessageLog.debug('terminal-ops-agent: ' + this.getPeerControl().getLocalPeer().endpoint + ' received ' + msg.type + ' from ' + source);
 
         if (msg.targetObjHash === this.objHash) {
             if (msg.type === TerminalOpsSyncAgentMessageType.RequestState) {
@@ -313,7 +321,7 @@ class TerminalOpsSyncAgent extends SwarmAgent implements StateAgent {
         const stateHash = state.hash();
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
-            TerminalOpsSyncAgent.controlLog.debug('Found new state ' + stateHash + ' for ' + this.objHash + ' in ' + this.swarmControl.getLocalPeer().endpoint);
+            this.controlLog.debug('Found new state ' + stateHash + ' for ' + this.objHash + ' in ' + this.peerNetwork.getLocalPeer().endpoint);
             this.state = state;
             this.stateHash = stateHash;
             let stateUpdate: AgentStateUpdateEvent = {

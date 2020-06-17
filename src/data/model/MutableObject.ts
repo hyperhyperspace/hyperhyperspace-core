@@ -4,8 +4,8 @@ import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
 import { Logger, LogLevel } from 'util/logging';
-import { StateAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
-import { SwarmControlAgent } from 'mesh/agents/swarm';
+import { StateSyncAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
+import { PeerNetworkAgent } from 'mesh/agents/peer';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
@@ -287,8 +287,13 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
-    createSyncAgentForSwarm(swarmControl: SwarmControlAgent) : StateAgent {
-        return new TerminalOpsSyncAgent(swarmControl, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
+    createSyncAgent(peerNetwork: PeerNetworkAgent) : StateSyncAgent {
+
+        return new TerminalOpsSyncAgent(peerNetwork, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
+    }
+
+    getAcceptedMutationOpClasses() : Array<string> {
+        return this._acceptedMutationOpClasses;
     }
 
 }

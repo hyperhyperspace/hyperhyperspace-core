@@ -1,10 +1,10 @@
-import { StateAgent } from 'mesh/agents/state/StateAgent';
+import { StateSyncAgent } from 'mesh/agents/state/StateSyncAgent';
 import { Endpoint } from 'mesh/agents/network';
 import { AgentPod, Event } from 'mesh/services';
 import { HashedObject, Hash } from 'data/model';
 import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
-import { SwarmControlAgent, SwarmAgent } from 'mesh/agents/swarm';
+import { PeerNetworkAgent, PeeringAgent } from 'mesh/agents/peer';
 
 
 class LinearState extends HashedObject {
@@ -55,7 +55,7 @@ type LinearStateMessage = RequestStateMessage | SendStateMessage;
 
 HashedObject.registerClass(LinearState.className, LinearState);
 
-class LinearStateAgent extends SwarmAgent implements StateAgent {
+class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
 
     static logger = new Logger(LinearState.name, LogLevel.INFO);
 
@@ -75,9 +75,9 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
     state?: LinearState;
     prevStates : Set<Hash>;
 
-    constructor(id: string, swarmControl: SwarmControlAgent) {
-        super(swarmControl);
-        this.topic = swarmControl.swarmId;
+    constructor(id: string, peerNetwork: PeerNetworkAgent) {
+        super(peerNetwork);
+        this.topic = peerNetwork.peerNetworkId;
         this.id = id;
         this.prevStates = new Set();
     }
@@ -193,7 +193,7 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
             type: MessageType.RequestState
         }
 
-        this.swarmControl.sendToPeer(endpoint, this.getAgentId(), requestStateMessage);
+        this.peerNetwork.sendToPeer(endpoint, this.getAgentId(), requestStateMessage);
     }
 
     private sendState(endpoint: Endpoint) {
@@ -202,7 +202,7 @@ class LinearStateAgent extends SwarmAgent implements StateAgent {
             state: this.state as LinearState
         }
 
-        this.swarmControl.sendToPeer(endpoint, this.getAgentId(), sendStateMessage);
+        this.peerNetwork.sendToPeer(endpoint, this.getAgentId(), sendStateMessage);
     }
 
 }

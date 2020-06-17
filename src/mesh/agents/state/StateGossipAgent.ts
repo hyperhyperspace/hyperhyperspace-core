@@ -1,5 +1,5 @@
-import { StateAgent } from '../state/StateAgent';
-import { SwarmAgent } from '../swarm/SwarmAgent';
+import { StateSyncAgent } from '../state/StateSyncAgent';
+import { PeeringAgent } from '../peer/PeeringAgent';
 import { SecureMessageReceivedEvent, SecureNetworkEventType } from '../network/SecureNetworkAgent';
 
 import { AgentPod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../base/AgentPod';
@@ -11,7 +11,7 @@ import { HashedMap } from 'data/model/HashedMap';
 import { Hash, HashedObject } from 'data/model';
 import { Shuffle } from 'util/shuffling';
 import { Logger, LogLevel } from 'util/logging';
-import { SwarmControlAgent } from '../swarm/SwarmControlAgent';
+import { PeerNetworkAgent, PeerNetworkEventType, NewPeerEvent } from '../peer/PeerNetworkAgent';
 
 
 enum GossipType {
@@ -22,7 +22,7 @@ enum GossipType {
 
 interface SendFullStateMessage { 
     type: GossipType.SendFullState,
-    state: HashedMap<AgentId, Hash>,
+    state: {entries: [AgentId, Hash][], hashes: Hash[]} //HashedMap<AgentId, Hash>.toArrays
 };
 
 interface SendStateUpdate {
@@ -59,14 +59,14 @@ type AgentStateUpdateEvent = {
     content: { agentId: AgentId, state: HashedObject }
 }
 
-class StateGossipAgent extends SwarmAgent {
+class StateGossipAgent extends PeeringAgent {
 
     static idForTopic(topic: string) {
         return 'state-gossip-agent-for-' + topic;
     }
 
     static peerMessageLog = new Logger(StateGossipAgent.name, LogLevel.INFO);
-    static controlLog      = new Logger(StateGossipAgent.name, LogLevel.INFO);
+    static controlLog     = new Logger(StateGossipAgent.name, LogLevel.INFO);
 
     // tunable working parameters
 
@@ -90,8 +90,11 @@ class StateGossipAgent extends SwarmAgent {
 
     previousStatesCache: Map<AgentId, Array<Hash>>;
 
-    constructor(topic: string, swarmControl: SwarmControlAgent) {
-        super(swarmControl);
+    peerMessageLog = StateGossipAgent.peerMessageLog;
+    controlLog     = StateGossipAgent.controlLog;
+
+    constructor(topic: string, peerNetwork: PeerNetworkAgent) {
+        super(peerNetwork);
         this.topic = topic;
 
         this.localState  = new Map();
@@ -110,7 +113,7 @@ class StateGossipAgent extends SwarmAgent {
 
     ready(pod: AgentPod): void {
         this.pod = pod;
-        StateGossipAgent.controlLog.debug('Agent ready');
+        this.controlLog.debug('Agent ready');
     }
 
     localAgentStateUpdate(agentId: AgentId, state: HashedObject) {
@@ -128,10 +131,10 @@ class StateGossipAgent extends SwarmAgent {
         this.localState.set(agentId, hash);
        
         if (shouldGossip) {
-            StateGossipAgent.controlLog.trace('Gossiping state ' + hash + ' from ' + this.swarmControl.getLocalPeer().endpoint);
+            this.controlLog.trace('Gossiping state ' + hash + ' from ' + this.peerNetwork.getLocalPeer().endpoint);
             this.gossipNewState(agentId, state);
         } else {
-            StateGossipAgent.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.swarmControl.getLocalPeer().endpoint);
+            this.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.peerNetwork.getLocalPeer().endpoint);
         }
     }
 
@@ -163,6 +166,13 @@ class StateGossipAgent extends SwarmAgent {
             let updateEv = ev as AgentStateUpdateEvent;
 
             this.localAgentStateUpdate(updateEv.content.agentId, updateEv.content.state);
+        } else if (ev.type === PeerNetworkEventType.NewPeer) {
+            let newPeerEv = ev as NewPeerEvent;
+
+            if (newPeerEv.content.peerNetworkId === this.peerNetwork.peerNetworkId) {
+                this.sendFullState(newPeerEv.content.peer.endpoint);
+            }
+            
         }
     }
 
@@ -210,9 +220,9 @@ class StateGossipAgent extends SwarmAgent {
     private gossipNewState(agentId: AgentId, state: HashedObject, sender?: Endpoint, timestamp?: number) {
 
 
-        const peers = this.getSwarmControl().getPeers();
+        const peers = this.getPeerControl().getPeers();
 
-        let count = Math.ceil(this.getSwarmControl().params.maxPeers * this.params.peerGossipFraction);
+        let count = Math.ceil(this.getPeerControl().params.maxPeers * this.params.peerGossipFraction);
 
         if (count < this.params.minGossipPeers) {
             count = this.params.minGossipPeers;
@@ -229,14 +239,14 @@ class StateGossipAgent extends SwarmAgent {
 
         Shuffle.array(peers);
 
-        StateGossipAgent.controlLog.trace('Gossiping state to ' + count + ' peers on ' + this.swarmControl.getLocalPeer().endpoint);
+        this.controlLog.trace('Gossiping state to ' + count + ' peers on ' + this.peerNetwork.getLocalPeer().endpoint);
 
         for (let i=0; i<count; i++) {
             if (sender === undefined || sender !== peers[i].endpoint) {
                 try {
                     this.sendStateUpdate(peers[i].endpoint, agentId, state, timestamp);
                 } catch (e) {
-                    StateGossipAgent.peerMessageLog.debug('Could not gossip message to ' + peers[i].endpoint + ', send failed with: ' + e);
+                    this.peerMessageLog.debug('Could not gossip message to ' + peers[i].endpoint + ', send failed with: ' + e);
                 }
                 
             }   
@@ -251,7 +261,7 @@ class StateGossipAgent extends SwarmAgent {
         let valueReady = false;
 
         if (agent !== undefined) {
-            const stateAgent = agent as StateAgent;
+            const stateAgent = agent as StateSyncAgent;
             
             try {
                 isNew = await stateAgent.receiveRemoteState(sender, stateHash, state);
@@ -282,10 +292,10 @@ class StateGossipAgent extends SwarmAgent {
         return (cache !== undefined) && cache.indexOf(state) >= 0;
     }
 
-    sendFullSate(ep: Endpoint) {
+    sendFullState(ep: Endpoint) {
         let fullStateMessage: SendFullStateMessage = { 
             type  : GossipType.SendFullState,
-            state : new HashedMap<AgentId, Hash>(this.localState.entries())
+            state : new HashedMap<AgentId, Hash>(this.localState.entries()).toArrays()
         };
 
         this.sendMessageToPeer(ep, this.getAgentId(), fullStateMessage);
@@ -302,20 +312,22 @@ class StateGossipAgent extends SwarmAgent {
             timestamp : timestamp
         };
 
-        StateGossipAgent.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.swarmControl.getLocalPeer().endpoint + ' to ' + peerEndpoint);
+        this.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.peerNetwork.getLocalPeer().endpoint + ' to ' + peerEndpoint);
         let result = this.sendMessageToPeer(peerEndpoint, this.getAgentId(), stateUpdateMessage);
 
         if (!result) {
-            StateGossipAgent.controlLog.debug('Sending state failed!');
+            this.controlLog.debug('Sending state failed!');
         }
     }
 
     private receiveGossip(source: Endpoint, gossip: GossipMessage): void {
 
-        StateGossipAgent.peerMessageLog.debug(this.getSwarmControl().getLocalPeer().endpoint + ' received ' + gossip.type + ' from ' + source);
+        this.peerMessageLog.debug(this.getPeerControl().getLocalPeer().endpoint + ' received ' + gossip.type + ' from ' + source);
 
         if (gossip.type === GossipType.SendFullState) {
-            this.receiveFullState(source, new Map(gossip.state.entries()));
+            let state = new HashedMap<AgentId, Hash>();
+            state.fromArrays(gossip.state.hashes, gossip.state.entries);
+            this.receiveFullState(source, new Map(state.entries()));
         }
 
         if (gossip.type === GossipType.SendStateUpdate) {
@@ -326,7 +338,7 @@ class StateGossipAgent extends SwarmAgent {
         }
 
         if (gossip.type === GossipType.RequestFullState) {
-            this.sendFullSate(source);
+            this.sendFullState(source);
         }
     }
 
@@ -377,7 +389,7 @@ class StateGossipAgent extends SwarmAgent {
 
             if (shouldGossip) {
 
-                StateGossipAgent.peerMessageLog.trace('gossiping...');
+                this.peerMessageLog.trace('gossiping...');
                 this.gossipNewState(agentId, state, sender, timestamp);
             }
         }

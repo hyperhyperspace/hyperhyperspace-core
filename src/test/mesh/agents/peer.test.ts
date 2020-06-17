@@ -1,17 +1,17 @@
 import { RNGImpl } from 'crypto/random';
-import { SwarmControlAgent } from 'mesh/agents/swarm';
-import { TestSwarm } from '../mock/TestSwarm';
+import { PeerNetworkAgent } from 'mesh/agents/peer';
+import { TestPeerNetwork } from '../mock/TestPeerNetwork';
 
 
-describe('Swarm management', () => {
-    test('2-peer swarm set up', async (done) => {
+describe('Peer group management', () => {
+    test('2-peer group set up', async (done) => {
 
 
-        let swarmId = new RNGImpl().randomHexString(64);
-        let networks = TestSwarm.generate(swarmId, 2, 2, 1);
+        let peerNetworkId = new RNGImpl().randomHexString(64);
+        let networks = TestPeerNetwork.generate(peerNetworkId, 2, 2, 1);
         networks;
 
-        let control0 = networks[0].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
+        let control0 = networks[0].getAgent(PeerNetworkAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerNetworkAgent;
 
         let checks = 0;
         let stats = control0.getStats();
@@ -30,14 +30,14 @@ describe('Swarm management', () => {
 
         done();
     }, 25000);
-    test('4-peer swarm clique set up', async (done) => {
+    test('4-peer group clique set up', async (done) => {
 
 
-        let swarmId = new RNGImpl().randomHexString(64);
-        let networks = TestSwarm.generate(swarmId, 4, 4, 3);
+        let peerNetworkId = new RNGImpl().randomHexString(64);
+        let networks = TestPeerNetwork.generate(peerNetworkId, 4, 4, 3);
         networks;
 
-        let control0 = networks[0].getAgent(SwarmControlAgent.agentIdForSwarm(swarmId)) as SwarmControlAgent;
+        let control0 = networks[0].getAgent(PeerNetworkAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerNetworkAgent;
 
         let checks = 0;
         let stats = control0.getStats();

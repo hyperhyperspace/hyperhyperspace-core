@@ -104,9 +104,8 @@ class Store {
 
         let object = context.objects.get(hash) as HashedObject;
         
-        if ( !object.hasStore() ) {
-            object.setStore(this);
-        }
+        object.setStore(this);
+        object.setLastHash(hash);
 
         if (loaded === undefined) {        
 

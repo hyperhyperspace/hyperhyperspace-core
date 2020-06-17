@@ -261,7 +261,9 @@ class WebRTCConnection {
     }
 
     private handleReceiveIceCandidate(candidate: RTCIceCandidateInit) {
-        this.connection?.addIceCandidate(candidate);
+        this.connection?.addIceCandidate(candidate).catch((reason: any) => {
+            WebRTCConnection.logger.warning('Failed to set ICE candidate, reason: ' + reason);
+        });
     }
 
     private setUpChannel() {

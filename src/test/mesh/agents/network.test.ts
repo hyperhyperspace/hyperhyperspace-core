@@ -1,7 +1,7 @@
 
 import { RNGImpl } from 'crypto/random';
 import { AgentPod } from 'mesh/base/AgentPod';
-import { TestConnectionAgent } from './mock/TestConnectionAgent';
+import { TestConnectionAgent } from '../mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 
 let linkupServer = 'ws://localhost:3002';
