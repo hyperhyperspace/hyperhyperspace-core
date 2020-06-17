@@ -37,29 +37,29 @@ enum PeerConnectionStatus {
 // messages using during negotiation, before a connection has been secured:
 // (i.e. both parties have proved they have the right identity for this peer group)
 
-enum PeerControlAgentMessageType  {
+enum PeerMeshAgentMessageType  {
     PeeringOffer      = 'peering-offer',
     PeeringOfferReply = 'peering-offer-reply',
 }
 
 type PeeringOfferMessage = {
-    type: PeerControlAgentMessageType.PeeringOffer,
+    type: PeerMeshAgentMessageType.PeeringOffer,
     content: { 
-        peerNetworkId: string,
+        meshId: string,
         localIdentityHash: Hash
     }
 };
 
 type PeeringOfferReplyMessage = {
-    type: PeerControlAgentMessageType.PeeringOfferReply,
+    type: PeerMeshAgentMessageType.PeeringOfferReply,
     content: {
-        peerNetworkId: string,
+        meshId: string,
         accepted: boolean,
         localIdentityHash: Hash
     }
 };
 
-type PeerControlAgentMessage = PeeringOfferMessage | PeeringOfferReplyMessage;
+type PeerMeshAgentMessage = PeeringOfferMessage | PeeringOfferReplyMessage;
 
 
 // secured connection: 
@@ -72,7 +72,7 @@ enum SecureMessageTypes {
 
 type PeerMessage = { 
     type: SecureMessageTypes.PeerMessage,
-    peerNetworkId: string,
+    meshId: string,
     agentId: AgentId, 
     content: any
 }
@@ -82,20 +82,20 @@ type PeerMessage = {
 // these messages are used to agree on a connection to use and safely close the others.
 type ConnectionSelectionMessage = {
     type: SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection,
-    peerNetworkId: string
+    meshId: string
 }
 
 type SecureMessage = PeerMessage | ConnectionSelectionMessage;
 
 
-enum PeerNetworkEventType {
+enum PeerMeshEventType {
     NewPeer = 'new-peer'
 }
 
 type NewPeerEvent = {
-    type: PeerNetworkEventType.NewPeer,
+    type: PeerMeshEventType.NewPeer,
     content: {
-        peerNetworkId: string,
+        meshId: string,
         peer: Peer
     }
 }
@@ -113,11 +113,11 @@ type Stats = {
     connections: number;
 }
 
-class PeerNetworkAgent implements Agent {
+class PeerMeshAgent implements Agent {
 
-    static controlLog = new Logger(PeerNetworkAgent.name, LogLevel.INFO);
+    static controlLog = new Logger(PeerMeshAgent.name, LogLevel.INFO);
 
-    peerNetworkId: string;
+    meshId: string;
     localPeer: Peer;
 
     peerSource: PeerSource;
@@ -136,10 +136,10 @@ class PeerNetworkAgent implements Agent {
     tick: () => Promise<void>;
     tickTimerRef: any;
 
-    controlLog = PeerNetworkAgent.controlLog;
+    controlLog = PeerMeshAgent.controlLog;
 
-    constructor(peerNetworkId: string, localPeer: Peer, peerSource: PeerSource, params?: Partial<Params>) {
-        this.peerNetworkId = peerNetworkId;
+    constructor(meshId: string, localPeer: Peer, peerSource: PeerSource, params?: Partial<Params>) {
+        this.meshId = meshId;
         this.localPeer = localPeer;
         
         this.peerSource = peerSource;
@@ -171,11 +171,11 @@ class PeerNetworkAgent implements Agent {
     }
 
     getAgentId(): string {
-        return PeerNetworkAgent.agentIdForPeerNetwork(this.peerNetworkId);
+        return PeerMeshAgent.agentIdForPeerNetwork(this.meshId);
     }
 
     getTopic(): string {
-        return this.peerNetworkId;
+        return this.meshId;
     }
 
     getLocalPeer(): Peer {
@@ -255,7 +255,7 @@ class PeerNetworkAgent implements Agent {
 
             let peerMsg: PeerMessage = {
                 type: SecureMessageTypes.PeerMessage,
-                peerNetworkId: this.peerNetworkId,
+                meshId: this.meshId,
                 agentId: agentId,
                 content: content
             };
@@ -451,7 +451,7 @@ class PeerNetworkAgent implements Agent {
     private sendConnectionSelectionMessage(chosenConnId: ConnectionId, endpoint: Endpoint, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection)) {
         let connSelectionMsg: ConnectionSelectionMessage = {
             type: type,
-            peerNetworkId: this.peerNetworkId,
+            meshId: this.meshId,
         };
 
         let secureConnAgent = this.getSecureConnAgent();
@@ -663,7 +663,7 @@ class PeerNetworkAgent implements Agent {
         }
     }
 
-    private async onReceivingOffer(connId: ConnectionId, source: Endpoint, destination: Endpoint, peerNetworkId: string, remoteIdentityHash: Hash) {
+    private async onReceivingOffer(connId: ConnectionId, source: Endpoint, destination: Endpoint, meshId: string, remoteIdentityHash: Hash) {
         
         this.controlLog.trace(() => (this.localPeer.endpoint + ' is receiving peering offer from ' + source));
 
@@ -695,7 +695,7 @@ class PeerNetworkAgent implements Agent {
                 this.controlLog.trace('Will NOT accept!');
                 if (peer !== undefined && 
                     peer.identityHash === remoteIdentityHash &&
-                    this.peerNetworkId === peerNetworkId) {
+                    this.meshId === meshId) {
                     
                     // OK, we don't want to accept, but this is, in principle, a valid peer.
                     // Send a rejection below.
@@ -706,7 +706,7 @@ class PeerNetworkAgent implements Agent {
         } else { // pc !== undefined
                  // OK, we had previous state - if everything checks up, accept.
 
-            if (peerNetworkId === this.peerNetworkId &&
+            if (meshId === this.meshId &&
                 pc.status === PeerConnectionStatus.WaitingForOffer &&
                 source === pc.peer.endpoint &&
                 destination === this.localPeer.endpoint &&
@@ -745,11 +745,11 @@ class PeerNetworkAgent implements Agent {
         }
     }
 
-    private onReceivingOfferReply(connId: ConnectionId, source: Endpoint, destination: Endpoint, peerNetworkId: string, remoteIdentityHash: Hash, accepted: boolean) {
+    private onReceivingOfferReply(connId: ConnectionId, source: Endpoint, destination: Endpoint, meshId: string, remoteIdentityHash: Hash, accepted: boolean) {
         let pc = this.connections.get(connId);
 
         if (pc !== undefined &&
-            peerNetworkId === this.peerNetworkId &&
+            meshId === this.meshId &&
             pc.status === PeerConnectionStatus.OfferSent &&
             source === pc.peer.endpoint &&
             destination === this.localPeer.endpoint && 
@@ -787,9 +787,9 @@ class PeerNetworkAgent implements Agent {
 
     private sendOffer(pc: PeerConnection) {
         let message: PeeringOfferMessage = {
-            type: PeerControlAgentMessageType.PeeringOffer,
+            type: PeerMeshAgentMessageType.PeeringOffer,
             content: {
-                peerNetworkId: this.peerNetworkId,
+                meshId: this.meshId,
                 localIdentityHash: this.localPeer.identityHash
             }
         };
@@ -801,9 +801,9 @@ class PeerNetworkAgent implements Agent {
 
     private sendOfferReply(connId: ConnectionId, accept: boolean) {
         let message: PeeringOfferReplyMessage = {
-            type: PeerControlAgentMessageType.PeeringOfferReply,
+            type: PeerMeshAgentMessageType.PeeringOfferReply,
             content: {
-                 peerNetworkId: this.peerNetworkId,
+                 meshId: this.meshId,
                  localIdentityHash: this.localPeer.identityHash,
                  accepted: accept
             }
@@ -816,10 +816,10 @@ class PeerNetworkAgent implements Agent {
 
     // handle of peer message reception
 
-    private onPeerMessage(connId: ConnectionId, sender: Hash, recipient: Hash, peerNetworkId: string, agentId: AgentId, message: any) {
+    private onPeerMessage(connId: ConnectionId, sender: Hash, recipient: Hash, meshId: string, agentId: AgentId, message: any) {
         let pc = this.connections.get(connId);
 
-        if (peerNetworkId === this.peerNetworkId &&
+        if (meshId === this.meshId &&
             pc !== undefined && pc.status === PeerConnectionStatus.Ready &&
             pc.peer.identityHash === sender && this.localPeer.identityHash === recipient) {
 
@@ -837,9 +837,9 @@ class PeerNetworkAgent implements Agent {
     // them to agree on a connection to use, and safely close the rest.
 
     
-    private onConnectionSelection(connId: ConnectionId, sender: Hash, recipient: Hash, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection), peerNetworkId: string) {
+    private onConnectionSelection(connId: ConnectionId, sender: Hash, recipient: Hash, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection), meshId: string) {
         
-        connId; sender; recipient; type; peerNetworkId;
+        connId; sender; recipient; type; meshId;
 
         let pc = this.connections.get(connId);
 
@@ -915,9 +915,9 @@ class PeerNetworkAgent implements Agent {
             let payload: SecureMessage = secMsgEv.content.payload;
 
             if (payload.type === SecureMessageTypes.PeerMessage) {
-                this.onPeerMessage(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.peerNetworkId, payload.agentId, payload.content);
+                this.onPeerMessage(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.meshId, payload.agentId, payload.content);
             } else if (payload.type === SecureMessageTypes.ChooseConnection || payload.type === SecureMessageTypes.ConfirmChosenConnection) {
-                this.onConnectionSelection(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.type, payload.peerNetworkId);
+                this.onConnectionSelection(secMsgEv.content.connId, secMsgEv.content.sender, secMsgEv.content.recipient, payload.type, payload.meshId);
             }
         } else if (ev.type === NetworkEventType.MessageReceived) {
             let msgEv = ev as MessageReceivedEvent;
@@ -927,16 +927,16 @@ class PeerNetworkAgent implements Agent {
 
     receiveMessage(connId: ConnectionId, source: Endpoint, destination: Endpoint, content: any): void {
         
-        let message = content as PeerControlAgentMessage;
+        let message = content as PeerMeshAgentMessage;
 
-        if (message.type === PeerControlAgentMessageType.PeeringOffer) {
+        if (message.type === PeerMeshAgentMessageType.PeeringOffer) {
             let offer = (content as PeeringOfferMessage).content;
 
-            this.onReceivingOffer(connId, source, destination, offer.peerNetworkId, offer.localIdentityHash);
-        } else if (message.type === PeerControlAgentMessageType.PeeringOfferReply) {
+            this.onReceivingOffer(connId, source, destination, offer.meshId, offer.localIdentityHash);
+        } else if (message.type === PeerMeshAgentMessageType.PeeringOfferReply) {
             let offerReply = (content as PeeringOfferReplyMessage).content;
 
-            this.onReceivingOfferReply(connId, source, destination, offerReply.peerNetworkId, offerReply.localIdentityHash, offerReply.accepted);
+            this.onReceivingOfferReply(connId, source, destination, offerReply.meshId, offerReply.localIdentityHash, offerReply.accepted);
         }
 
     }
@@ -945,9 +945,9 @@ class PeerNetworkAgent implements Agent {
 
     private broadcastNewPeerEvent(peer: Peer) {
         let ev: NewPeerEvent = {
-            type: PeerNetworkEventType.NewPeer,
+            type: PeerMeshEventType.NewPeer,
             content: {
-                peerNetworkId: this.peerNetworkId,
+                meshId: this.meshId,
                 peer: peer
             }
         };
@@ -969,10 +969,10 @@ class PeerNetworkAgent implements Agent {
         return this.getLocalAgent(SecureNetworkAgent.Id) as SecureNetworkAgent;
     }
 
-    static agentIdForPeerNetwork(peerNetworkId: string) {
-        return 'peer-control-for-' + peerNetworkId;
+    static agentIdForPeerNetwork(meshId: string) {
+        return 'peer-control-for-' + meshId;
     }
 
 }
 
-export { PeerNetworkAgent, Peer, PeerNetworkEventType, NewPeerEvent };
+export { PeerMeshAgent, Peer, PeerMeshEventType, NewPeerEvent };

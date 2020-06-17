@@ -1,5 +1,5 @@
 import { Endpoint } from '../network/NetworkAgent';
-import { Peer } from './PeerNetworkAgent';
+import { Peer } from './PeerMeshAgent';
 
 interface PeerSource {
 

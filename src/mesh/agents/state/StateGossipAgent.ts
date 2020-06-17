@@ -11,7 +11,7 @@ import { HashedMap } from 'data/model/HashedMap';
 import { Hash, HashedObject } from 'data/model';
 import { Shuffle } from 'util/shuffling';
 import { Logger, LogLevel } from 'util/logging';
-import { PeerNetworkAgent, PeerNetworkEventType, NewPeerEvent } from '../peer/PeerNetworkAgent';
+import { PeerMeshAgent, PeerMeshEventType, NewPeerEvent } from '../peer/PeerMeshAgent';
 
 
 enum GossipType {
@@ -93,7 +93,7 @@ class StateGossipAgent extends PeeringAgent {
     peerMessageLog = StateGossipAgent.peerMessageLog;
     controlLog     = StateGossipAgent.controlLog;
 
-    constructor(topic: string, peerNetwork: PeerNetworkAgent) {
+    constructor(topic: string, peerNetwork: PeerMeshAgent) {
         super(peerNetwork);
         this.topic = topic;
 
@@ -166,10 +166,10 @@ class StateGossipAgent extends PeeringAgent {
             let updateEv = ev as AgentStateUpdateEvent;
 
             this.localAgentStateUpdate(updateEv.content.agentId, updateEv.content.state);
-        } else if (ev.type === PeerNetworkEventType.NewPeer) {
+        } else if (ev.type === PeerMeshEventType.NewPeer) {
             let newPeerEv = ev as NewPeerEvent;
 
-            if (newPeerEv.content.peerNetworkId === this.peerNetwork.peerNetworkId) {
+            if (newPeerEv.content.meshId === this.peerNetwork.meshId) {
                 this.sendFullState(newPeerEv.content.peer.endpoint);
             }
             

@@ -1,4 +1,4 @@
-import { PeerNetworkAgent } from './PeerNetworkAgent';
+import { PeerMeshAgent } from './PeerMeshAgent';
 import { Agent, AgentId } from '../../base/Agent';
 import { AgentPod, Event } from '../../base/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
@@ -7,9 +7,9 @@ import { Hash } from 'data/model';
 
 abstract class PeeringAgent implements Agent {
 
-    peerNetwork: PeerNetworkAgent;
+    peerNetwork: PeerMeshAgent;
 
-    constructor(peerNetwork: PeerNetworkAgent) {
+    constructor(peerNetwork: PeerMeshAgent) {
         this.peerNetwork = peerNetwork;
     }
 

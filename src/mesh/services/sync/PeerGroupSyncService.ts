@@ -1,7 +1,7 @@
 import { AgentPod } from '../../base/AgentPod';
 import { NetworkAgent } from '../../agents/network';
 import { SecureNetworkAgent } from '../../agents/network/SecureNetworkAgent';
-import { PeerNetworkAgent, Peer, PeerSource } from '../../agents/peer';
+import { PeerMeshAgent, Peer, PeerSource } from '../../agents/peer';
 import { MutableObject, Hash, HashedObject } from 'data/model';
 import { StateGossipAgent, StateSyncAgent } from 'mesh/agents/state';
 
@@ -20,7 +20,7 @@ class PeerGroupSyncService {
 
     network       : NetworkAgent;
     secureNetwork : SecureNetworkAgent;
-    peerNetwork   : PeerNetworkAgent;
+    peerNetwork   : PeerMeshAgent;
     gossip        : StateGossipAgent;
 
     syncAgents    : Map<Hash, StateSyncAgent>;
@@ -38,7 +38,7 @@ class PeerGroupSyncService {
 
         this.network       = new NetworkAgent();
         this.secureNetwork = new SecureNetworkAgent();
-        this.peerNetwork   = new PeerNetworkAgent(this.groupId, this.localPeer, this.peerSource);
+        this.peerNetwork   = new PeerMeshAgent(this.groupId, this.localPeer, this.peerSource);
         this.gossip        = new StateGossipAgent('gossip-for' + this.groupId, this.peerNetwork);
 
         this.syncAgents = new Map();
@@ -76,7 +76,7 @@ class PeerGroupSyncService {
 
         if (syncAgent === undefined) {
             this.objects.set(hash, mut);
-            syncAgent = mut.createSyncAgent(this.peerNetwork as PeerNetworkAgent);
+            syncAgent = mut.createSyncAgent(this.peerNetwork as PeerMeshAgent);
             this.syncAgents.set(hash, syncAgent);
         }
 

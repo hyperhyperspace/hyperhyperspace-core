@@ -5,7 +5,7 @@ import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
 import { Logger, LogLevel } from 'util/logging';
 import { StateSyncAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
-import { PeerNetworkAgent } from 'mesh/agents/peer';
+import { PeerMeshAgent } from 'mesh/agents/peer';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
@@ -287,7 +287,7 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
-    createSyncAgent(peerNetwork: PeerNetworkAgent) : StateSyncAgent {
+    createSyncAgent(peerNetwork: PeerMeshAgent) : StateSyncAgent {
 
         return new TerminalOpsSyncAgent(peerNetwork, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }

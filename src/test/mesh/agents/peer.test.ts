@@ -1,5 +1,5 @@
 import { RNGImpl } from 'crypto/random';
-import { PeerNetworkAgent } from 'mesh/agents/peer';
+import { PeerMeshAgent } from 'mesh/agents/peer';
 import { TestPeerNetwork } from '../mock/TestPeerNetwork';
 
 
@@ -11,7 +11,7 @@ describe('Peer group management', () => {
         let networks = TestPeerNetwork.generate(peerNetworkId, 2, 2, 1);
         networks;
 
-        let control0 = networks[0].getAgent(PeerNetworkAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerNetworkAgent;
+        let control0 = networks[0].getAgent(PeerMeshAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerMeshAgent;
 
         let checks = 0;
         let stats = control0.getStats();
@@ -37,7 +37,7 @@ describe('Peer group management', () => {
         let networks = TestPeerNetwork.generate(peerNetworkId, 4, 4, 3);
         networks;
 
-        let control0 = networks[0].getAgent(PeerNetworkAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerNetworkAgent;
+        let control0 = networks[0].getAgent(PeerMeshAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerMeshAgent;
 
         let checks = 0;
         let stats = control0.getStats();

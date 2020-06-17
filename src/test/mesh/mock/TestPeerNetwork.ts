@@ -1,5 +1,5 @@
 import { AgentPod } from 'mesh/base/AgentPod';
-import { Peer, PeerNetworkAgent } from 'mesh/agents/peer';
+import { Peer, PeerMeshAgent } from 'mesh/agents/peer';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { TestPeerSource } from './TestPeerSource';
 import { RNGImpl } from 'crypto/random';
@@ -36,7 +36,7 @@ class TestPeerNetwork {
             let secureConn = new SecureNetworkAgent();
             pod.registerAgent(secureConn);
             
-            let peerNetwork = new PeerNetworkAgent(topic, peers[i], peerSource, { maxPeers: peerConnCount, minPeers: peerConnCount });
+            let peerNetwork = new PeerMeshAgent(topic, peers[i], peerSource, { maxPeers: peerConnCount, minPeers: peerConnCount });
             pod.registerAgent(peerNetwork);
             pods.push(pod);
         }

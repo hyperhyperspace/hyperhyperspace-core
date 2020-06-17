@@ -12,7 +12,7 @@ import { StateSyncAgent } from './StateSyncAgent';
 import { TerminalOpsState } from './TerminalOpsState';
 import { Logger, LogLevel } from 'util/logging';
 import { PeeringAgent } from '../peer/PeeringAgent';
-import { PeerNetworkAgent } from '../peer/PeerNetworkAgent';
+import { PeerMeshAgent } from '../peer/PeerMeshAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
 
@@ -103,7 +103,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
     peerMessageLog = TerminalOpsSyncAgent.peerMessageLog;
     opTransferLog  = TerminalOpsSyncAgent.opTransferLog;
 
-    constructor(peerNetwork: PeerNetworkAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
+    constructor(peerNetwork: PeerMeshAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
         super(peerNetwork);
 
         if (params === undefined) {
