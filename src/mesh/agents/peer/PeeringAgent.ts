@@ -7,10 +7,10 @@ import { Hash } from 'data/model';
 
 abstract class PeeringAgent implements Agent {
 
-    peerNetwork: PeerMeshAgent;
+    peerMesh: PeerMeshAgent;
 
     constructor(peerNetwork: PeerMeshAgent) {
-        this.peerNetwork = peerNetwork;
+        this.peerMesh = peerNetwork;
     }
 
     abstract getAgentId(): string;
@@ -21,11 +21,11 @@ abstract class PeeringAgent implements Agent {
     }
     
     getPeerControl() {
-        return this.peerNetwork;
+        return this.peerMesh;
     }
 
     sendMessageToPeer(destination: Endpoint, agentId: AgentId, content: any) : boolean {
-        return this.peerNetwork.sendToPeer(destination, agentId, content);
+        return this.peerMesh.sendToPeer(destination, agentId, content);
     }
 
     abstract receivePeerMessage(source: Endpoint, sender: Hash, recipient: Hash, content: any) : void;

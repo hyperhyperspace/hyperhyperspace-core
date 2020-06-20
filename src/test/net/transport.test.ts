@@ -1,15 +1,16 @@
 
 import { WebRTCConnection } from 'net/transport';
 import { LinkupManager, LinkupAddress } from 'net/linkup';
+import { describeProxy } from 'test/config';
 
-describe('Transports', () => {
+describeProxy('Transports', () => {
 
     test('WebRTC send / answer', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
-        //let linkupServer2 = 'wss://mypeer.net:443';
-        let linkupServer1 = 'ws://localhost:3002';
+        //let linkupServer2 = LinkupManager.defaultLinkupServer;
+        let linkupServer1 = LinkupManager.defaultLinkupServer;
 
         let address1 = new LinkupAddress(linkupServer1, 'addressOne_C');
         let address2 = new LinkupAddress(linkupServer1, 'addressTwo_C');

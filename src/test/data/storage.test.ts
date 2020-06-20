@@ -3,9 +3,10 @@ import { HashedObject, HashedSet, HashReference, MutationOp } from 'data/model';
 
 import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
 import { SomethingMutable, SomeMutation } from './types/SomethingMutable';
+import { describeProxy } from 'test/config';
 
 
-describe('Storage', () => {
+describeProxy('Storage', () => {
     test('Indexeddb-based save / load cycle', async () => {
         let objects = createHashedObjects();
 

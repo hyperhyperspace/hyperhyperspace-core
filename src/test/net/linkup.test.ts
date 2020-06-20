@@ -1,12 +1,13 @@
 import { LinkupManager, LinkupAddress } from 'net/linkup';
+import { describeProxy } from 'test/config';
 
-describe('Single-host LinkupManager', () => {
+describeProxy('Single-host LinkupManager', () => {
     test('Call starting', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
-        let address1 = new LinkupAddress(/*'wss://mypeer.net:443'*/'wss://mypeer.net:443', 'addressOne_A');
-        let address2 = new LinkupAddress(/*'wss://mypeer.net:443'*/'wss://mypeer.net:443', 'addressTwo_A');
+        let address1 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressOne_A');
+        let address2 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressTwo_A');
 
         let callId = 'DUMMY_CALL_ID_TEST_A';
         let message = 'MESSAGE';
@@ -31,14 +32,14 @@ describe('Single-host LinkupManager', () => {
 
         
 
-    }, 10000);
+    }, 20000);
 
     test('Call answering', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
-        let address1 = new LinkupAddress(/*'wss://mypeer.net:443'*/'wss://mypeer.net:443', 'addressOne_B');
-        let address2 = new LinkupAddress(/*'wss://mypeer.net:443'*/'wss://mypeer.net:443', 'addressTwo_B');
+        let address1 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressOne_B');
+        let address2 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressTwo_B');
 
         let callId =  'DUMMY_CALL_ID_TEST_B';
         let message = 'MESSAGE';
@@ -70,5 +71,5 @@ describe('Single-host LinkupManager', () => {
 
         
 
-    }, 10000);
+    }, 20000);
 });

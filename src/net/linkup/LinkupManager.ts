@@ -5,6 +5,9 @@ import { LinkupServerConnection, NewCallMessageCallback, MessageCallback, Linku
 type QueryCallback = (queryId: string, listening: Array<LinkupAddress>) => void;
 
 class LinkupManager {
+
+    static defaultLinkupServer = 'wss://mypeer.net:443';
+
     serverConnections : Map<string, LinkupServerConnection>;
 
     serverQueryCallback : LinkupIdQueryCallback;

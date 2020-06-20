@@ -1,6 +1,7 @@
 import { RNG, RNGImpl } from 'crypto/random';
+import { describeProxy } from 'test/config';
 
-describe('RNG', () => {
+describeProxy('RNG', () => {
     test('Basic RNG length test', () => {
         let rng : RNG = new RNGImpl();
         for (let i=0; i<16; i++) {

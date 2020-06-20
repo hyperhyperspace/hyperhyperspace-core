@@ -124,7 +124,12 @@ class NetworkAgent implements Agent {
 
             const message = JSON.parse(data);
 
-            if (connInfo !== undefined) {                
+            if (connInfo !== undefined) {           
+                
+                if (connInfo.status !== ConnectionStatus.Ready) {
+                    this.connectionReadyCallback(conn);
+                }
+
                 if (message.connectionId !== undefined) {
                     
                     // plain message, not peer to peer yet.
@@ -145,18 +150,22 @@ class NetworkAgent implements Agent {
             if (connInfo === undefined) {
                 conn.close();
             } else {
-                this.connections.set(connectionId, conn);
-                connInfo.status = ConnectionStatus.Ready;
-                const ev: ConnectionStatusChangeEvent = {
-                    type: NetworkEventType.ConnectionStatusChange, 
-                    content: {
-                        connId          : connectionId,
-                        localEndpoint   : connInfo.localEndpoint,
-                        remoteEndpoint  : connInfo.remoteEndpoint,
-                        status          : ConnectionStatus.Ready
-                    }
-                };
-                this.pod?.broadcastEvent(ev);
+
+                if (connInfo.status !== ConnectionStatus.Ready) {
+                    this.connections.set(connectionId, conn);
+                    connInfo.status = ConnectionStatus.Ready;
+                    const ev: ConnectionStatusChangeEvent = {
+                        type: NetworkEventType.ConnectionStatusChange, 
+                        content: {
+                            connId          : connectionId,
+                            localEndpoint   : connInfo.localEndpoint,
+                            remoteEndpoint  : connInfo.remoteEndpoint,
+                            status          : ConnectionStatus.Ready
+                        }
+                    };
+                    this.pod?.broadcastEvent(ev);
+                }
+
             }
         }
 

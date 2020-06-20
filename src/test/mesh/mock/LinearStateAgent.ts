@@ -196,7 +196,7 @@ class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
             type: MessageType.RequestState
         }
 
-        this.peerNetwork.sendToPeer(endpoint, this.getAgentId(), requestStateMessage);
+        this.peerMesh.sendToPeer(endpoint, this.getAgentId(), requestStateMessage);
     }
 
     private sendState(endpoint: Endpoint) {
@@ -205,7 +205,7 @@ class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
             state: (this.state as LinearState).toLiteral()
         }
 
-        this.peerNetwork.sendToPeer(endpoint, this.getAgentId(), sendStateMessage);
+        this.peerMesh.sendToPeer(endpoint, this.getAgentId(), sendStateMessage);
     }
 
 }

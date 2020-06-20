@@ -1,9 +1,9 @@
 import { RSAPublicKey as _PK } from 'data/identity';
 import { HashedObject } from 'data/model';
 import { TestIdentity } from './types/TestIdentity';
+import { describeProxy } from '../config';
 
-
-describe('Identity', () => {
+describeProxy('Identity', () => {
     test( 'Basic identity', () => {
 
         let keyPair = TestIdentity.getFistTestKeyPair();

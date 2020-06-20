@@ -3,10 +3,12 @@ import { RNGImpl } from 'crypto/random';
 import { AgentPod } from 'mesh/base/AgentPod';
 import { TestConnectionAgent } from '../mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
+import { LinkupManager } from 'net/linkup';
+import { describeProxy } from 'test/config';
 
-let linkupServer = 'wss://mypeer.net:443';
+let linkupServer = LinkupManager.defaultLinkupServer;
 
-describe('Basic networking', () => {
+describeProxy('Basic networking', () => {
 
     test('2-node network test', async (done) => {
 

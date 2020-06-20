@@ -131,10 +131,10 @@ class StateGossipAgent extends PeeringAgent {
         this.localState.set(agentId, hash);
        
         if (shouldGossip) {
-            this.controlLog.trace('Gossiping state ' + hash + ' from ' + this.peerNetwork.getLocalPeer().endpoint);
+            this.controlLog.trace('Gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
             this.gossipNewState(agentId, state);
         } else {
-            this.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.peerNetwork.getLocalPeer().endpoint);
+            this.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
         }
     }
 
@@ -169,7 +169,8 @@ class StateGossipAgent extends PeeringAgent {
         } else if (ev.type === PeerMeshEventType.NewPeer) {
             let newPeerEv = ev as NewPeerEvent;
 
-            if (newPeerEv.content.meshId === this.peerNetwork.meshId) {
+            if (newPeerEv.content.meshId === this.peerMesh.meshId) {
+                this.controlLog.trace(this.peerMesh.localPeer.endpoint + ' detected new peer: ' + newPeerEv.content.peer.endpoint)
                 this.sendFullState(newPeerEv.content.peer.endpoint);
             }
             
@@ -239,7 +240,7 @@ class StateGossipAgent extends PeeringAgent {
 
         Shuffle.array(peers);
 
-        this.controlLog.trace('Gossiping state to ' + count + ' peers on ' + this.peerNetwork.getLocalPeer().endpoint);
+        this.controlLog.trace('Gossiping state to ' + count + ' peers on ' + this.peerMesh.getLocalPeer().endpoint);
 
         for (let i=0; i<count; i++) {
             if (sender === undefined || sender !== peers[i].endpoint) {
@@ -293,6 +294,7 @@ class StateGossipAgent extends PeeringAgent {
     }
 
     sendFullState(ep: Endpoint) {
+
         let fullStateMessage: SendFullStateMessage = { 
             type  : GossipType.SendFullState,
             state : new HashedMap<AgentId, Hash>(this.localState.entries()).toArrays()
@@ -312,7 +314,7 @@ class StateGossipAgent extends PeeringAgent {
             timestamp : timestamp
         };
 
-        this.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.peerNetwork.getLocalPeer().endpoint + ' to ' + peerEndpoint);
+        this.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.peerMesh.getLocalPeer().endpoint + ' to ' + peerEndpoint);
         let result = this.sendMessageToPeer(peerEndpoint, this.getAgentId(), stateUpdateMessage);
 
         if (!result) {

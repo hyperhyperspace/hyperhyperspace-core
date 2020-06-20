@@ -9,13 +9,14 @@ import { Store, IdbBackend } from 'data/storage';
 import { MutableSet } from 'data/collections';
 import { Identity } from 'data/identity';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state/TerminalOpsSyncAgent';
+import { describeProxy } from 'test/config';
 
-describe('State sync', () => {
+describeProxy('State sync', () => {
     test('Gossip agent in small peer group', async (done) => {
 
-        let topic = new RNGImpl().randomHexString(64);
+        let meshId = new RNGImpl().randomHexString(64);
 
-        let pods = TestPeerNetwork.generate(topic, 3, 3, 2);
+        let pods = TestPeerNetwork.generate(meshId, 3, 3, 2);
 
         const objCount = 3;
         const objIds   = new Array<Hash>();
@@ -24,8 +25,8 @@ describe('State sync', () => {
         }
 
         for (const pod of pods) {
-            const peerNetwork = pod.getAgent(PeerMeshAgent.agentIdForPeerNetwork(topic)) as PeerMeshAgent;
-            const gossip = new StateGossipAgent(topic, peerNetwork);
+            const peerNetwork = pod.getAgent(PeerMeshAgent.agentIdForMesh(meshId)) as PeerMeshAgent;
+            const gossip = new StateGossipAgent(meshId, peerNetwork);
             pod.registerAgent(gossip);
             for (let i=0; i<objCount; i++) {
                 let agent = new LinearStateAgent(objIds[i], peerNetwork);
@@ -67,7 +68,7 @@ describe('State sync', () => {
 
             let finished = false;
             let checks = 0;
-            while (! finished && checks < 10) {
+            while (! finished && checks < 100) {
                 
                 await new Promise(r => { window.setTimeout( r, 50); });
     
@@ -97,7 +98,7 @@ describe('State sync', () => {
         }
 
         done();
-    });
+    }, 35000);
 
     test('Terminal ops agent-based set sync in small peer group', async (done) => {
 
@@ -110,7 +111,7 @@ describe('State sync', () => {
         let stores : Array<Store> = [];
         
         for (let i=0; i<size; i++) {
-            const peerNetwork = pods[i].getAgent(PeerMeshAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerMeshAgent;
+            const peerNetwork = pods[i].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent;
             const store = new Store(new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
             stores.push(store);
             let gossip = new StateGossipAgent(peerNetworkId, peerNetwork);
@@ -129,8 +130,8 @@ describe('State sync', () => {
         await stores[0].save(s);
 
         for (let i=0; i<size; i++) {
-            const peerNetwork = pods[i].getAgent(PeerMeshAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerMeshAgent;
-            let agent = new TerminalOpsSyncAgent(peerNetwork, s.hash(), stores[i], MutableSet.opClasses);
+            const meshAgent = pods[i].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent;
+            let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
             //agent;
             pods[i].registerAgent(agent);
         }
@@ -159,34 +160,55 @@ describe('State sync', () => {
 
         //TestTopology.waitForPeers(swarms, size - 1);
 
-        let replicated = false;
+        let meshReady = false;
 
         let count = 0;
 
-        while (!replicated && count < 200) {
-
+        while (!meshReady && count < 400) {
             await new Promise(r => setTimeout(r, 50));
-
-            const sr = await stores[size-1].load(s.hash()) as MutableSet<Identity> | undefined;
-
-            if (sr !== undefined) {
-                
-                
-                await sr.loadAllOpsFromStore();
-                replicated = sr.size() === 1;
-                //for (const elmt of sr.values()) {
-                    //console.log('FOUND ELMT:');
-                    //console.log(elmt);
-                //}
-            }
-
+            const meshAgent = pods[size-1].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent
+            meshReady = meshAgent.getPeers().length === (size-1);
+            //console.log(count + '. peers: ' + meshAgent.getPeers().length);
             count = count + 1;
         }
 
+
+        let replicated = false;
+
+        if (meshReady) {
+            count = 0;
+
+            while (!replicated && count < 200) {
+    
+                await new Promise(r => setTimeout(r, 50));
+    
+                const sr = await stores[size-1].load(s.hash()) as MutableSet<Identity> | undefined;
+    
+                if (sr !== undefined) {
+                    
+                    
+                    await sr.loadAllOpsFromStore();
+                    replicated = sr.size() === 1;
+                    //for (const elmt of sr.values()) {
+                        //console.log('FOUND ELMT:');
+                        //console.log(elmt);
+                    //}
+                }
+    
+                count = count + 1;
+            }
+        }
+
+
+
+        //const meshAgent = pods[0].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent
+        //expect(meshAgent.getPeers().length).toEqual(size-1);
+
+        expect(meshReady).toBeTruthy();
         expect(replicated).toBeTruthy();
 
         done();
     
 
-    }, 20000);
+    }, 35000);
 });

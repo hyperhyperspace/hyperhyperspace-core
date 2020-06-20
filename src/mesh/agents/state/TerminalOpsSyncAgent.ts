@@ -109,7 +109,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         if (params === undefined) {
             params = {
                 sendTimeout: 60,
-                receiveTimeout: 60 + 15,
+                receiveTimeout: 120,
                 incompleteOpTimeout: 3600
             };
         }
@@ -122,7 +122,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
 
         this.opCallback = async (opHash: Hash) => {
 
-            this.opTransferLog.debug('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.peerNetwork.getLocalPeer().endpoint);
+            this.opTransferLog.debug('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.peerMesh.getLocalPeer().endpoint);
 
             let op = await this.store.load(opHash) as MutationOp;
             if (this.shouldAcceptMutationOp(op)) {
@@ -180,6 +180,8 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
 
                 // do something with
 
+                this.controlLog.warning('fetching of object with hash ' + hash + ' has timed out');
+
                 hash;
             }
 
@@ -214,8 +216,8 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         
         this.controlLog.debug(
               'Starting for object ' + this.objHash + 
-              ' on ep ' + this.peerNetwork.getLocalPeer().endpoint + 
-              ' (topic: ' + this.peerNetwork.getTopic() + ')');
+              ' on ep ' + this.peerMesh.getLocalPeer().endpoint + 
+              ' (topic: ' + this.peerMesh.getTopic() + ')');
         
         this.pod = pod;
         this.loadStoredState();
@@ -321,7 +323,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         const stateHash = state.hash();
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
-            this.controlLog.debug('Found new state ' + stateHash + ' for ' + this.objHash + ' in ' + this.peerNetwork.getLocalPeer().endpoint);
+            this.controlLog.debug('Found new state ' + stateHash + ' for ' + this.objHash + ' in ' + this.peerMesh.getLocalPeer().endpoint);
             this.state = state;
             this.stateHash = stateHash;
             let stateUpdate: AgentStateUpdateEvent = {
@@ -482,7 +484,10 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         let obj = HashedObject.fromContext(context, hash);
 
         if (this.shouldAcceptMutationOp(obj as MutationOp)) {
+            this.controlLog.trace(() => 'saving object with hash ' + hash + ' in ' + this.peerMesh.localPeer.endpoint);
             await this.store.save(obj);
+        } else {
+            this.controlLog.warning(() => 'NOT saving object with hash ' + hash + ' in ' + this.peerMesh.localPeer.endpoint + ', it has the wrong type for a mutation op.');
         }
 
         let destinations = this.outgoingObjects.get(hash);
@@ -505,8 +510,11 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                 try {
                     this.processReceivedObject(opHash, context);
                 // TODO: catch error, log, report bad peer?
+                } catch(e) { 
+                    this.controlLog.warning('could not process received object with hash ' + hash + ', error is: ' + e);
                 } finally {
                     this.incompleteOps.delete(opHash);
+                    
                 }
             }
         }
@@ -529,6 +537,8 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         if (context.checkRootHashes() && context.checkLiteralHashes()) {
 
             for (const hash of context.rootHashes) {
+
+                this.controlLog.trace(() => 'processing incoming object with hash ' + hash);
                 
                 const incoming = this.incomingObjects.get(hash)?.get(source);
 
@@ -541,6 +551,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                             let dep = await this.store.load(depHash);
                             if (dep === undefined || dep.hash(secret) !== ownershipProofForHash.get(depHash)) {
                                 if (dep !== undefined) {
+                                    this.controlLog.trace('missing valid ownership proof for ' + hash);
                                     // TODO: log / report invalid ownership proof
                                 }
                                 toRequest.push({hash: depHash, dependencyChain: depChain});
@@ -550,11 +561,15 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                         }
                         
                         if (toRequest.length === 0) {
+                            this.controlLog.trace('received object with hash ' + hash + ' is complete, about to process');
                             this.processReceivedObject(hash, context);
                         } else {
-
+                            
                             if (this.shouldAcceptMutationOpLiteral(context.literals.get(hash) as Literal)) {
+                                this.controlLog.trace('received object with hash ' + hash + ' is incomplete, about to process');
                                 this.processIncompleteOp(source, hash, context, toRequest);
+                            } else {
+                                this.controlLog.warning('received object with hash ' + hash + ' has the wrong type for a mutation op, ignoring');
                             }
 
                             this.sendRequestObjsMessage(source, toRequest);
@@ -565,11 +580,20 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                     }
                     this.incomingObjects.delete(hash);
                 } else {
+                    
                     // TODO: report missing or incorrect incoming object entry
+                    if (incoming === undefined) {
+                        this.controlLog.warning('missing incoming object entry for hash ' + hash + ' in object sent by ' + source);
+                    } else {
+                        this.controlLog.warning('icnoming object secret mismatch, expected: ' + secret + ', received: ' + incoming.secret);
+                    }
+                    
                 }
             }
         } else {
             // TODO: report invalid context somewhere
+            this.controlLog.warning('received invalid context from ' + source + ' with rootHashes ' + context?.rootHashes)
+            
         }
     }
 

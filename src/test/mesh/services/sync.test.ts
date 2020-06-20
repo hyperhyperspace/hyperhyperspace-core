@@ -8,8 +8,9 @@ import { SamplePeerSource } from '../types/SamplePeerSource';
 import { MutableSet } from 'data/collections';
 import { Logger, LogLevel } from 'util/logging';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state';
+import { describeProxy } from 'test/config';
 
-describe('Sync services', () => {
+describeProxy('Sync services', () => {
 
     test('2-node sync service test', async (done) => {
 
@@ -61,26 +62,27 @@ describe('Sync services', () => {
         peers = await stores[1].load(peers.hash()) as MutableSet<SamplePeer>;
 
         let logger = new Logger('2-sync test');
-        logger.setLevel(LogLevel.INFO);
+        logger.setLevel(LogLevel.TRACE);
 
         {
             let gossip = syncServices[0].gossip;
             gossip;
-            //gossip.controlLog     = logger;
-            //gossip.peerMessageLog = logger;
+            gossip.controlLog     = logger;
+            gossip.peerMessageLog = logger;
         }
 
         {
             let peersSync = syncServices[0].syncAgents.get(peers.hash()) as TerminalOpsSyncAgent;
             peersSync;
-            //peersSync.controlLog     = logger;
-            //peersSync.peerMessageLog = logger;
-            //peersSync.opTransferLog  = logger;
+            peersSync.controlLog     = logger;
+            peersSync.peerMessageLog = logger;
+            peersSync.opTransferLog  = logger;
         }
 
         {
             let peerNetwork = syncServices[0].peerNetwork;
-            peerNetwork.controlLog = logger;
+            peerNetwork;
+            //peerNetwork.controlLog = logger;
         }
         
         syncServices[0].start();
@@ -94,7 +96,7 @@ describe('Sync services', () => {
         await peers.loadAllOpsFromStore();
 
         let ticks = 0;
-        while (peers.size() < 2 && ticks++ < 200) {
+        while (peers.size() < 2 && ticks++ < 400) {
             await new Promise(r => setTimeout(r, 50));
             await peers.loadAllOpsFromStore();
         }

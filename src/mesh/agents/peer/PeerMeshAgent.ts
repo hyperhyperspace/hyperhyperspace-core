@@ -166,12 +166,12 @@ class PeerMeshAgent implements Agent {
         this.tick = async () => {
             this.cleanUp();
             this.queryForOnlinePeers();
-            this.deduplicateConnections();
+            if (false) { this.deduplicateConnections() };
         };
     }
 
     getAgentId(): string {
-        return PeerMeshAgent.agentIdForPeerNetwork(this.meshId);
+        return PeerMeshAgent.agentIdForMesh(this.meshId);
     }
 
     getTopic(): string {
@@ -372,7 +372,7 @@ class PeerMeshAgent implements Agent {
             }
 
             if (endpoints.length > 0) {
-                this.controlLog.trace(() => ('Querying for online endpoints: '  + endpoints.map((ep: Endpoint) => LinkupAddress.fromURL(ep))));
+                this.controlLog.trace(() => ('Querying for online endpoints: '  + endpoints));
 
                 this.getNetworkAgent().queryForListeningAddresses(
                                     LinkupAddress.fromURL(this.localPeer.endpoint), 
@@ -642,7 +642,10 @@ class PeerMeshAgent implements Agent {
         if (this.localPeer.endpoint === local) {
             let peer = await this.peerSource.getPeerForEndpoint(remote);
 
+            this.controlLog.trace(() => this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
+
             if (this.shouldAcceptPeerConnection(peer)) {
+                this.controlLog.trace('Will accept!');
                 this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
                 this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.ReceivingConnection);
             }
@@ -653,6 +656,8 @@ class PeerMeshAgent implements Agent {
     private onConnectionEstablishment(connId: ConnectionId, local: Endpoint, remote: Endpoint) {
         let pc = this.connections.get(connId);
 
+        this.controlLog.trace(() => this.localPeer.endpoint + 'is receiving a connection from ' + remote + ' connId is ' + connId);
+
         if (pc !== undefined && this.localPeer.endpoint === local && pc.peer.endpoint === remote) {
             if (pc.status === PeerConnectionStatus.Connecting) {
                 this.sendOffer(pc);
@@ -660,6 +665,8 @@ class PeerMeshAgent implements Agent {
             } else if (pc.status === PeerConnectionStatus.ReceivingConnection) {
                 pc.status = PeerConnectionStatus.WaitingForOffer;
             }
+        } else {
+            this.controlLog.trace('Unknown connection, ignoring. pc=' + pc + ' local=' + local + ' remote='+ remote);
         }
     }
 
@@ -706,14 +713,18 @@ class PeerMeshAgent implements Agent {
         } else { // pc !== undefined
                  // OK, we had previous state - if everything checks up, accept.
 
+            this.controlLog.trace('Found previous state:' + pc.status);
             if (meshId === this.meshId &&
                 pc.status === PeerConnectionStatus.WaitingForOffer &&
                 source === pc.peer.endpoint &&
                 destination === this.localPeer.endpoint &&
                 remoteIdentityHash === pc.peer.identityHash) {
                 
+                this.controlLog.trace('Everything checks out!');
                 reply  = true;
                 accept = true;
+            } else {
+                this.controlLog.trace('The request is invalid.');
             }
         }
 
@@ -747,6 +758,8 @@ class PeerMeshAgent implements Agent {
 
     private onReceivingOfferReply(connId: ConnectionId, source: Endpoint, destination: Endpoint, meshId: string, remoteIdentityHash: Hash, accepted: boolean) {
         let pc = this.connections.get(connId);
+
+        this.controlLog.trace(this.localPeer.endpoint + ' is receiving offer reply from ' + source);
 
         if (pc !== undefined &&
             meshId === this.meshId &&
@@ -969,7 +982,7 @@ class PeerMeshAgent implements Agent {
         return this.getLocalAgent(SecureNetworkAgent.Id) as SecureNetworkAgent;
     }
 
-    static agentIdForPeerNetwork(meshId: string) {
+    static agentIdForMesh(meshId: string) {
         return 'peer-control-for-' + meshId;
     }
 

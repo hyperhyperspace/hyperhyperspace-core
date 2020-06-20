@@ -1,9 +1,11 @@
 import { RNGImpl } from 'crypto/random';
 import { PeerMeshAgent } from 'mesh/agents/peer';
 import { TestPeerNetwork } from '../mock/TestPeerNetwork';
+import { describeProxy } from 'test/config';
+import { Logger, LogLevel } from 'util/logging';
 
 
-describe('Peer group management', () => {
+describeProxy('Peer group management', () => {
     test('2-peer group set up', async (done) => {
 
 
@@ -11,7 +13,7 @@ describe('Peer group management', () => {
         let networks = TestPeerNetwork.generate(peerNetworkId, 2, 2, 1);
         networks;
 
-        let control0 = networks[0].getAgent(PeerMeshAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerMeshAgent;
+        let control0 = networks[0].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent;
 
         let checks = 0;
         let stats = control0.getStats();
@@ -37,7 +39,9 @@ describe('Peer group management', () => {
         let networks = TestPeerNetwork.generate(peerNetworkId, 4, 4, 3);
         networks;
 
-        let control0 = networks[0].getAgent(PeerMeshAgent.agentIdForPeerNetwork(peerNetworkId)) as PeerMeshAgent;
+        let control0 = networks[0].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent;
+
+        control0.controlLog = new Logger('mesh-debug', LogLevel.INFO);
 
         let checks = 0;
         let stats = control0.getStats();
@@ -56,5 +60,5 @@ describe('Peer group management', () => {
         expect(stats.connections).toEqual(stats.peers);
 
         done();
-    }, 25000);
+    }, 35000);
 });

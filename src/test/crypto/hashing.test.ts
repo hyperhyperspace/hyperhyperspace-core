@@ -1,7 +1,8 @@
 import { SHA, SHAImpl } from 'crypto/hashing';
 import { RMD, RMDImpl } from 'crypto/hashing';
+import { describeProxy } from 'test/config';
 
-describe('Hashing', () => {
+describeProxy('Hashing', () => {
     test('SHA256 test', () => {
         let sha = new SHAImpl() as SHA;
         let message = 'say hi to the sha';
