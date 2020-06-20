@@ -62,7 +62,7 @@ describeProxy('Sync services', () => {
         peers = await stores[1].load(peers.hash()) as MutableSet<SamplePeer>;
 
         let logger = new Logger('2-sync test');
-        logger.setLevel(LogLevel.TRACE);
+        logger.setLevel(LogLevel.INFO);
 
         {
             let gossip = syncServices[0].gossip;
