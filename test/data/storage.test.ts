@@ -3,7 +3,7 @@ import { HashedObject, HashedSet, HashReference, MutationOp } from 'data/model';
 
 import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
 import { SomethingMutable, SomeMutation } from './types/SomethingMutable';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 
 describeProxy('Storage', () => {

@@ -8,7 +8,7 @@ import { SamplePeerSource } from '../types/SamplePeerSource';
 import { MutableSet } from 'data/collections';
 import { Logger, LogLevel } from 'util/logging';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('Sync services', () => {
 

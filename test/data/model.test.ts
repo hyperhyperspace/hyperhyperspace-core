@@ -3,7 +3,7 @@ import { HashedObject, HashedSet, Serialization, Context } from 'data/model';
 import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
 import { OverrideIds } from './types/OverrideIds';
 import { HashedMap } from 'data/model/HashedMap';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('Data model', () => {
     test( 'Basic types', () => {

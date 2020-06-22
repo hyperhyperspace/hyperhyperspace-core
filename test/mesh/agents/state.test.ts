@@ -1,15 +1,17 @@
 import { TestPeerNetwork } from '../mock/TestPeerNetwork';
+
+import { TestIdentity } from 'data/types/TestIdentity';
+
 import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { PeerMeshAgent } from 'mesh/agents/peer';
 import { Hash } from 'data/model';
 import { RNGImpl } from 'crypto/random';
 import { LinearStateAgent } from '../mock/LinearStateAgent';
-import { TestIdentity } from 'test/data/types/TestIdentity';
 import { Store, IdbBackend } from 'data/storage';
 import { MutableSet } from 'data/collections';
 import { Identity } from 'data/identity';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state/TerminalOpsSyncAgent';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('State sync', () => {
     test('Gossip agent in small peer group', async (done) => {

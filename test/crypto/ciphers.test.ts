@@ -1,6 +1,6 @@
 import { RSA, RSAImpl } from 'crypto/ciphers';
 import { ChaCha20, ChaCha20Impl } from 'crypto/ciphers';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('Ciphers', () => {
     test('chacha20 self test', () => {

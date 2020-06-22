@@ -1,5 +1,5 @@
 import { LinkupManager, LinkupAddress } from 'net/linkup';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('Single-host LinkupManager', () => {
     test('Call starting', (done) => {

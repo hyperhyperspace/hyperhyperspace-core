@@ -1,7 +1,7 @@
 import { RNGImpl } from 'crypto/random';
 import { PeerMeshAgent } from 'mesh/agents/peer';
 import { TestPeerNetwork } from '../mock/TestPeerNetwork';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 import { Logger, LogLevel } from 'util/logging';
 
 

@@ -1,5 +1,5 @@
 import { RNG, RNGImpl } from 'crypto/random';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('RNG', () => {
     test('Basic RNG length test', () => {

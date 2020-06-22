@@ -1,59 +1,46 @@
 {
-  "version": "0.1.0",
-  "license": "MIT",
-  "main": "dist/index.js",
-  "typings": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "src"
-  ],
-  "engines": {
-    "node": ">=10"
-  },
-  "scripts": {
-    "start": "tsdx watch",
-    "build": "tsdx build",
-    "test": "tsdx test",
-    "lint": "tsdx lint",
-    "prepare": "tsdx build"
-  },
-  "peerDependencies": {},
-  "husky": {
-    "hooks": {
-      "pre-commit": "tsdx test"
-    }
-  },
-  "prettier": {
-    "printWidth": 80,
-    "semi": true,
-    "singleQuote": true,
-    "trailingComma": "es5"
-  },
   "name": "hyper-hyper-space",
+  "version": "0.0.1",
+  "main": "dist-browser/index.js",
   "author": "Santiago Bazerque",
-  "module": "dist/hyper-hyper-space.esm.js",
+  "license": "MIT",
+  "files": "dist-browser",
+  "scripts": {
+    "build": "npx tsc --project tsconfig-browser.json",
+    "build-node": "npx tsc",
+    "clean": "rm -rf ./dist-browser/* ./dist-node/*",
+    "test": "npx jest"
+  },
   "devDependencies": {
-    "fake-indexeddb": "^3.0.0",
-    "husky": "^4.2.5",
-    "tsdx": "^0.13.2",
-    "tslib": "^1.11.1",
-    "typescript": "^3.8.3"
+    "@types/jest": "^26.0.0",
+    "fake-indexeddb": "^3.0.2",
+    "jest": "^26.0.1",
+    "ts-jest": "^26.1.0",
+    "typescript": "^3.9.5",
+    "wrtc": "^0.4.5"
   },
   "dependencies": {
-    "@types/node": "^13.13.2",
+    "@types/node": "^14.0.13",
     "chacha-js": "^2.1.1",
     "get-random-values": "^1.2.0",
-    "idb": "^5.0.2",
+    "idb": "^5.0.4",
     "jsencrypt": "^3.0.0-rc.1",
     "jshashes": "^1.0.8",
-    "wrtc": "^0.4.4"
+    "tslib": "^2.0.0"
   },
   "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "jsdom",
     "verbose": true,
     "modulePaths": [
+      "<rootDir>/test",
       "<rootDir>/src",
-      "<rootDir>/src/poly/node",
+      "<rootDir>/poly/node",
       "<rootDir>/node_modules/**"
+    ],
+    "roots" : [ 
+      "./test" 
     ]
   }
+
 }

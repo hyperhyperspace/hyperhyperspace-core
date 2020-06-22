@@ -4,7 +4,7 @@ import { AgentPod } from 'mesh/base/AgentPod';
 import { TestConnectionAgent } from '../mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 import { LinkupManager } from 'net/linkup';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 let linkupServer = LinkupManager.defaultLinkupServer;
 

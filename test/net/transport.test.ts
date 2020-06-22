@@ -1,7 +1,7 @@
 
 import { WebRTCConnection } from 'net/transport';
 import { LinkupManager, LinkupAddress } from 'net/linkup';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('Transports', () => {
 

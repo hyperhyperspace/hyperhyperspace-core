@@ -1,6 +1,6 @@
 import { SHA, SHAImpl } from 'crypto/hashing';
 import { RMD, RMDImpl } from 'crypto/hashing';
-import { describeProxy } from 'test/config';
+import { describeProxy } from 'config';
 
 describeProxy('Hashing', () => {
     test('SHA256 test', () => {

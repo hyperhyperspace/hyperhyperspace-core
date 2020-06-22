@@ -1,4 +1,3 @@
-import { Swarm } from './sync/swarm';
 //import { WebRTCConnection } from './sync/transport';
 
 
@@ -10,17 +9,29 @@ export * from 'crypto/ciphers';
 export * from 'crypto/hashing';
 export * from 'crypto/random';
 
-export * from 'rngpoly';
-export * from 'webrtcpoly';
+//export * from 'rngpoly';
+//export * from 'webrtcpoly';
 require('indexeddbpoly');
 
-export * from 'sync/linkup';
-export * from 'sync/swarm';
-export * from 'sync/transport';
+export * from 'net/linkup';
+export * from 'net/transport';
+export * from 'mesh/agents/network';
+export * from 'mesh/agents/peer';
+export * from 'mesh/agents/state';
+export * from 'mesh/services';
 
+/*
 console.log(' it runs ');
 
-//new Swarm('topic');
+let b = new IdbBackend('test');
+let s = new Store(b);
 
-Swarm;
+let kp = RSAKeyPair.generate(512);
+let id = Identity.fromKeyPair({'name': 'test'}, kp);
+
+s.save(kp).then(() => { s.save(id) });
+
+console.log(id.hash());
+*/
+//new Swarm('topic');
 //WebRTCConnection;

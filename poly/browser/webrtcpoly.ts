@@ -4,3 +4,5 @@ class WebRTCShim {
         return new RTCPeerConnection(servers);
     }
 }
+
+export { WebRTCShim }
