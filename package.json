@@ -4,7 +4,7 @@
   "main": "dist-browser/index.js",
   "author": "Santiago Bazerque",
   "license": "MIT",
-  "files": "dist-browser",
+  "files": [ "dist-browser" ],
   "scripts": {
     "build": "npx tsc --project tsconfig-browser.json",
     "build-node": "npx tsc",

@@ -18,7 +18,7 @@ export * from 'net/transport';
 export * from 'mesh/agents/network';
 export * from 'mesh/agents/peer';
 export * from 'mesh/agents/state';
-export * from 'mesh/services';
+export * from 'mesh/spaces';
 
 /*
 console.log(' it runs ');

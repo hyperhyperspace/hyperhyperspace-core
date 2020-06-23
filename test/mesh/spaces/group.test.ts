@@ -1,5 +1,5 @@
-import { Store, IdbBackend } from "data/storage";
-import { PeerGroupSyncService } from 'mesh/services/sync/PeerGroupSyncService';
+import { Store, IdbBackend } from 'data/storage';
+import { GroupSharedSpace } from 'mesh/spaces';
 import { SamplePeer } from '../types/SamplePeer';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { Hash } from 'data/model';
@@ -10,16 +10,16 @@ import { Logger, LogLevel } from 'util/logging';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state';
 import { describeProxy } from 'config';
 
-describeProxy('Sync services', () => {
+describeProxy('Group shared spaces', () => {
 
-    test('2-node sync service test', async (done) => {
+    test('2-node sync test', async (done) => {
 
         const size = 2;
 
         let groupId = new RNGImpl().randomHexString(32);
 
         let samplePeers  : Array<SamplePeer> = [];
-        let syncServices : Array<PeerGroupSyncService> = [];
+        let syncServices : Array<GroupSharedSpace> = [];
         let stores : Array<Store> = [];
 
         let allPeers = new Map<Hash, SamplePeer>();
@@ -38,7 +38,7 @@ describeProxy('Sync services', () => {
             let store = stores[i];
             let samplePeer = samplePeers[i];
             let samplePeerSource = new SamplePeerSource(store, allPeers);
-            let syncService = new PeerGroupSyncService(groupId, samplePeer.getPeer(), samplePeerSource, true);
+            let syncService = new GroupSharedSpace(groupId, samplePeer.getPeer(), samplePeerSource, true);
             
             syncServices.push(syncService);
 

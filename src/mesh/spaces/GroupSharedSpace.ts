@@ -1,11 +1,11 @@
-import { AgentPod } from '../../base/AgentPod';
-import { NetworkAgent } from '../../agents/network';
-import { SecureNetworkAgent } from '../../agents/network/SecureNetworkAgent';
-import { PeerMeshAgent, Peer, PeerSource } from '../../agents/peer';
+import { AgentPod } from '../common';
+import { NetworkAgent } from '../agents/network';
+import { SecureNetworkAgent } from '../agents/network/SecureNetworkAgent';
+import { PeerMeshAgent, Peer, PeerSource } from '../agents/peer';
+import { StateGossipAgent, StateSyncAgent } from '../agents/state';
 import { MutableObject, Hash, HashedObject } from 'data/model';
-import { StateGossipAgent, StateSyncAgent } from 'mesh/agents/state';
 
-class PeerGroupSyncService {
+class GroupSharedSpace {
 
     groupId    : string;
     localPeer  : Peer;
@@ -135,4 +135,4 @@ class PeerGroupSyncService {
 
 }
 
-export { PeerGroupSyncService };
+export { GroupSharedSpace };

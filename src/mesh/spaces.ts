@@ -1,0 +1,1 @@
+export { GroupSharedSpace } from './spaces/GroupSharedSpace';
