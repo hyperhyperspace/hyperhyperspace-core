@@ -1,70 +1,158 @@
 import { AgentPod } from '../common';
 import { NetworkAgent } from '../agents/network';
 import { SecureNetworkAgent } from '../agents/network/SecureNetworkAgent';
-import { PeerMeshAgent, Peer, PeerSource } from '../agents/peer';
+import { PeerMeshAgent, Peer, PeerSource, EmptyPeerSource } from '../agents/peer';
 import { StateGossipAgent, StateSyncAgent } from '../agents/state';
 import { MutableObject, Hash, HashedObject } from 'data/model';
+import { Store, IdbBackend } from 'data/storage';
+import { Agent } from 'mesh/base/Agent';
+import { Namespace } from 'data/model/Namespace';
+
+type Config = {
+    syncDependencies?: boolean
+}
+
+type Resources = {
+    peerSource: PeerSource,
+    store: Store,
+    pod: AgentPod
+}
 
 class GroupSharedSpace {
 
-    groupId    : string;
+    spaceId    : string;
     localPeer  : Peer;
     peerSource : PeerSource;
 
     syncDependencies: boolean;
 
+    namespace: Namespace;
+    store: Store;
+
     objects : Map<Hash, MutableObject>;
+    definedKeys: Map<string, MutableObject>;
+    initialized : boolean;
     started : boolean;
 
-    pod? : AgentPod;
-
-    network       : NetworkAgent;
-    secureNetwork : SecureNetworkAgent;
-    peerNetwork   : PeerMeshAgent;
-    gossip        : StateGossipAgent;
+    pod : AgentPod;
+    
+    network?       : NetworkAgent;
+    secureNetwork? : SecureNetworkAgent;
+    peerMesh?      : PeerMeshAgent;
+    gossip?        : StateGossipAgent;
 
     syncAgents    : Map<Hash, StateSyncAgent>;
 
-    constructor(groupId: string, localPeer: Peer, peerSource: PeerSource, syncDependencies=true) {
+    constructor(spaceId: string, localPeer: Peer, config?: Config, resources?: Partial<Resources>) {
 
-        this.groupId     = groupId;
+        this.spaceId     = spaceId;
         this.localPeer  = localPeer;
-        this.peerSource = peerSource;
+        
+        if (resources?.peerSource !== undefined) {
+            this.peerSource = resources?.peerSource;
+        } else {
+            this.peerSource = new EmptyPeerSource();
+        }
 
-        this.syncDependencies = syncDependencies;
+        if (resources?.store !== undefined) {
+            this.store = resources.store;
+        } else {
+            this.store = new Store(new IdbBackend('group-shared-space-' + spaceId));
+        }
+
+        if (resources?.pod !== undefined) {
+            this.pod = resources.pod;
+        } else {
+            this.pod = new AgentPod();
+        }
+        
+        if (config?.syncDependencies !== undefined) {
+            this.syncDependencies = config.syncDependencies;
+        } else {
+            this.syncDependencies = true;
+        }
+
+        this.namespace = new Namespace(spaceId);
 
         this.objects = new Map();
+        this.definedKeys = new Map();
+        this.initialized = false;
         this.started = false;
-
-        this.network       = new NetworkAgent();
-        this.secureNetwork = new SecureNetworkAgent();
-        this.peerNetwork   = new PeerMeshAgent(this.groupId, this.localPeer, this.peerSource);
-        this.gossip        = new StateGossipAgent('gossip-for' + this.groupId, this.peerNetwork);
 
         this.syncAgents = new Map();
     }
 
+    setPeerSource(peerSource: PeerSource) {
+
+        if (this.started) {
+            throw new Error("Can't change peer source after space has started.");
+        }
+        this.peerSource = peerSource;
+    }
+
+    getPeerSource() {
+        return this.peerSource;
+    }
+
+    getPod() {
+        return this.pod;
+    }
+
+    getStore() {
+        return this.store;
+    }
+
+    init() {
+        this.network       = new NetworkAgent();
+        this.secureNetwork = new SecureNetworkAgent();
+        this.peerMesh      = new PeerMeshAgent(this.spaceId, this.localPeer, this.peerSource);
+        this.gossip        = new StateGossipAgent('gossip-for' + this.spaceId, this.peerMesh);
+
+        this.initialized = true;
+    }
+
     start() {
 
-        this.pod = new AgentPod();
+        if (!this.initialized) {
+            this.init();
+        }
 
-        this.pod.registerAgent(this.network);
-        this.pod.registerAgent(this.secureNetwork);
-        this.pod.registerAgent(this.peerNetwork);
-        this.pod.registerAgent(this.gossip);
+        this.pod.registerAgent(this.network as Agent);
+        this.pod.registerAgent(this.secureNetwork as Agent);
+        this.pod.registerAgent(this.peerMesh as Agent);
+        this.pod.registerAgent(this.gossip as Agent);
 
-        for (const [hash, mut] of this.objects) {
-            let agent = this.syncAgents.get(hash) as StateSyncAgent;
-            this.startStateSyncAgent(mut, agent);
+        for (const mut of this.objects.values()) {
+            let syncAgent = this.createStateSyncAgent(mut);
+            this.startStateSyncAgent(mut, syncAgent);
         }
 
         this.started = true;
     }
 
-    addObject(mut: MutableObject) {
-        let syncAgent = this.createStateSyncAgent(mut);
-        if (this.started) {
-            this.startStateSyncAgent(mut, syncAgent)
+    async attach(key: string, mut: MutableObject) : Promise<void> {
+
+        this.namespace.define(key, mut);
+        this.definedKeys.set(key, mut);
+        await this.store.save(mut);
+        this.addObject(mut);
+        
+    }
+
+    async getAttached(key: string) {
+        return this.definedKeys.get(key);
+    }
+
+    private addObject(mut: MutableObject) {
+        let hash = mut.hash();
+
+        if (!this.objects.has(hash)) {
+            this.objects.set(mut.hash(), mut);
+
+            if (this.started) {
+                let syncAgent = this.createStateSyncAgent(mut);
+                this.startStateSyncAgent(mut, syncAgent)
+            }
         }
     }
 
@@ -76,7 +164,7 @@ class GroupSharedSpace {
 
         if (syncAgent === undefined) {
             this.objects.set(hash, mut);
-            syncAgent = mut.createSyncAgent(this.peerNetwork as PeerMeshAgent);
+            syncAgent = mut.createSyncAgent(this.peerMesh as PeerMeshAgent);
             this.syncAgents.set(hash, syncAgent);
         }
 

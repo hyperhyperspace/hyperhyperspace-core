@@ -1,6 +1,6 @@
 {
   "name": "hyper-hyper-space",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "main": "dist-browser/index.js",
   "author": "Santiago Bazerque",
   "license": "MIT",

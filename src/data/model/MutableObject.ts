@@ -287,9 +287,8 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
-    createSyncAgent(peerNetwork: PeerMeshAgent) : StateSyncAgent {
-
-        return new TerminalOpsSyncAgent(peerNetwork, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
+    createSyncAgent(peerMeshAgent: PeerMeshAgent) : StateSyncAgent {
+        return new TerminalOpsSyncAgent(peerMeshAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 
     getAcceptedMutationOpClasses() : Array<string> {

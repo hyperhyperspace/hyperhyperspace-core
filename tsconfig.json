@@ -42,7 +42,7 @@
 
     /* Module Resolution Options */
     "moduleResolution": "node",            /* Specify module resolution strategy: 'node' (Node.js) or 'classic' (TypeScript pre-1.6). */
-     "baseUrl": "./",                       /* Base directory to resolve non-absolute module names. */
+     "baseUrl": ".",                       /* Base directory to resolve non-absolute module names. */
      "paths": {
 		   "*" : ["src/*", "node_modules/*", "poly/node/*", "test/*"]
       },                           /* A series of entries which re-map imports to lookup locations relative to the 'baseUrl'. */
@@ -69,5 +69,5 @@
     "forceConsistentCasingInFileNames": true  /* Disallow inconsistently-cased references to the same file. */
   },
   "files": [ "src/index.ts" ],
-  "include": [ "./types/*" ]
+  "include": [ "./types/*", "./src/**/*", "./test/**/*" ]
 }

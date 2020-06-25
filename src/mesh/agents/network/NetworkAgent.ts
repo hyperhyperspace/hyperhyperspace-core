@@ -75,10 +75,14 @@ class NetworkAgent implements Agent {
 
     static AgentId = 'network-agent';
 
-    static logger = new Logger(NetworkAgent.name, LogLevel.INFO);
-    static connLogger = new Logger(NetworkAgent.name + ' conn', LogLevel.INFO);
+    static logger        = new Logger(NetworkAgent.name, LogLevel.INFO);
+    static connLogger    = new Logger(NetworkAgent.name + ' conn', LogLevel.INFO);
     static messageLogger = new Logger(NetworkAgent.name + ' msg', LogLevel.INFO);
     
+    logger        : Logger;
+    connLogger    : Logger;
+    messageLogger : Logger;
+
     pod?: AgentPod;
 
     linkupManager : LinkupManager;
@@ -107,6 +111,10 @@ class NetworkAgent implements Agent {
 
     constructor(linkupManager = new LinkupManager()) {
 
+        this.logger        = NetworkAgent.logger;
+        this.connLogger    = NetworkAgent.connLogger;
+        this.messageLogger = NetworkAgent.messageLogger;
+
         this.linkupManager = linkupManager;
 
         this.listening   = new Set();
@@ -117,7 +125,7 @@ class NetworkAgent implements Agent {
 
         this.messageCallback = (data: any, conn: WebRTCConnection) => {
 
-            NetworkAgent.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getCallId())?.localEndpoint + ' received message: ' + data);
+            this.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getCallId())?.localEndpoint + ' received message: ' + data);
 
             const connectionId = conn.getCallId(); 
             const connInfo = this.connectionInfo.get(connectionId);
@@ -290,7 +298,7 @@ class NetworkAgent implements Agent {
         this.linkupManager.listenForQueryResponses(endpoint, (ep: string, addresses: Array<LinkupAddress>) => {
 
             if (this.listening.has(ep)) {
-                NetworkAgent.connLogger.debug(ep + ' received listening notice of ' + addresses.map((l:LinkupAddress) => l.url()));
+                this.connLogger.debug(ep + ' received listening notice of ' + addresses.map((l:LinkupAddress) => l.url()));
                 for (const address of addresses) {
 
                     let ev: RemoteAddressListeningEvent = {
@@ -303,12 +311,12 @@ class NetworkAgent implements Agent {
                     this.pod?.broadcastEvent(ev);
                 }
             } else {
-                NetworkAgent.connLogger.debug('received wrongly addressed listenForQueryResponse message, was meant for ' + ep + ' which is not listening in this network node.');
+                this.connLogger.debug('received wrongly addressed listenForQueryResponse message, was meant for ' + ep + ' which is not listening in this network node.');
             }
 
         });
 
-        NetworkAgent.logger.debug('Listening for endpoint ' + endpoint);
+        this.logger.debug('Listening for endpoint ' + endpoint);
         this.linkupManager.listenForMessagesNewCall(address, this.newConnectionRequestCallback);
     }
 
@@ -349,7 +357,7 @@ class NetworkAgent implements Agent {
         console.log('stats: established='+est+' in validation='+val+' validated='+ok);
         */
 
-        NetworkAgent.connLogger.debug(local + ' is asking for connection to ' + remote);
+        this.connLogger.debug(local + ' is asking for connection to ' + remote);
 
         const localAddress  = LinkupAddress.fromURL(local);
         const remoteAddress = LinkupAddress.fromURL(remote);
@@ -414,13 +422,13 @@ class NetworkAgent implements Agent {
 
         let connInfo = this.connectionInfo.get(id);
 
-        NetworkAgent.connLogger.debug('connection ' + id + ' is being released by agent ' + requestedBy + ' on ' + connInfo?.localEndpoint);
+        this.connLogger.debug('connection ' + id + ' is being released by agent ' + requestedBy + ' on ' + connInfo?.localEndpoint);
 
         connInfo?.requestedBy.delete(requestedBy);
 
         if (connInfo?.requestedBy.size === 0) {
 
-            NetworkAgent.connLogger.debug('connection ' + id + ' is no longer being used on ' + connInfo?.localEndpoint + ', closing');
+            this.connLogger.debug('connection ' + id + ' is no longer being used on ' + connInfo?.localEndpoint + ', closing');
 
             conn.close();
 
@@ -447,7 +455,7 @@ class NetworkAgent implements Agent {
 
     queryForListeningAddresses(source: LinkupAddress, targets: Array<LinkupAddress>) {
 
-        NetworkAgent.connLogger.log(source.url() + ' asking if any is online: ' + targets.map((l: LinkupAddress) => l.url()), LogLevel.DEBUG);
+        this.connLogger.log(source.url() + ' asking if any is online: ' + targets.map((l: LinkupAddress) => l.url()), LogLevel.DEBUG);
 
         if (this.listening.has(source.url())) {
             this.linkupManager.queryForListeningAddresses(source.url(), targets);

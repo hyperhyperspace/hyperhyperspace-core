@@ -9,8 +9,8 @@ abstract class PeeringAgent implements Agent {
 
     peerMesh: PeerMeshAgent;
 
-    constructor(peerNetwork: PeerMeshAgent) {
-        this.peerMesh = peerNetwork;
+    constructor(peerMesh: PeerMeshAgent) {
+        this.peerMesh = peerMesh;
     }
 
     abstract getAgentId(): string;
