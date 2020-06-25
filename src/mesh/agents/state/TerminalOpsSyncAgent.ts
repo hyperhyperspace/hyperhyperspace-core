@@ -18,7 +18,7 @@ import { MultiMap } from 'util/multimap';
 
 
 enum TerminalOpsSyncAgentMessageType {
-    RequestState     = 'resuest-state',
+    RequestState     = 'request-state',
     SendState        = 'send-state',
     RequestObjs      = 'request-objs',
     SendObjs         = 'send-objs'
@@ -372,7 +372,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         this.sendSyncMessageToPeer(destination, msg);
     }
 
-    private sendState(ep: Endpoint) {
+    sendState(ep: Endpoint) {
         let msg: SendStateMessage = {
             type: TerminalOpsSyncAgentMessageType.SendState,
             targetObjHash: this.objHash,

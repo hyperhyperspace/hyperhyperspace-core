@@ -57,7 +57,7 @@ class GroupSharedSpace {
         if (resources?.store !== undefined) {
             this.store = resources.store;
         } else {
-            this.store = new Store(new IdbBackend('group-shared-space-' + spaceId));
+            this.store = new Store(new IdbBackend('group-shared-space-' + spaceId + '-' + localPeer.identityHash));
         }
 
         if (resources?.pod !== undefined) {
@@ -139,7 +139,7 @@ class GroupSharedSpace {
         
     }
 
-    async getAttached(key: string) {
+    get(key: string) {
         return this.definedKeys.get(key);
     }
 

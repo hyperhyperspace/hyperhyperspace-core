@@ -279,11 +279,11 @@ class StateGossipAgent extends PeeringAgent {
             if (valueReady) {
                 return isNew;
             } else {
-                return false;
+                throw new Error('Error processing remote state.');
             }
             
         } else {
-            return false;
+            throw new Error('Cannot find receiving agent.');
         }
 
     }
@@ -368,7 +368,12 @@ class StateGossipAgent extends PeeringAgent {
                     const cacheHit = this.stateIsInPreviousCache(agentId, hash);
                     if (! cacheHit) {
                         this.cachePreviousState(agentId, hash);
-                        this.notifyAgentOfStateArrival(sender, agentId, hash);
+                        try {
+                            this.notifyAgentOfStateArrival(sender, agentId, hash);
+                        } catch (e) {
+                            //FIXME
+                        }
+                        
 
                         // I _think_ it's better to not gossip in this case.
                     }
@@ -383,17 +388,32 @@ class StateGossipAgent extends PeeringAgent {
         const hash = state.hash();
         const cacheHit = this.stateIsInPreviousCache(agentId, state.hash());
 
+        let receivedOldState = cacheHit;
+
         if (!cacheHit) {
-            this.cachePreviousState(agentId, hash);
-            let shouldGossip = await this.notifyAgentOfStateArrival(sender, agentId, hash, state);
+            
+            try {
+                let shouldGossip = await this.notifyAgentOfStateArrival(sender, agentId, hash, state);
+                // if the state is valid, cache
+                this.cachePreviousState(agentId, hash);
 
-            shouldGossip = shouldGossip && Math.random() < this.params.peerGossipProb;
-
-            if (shouldGossip) {
-
-                this.peerMessageLog.trace('gossiping...');
-                this.gossipNewState(agentId, state, sender, timestamp);
+                if (shouldGossip) {
+                    if (Math.random() < this.params.peerGossipProb) {
+                        this.peerMessageLog.trace('gossiping...');
+                        this.gossipNewState(agentId, state, sender, timestamp);
+                    }
+                } else {
+                    receivedOldState = true;
+                }
+            } catch (e) {
+                // maybe cache erroneous states so we don't process them over and over?
             }
+
+        }
+
+        if (receivedOldState) {
+            this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
+            (this.pod?.getAgent(agentId) as StateSyncAgent)?.sendState(sender);
         }
 
     }
