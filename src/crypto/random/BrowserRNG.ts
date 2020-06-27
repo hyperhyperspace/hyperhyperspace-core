@@ -1,4 +1,4 @@
-import { getRandomValues } from 'rngpoly';
+import { getRandomValues } from 'poly/rngpoly';
 
 import { RNG } from "./RNG";
 

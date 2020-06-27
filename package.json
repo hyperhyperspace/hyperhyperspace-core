@@ -1,20 +1,24 @@
 {
   "name": "hyper-hyper-space",
   "version": "0.1.0",
-  "main": "dist-browser/index.js",
   "author": "Santiago Bazerque",
   "license": "MIT",
-  "files": [ "dist-browser" ],
+
+  "source": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+
   "scripts": {
-    "build": "npx tsc --project tsconfig-browser.json",
-    "build-node": "npx tsc",
-    "clean": "rm -rf ./dist-browser/* ./dist-node/*",
+    "build": "npx microbundle-crl",
+    "build-test": "npx tsc --project tsconfig.test.json",
+    "clean": "rm -rf ./dist/* ./dist-test/*",
     "test": "npx jest"
   },
   "devDependencies": {
     "@types/jest": "^26.0.0",
     "fake-indexeddb": "^3.0.2",
     "jest": "^26.0.1",
+    "microbundle-crl": "^0.13.10",
     "ts-jest": "^26.1.0",
     "typescript": "^3.9.5",
     "wrtc": "^0.4.5"
@@ -33,14 +37,18 @@
     "testEnvironment": "jsdom",
     "verbose": true,
     "modulePaths": [
+      "<rootDir>/target/node/",
       "<rootDir>/test",
       "<rootDir>/src",
-      "<rootDir>/poly/node",
       "<rootDir>/node_modules/**"
     ],
-    "roots" : [ 
-      "./test" 
-    ]
+    "roots": [
+      "./test"
+    ],
+    "globals": {
+      "ts-jest": {
+        "tsConfig": "tsconfig.test.json"
+      }
+    }
   }
-
 }

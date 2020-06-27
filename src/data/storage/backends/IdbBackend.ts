@@ -1,11 +1,15 @@
-require('indexeddbpoly');
+//require('indexeddbpoly');
 
+
+import { IndexedDbShim } from 'poly/indexeddbpoly';
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
 import { Literal } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { openDB, IDBPDatabase } from 'idb';
 import { Logger, LogLevel } from 'util/logging';
+
+IndexedDbShim;
 
 type IdbStorageFormat = {
     literal    : Literal,

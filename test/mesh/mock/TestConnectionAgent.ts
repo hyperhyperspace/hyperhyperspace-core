@@ -1,7 +1,7 @@
 import { Endpoint, ConnectionId, NetworkEventType, 
         ConnectionStatusChangeEvent, ConnectionStatus, NetworkAgent, MessageReceivedEvent } from 'mesh/agents/network';
-import { AgentPod, Event } from 'mesh/services';
-import { Agent } from 'mesh/services';
+import { AgentPod, Event } from 'mesh/common';
+import { Agent } from 'mesh/common';
 import { MultiMap } from 'util/multimap';
 
 

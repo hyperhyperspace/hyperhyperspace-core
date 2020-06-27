@@ -1,5 +1,5 @@
-dist-node/
-dist-browser/
+dist/
+dist-test/
 node_modules
 yarn.lock
 package-lock.json

@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, MutableObject, Literal, AliasingContext, Context } from 'data/model.ts';
+import { HashedObject, MutableObject, Literal, AliasingContext, Context } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { MultiMap } from 'util/multimap';

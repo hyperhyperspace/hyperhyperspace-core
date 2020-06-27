@@ -1,0 +1,7 @@
+//
+
+class IndexedDbShim {
+    
+}
+
+export { IndexedDbShim }

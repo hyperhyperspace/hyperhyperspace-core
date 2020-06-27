@@ -1,9 +1,9 @@
 //import { WebRTCConnection } from './sync/transport';
 
 
-export * from 'data/identity';
-export * from 'data/model';
-export * from 'data/storage';
+export { Identity, RSAKeyPair, RSAPublicKey } from 'data/identity';
+export { HashedObject, MutableObject, MutationOp, HashReference, HashedSet, Hashing, Hash, Serialization } from 'data/model';
+export { Store, Backend, IdbBackend } from 'data/storage';
 
 export * from 'crypto/ciphers';
 export * from 'crypto/hashing';
@@ -11,14 +11,14 @@ export * from 'crypto/random';
 
 //export * from 'rngpoly';
 //export * from 'webrtcpoly';
-require('indexeddbpoly');
+//require('indexeddbpoly');
 
 export * from 'net/linkup';
 export * from 'net/transport';
 export * from 'mesh/agents/network';
 export * from 'mesh/agents/peer';
 export * from 'mesh/agents/state';
-export * from 'mesh/spaces';
+export { GroupSharedSpace } from 'mesh/spaces';
 
 /*
 console.log(' it runs ');

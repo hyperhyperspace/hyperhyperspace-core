@@ -1,7 +1,7 @@
 import { LinkupAddress, LinkupManager } from '../linkup';
 import { Logger, LogLevel } from '../../util/logging';
 
-import { WebRTCShim } from 'webrtcpoly';
+import { WebRTCShim } from 'poly/webrtcpoly';
 
 /* A WebRTC Connection is used to create a bi-directional
    DataChannel between two hosts. A LinkupManager object 

@@ -1,1 +1,0 @@
-require("fake-indexeddb/auto");
