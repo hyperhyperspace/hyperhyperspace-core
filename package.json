@@ -9,8 +9,8 @@
   "types": "dist/index.d.ts",
 
   "scripts": {
-    "build": "npx microbundle-crl",
-    "build-test": "npx tsc --project tsconfig.test.json",
+    "build": "npx microbundle-crl --tsconfig tsconfig.build.json",
+    "build-test": "npx tsc --project tsconfig.json",
     "clean": "rm -rf ./dist/* ./dist-test/*",
     "test": "npx jest"
   },
@@ -47,7 +47,7 @@
     ],
     "globals": {
       "ts-jest": {
-        "tsConfig": "tsconfig.test.json"
+        "tsConfig": "tsconfig.json"
       }
     }
   }

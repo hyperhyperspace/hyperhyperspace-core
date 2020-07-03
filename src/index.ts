@@ -2,7 +2,7 @@
 
 
 export { Identity, RSAKeyPair, RSAPublicKey } from 'data/identity';
-export { HashedObject, MutableObject, MutationOp, HashReference, HashedSet, Hashing, Hash, Serialization } from 'data/model';
+export { HashedObject, MutableObject, MutationOp, HashReference, HashedSet, Hashing, Hash, Serialization, Namespace } from 'data/model';
 export { Store, Backend, IdbBackend } from 'data/storage';
 
 export * from 'crypto/ciphers';
@@ -18,6 +18,7 @@ export * from 'net/transport';
 export * from 'mesh/agents/network';
 export * from 'mesh/agents/peer';
 export * from 'mesh/agents/state';
+export { MeshService, Agent, AgentPod } from 'mesh/service';
 export { GroupSharedSpace } from 'mesh/spaces';
 
 /*

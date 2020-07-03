@@ -161,6 +161,13 @@ class WebRTCConnection {
         this.init();
 
         this.initiator   = false;
+
+        this.handleSignallingMessage(message);
+    }
+
+    /* Sometimes the receiving end defers accepting the connection a bit,
+       and several signalling messages crop up. */
+    receiveSignallingMessage(message: any) {
         this.handleSignallingMessage(message);
     }
 
@@ -238,7 +245,9 @@ class WebRTCConnection {
                 this.setUpChannel();
             }
 
-            this.connection.setRemoteDescription(description);
+            this.connection.setRemoteDescription(description).catch((reason: any) => {
+                WebRTCConnection.logger.warning('Failed to set remote description, reason: ' + JSON.stringify(reason));
+             });
         } else {
             WebRTCConnection.logger.error('Received message for callId ' + callId + ' but connection was undefined on ' + this.localAddress.linkupId);
         }
@@ -262,7 +271,7 @@ class WebRTCConnection {
 
     private handleReceiveIceCandidate(candidate: RTCIceCandidateInit) {
         this.connection?.addIceCandidate(candidate).catch((reason: any) => {
-            WebRTCConnection.logger.warning('Failed to set ICE candidate, reason: ' + reason);
+            WebRTCConnection.logger.warning('Failed to set ICE candidate, reason: ' + JSON.stringify(reason));
         });
     }
 

@@ -1,4 +1,4 @@
-import { AgentPod } from 'mesh/base/AgentPod';
+import { AgentPod } from 'mesh/service/AgentPod';
 import { Peer, PeerMeshAgent } from 'mesh/agents/peer';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { TestPeerSource } from './TestPeerSource';

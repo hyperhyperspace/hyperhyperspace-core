@@ -32,6 +32,7 @@ describeProxy('State sync', () => {
             pod.registerAgent(gossip);
             for (let i=0; i<objCount; i++) {
                 let agent = new LinearStateAgent(objIds[i], peerNetwork);
+                gossip.trackAgentState(agent.getAgentId());
                 pod.registerAgent(agent);
             }
         }
@@ -134,6 +135,8 @@ describeProxy('State sync', () => {
         for (let i=0; i<size; i++) {
             const meshAgent = pods[i].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent;
             let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
+            let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
+            gossip.trackAgentState(agent.getAgentId());
             //agent;
             pods[i].registerAgent(agent);
         }
@@ -180,7 +183,7 @@ describeProxy('State sync', () => {
         if (meshReady) {
             count = 0;
 
-            while (!replicated && count < 200) {
+            while (!replicated && count < 400) {
     
                 await new Promise(r => setTimeout(r, 50));
     
@@ -212,5 +215,5 @@ describeProxy('State sync', () => {
         done();
     
 
-    }, 35000);
+    }, 45000);
 });

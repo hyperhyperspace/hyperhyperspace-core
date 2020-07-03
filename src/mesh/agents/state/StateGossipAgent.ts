@@ -2,8 +2,8 @@ import { StateSyncAgent } from '../state/StateSyncAgent';
 import { PeeringAgent } from '../peer/PeeringAgent';
 import { SecureMessageReceivedEvent, SecureNetworkEventType } from '../network/SecureNetworkAgent';
 
-import { AgentPod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../base/AgentPod';
-import { AgentId } from '../../base/Agent';
+import { AgentPod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../service/AgentPod';
+import { AgentId } from '../../service/Agent';
 import { Endpoint } from '../network/NetworkAgent';
 //import { PeerId } from '../../network/Peer';
 
@@ -61,8 +61,8 @@ type AgentStateUpdateEvent = {
 
 class StateGossipAgent extends PeeringAgent {
 
-    static idForTopic(topic: string) {
-        return 'state-gossip-agent-for-' + topic;
+    static agentIdForGossip(gossipId: string) {
+        return 'state-gossip-agent-for-' + gossipId;
     }
 
     static peerMessageLog = new Logger(StateGossipAgent.name, LogLevel.INFO);
@@ -80,10 +80,11 @@ class StateGossipAgent extends PeeringAgent {
         maxGossipDelay       : 5000
     };
 
-    topic: string;
+    gossipId: string;
 
     pod?: AgentPod;
 
+    trackedAgentIds: Set<AgentId>;
     localState: PeerState;
 
     remoteState: Map<Endpoint, PeerState>;
@@ -95,8 +96,9 @@ class StateGossipAgent extends PeeringAgent {
 
     constructor(topic: string, peerNetwork: PeerMeshAgent) {
         super(peerNetwork);
-        this.topic = topic;
+        this.gossipId = topic;
 
+        this.trackedAgentIds = new Set();
         this.localState  = new Map();
         this.remoteState = new Map();
 
@@ -104,7 +106,7 @@ class StateGossipAgent extends PeeringAgent {
     }
 
     getAgentId(): string {
-        return StateGossipAgent.idForTopic(this.topic);
+        return StateGossipAgent.agentIdForGossip(this.gossipId);
     }
 
     getNetwork() : AgentPod {
@@ -116,26 +118,37 @@ class StateGossipAgent extends PeeringAgent {
         this.controlLog.debug('Agent ready');
     }
 
+    trackAgentState(agentId: AgentId) {
+        this.trackedAgentIds.add(agentId);
+    }
+
+    isTrackingState(agentId: AgentId) {
+        return this.trackedAgentIds.has(agentId);
+    }
+
     localAgentStateUpdate(agentId: AgentId, state: HashedObject) {
 
-        const hash = state.hash();
+        if (this.trackedAgentIds.has(agentId)) {
+            const hash = state.hash();
 
-        const shouldGossip = ! this.stateIsInPreviousCache(agentId, hash);
-
-        const currentState = this.localState.get(agentId);
-
-        if (currentState !== undefined && hash !== currentState) {
-            this.cachePreviousState(agentId, currentState);
+            const shouldGossip = ! this.stateIsInPreviousCache(agentId, hash);
+    
+            const currentState = this.localState.get(agentId);
+    
+            if (currentState !== undefined && hash !== currentState) {
+                this.cachePreviousState(agentId, currentState);
+            }
+    
+            this.localState.set(agentId, hash);
+           
+            if (shouldGossip) {
+                this.controlLog.trace('Gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
+                this.gossipNewState(agentId, state);
+            } else {
+                this.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
+            }
         }
 
-        this.localState.set(agentId, hash);
-       
-        if (shouldGossip) {
-            this.controlLog.trace('Gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
-            this.gossipNewState(agentId, state);
-        } else {
-            this.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
-        }
     }
 
     dropAgentState(agentId: AgentId) {
@@ -358,27 +371,31 @@ class StateGossipAgent extends PeeringAgent {
     private receiveFullState(sender: Endpoint, state: PeerState) {
 
         for(const [agentId, hash] of state.entries()) {
-            const agent = this.getLocalStateAgent(agentId);
 
-            if (agent !== undefined) {
+            if (this.trackedAgentIds.has(agentId)) {
+                const agent = this.getLocalStateAgent(agentId);
 
-                const currentState = this.localState.get(agentId);
-
-                if (currentState !== hash) {
-                    const cacheHit = this.stateIsInPreviousCache(agentId, hash);
-                    if (! cacheHit) {
-                        this.cachePreviousState(agentId, hash);
-                        try {
-                            this.notifyAgentOfStateArrival(sender, agentId, hash);
-                        } catch (e) {
-                            //FIXME
+                if (agent !== undefined) {
+    
+                    const currentState = this.localState.get(agentId);
+    
+                    if (currentState !== hash) {
+                        const cacheHit = this.stateIsInPreviousCache(agentId, hash);
+                        if (! cacheHit) {
+                            this.cachePreviousState(agentId, hash);
+                            try {
+                                this.notifyAgentOfStateArrival(sender, agentId, hash);
+                            } catch (e) {
+                                //FIXME
+                            }
+                            
+    
+                            // I _think_ it's better to not gossip in this case.
                         }
-                        
-
-                        // I _think_ it's better to not gossip in this case.
                     }
                 }
             }
+
         }
 
     }

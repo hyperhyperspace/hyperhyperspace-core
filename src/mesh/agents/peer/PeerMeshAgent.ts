@@ -5,11 +5,11 @@ import { SecureNetworkAgent, SecureNetworkEventType, ConnectionIdentityAuthEvent
     IdentityLocation, IdentityAuthStatus, SecureMessageReceivedEvent } from '../network/SecureNetworkAgent';
 
 
-import { Agent, AgentId } from '../../base/Agent';
+import { Agent, AgentId } from '../../service/Agent';
 import { NetworkAgent, Endpoint, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, 
          ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent } from '../network/NetworkAgent';
 
-import { AgentPod, Event } from '../../base/AgentPod';
+import { AgentPod, Event } from '../../service/AgentPod';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 
 import { Hash } from 'data/model';
@@ -159,8 +159,8 @@ class PeerMeshAgent implements Agent {
             minPeers: params.minPeers || 6,
             maxPeers: params.maxPeers || 12,
             peerConnectionTimeout: params.peerConnectionTimeout || 20,
-            peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 120,
-            tickInterval: params.tickInterval || 10
+            peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 20,
+            tickInterval: params.tickInterval || 5
         };
 
         this.tick = async () => {
@@ -318,7 +318,7 @@ class PeerMeshAgent implements Agent {
         // Remove connection attempt timestamps that are too old to make a difference.
         // (i.e. peerConnectionAttemptInterval has already elapsed and we can try to reconnect)
         for (const [endpoint, timestamp] of Array.from(this.connectionAttemptTimestamps.entries())) {
-            if (now > timestamp + 500 /*this.params.peerConnectionAttemptInterval * 1000*/) { // FIXME
+            if (now > timestamp + this.params.peerConnectionAttemptInterval * 1000) {
                 this.connectionAttemptTimestamps.delete(endpoint);
             }
         };
@@ -329,10 +329,11 @@ class PeerMeshAgent implements Agent {
         if (this.connectionsPerEndpoint.size < this.params.minPeers) {
 
             let candidates = await this.peerSource.getPeers(this.params.minPeers * 5);
-            const endpoints = new Array<Endpoint>();
+            let endpoints = new Array<Endpoint>();
+            let fallbackEndpoints = new Array<Endpoint>();
             const now = Date.now();
 
-            this.controlLog.trace(() => ('Looking for peers, got ' + candidates.length + ' candidates'));
+            this.controlLog.debug(() => ('Looking for peers, got ' + candidates.length + ' candidates'));
 
             for (const candidate of candidates) {
 
@@ -352,9 +353,15 @@ class PeerMeshAgent implements Agent {
                 }
 
                 const lastAttemptTimestamp = this.connectionAttemptTimestamps.get(candidate.endpoint);
+
+                if (fallbackEndpoints.length < this.params.minPeers - this.connectionsPerEndpoint.size) {
+                    fallbackEndpoints.push(candidate.endpoint);
+                }
+
                 if (lastAttemptTimestamp !== undefined &&
                     now < lastAttemptTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
 
+                    
                     continue
                 }
 
@@ -367,12 +374,16 @@ class PeerMeshAgent implements Agent {
                 }
             }
 
+            if (endpoints.length < this.params.minPeers) {
+                endpoints = fallbackEndpoints;
+            }
+
             for (const endpoint of endpoints) {
                 this.onlineQueryTimestamps.set(endpoint, now);
             }
 
             if (endpoints.length > 0) {
-                this.controlLog.trace(() => ('Querying for online endpoints: '  + endpoints));
+                this.controlLog.debug(() => ('Querying for online endpoints: '  + endpoints));
 
                 this.getNetworkAgent().queryForListeningAddresses(
                                     LinkupAddress.fromURL(this.localPeer.endpoint), 
@@ -623,17 +634,17 @@ class PeerMeshAgent implements Agent {
 
     private async onOnlineEndpointDiscovery(ep: Endpoint) {
 
-        this.controlLog.trace(() => (this.localPeer.endpoint + ' has discovered that ' + ep + ' is online.'));
+        this.controlLog.debug(() => (this.localPeer.endpoint + ' has discovered that ' + ep + ' is online.'));
 
         let peer = await this.peerSource.getPeerForEndpoint(ep);
 
         if (this.shouldConnectToPeer(peer)) {
-            this.controlLog.trace(() => (this.localPeer.endpoint + ' will initiate peer connection to ' + ep + '.'));
+            this.controlLog.debug(() => (this.localPeer.endpoint + ' will initiate peer connection to ' + ep + '.'));
             let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as Peer).endpoint, this.getAgentId());
             this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.Connecting);
             this.connectionAttemptTimestamps.set(ep, Date.now());
         } else {
-            this.controlLog.trace(() => (this.localPeer.endpoint + ' will NOT initiate peer connection to ' + ep + '.'));
+            this.controlLog.debug(() => (this.localPeer.endpoint + ' will NOT initiate peer connection to ' + ep + '.'));
         }
     }
 
@@ -645,7 +656,7 @@ class PeerMeshAgent implements Agent {
             this.controlLog.trace(() => this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
 
             if (this.shouldAcceptPeerConnection(peer)) {
-                this.controlLog.trace('Will accept!');
+                this.controlLog.debug('Will accept!');
                 this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
                 this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.ReceivingConnection);
             }
@@ -691,7 +702,7 @@ class PeerMeshAgent implements Agent {
 
             if (this.shouldAcceptPeerConnection(peer)) {
 
-                this.controlLog.trace('Will accept!');
+                this.controlLog.debug('Will accept!');
                 // Act as if we had just received the connection, process offer below.
                 this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.WaitingForOffer);
                 accept = true;
@@ -699,7 +710,7 @@ class PeerMeshAgent implements Agent {
 
             } else {
 
-                this.controlLog.trace('Will NOT accept!');
+                this.controlLog.debug('Will NOT accept!');
                 if (peer !== undefined && 
                     peer.identityHash === remoteIdentityHash &&
                     this.meshId === meshId) {

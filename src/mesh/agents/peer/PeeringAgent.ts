@@ -1,6 +1,6 @@
 import { PeerMeshAgent } from './PeerMeshAgent';
-import { Agent, AgentId } from '../../base/Agent';
-import { AgentPod, Event } from '../../base/AgentPod';
+import { Agent, AgentId } from '../../service/Agent';
+import { AgentPod, Event } from '../../service/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { Hash } from 'data/model';

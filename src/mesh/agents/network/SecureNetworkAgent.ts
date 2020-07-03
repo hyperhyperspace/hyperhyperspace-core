@@ -1,6 +1,6 @@
-import { Agent, AgentId } from '../../base/Agent';
+import { Agent, AgentId } from '../../service/Agent';
 
-import { AgentPod, Event } from '../../base/AgentPod';
+import { AgentPod, Event } from '../../service/AgentPod';
 
 import { NetworkAgent, ConnectionId, 
          NetworkEventType, ConnectionStatusChangeEvent, 

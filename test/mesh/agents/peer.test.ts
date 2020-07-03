@@ -4,7 +4,6 @@ import { TestPeerNetwork } from '../mock/TestPeerNetwork';
 import { describeProxy } from 'config';
 import { Logger, LogLevel } from 'util/logging';
 
-
 describeProxy('Peer group management', () => {
     test('2-peer group set up', async (done) => {
 

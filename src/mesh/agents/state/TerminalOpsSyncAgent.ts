@@ -4,7 +4,7 @@ import { HashedSet, Dependency, Literal } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 import { MutationOp } from 'data/model/MutationOp';
 
-import { AgentPod } from '../../base/AgentPod';
+import { AgentPod } from '../../service/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { GossipEventTypes, AgentStateUpdateEvent } from './StateGossipAgent';
@@ -103,13 +103,13 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
     peerMessageLog = TerminalOpsSyncAgent.peerMessageLog;
     opTransferLog  = TerminalOpsSyncAgent.opTransferLog;
 
-    constructor(peerNetwork: PeerMeshAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
-        super(peerNetwork);
+    constructor(peerMesh: PeerMeshAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
+        super(peerMesh);
 
         if (params === undefined) {
             params = {
                 sendTimeout: 60,
-                receiveTimeout: 120,
+                receiveTimeout: 90,
                 incompleteOpTimeout: 3600
             };
         }
@@ -137,7 +137,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         this.opsForMissingObj = new MultiMap();
 
         this.opShippingInterval = window.setInterval(() => {
-            let now = new Date().getTime();
+            let now = Date.now();
             
             // check sending / receiving timeouts & remove stale entries
 
@@ -152,7 +152,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                     let outdatedEndpoints: Array<Hash> = []
     
                     for (const [endpoint, params] of destinations.entries()) {
-                        if (params.timeout > now) {
+                        if (now > params.timeout) {
                             outdatedEndpoints.push(endpoint);
                         }
                     }
@@ -181,8 +181,6 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                 // do something with
 
                 this.controlLog.warning('fetching of object with hash ' + hash + ' has timed out');
-
-                hash;
             }
 
             let timeoutedIncompleteOps = new Array<Hash>();
@@ -373,13 +371,16 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
     }
 
     sendState(ep: Endpoint) {
-        let msg: SendStateMessage = {
-            type: TerminalOpsSyncAgentMessageType.SendState,
-            targetObjHash: this.objHash,
-            state: this.state?.toLiteral()
-        };
 
-        this.sendSyncMessageToPeer(ep, msg);
+        if (this.state !== undefined) {
+            let msg: SendStateMessage = {
+                type: TerminalOpsSyncAgentMessageType.SendState,
+                targetObjHash: this.objHash,
+                state: this.state?.toLiteral()
+            };
+    
+            this.sendSyncMessageToPeer(ep, msg);
+        }
     }
 
     private async sendOrScheduleObjects(destination: Endpoint, requestedObjects: Array<ObjectRequest>, secret: string) {
@@ -585,7 +586,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                     if (incoming === undefined) {
                         this.controlLog.warning('missing incoming object entry for hash ' + hash + ' in object sent by ' + source);
                     } else {
-                        this.controlLog.warning('icnoming object secret mismatch, expected: ' + secret + ', received: ' + incoming.secret);
+                        this.controlLog.warning('incoming object secret mismatch, expected: ' + secret + ', received: ' + incoming.secret);
                     }
                     
                 }
@@ -607,7 +608,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                 source: source,
                 context: context,
                 missingObjects: missingObjects,
-                timeout: Date.now() + this.params.incompleteOpTimeout
+                timeout: Date.now() + this.params.incompleteOpTimeout * 1000
             };
             this.incompleteOps.set(hash, incompleteOp);
         } else {
@@ -633,7 +634,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                     this.incompleteOps.delete(hash);
                 }
             } else if (incompleteOp.missingObjects.size < initialMissingCount) {
-                incompleteOp.timeout = Date.now() + this.params.incompleteOpTimeout;
+                incompleteOp.timeout = Date.now() + this.params.incompleteOpTimeout * 1000;
             }
         }
 
@@ -671,7 +672,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
             allMovements.set(objHash, movement);
         }
 
-        movement.set(endpoint, {dependencyChain: dependencyChain, secret: secret, timeout: Date.now() + timeout});
+        movement.set(endpoint, {dependencyChain: dependencyChain, secret: secret, timeout: Date.now() + timeout * 1000});
     }
 
 

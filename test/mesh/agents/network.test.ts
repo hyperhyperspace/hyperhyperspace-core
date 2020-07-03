@@ -1,6 +1,6 @@
 
 import { RNGImpl } from 'crypto/random';
-import { AgentPod } from 'mesh/base/AgentPod';
+import { AgentPod } from 'mesh/service/AgentPod';
 import { TestConnectionAgent } from '../mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 import { LinkupManager } from 'net/linkup';

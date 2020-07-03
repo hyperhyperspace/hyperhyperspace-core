@@ -8,3 +8,4 @@ export { ReversibleObject } from './model/ReversibleObject';
 export { ReversibleOp } from './model/ReversibleOp';
 export { UndoOp } from './model/UndoOp';
 export { Serialization } from './model/Serialization';
+export { Namespace } from './model/Namespace';

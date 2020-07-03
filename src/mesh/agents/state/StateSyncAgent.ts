@@ -1,6 +1,6 @@
 import { Hash, HashedObject } from 'data/model';
 
-import { Agent } from '../../base/Agent';
+import { Agent } from '../../service/Agent';
 import { Endpoint } from '../network/NetworkAgent';
 
 interface StateSyncAgent extends Agent {

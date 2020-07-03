@@ -123,14 +123,14 @@ class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
         this.state = new LinearState(this.seq, this.message)
 
         
-
+        //FIXME: this works with events now, right?
         this.gossipAgent?.localAgentStateUpdate(this.getAgentId(), this.state);
     }
 
 
     ready(pod: AgentPod): void {
         this.pod = pod;
-        this.gossipAgent = pod.getAgent(StateGossipAgent.idForTopic(this.topic)) as StateGossipAgent;
+        this.gossipAgent = pod.getAgent(StateGossipAgent.agentIdForGossip(this.topic)) as StateGossipAgent;
     }
 
     receiveLocalEvent(ev: Event): void {
