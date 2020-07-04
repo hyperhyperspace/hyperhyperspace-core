@@ -1,4 +1,4 @@
-import { RNGImpl } from 'crypto/random.js';
+import { RNGImpl } from 'crypto/random';
 
 class Timestamps {
 
