@@ -5,6 +5,7 @@ import { TestPeerSource } from './TestPeerSource';
 import { RNGImpl } from 'crypto/random';
 import { SecureNetworkAgent } from 'mesh/agents/network/SecureNetworkAgent';
 import { NetworkAgent } from 'mesh/agents/network';
+import { LinkupManager } from 'net/linkup';
 
 
 
@@ -18,7 +19,7 @@ class TestPeerNetwork {
             let id = Identity.fromKeyPair({'id':'peer' + i}, RSAKeyPair.generate(512));
             
             let peer: Peer = {
-                endpoint: 'wss://mypeer.net:443/' + new RNGImpl().randomHexString(128),
+                endpoint: LinkupManager.defaultLinkupServer + '/' + new RNGImpl().randomHexString(128),
                 identity: id,
                 identityHash: id.hash()
             };

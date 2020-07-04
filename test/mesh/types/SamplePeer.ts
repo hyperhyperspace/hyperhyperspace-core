@@ -2,8 +2,9 @@ import { HashedObject, Hash } from "data/model";
 import { Identity } from 'data/identity';
 import { Peer } from 'mesh/agents/peer';
 import { Endpoint } from 'mesh/agents/network';
+import { LinkupManager } from 'net/linkup';
 
-const LINKUP = 'wss://mypeer.net:443/sample-peer-'
+const LINKUP = LinkupManager.defaultLinkupServer + '/sample-peer-'
 
 class SamplePeer extends HashedObject {
 

@@ -9,3 +9,4 @@ export { ReversibleOp } from './model/ReversibleOp';
 export { UndoOp } from './model/UndoOp';
 export { Serialization } from './model/Serialization';
 export { Namespace } from './model/Namespace';
+export { MutableReference } from './model/MutableReference';
