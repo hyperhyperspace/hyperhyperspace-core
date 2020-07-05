@@ -20,7 +20,7 @@ describeProxy('Identity', () => {
 
         let signature = keyPair.sign(text);
 
-        expect(id.verify(text, signature)).toBeTruthy();
+        expect(id.verifySignature(text, signature)).toBeTruthy();
 
     });
 

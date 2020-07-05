@@ -2,8 +2,9 @@
 
 
 export { Identity, RSAKeyPair, RSAPublicKey } from 'data/identity';
-export { HashedObject, MutableObject, MutationOp, HashReference, MutableReference, HashedSet, Hashing, Hash, Serialization, Namespace } from 'data/model';
+export { HashedObject, MutableObject, MutationOp, HashReference, HashedSet, Hashing, Hash, Serialization, Namespace } from 'data/model';
 export { Store, Backend, IdbBackend } from 'data/storage';
+export { MutableReference, MutableSet } from 'data/containers';
 
 export * from 'crypto/ciphers';
 export * from 'crypto/hashing';

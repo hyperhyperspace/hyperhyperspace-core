@@ -27,6 +27,10 @@ class SamplePeer extends HashedObject {
 
     }
 
+    validate() {
+        return true;
+    }
+
     getClassName() {
         return SamplePeer.className;
     }

@@ -1,7 +1,9 @@
-import { MutableObject } from './MutableObject';
-import { MutationOp } from './MutationOp';
-import { HashedObject } from './HashedObject';
+import { MutableObject } from '../model/MutableObject';
+import { MutationOp } from '../model/MutationOp';
+import { HashedObject } from '../model/HashedObject';
 import { Timestamps } from 'util/timestamps';
+import { Types } from './Types';
+import { Hash } from 'data/model/Hashing';
 
 class MutableReference<T> extends MutableObject {
 
@@ -15,6 +17,8 @@ class MutableReference<T> extends MutableObject {
 
     constructor() {
         super([RefUpdateOp.className]);
+
+        this.setRandomId();
     }
 
     async mutate(op: MutationOp): Promise<void> {
@@ -38,19 +42,13 @@ class MutableReference<T> extends MutableObject {
     }
     
     init(): void {
-        if (this.typeConstraints !== undefined) {
+        
+    }
 
-            if (!Array.isArray(this.typeConstraints) ) {
-                throw new Error('The field typeConstraints of class MutableReference should be an array.')
-            }
+    validate(references: Map<Hash, HashedObject>) {
+        references;
 
-            for (const typeConstraint of this.typeConstraints) {
-                if ((typeof typeConstraint) !== 'string') {
-                    throw new Error('The typeConstarings field of class MutableReference can only contain strings.');
-                }
-            }
-
-        }
+        return Types.isTypeConstraint(this.typeConstraints);
     }
     
 }
@@ -74,49 +72,58 @@ class RefUpdateOp<T> extends MutationOp {
 
     init(): void {
 
+    }
+
+    validate(references: Map<Hash, HashedObject>) {
+
+        if (!super.validate(references)) {
+            return false;
+        }
+
+        if (this.getTarget().getAuthor() !== undefined && !(this.getTarget().getAuthor()?.equals(this.getAuthor()))) {
+            return false;
+            //throw new Error('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTarget().getAuthor()?.hash() + '.');
+        }
+
         if (this.sequence === undefined) {
-            throw new Error('The field sequence is mandatory in class RefUpdateOp');
+            return false;
+            //throw new Error('The field sequence is mandatory in class RefUpdateOp');
         }
 
         if ((typeof this.sequence) !== 'number') {
-            throw new Error('The field sequence should be of type number in class RefUpdateop');
+            return false;
+            //throw new Error('The field sequence should be of type number in class RefUpdateop');
         }
 
         if (this.timestamp === undefined) {
-            throw new Error('The field timestamp is mandatory in class RefUpdateOp');
+            return false;
+            //throw new Error('The field timestamp is mandatory in class RefUpdateOp');
         }
 
         if ((typeof this.timestamp) !== 'string') {
-            throw new Error('The field timestamp should be of type timestamp in class RefUpdateop');
+            return false;
+            //throw new Error('The field timestamp should be of type timestamp in class RefUpdateop');
         }
 
         if (this.value === undefined) {
-            throw new Error('The field value is mandatory in class REfUpdateop');
+            return false;
+            //throw new Error('The field value is mandatory in class REfUpdateop');
         }
 
         if (this.target === undefined || 
             this.target.getClassName() !== MutableReference.className ) {
-                throw new Error('A RefUpdateOp can only have a MutableReference as its target.');
+                return false;
+                //throw new Error('A RefUpdateOp can only have a MutableReference as its target.');
         }
 
         let constraints = (this.target as MutableReference<T>).typeConstraints;
-        let valid = false;
 
-        if (constraints !== undefined) {
-            for (const constraint of constraints) {
-                if (this.hasValidType(this.value as T, constraint)) {
-                    valid = true;
-                    break;
-                }
-            }
-        } else {
-            valid = true;
+        if (!Types.satisfies(this.value, constraints)) {
+            return false;
+            //throw new Error('RefUpdateOp contains a value with an unexpected type.')
         }
 
-        if (!valid) {
-            throw new Error('RefUpdateOp contains a value with an unexpected type.')
-        }
-
+        return true;
     }
 
     getSequence() {
@@ -129,16 +136,6 @@ class RefUpdateOp<T> extends MutationOp {
 
     getValue() {
         return this.value as T;
-    }
-
-    private hasValidType(value: T, typ: string) {
-        if (typ === 'string') {
-            return (typeof value) === 'string';
-        } else if (typ === 'number') {
-            return (typeof value) === 'number';
-        } else {
-            return (value instanceof HashedObject && value.getClassName() === typ);
-        }
     }
 }
 

@@ -4,6 +4,7 @@ import { Hash } from 'data/model/Hashing';
 import { MutationOp } from 'data/model/MutationOp';
 import { HashedSet } from 'data/model/HashedSet';
 import { HashReference } from 'data/model/HashReference';
+import { Types } from './Types';
 
 type ElmtHash = Hash;
 
@@ -23,13 +24,26 @@ abstract class MutableSetOp<T extends HashedObject> extends MutationOp {
     }
 
     init(): void {
+
+    }
+
+    validate(references: Map<Hash, HashedObject>) {
+
+        if (!super.validate(references)) {
+            return false;
+        }
+
         if (! (this.getTarget() instanceof MutableSet)) {
-            throw new Error('MutableSetOp.target must be a MutableSet, got a ' + this.getTarget().getClassName() + ' instead.');
+            return false;
+            //throw new Error('MutableSetOp.target must be a MutableSet, got a ' + this.getTarget().getClassName() + ' instead.');
         }
 
         if (this.getTarget().getAuthor() !== undefined && !(this.getTarget().getAuthor()?.equals(this.getAuthor()))) {
-            throw new Error('MutableSetOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTarget().getAuthor()?.hash() + '.');
+            return false;
+            //throw new Error('MutableSetOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTarget().getAuthor()?.hash() + '.');
         }
+
+        return true;
     }
     
 }
@@ -51,6 +65,26 @@ class MutableSetAddOp<T extends HashedObject> extends MutableSetOp<T> {
 
     getClassName() {
         return MutableSetAddOp.className;
+    }
+
+    init() {
+        super.init();
+    }
+
+    validate(references: Map<Hash, HashedObject>) {
+
+        if (!super.validate(references)) {
+            return false;
+        }
+
+        const constraints = (this.getTarget() as MutableSet<T>).typeConstraints;
+
+        if (!Types.satisfies(this.element, constraints)) {
+            return false;
+            //throw new Error('MutableSetAddOp contains a value with an unexpected type.')
+        }
+
+        return true;
     }
 }
 
@@ -81,9 +115,58 @@ class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
         }
     }
 
+    // need a valid() function, that is called only when an object is NEW and we don't yet
+    // trust its integrity. init() will be called every time it is loaded (after all the
+    // fields have been filled in, either by the constructor or by the deliteralization
+    // mechanism, and after valid, if it is untrusted)
+    
+    // valid needs all the references also, already validated, to do its checks.
+
+    // (all this follows from the need to validate deletedOps)
+
+    init() {
+
+        super.init();
+
+    }
+
+    validate(references: Map<Hash, HashedObject>) {
+
+        if (!super.validate(references)) {
+            return false;
+        }
+
+
+        if (this.elementHash === undefined) {
+            return false;
+            //throw new Error('The field elementHash of type MutableSetDeletOp is mandatory.')
+        }
+
+        if (typeof this.elementHash !== 'string') {
+            return false;
+            //throw new Error('The field elementHash of type MutebleSetDeleteOp should be a string.')
+        }
+
+        if (this.deletedOps === undefined) {
+            return false;
+            //throw new Error('The field deletedOps of type MutableSetDeleteOp is mandatory');
+        }
+
+        if (!(this.deletedOps instanceof HashedSet)) {
+            return false;
+            //throw new Error('The field deletedOps of type MutableSetDeleteOp should be a HashedSet.');
+        }
+
+
+        return true;
+
+    }
+
     getClassName() {
         return MutableSetDeleteOp.className;
     }
+
+    
 }
 
 MutableSetDeleteOp.registerClass(MutableSetDeleteOp.className, MutableSetDeleteOp);
@@ -92,6 +175,8 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
     static className = 'hss/MutableSet';
     static opClasses = [MutableSetAddOp.className, MutableSetDeleteOp.className];
+
+    typeConstraints?: Array<string>;
 
     _elements: Map<ElmtHash, T>;
     _currentAddOpRefs: Map<ElmtHash, HashedSet<HashReference<T>>>;
@@ -104,6 +189,15 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         this._elements = new Map();
         this._currentAddOpRefs = new Map();
 
+    }
+
+    init(): void {
+
+    }
+
+    validate(references: Map<Hash, HashedObject>) {
+        references;
+        return Types.isTypeConstraint(this.typeConstraints);
     }
 
     async add(element: T) {
@@ -198,10 +292,6 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     
     getClassName(): string {
         return MutableSet.className;
-    }
-
-    init(): void {
-        // TODO
     }
 
 }

@@ -95,14 +95,14 @@ class HashedSet<T> {
         return this.hashedElements.size;
     }
 
-    static deliteralize(value: any, context: Context) : HashedSet<any> {
+    static deliteralize(value: any, context: Context, validate=false) : HashedSet<any> {
         
         if (value['_type'] !== 'hashed_set') {
             throw new Error("Trying to deliteralize value, but _type is '" + value['_type'] + "' (shoud be 'hashed_set')");
         }
 
         let hashes = value['_hashes'];
-        let elements = HashedObject.deliteralizeField(value['_elements'], context);
+        let elements = HashedObject.deliteralizeField(value['_elements'], context, validate);
         
         let hset = new HashedSet();
         hset.fromArrays(hashes, elements);

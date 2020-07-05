@@ -14,6 +14,30 @@ abstract class MutationOp extends HashedObject {
         this.target  = target;
     }
 
+    validate(references: Map<Hash, HashedObject>) {
+
+        if (this.target === undefined) {
+            return false;
+        }
+
+        if (this.prevOps !== undefined) {
+            for (const prevOpRef of this.prevOps.values()) {
+                let prevOp = references.get(prevOpRef.hash);
+
+                if (prevOp === undefined) {
+                    return false;
+                } else if (! (prevOp instanceof MutationOp)) {
+                    return false
+                } else if (! ((prevOp as MutationOp).target as MutableObject).equals(this.target)) { 
+                    return false;
+                }
+            }
+        }
+
+        return true;
+
+    }
+
     getTarget() : MutableObject {
         return this.target as MutableObject;
     }

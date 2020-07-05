@@ -57,6 +57,7 @@ abstract class HashedObject {
     abstract getClassName() : string;
 
     abstract init() : void;
+    abstract validate(references: Map<Hash, HashedObject>) : boolean;
 
     getId() : (string | undefined) {
         return this.id;
@@ -292,7 +293,7 @@ abstract class HashedObject {
             literal.signature = this.author?.sign(hash);
         } else {
             if (this.author !== undefined) {
-                if (this.hasLastSignature() && this.author.verify(hash, this.getLastSignature())) {
+                if (this.hasLastSignature() && this.author.verifySignature(hash, this.getLastSignature())) {
                     literal.signature = this.getLastSignature();
                 }
             }
@@ -429,7 +430,10 @@ abstract class HashedObject {
 
     }
 
-    static fromContext(context: Context, hash?: Hash) : HashedObject {
+    // Note: If validate=true, then all the HashReferences present in all the literals that
+    //       need to be deliteralized to re-create the root object MUST be present in
+    //       context.objects, since they are necessary for validation.
+    static fromContext(context: Context, hash?: Hash, validate=false) : HashedObject {
 
         if (hash === undefined) {
             if (context.rootHashes.length === 0) {
@@ -440,7 +444,7 @@ abstract class HashedObject {
             hash = context.rootHashes[0];
         }
 
-        HashedObject.deliteralizeInContext(hash, context);
+        HashedObject.deliteralizeInContext(hash, context, validate);
 
         return context.objects.get(hash) as HashedObject;
     }
@@ -449,7 +453,7 @@ abstract class HashedObject {
     //                        recreate the object and insert it into the context
     //                        (be smart and only do it if it hasn't been done already)
 
-    static deliteralizeInContext(hash: Hash, context: Context) : void {
+    static deliteralizeInContext(hash: Hash, context: Context, validate=false) : void {
 
         let hashedObject = context.objects.get(hash);
 
@@ -489,7 +493,7 @@ abstract class HashedObject {
 
         for (const [fieldName, fieldValue] of Object.entries(value['_fields'])) {
             if (fieldName.length>0 && fieldName[0] !== '_') {
-                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context);
+                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context, validate);
             }
         }
 
@@ -499,26 +503,50 @@ abstract class HashedObject {
         
         hashedObject.setLastHash(hash);
 
+        if (validate) {
+
+            if (hashedObject.author !== undefined) {
+                if (literal.signature === undefined) {
+                    throw new Error('Singature is missing for object ' + hash);
+                }
+
+                if (!hashedObject.author.verifySignature(hash, literal.signature)) {
+                    throw new Error('Invalid signature for obejct ' + hash);
+                }
+            }
+
+            if (!hashedObject.validate(context.objects)) {
+                throw new Error('Validation failed for object ' + hash);
+            }
+
+        }
+
         hashedObject.init();
 
 
         // check object signature if author is present
         if (hashedObject.author !== undefined) {
+
+            // validation is asked for explicitly now, so the following does not 
+            // belong here:
+
+            /*
             if (literal.signature === undefined) {
                 throw new Error('Singature is missing for object ' + hash);
             }
 
-            if (!hashedObject.author.verify(hash, literal.signature)) {
+            if (!hashedObject.author.verifySignature(hash, literal.signature)) {
                 throw new Error('Invalid signature for obejct ' + hash);
             }
+            */
 
-            hashedObject.setLastSignature(literal.signature);
+            hashedObject.setLastSignature(literal.signature as string);
         }
 
         context.objects.set(hash, hashedObject);
     }
 
-    static deliteralizeField(value: any, context: Context) : any  {
+    static deliteralizeField(value: any, context: Context, validate=false) : any  {
 
         let something: any;
 
@@ -530,17 +558,17 @@ abstract class HashedObject {
             if (Array.isArray(value)) {
                 something = [];
                for (const elmt of value) {
-                   something.push(HashedObject.deliteralizeField(elmt, context));
+                   something.push(HashedObject.deliteralizeField(elmt, context, validate));
                }
             } else if (value['_type'] === undefined) {
                 something = {} as any;
 
                 for (const [fieldName, fieldValue] of Object.entries(value)) {
-                    something[fieldName] = HashedObject.deliteralizeField(fieldValue, context);
+                    something[fieldName] = HashedObject.deliteralizeField(fieldValue, context, validate);
                 }
             } else {
                 if (value['_type'] === 'hashed_set') {
-                    something = HashedSet.deliteralize(value, context);
+                    something = HashedSet.deliteralize(value, context, validate);
                 } else if (value['_type'] === 'hashed_map') { 
                     something = HashedMap.deliteralize(value, context);
                 } else if (value['_type'] === 'hashed_object_reference') {
@@ -548,7 +576,7 @@ abstract class HashedObject {
                 } else if (value['_type'] === 'hashed_object_dependency') {
                     let hash = value['_hash'];
 
-                    HashedObject.deliteralizeInContext(hash, context);
+                    HashedObject.deliteralizeInContext(hash, context, validate);
                     something = context.objects.get(hash) as HashedObject;
 
                 } else if (value['_type'] === 'hashed_object') {

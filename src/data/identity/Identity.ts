@@ -37,13 +37,17 @@ class Identity extends HashedObject {
         
     }
 
+    validate() {
+        return true;
+    }
+
     getClassName() {
         return Identity.className;
     }
 
-    verify(text: string, signature: string) {
+    verifySignature(text: string, signature: string) {
         //text; signature; return true; // mock
-        return this.publicKey?.verify(text, signature);
+        return this.publicKey?.verifySignature(text, signature);
     }
 
     encrypt(text: string) {

@@ -100,14 +100,14 @@ class HashedMap<K, V> {
         return Hashing.forValue(this.literalize().value);
     }
 
-    static deliteralize(value: any, context: Context) : HashedMap<any, any> {
+    static deliteralize(value: any, context: Context, validate=false) : HashedMap<any, any> {
 
         if (value['_type'] !== 'hashed_map') {
             throw new Error("Trying to deliteralize value, but _type is '" + value['_type'] + "' (shoud be 'hashed_map')");
         }
 
         let hashes = value['_hashes'];
-        let entries = HashedObject.deliteralizeField(value['_entries'], context);
+        let entries = HashedObject.deliteralizeField(value['_entries'], context, validate);
 
         let hmap = new HashedMap();
         hmap.fromArrays(hashes, entries);

@@ -8,7 +8,7 @@ import { Hash } from 'data/model';
 import { RNGImpl } from 'crypto/random';
 import { LinearStateAgent } from '../mock/LinearStateAgent';
 import { Store, IdbBackend } from 'data/storage';
-import { MutableSet } from 'data/collections';
+import { MutableSet } from 'data/containers';
 import { Identity } from 'data/identity';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state/TerminalOpsSyncAgent';
 import { describeProxy } from 'config';

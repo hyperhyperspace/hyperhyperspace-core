@@ -482,7 +482,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
     }
 
     private async processReceivedObject(hash: Hash, context: Context) {
-        let obj = HashedObject.fromContext(context, hash);
+        let obj = HashedObject.fromContext(context, hash, true);
 
         if (this.shouldAcceptMutationOp(obj as MutationOp)) {
             this.controlLog.trace(() => 'saving object with hash ' + hash + ' in ' + this.peerMesh.localPeer.endpoint);
@@ -566,6 +566,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                             this.processReceivedObject(hash, context);
                         } else {
                             
+                            // If this claims to be an op that should be prcesed later, record an incomplete op
                             if (this.shouldAcceptMutationOpLiteral(context.literals.get(hash) as Literal)) {
                                 this.controlLog.trace('received object with hash ' + hash + ' is incomplete, about to process');
                                 this.processIncompleteOp(source, hash, context, toRequest);

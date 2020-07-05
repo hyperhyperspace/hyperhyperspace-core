@@ -32,6 +32,10 @@ class RSAPublicKey extends HashedObject {
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey());
     }
 
+    validate() {
+        return true;
+    }
+
     getClassName() {
         return RSAPublicKey.className;
     }
@@ -48,8 +52,13 @@ class RSAPublicKey extends HashedObject {
         return RSAKeyPair.hashPublicKeyPart(this.format as string, this.publicKey as string);
     }
 
-    verify(text: string, signature: string) {
-        return this._rsa?.verify(text, signature);
+    verifySignature(text: string, signature: string) {
+
+        if (this._rsa === undefined) {
+            throw new Error('RSA public key is empty, cannot verify signature');
+        }
+
+        return this._rsa.verify(text, signature);
     }
 
     encrypt(plainText: string) {

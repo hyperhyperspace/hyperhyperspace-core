@@ -51,6 +51,11 @@ class RSAKeyPair extends HashedObject {
         }
     }
 
+    validate() {
+        this.initRSA();
+        return this.checkSelfSignature();
+    }
+
     private initRSA() {
         this._rsa = new RSAImpl();
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey(), this.getPrivateKey());
@@ -61,7 +66,7 @@ class RSAKeyPair extends HashedObject {
     }
 
     private checkSelfSignature() {
-        return this.makePublicKey().verify(this.privateKey as string, this.privateKeySignature as string);
+        return this.makePublicKey().verifySignature(this.privateKey as string, this.privateKeySignature as string);
     }
 
     getClassName() {
@@ -92,7 +97,7 @@ class RSAKeyPair extends HashedObject {
         return this._rsa?.sign(text) as string;
     }
 
-    verify(text: string, signature: string) {
+    verifySignature(text: string, signature: string) {
         return this._rsa?.verify(text, signature);
     }
 
