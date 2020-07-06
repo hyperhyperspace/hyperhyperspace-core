@@ -25,8 +25,9 @@ class HasId extends MutableObject {
         throw new Error();
     }
 
-    async validate(_op: MutationOp) : Promise<boolean> {
-        return false;
+    validate(references: Map<string, HashedObject>) : boolean {
+        references;
+        return true;
     }
 }
 
@@ -52,6 +53,11 @@ class OverrideIds extends HashedObject {
 
     init() {
         
+    }
+
+    validate(references: Map<string, HashedObject>): boolean {
+        references;
+        return true;
     }
 
 }

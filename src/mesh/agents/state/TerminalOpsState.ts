@@ -27,10 +27,13 @@ class TerminalOpsState extends HashedObject {
         return TerminalOpsState.className;
     }
 
+    validate(references: Map<Hash, HashedObject>) {
+        references;
+        return this.objectHash !== undefined && this.terminalOps !== undefined;
+    }
+
     init() {
-        if (this.objectHash === undefined || this.terminalOps === undefined) {
-            throw new Error("Missing fields in TerminalOpsState");
-        }
+
     }
 }
 

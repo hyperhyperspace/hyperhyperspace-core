@@ -1,4 +1,4 @@
-import { MutableObject, MutationOp, Hash } from 'data/model';
+import { MutableObject, MutationOp, Hash, HashedObject } from 'data/model';
 
 class SomethingMutable extends MutableObject {
 
@@ -20,6 +20,11 @@ class SomethingMutable extends MutableObject {
 
     init() {
 
+    }
+
+    validate(references: Map<string, HashedObject>): boolean {
+        references;
+        return true;
     }
 
     async mutate(_op: MutationOp): Promise<void> {

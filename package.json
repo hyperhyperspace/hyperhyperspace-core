@@ -3,19 +3,19 @@
   "version": "0.1.0",
   "author": "Santiago Bazerque",
   "license": "MIT",
-
   "source": "src/index.ts",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "types": "decl/index.d.ts",
 
   "scripts": {
-    "build": "npx microbundle-crl --tsconfig tsconfig.build.json",
+    "build": "npx microbundle-crl --tsconfig tsconfig.build.json &&  npx tsc --project tsconfig.build.json --declaration --outDir ./decl",
     "build-test": "npx tsc --project tsconfig.json",
-    "clean": "rm -rf ./dist/* ./dist-test/*",
+    "clean": "rm -rf ./decl/* ./dist/* ./dist-test/*",
     "test": "npx jest"
   },
   "devDependencies": {
     "@types/jest": "^26.0.0",
+    "dts-generator": "^3.0.0",
     "fake-indexeddb": "^3.0.2",
     "jest": "^26.0.1",
     "microbundle-crl": "^0.13.10",

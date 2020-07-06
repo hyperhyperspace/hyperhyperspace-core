@@ -35,6 +35,10 @@ class LinearState extends HashedObject {
         //
     }
     
+    validate(references: Map<string, HashedObject>): boolean {
+        references;
+        return true;
+    }
 }
 
 enum MessageType {

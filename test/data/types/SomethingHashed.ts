@@ -21,6 +21,12 @@ class SomethingHashed extends HashedObject {
     init() {
         
     }
+
+    validate(references: Map<string, HashedObject>): boolean {
+        references;
+
+        return true;
+    }
 }
 
 HashedObject.registerClass(SomethingHashed.className, SomethingHashed);
