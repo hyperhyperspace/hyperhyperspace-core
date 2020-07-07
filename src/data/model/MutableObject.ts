@@ -41,13 +41,21 @@ abstract class MutableObject extends HashedObject {
 
     abstract async mutate(op: MutationOp): Promise<void>;
 
-    bindToStore() {
+    setAutoUpdate(auto: boolean) {
+        if (auto) {
+            this.bindToStore();
+        } else {
+            this.unbindFromStore();
+        }
+    }
+
+    private bindToStore() {
         // NOTE: watchReferences is idempotent
         this.getStore().watchReferences('target', this.getLastHash(), this._opCallback);
         this._boundToStore = true;
     }
 
-    unbindFromStore() {
+    private unbindFromStore() {
         this.getStore().removeReferencesWatch('target', this.getLastHash(), this._opCallback);
         this._boundToStore = false;
     }

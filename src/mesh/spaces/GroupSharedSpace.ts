@@ -117,11 +117,6 @@ class GroupSharedSpace {
         }
     }
 
-
-
-
-
-
 }
 
 export { GroupSharedSpace };

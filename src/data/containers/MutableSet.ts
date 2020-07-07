@@ -5,6 +5,7 @@ import { MutationOp } from 'data/model/MutationOp';
 import { HashedSet } from 'data/model/HashedSet';
 import { HashReference } from 'data/model/HashReference';
 import { Types } from './Types';
+import { Logger, LogLevel } from 'util/logging';
 
 type ElmtHash = Hash;
 
@@ -138,23 +139,49 @@ class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
 
 
         if (this.elementHash === undefined) {
+            
+            MutableSet.logger.warning('The field elementHash of type MutableSetDeletOp is mandatory.')
             return false;
-            //throw new Error('The field elementHash of type MutableSetDeletOp is mandatory.')
         }
 
         if (typeof this.elementHash !== 'string') {
+            MutableSet.logger.warning('The field elementHash of type MutebleSetDeleteOp should be a string.')
             return false;
-            //throw new Error('The field elementHash of type MutebleSetDeleteOp should be a string.')
         }
 
         if (this.deletedOps === undefined) {
+            MutableSet.logger.warning('The field deletedOps of type MutableSetDeleteOp is mandatory');
             return false;
-            //throw new Error('The field deletedOps of type MutableSetDeleteOp is mandatory');
         }
 
         if (!(this.deletedOps instanceof HashedSet)) {
+            MutableSet.logger.warning('The field deletedOps of type MutableSetDeleteOp should be a HashedSet.');
             return false;
-            //throw new Error('The field deletedOps of type MutableSetDeleteOp should be a HashedSet.');
+        }
+
+        for (const ref of (this.deletedOps as HashedSet<HashReference<MutableSetAddOp<T>>>).values()) {
+            const op = references.get(ref.hash);
+
+            if (op === undefined) {
+                MutableSet.logger.warning('Addition op referenced in MutableSet deletion op is missing from references provided for validation.');
+            }
+
+            if (!(op instanceof MutableSetAddOp)) {
+                MutableSet.logger.warning('Addition op referenced in MutableSet deletion op has the wrong type in the references provided for validation.');
+                return false;
+            }
+
+            if (!op.target?.equals(this.target)) {
+                MutableSet.logger.warning('Addition op referenced in MutableSet deletion op points to a different set.');
+                return false;
+            }
+
+            const addOp = op as MutableSetAddOp<T>;
+
+            if (addOp.element?.hash() !== this.elementHash) {
+                MutableSet.logger.warning('Addition op referenced in MutableSet deletion op contains an element whose hash does not match the one being deleted.');
+                return false;
+            }
         }
 
 
@@ -165,7 +192,6 @@ class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
     getClassName() {
         return MutableSetDeleteOp.className;
     }
-
     
 }
 
@@ -175,6 +201,9 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
     static className = 'hss/MutableSet';
     static opClasses = [MutableSetAddOp.className, MutableSetDeleteOp.className];
+    static logger    = new Logger(MutableSet.className, LogLevel.INFO);
+
+    logger: Logger;
 
     typeConstraints?: Array<string>;
 
@@ -183,6 +212,8 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
     constructor() {
         super(MutableSet.opClasses);
+
+        this.logger = MutableSet.logger;
 
         this.setRandomId();
 
@@ -288,6 +319,11 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         }
 
         
+    }
+
+    autoSync() {
+        this.setAutoUpdate(true);
+        this.loadAllOpsFromStore();
     }
     
     getClassName(): string {
