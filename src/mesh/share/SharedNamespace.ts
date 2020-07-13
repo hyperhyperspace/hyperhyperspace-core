@@ -1,8 +1,7 @@
 
 import { Peer, PeerSource } from '../agents/peer';
-import { MutableObject, Hash } from 'data/model';
+import { MutableObject, Hash, HashedObject } from 'data/model';
 import { Store, IdbBackend } from 'data/storage';
-import { Namespace } from 'data/model/Namespace';
 import { MeshService } from 'mesh/service/MeshService';
 
 type Config = {
@@ -14,7 +13,7 @@ type Resources = {
     mesh: MeshService
 }
 
-class GroupSharedSpace {
+class SharedNamespace {
 
     spaceId    : string;
     localPeer  : Peer;
@@ -22,7 +21,6 @@ class GroupSharedSpace {
 
     syncDependencies: boolean;
 
-    namespace: Namespace;
     store: Store;
 
     mesh: MeshService;
@@ -56,8 +54,6 @@ class GroupSharedSpace {
         } else {
             this.syncDependencies = true;
         }
-
-        this.namespace = new Namespace(spaceId);
 
         this.objects = new Map();
         this.definedKeys = new Map();
@@ -95,7 +91,7 @@ class GroupSharedSpace {
 
     async attach(key: string, mut: MutableObject) : Promise<void> {
 
-        this.namespace.define(key, mut);
+        mut.setId(HashedObject.generateIdForPath(this.spaceId, key));
         this.definedKeys.set(key, mut);
         await this.store.save(mut);
         this.addObject(mut);
@@ -119,4 +115,4 @@ class GroupSharedSpace {
 
 }
 
-export { GroupSharedSpace };
+export { SharedNamespace };

@@ -20,7 +20,7 @@ export * from './mesh/agents/network';
 export * from './mesh/agents/peer';
 export * from './mesh/agents/state';
 export { MeshService, Agent, AgentPod } from './mesh/service';
-export { GroupSharedSpace } from './mesh/spaces';
+export { SharedNamespace } from './mesh/share';
 
 /*
 console.log(' it runs ');

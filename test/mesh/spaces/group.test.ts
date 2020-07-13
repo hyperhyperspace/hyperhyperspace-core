@@ -1,4 +1,4 @@
-import { GroupSharedSpace } from 'mesh/spaces';
+import { SharedNamespace } from 'mesh/share';
 import { SamplePeer } from '../types/SamplePeer';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { Hash } from 'data/model';
@@ -189,11 +189,11 @@ let generateSpacesForPeers = (spaceId: string, samplePeers: Array<SamplePeer>) =
 
     let allPeers = hashSamplePeers(samplePeers);
 
-    let spaces = new Array<GroupSharedSpace>();
+    let spaces = new Array<SharedNamespace>();
 
     for (let i=0; i<samplePeers.length; i++) {
         let samplePeer = samplePeers[i];
-        let space = new GroupSharedSpace(spaceId, samplePeer.getPeer());
+        let space = new SharedNamespace(spaceId, samplePeer.getPeer());
         let samplePeerSource = new SamplePeerSource(space.getStore(), allPeers);
         space.setPeerSource(samplePeerSource);
         spaces.push(space);
@@ -202,7 +202,7 @@ let generateSpacesForPeers = (spaceId: string, samplePeers: Array<SamplePeer>) =
     return spaces;
 }
 
-let connectSpaceWithLogger = (space: GroupSharedSpace, logger: Logger) => {
+let connectSpaceWithLogger = (space: SharedNamespace, logger: Logger) => {
 
     {
         let network = space.mesh.network as NetworkAgent;

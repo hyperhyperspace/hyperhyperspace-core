@@ -5,6 +5,7 @@
   "license": "MIT",
   "source": "src/index.ts",
   "main": "dist/index.js",
+  "module": "dist/index.esm.js",
   "types": "decl/index.d.ts",
 
   "scripts": {
