@@ -1,4 +1,5 @@
-import { HashedObject, Context } from './HashedObject';
+import { HashedObject } from './HashedObject';
+import { Context } from './Context';  
 import { MutableObject } from './MutableObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';

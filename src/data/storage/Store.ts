@@ -1,10 +1,11 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { HashedObject, MutableObject, Literal, AliasingContext, Context } from 'data/model';
+import { HashedObject, MutableObject, Literal, Context } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity/Identity';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
+import { Resources } from 'data/model/Context';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
@@ -20,6 +21,8 @@ class Store {
     private referencesCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
     private classReferencesCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
 
+    private resources?: Partial<Resources>;
+
     constructor(backend : Backend) {
         this.backend = backend;
 
@@ -32,6 +35,14 @@ class Store {
     //                         operations in a mutable object that was referenced in one of
     //       (* note 1)        this object's dependencies. You need to call save explicitly
     //                         on the mutable object whose operations you want saved.
+
+    setResources(resources: Partial<Resources>) {
+        this.resources = resources;
+    }
+
+    getResources() : Partial<Resources> | undefined {
+        return this.resources;
+    }
 
     async save(object: HashedObject) : Promise<void>{
         let context = object.toContext();
@@ -207,15 +218,11 @@ class Store {
         return this.backend.load(hash);
     }
 
-    async load(hash: Hash, aliasingContext?: AliasingContext) : Promise<HashedObject | undefined> {
+    async load(hash: Hash) : Promise<HashedObject | undefined> {
 
         let context = new Context();
 
-        context.aliased = aliasingContext?.aliased;
-
-        if (context.aliased === undefined) {
-            context.aliased = new Map();
-        }
+        context.resources = this.resources;
 
         return this.loadWithContext(hash, context);
     }
@@ -241,7 +248,7 @@ class Store {
 
             for (let dependency of literal.dependencies) {
                 if (dependency.type === 'literal') {
-                    if (context.aliased?.get(dependency.hash) === undefined &&
+                    if (context.resources?.aliasing?.get(dependency.hash) === undefined &&
                         context.objects.get(dependency.hash)  === undefined && 
                         context.literals.get(dependency.hash) === undefined) {
 
@@ -352,7 +359,7 @@ class Store {
         return info;
     }
 
-    async loadClosure(init: Set<Hash>, next: (obj: HashedObject) => Set<Hash>, aliasingContext?: AliasingContext | undefined) : Promise<Set<Hash>> {
+    async loadClosure(init: Set<Hash>, next: (obj: HashedObject) => Set<Hash>) : Promise<Set<Hash>> {
 
         let closure = new Set<Hash>();
         let pending = new Set<Hash>(init);
@@ -362,7 +369,7 @@ class Store {
             pending.delete(value);
             closure.add(value);
 
-            let obj = await this.load(value, aliasingContext) as HashedObject;
+            let obj = await this.load(value) as HashedObject;
             let children = next(obj);
 
             for (const hash of children.values()) {

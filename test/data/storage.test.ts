@@ -111,7 +111,7 @@ describeProxy('Storage', () => {
 
         let sm2 = await store.load(hash) as SomethingMutable;
 
-        sm2.setAutoUpdate(true);
+        sm2.watchForChanges(true);
 
         await sm.testOperation('hello');
         await sm.testOperation('world');

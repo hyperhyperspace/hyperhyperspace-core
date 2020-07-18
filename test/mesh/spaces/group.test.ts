@@ -6,7 +6,7 @@ import { RNGImpl } from 'crypto/random';
 import { SamplePeerSource } from '../types/SamplePeerSource';
 import { MutableSet } from 'data/containers';
 import { Logger, LogLevel } from 'util/logging';
-import { PeerMeshAgent } from 'mesh/agents/peer';
+import { PeerGroupAgent } from 'mesh/agents/peer';
 import { NetworkAgent } from 'mesh/agents/network';
 import { describeProxy } from 'config';
 
@@ -58,21 +58,21 @@ describeProxy('Group shared spaces', () => {
 
         await new Promise(r => setTimeout(r, 50));
 
-        await peers.loadAllOpsFromStore();
+        await peers.loadAllChanges();
 
         let ticks = 0;
-        while (((spaces[0].mesh.pod.getAgent(PeerMeshAgent.agentIdForMesh(spaces[0].spaceId)) as PeerMeshAgent).getPeers().length < size-1 || 
+        while (((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length < size-1 || 
                peers.size() < size) 
                && ticks++ < 800) {
             await new Promise(r => setTimeout(r, 50));
-            await peers.loadAllOpsFromStore();
+            await peers.loadAllChanges();
             //console.log(ticks);
             
             //let pc = (spaces[0].mesh.pod.getAgent(PeerMeshAgent.agentIdForMesh(spaces[0].spaceId)) as PeerMeshAgent).getPeers().length;
             //console.log('peers: ' + pc);
         }
 
-        expect((spaces[0].mesh.pod.getAgent(PeerMeshAgent.agentIdForMesh(spaces[0].spaceId)) as PeerMeshAgent).getPeers().length).toEqual(size-1);
+        expect((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length).toEqual(size-1);
         expect(peers.size()).toEqual(size);
         done();
     }, 35000);
@@ -133,12 +133,12 @@ test('2-node nested sync test', async (done) => {
 
 
     let lastThings = spaces[size-1].get('things') as MutableSet<MutableSet<SamplePeer>>;
-    lastThings.loadAllOpsFromStore();
+    lastThings.loadAllChanges();
 
     let ticks = 0;
     while (ticks++ < 400 && lastThings.size() < 1) {
         await new Promise(r => setTimeout(r, 50));
-        lastThings?.loadAllOpsFromStore();
+        lastThings?.loadAllChanges();
         //console.log('T'+ticks);
     }
 
@@ -153,7 +153,7 @@ test('2-node nested sync test', async (done) => {
 
     let samplePeer = lastInner?.size() > 0 ? lastInner.values().next().value : undefined;
 
-    expect((spaces[0].mesh.pod.getAgent(PeerMeshAgent.agentIdForMesh(spaces[0].spaceId)) as PeerMeshAgent).getPeers().length).toEqual(size-1);
+    expect((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length).toEqual(size-1);
     expect(lastThings.size()).toEqual(1);
     expect(lastInner.size()).toEqual(1);
     expect(samplePeer?.hash()).toEqual(samplePeers[0].hash());

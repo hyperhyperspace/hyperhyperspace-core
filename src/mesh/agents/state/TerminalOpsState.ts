@@ -5,7 +5,7 @@ import { HashedSet } from 'data/model/HashedSet';
 
 class TerminalOpsState extends HashedObject {
     
-    static className = 'hhs/TerminalOpsState';
+    static className = 'hhs/v0/TerminalOpsState';
 
     objectHash?  : Hash;
     terminalOps? : HashedSet<Hash>;

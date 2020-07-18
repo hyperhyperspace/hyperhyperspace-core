@@ -1,7 +1,7 @@
 import { MutableObject } from './MutableObject'
 import { MutationOp } from './MutationOp'
 import { UndoOp } from './UndoOp';
-import { Context } from './HashedObject';
+import { Context } from './Context';
 import { Hash } from './Hashing';
 
 

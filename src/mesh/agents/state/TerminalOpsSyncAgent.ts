@@ -1,8 +1,8 @@
-import { Store } from 'data/storage/Store';
-import { HashedObject, Context, LiteralContext } from 'data/model/HashedObject';
-import { HashedSet, Dependency, Literal } from 'data/model';
-import { Hash } from 'data/model/Hashing';
-import { MutationOp } from 'data/model/MutationOp';
+
+import { HashedObject, HashedSet, Hash } from 'data/model';
+import { MutationOp } from 'data/model';
+import { Context, Literal, LiteralContext, Dependency } from 'data/model';
+import { Store } from 'data/storage';
 
 import { AgentPod } from '../../service/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
@@ -12,7 +12,7 @@ import { StateSyncAgent } from './StateSyncAgent';
 import { TerminalOpsState } from './TerminalOpsState';
 import { Logger, LogLevel } from 'util/logging';
 import { PeeringAgent } from '../peer/PeeringAgent';
-import { PeerMeshAgent } from '../peer/PeerMeshAgent';
+import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
 
@@ -103,8 +103,8 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
     peerMessageLog = TerminalOpsSyncAgent.peerMessageLog;
     opTransferLog  = TerminalOpsSyncAgent.opTransferLog;
 
-    constructor(peerMesh: PeerMeshAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
-        super(peerMesh);
+    constructor(peerGroupAgent: PeerGroupAgent, objectHash: Hash, store: Store, acceptedMutationOpClasses : Array<string>, params?: TerminalOpsSyncAgentParams) {
+        super(peerGroupAgent);
 
         if (params === undefined) {
             params = {
@@ -122,7 +122,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
 
         this.opCallback = async (opHash: Hash) => {
 
-            this.opTransferLog.debug('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.peerMesh.getLocalPeer().endpoint);
+            this.opTransferLog.debug('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.peerGroupAgent.getLocalPeer().endpoint);
 
             let op = await this.store.load(opHash) as MutationOp;
             if (this.shouldAcceptMutationOp(op)) {
@@ -214,8 +214,8 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         
         this.controlLog.debug(
               'Starting for object ' + this.objHash + 
-              ' on ep ' + this.peerMesh.getLocalPeer().endpoint + 
-              ' (topic: ' + this.peerMesh.getTopic() + ')');
+              ' on ep ' + this.peerGroupAgent.getLocalPeer().endpoint + 
+              ' (topic: ' + this.peerGroupAgent.getTopic() + ')');
         
         this.pod = pod;
         this.loadStoredState();
@@ -321,7 +321,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         const stateHash = state.hash();
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
-            this.controlLog.debug('Found new state ' + stateHash + ' for ' + this.objHash + ' in ' + this.peerMesh.getLocalPeer().endpoint);
+            this.controlLog.debug('Found new state ' + stateHash + ' for ' + this.objHash + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
             this.state = state;
             this.stateHash = stateHash;
             let stateUpdate: AgentStateUpdateEvent = {
@@ -485,10 +485,10 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
         let obj = HashedObject.fromContext(context, hash, true);
 
         if (this.shouldAcceptMutationOp(obj as MutationOp)) {
-            this.controlLog.trace(() => 'saving object with hash ' + hash + ' in ' + this.peerMesh.localPeer.endpoint);
+            this.controlLog.trace(() => 'saving object with hash ' + hash + ' in ' + this.peerGroupAgent.localPeer.endpoint);
             await this.store.save(obj);
         } else {
-            this.controlLog.warning(() => 'NOT saving object with hash ' + hash + ' in ' + this.peerMesh.localPeer.endpoint + ', it has the wrong type for a mutation op.');
+            this.controlLog.warning(() => 'NOT saving object with hash ' + hash + ' in ' + this.peerGroupAgent.localPeer.endpoint + ', it has the wrong type for a mutation op.');
         }
 
         let destinations = this.outgoingObjects.get(hash);

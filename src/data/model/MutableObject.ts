@@ -1,11 +1,12 @@
-import { HashedObject, Context } from './HashedObject';
+import { HashedObject } from './HashedObject';
+import { Context } from './Context';
 import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { Store } from 'data/storage/Store';
 import { Logger, LogLevel } from 'util/logging';
 import { StateSyncAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
-import { PeerMeshAgent } from 'mesh/agents/peer';
+import { PeerGroupAgent } from 'mesh/agents/peer';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
@@ -41,7 +42,7 @@ abstract class MutableObject extends HashedObject {
 
     abstract async mutate(op: MutationOp): Promise<void>;
 
-    setAutoUpdate(auto: boolean) {
+    watchForChanges(auto: boolean) {
         if (auto) {
             this.bindToStore();
         } else {
@@ -77,14 +78,14 @@ abstract class MutableObject extends HashedObject {
                 throw new Error("Trying to load operations from store starting at " + start + " but load strategy was set to 'full' - you should use 'lazy' instead");
             }
 
-            await this.loadAllOpsFromStore();
+            await this.loadAllChanges();
         } else if (this._loadStrategy === 'lazy') {
             await this.loadLastOpsFromStore(limit, start);
         }
 
     }
 
-    async loadAllOpsFromStore() {
+    async loadAllChanges() {
         
         let batchSize = 50;
 
@@ -114,6 +115,11 @@ abstract class MutableObject extends HashedObject {
                                         start: results.end
                                     });
         }
+    }
+
+    async loadAndWatchForChanges() {
+        this.watchForChanges(true);
+        await this.loadAllChanges();
     }
 
     async loadLastOpsFromStore(limit?: number, start?: string) {
@@ -150,7 +156,7 @@ abstract class MutableObject extends HashedObject {
     async applyOpFromStore(hash: Hash) : Promise<void> {
         let op: MutationOp;
 
-        op = await this.getStore().load(hash, this.getAliasingContext()) as MutationOp;
+        op = await this.getStore().load(hash) as MutationOp;
         
         await this.apply(op);
     }
@@ -206,7 +212,7 @@ abstract class MutableObject extends HashedObject {
                 let terminalOpRefs = new Set<HashReference<MutationOp>>();
 
                 for (const opHash of terminalOps) {
-                    let terminalOp = await this.getStore().load(opHash, this.getAliasingContext()) as MutationOp;
+                    let terminalOp = await this.getStore().load(opHash) as MutationOp;
                     terminalOpRefs.add(terminalOp.createReference());
                 }
 
@@ -295,8 +301,8 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
-    createSyncAgent(peerMeshAgent: PeerMeshAgent) : StateSyncAgent {
-        return new TerminalOpsSyncAgent(peerMeshAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
+    createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {
+        return new TerminalOpsSyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 
     getAcceptedMutationOpClasses() : Array<string> {

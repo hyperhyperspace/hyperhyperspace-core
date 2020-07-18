@@ -51,7 +51,7 @@ abstract class MutableSetOp<T extends HashedObject> extends MutationOp {
 
 class MutableSetAddOp<T extends HashedObject> extends MutableSetOp<T> {
 
-    static className = 'hhs/MutableSetAddOp';
+    static className = 'hhs/v0/MutableSetAddOp';
 
     element?: T;
 
@@ -93,7 +93,7 @@ MutableSetAddOp.registerClass(MutableSetAddOp.className, MutableSetAddOp);
 
 class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
 
-    static className = 'hhs/MutableSetDeleteOp';
+    static className = 'hhs/v0/MutableSetDeleteOp';
 
     elementHash? : Hash;
     deletedOps?  : HashedSet<HashReference<MutableSetAddOp<T>>>;
@@ -210,6 +210,9 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     _elements: Map<ElmtHash, T>;
     _currentAddOpRefs: Map<ElmtHash, HashedSet<HashReference<T>>>;
 
+    _addElementCallback?    : (element: T) => void;
+    _deleteElementCallback? : (element: T) => void;
+
     constructor() {
         super(MutableSet.opClasses);
 
@@ -260,6 +263,10 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         return this._elements.get(hash) !== undefined;
     }
 
+    get(hash: Hash) : T | undefined {
+        return this._elements.get(hash);
+    }
+
     size() {
         return this._elements.size;
     }
@@ -290,6 +297,14 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
             this._elements.set(hash, addOp.element as T)
 
+            if (this._addElementCallback !== undefined) {
+                try {
+                    this._addElementCallback(addOp.element as T);
+                } catch (e) {
+                    this.logger.warning(() => ('Error calling MutableSet element addition callback on op ' + addOp.hash()));
+                }
+            }
+
         } else if (op instanceof MutableSetDeleteOp) {
             const deleteOp = op as MutableSetDeleteOp<T>;
 
@@ -309,8 +324,16 @@ class MutableSet<T extends HashedObject> extends MutableObject {
                 }
 
                 if (current.size() === 0) {
+                    const deleted = this._elements.get(hash) as T;
                     this._elements.delete(hash);
                     this._currentAddOpRefs.delete(hash);
+                    if (this._deleteElementCallback !== undefined) {
+                        try {
+                            this._deleteElementCallback(deleted);
+                        } catch (e) {
+                            this.logger.warning(() => ('Error calling MutableSet element deletion callback on op ' + deleteOp.hash()));
+                        }
+                    }
                 }
             }
 
@@ -318,12 +341,14 @@ class MutableSet<T extends HashedObject> extends MutableObject {
             throw new Error("Method not implemented.");
         }
 
-        
     }
 
-    autoSync() {
-        this.setAutoUpdate(true);
-        this.loadAllOpsFromStore();
+    onAddition(callback: (elem: T) => void) {
+        this._addElementCallback = callback;
+    }
+
+    onDeletion(callback: (elem: T) => void) {
+        this._deleteElementCallback = callback;
     }
     
     getClassName(): string {

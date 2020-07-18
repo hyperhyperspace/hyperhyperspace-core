@@ -1,4 +1,4 @@
-import { PeerMeshAgent } from './PeerMeshAgent';
+import { PeerGroupAgent } from './PeerGroupAgent';
 import { Agent, AgentId } from '../../service/Agent';
 import { AgentPod, Event } from '../../service/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
@@ -7,10 +7,10 @@ import { Hash } from 'data/model';
 
 abstract class PeeringAgent implements Agent {
 
-    peerMesh: PeerMeshAgent;
+    peerGroupAgent: PeerGroupAgent;
 
-    constructor(peerMesh: PeerMeshAgent) {
-        this.peerMesh = peerMesh;
+    constructor(peerGroupAgent: PeerGroupAgent) {
+        this.peerGroupAgent = peerGroupAgent;
     }
 
     abstract getAgentId(): string;
@@ -21,11 +21,11 @@ abstract class PeeringAgent implements Agent {
     }
     
     getPeerControl() {
-        return this.peerMesh;
+        return this.peerGroupAgent;
     }
 
     sendMessageToPeer(destination: Endpoint, agentId: AgentId, content: any) : boolean {
-        return this.peerMesh.sendToPeer(destination, agentId, content);
+        return this.peerGroupAgent.sendToPeer(destination, agentId, content);
     }
 
     abstract receivePeerMessage(source: Endpoint, sender: Hash, recipient: Hash, content: any) : void;

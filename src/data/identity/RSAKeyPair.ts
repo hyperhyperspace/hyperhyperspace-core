@@ -14,7 +14,7 @@ import { Hashing } from 'data/model/Hashing';
 
 class RSAKeyPair extends HashedObject {
 
-    static className = 'hhs/RSAKeyPair';
+    static className = 'hhs/v0/RSAKeyPair';
 
     static generate(bits: number) {
         let rsa = new RSAImpl();

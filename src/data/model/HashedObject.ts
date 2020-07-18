@@ -9,14 +9,14 @@ import { HashedSet } from './HashedSet';
 import { HashReference } from './HashReference';
 import { HashedMap } from './HashedMap';
 
-import { Context, LiteralContext } from './Context';
+import { Context, LiteralContext, Resources } from './Context';
 
 import { __spreadArrays } from 'tslib';
+import { Mesh } from 'mesh/service';
 
 type Literal           = { hash: Hash, value: any, author?: Hash, signature?: string, dependencies: Array<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
 
-type AliasingContext  = { aliased: Map<Hash, HashedObject> };
 //type ObjectContext    = { rootHashes: Array<Hash>, objects: Map<Hash, HashedObject> };
 //type LiteralContext   = { rootHashes: Array<Hash>, literals: Map<Hash, Literal> };
 //type Context = { rootHashes: Array<Hash>, objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal>, aliased?: Map<Hash, HashedObject> };  //ObjectContext & Partial<AliasingContext>;
@@ -44,11 +44,11 @@ abstract class HashedObject {
 
     
     private _signOnLiteraliz  : boolean;
-    private _store?           : Store;
+    //private _store?           : Store;
     private _lastHash?        : Hash;
     private _lastSignature?   : string;
 
-    private _aliasingContext? : AliasingContext;
+    private _resources? : Partial<Resources>;
 
     constructor() {
         this._signOnLiteraliz = false;
@@ -126,20 +126,33 @@ abstract class HashedObject {
     }
 
     hasStore() : boolean {
-        return this._store !== undefined;
+        return this._resources?.store !== undefined;
     }
 
     setStore(store: Store) : void {
-        this._store = store;
+
+        if (this._resources === undefined) {
+            this._resources = { } as Resources;
+        }
+
+        this._resources.store = store;
     }
 
     getStore() : Store {
 
-        if (this._store === undefined) {
-            throw new Error('Attempted to get store within an unstored object.');
+        if (!this.hasStore()) {
+            throw new Error('Attempted to get store from object resources, but one is not present.');
         }
 
-        return this._store;
+        return this._resources?.store as Store;
+    }
+
+    getMesh() : Mesh {
+        if (this._resources?.mesh === undefined) {
+            throw new Error('Attempted to get mesh from object resources, but one is not present.');
+        } else {
+            return this._resources?.mesh;
+        }
     }
 
     hasLastHash() {
@@ -210,12 +223,12 @@ abstract class HashedObject {
         (this as any)[fieldName] = object;
     }
 
-    setAliasingContext(aliasingContext: AliasingContext) : void {
-        this._aliasingContext = aliasingContext;
+    setResources(resources: Partial<Resources>) : void {
+        this._resources = resources;
     }
 
-    getAliasingContext() : AliasingContext | undefined {
-        return this._aliasingContext;
+    getResources() : Partial<Resources> | undefined {
+        return this._resources;
     }
 
     toLiteralContext(context?: Context) : LiteralContext {
@@ -301,8 +314,8 @@ abstract class HashedObject {
 
         
 
-        if (context.aliased?.get(hash) !== undefined) {
-            context.objects.set(hash, context.aliased.get(hash) as HashedObject);
+        if (context.resources?.aliasing?.get(hash) !== undefined) {
+            context.objects.set(hash, context.resources.aliasing.get(hash) as HashedObject);
         } else {
             context.objects.set(hash, this);
         }
@@ -462,7 +475,7 @@ abstract class HashedObject {
         }
 
         // check if we can extract the object from the shared context
-        let sharedObject = context.aliased?.get(hash);
+        let sharedObject = context?.resources?.aliasing?.get(hash);
 
         if (sharedObject !== undefined) {
             context.objects.set(hash, sharedObject);
@@ -497,8 +510,8 @@ abstract class HashedObject {
             }
         }
 
-        if (context.aliased !== undefined) {
-            hashedObject.setAliasingContext({ aliased: context.aliased });
+        if (context.resources !== undefined) {
+            hashedObject.setResources(context.resources);
         }
         
         hashedObject.setLastHash(hash);
@@ -704,4 +717,4 @@ abstract class HashedObject {
 
 }
 
-export { HashedObject, Literal, Dependency, Context, AliasingContext, LiteralContext };
+export { HashedObject, Literal, Dependency };

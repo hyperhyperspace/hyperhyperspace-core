@@ -11,7 +11,7 @@ import { HashedMap } from 'data/model/HashedMap';
 import { Hash, HashedObject } from 'data/model';
 import { Shuffle } from 'util/shuffling';
 import { Logger, LogLevel } from 'util/logging';
-import { PeerMeshAgent, PeerMeshEventType, NewPeerEvent } from '../peer/PeerMeshAgent';
+import { PeerGroupAgent, PeerMeshEventType, NewPeerEvent } from '../peer/PeerGroupAgent';
 
 
 enum GossipType {
@@ -94,7 +94,7 @@ class StateGossipAgent extends PeeringAgent {
     peerMessageLog = StateGossipAgent.peerMessageLog;
     controlLog     = StateGossipAgent.controlLog;
 
-    constructor(topic: string, peerNetwork: PeerMeshAgent) {
+    constructor(topic: string, peerNetwork: PeerGroupAgent) {
         super(peerNetwork);
         this.gossipId = topic;
 
@@ -142,10 +142,10 @@ class StateGossipAgent extends PeeringAgent {
             this.localState.set(agentId, hash);
            
             if (shouldGossip) {
-                this.controlLog.trace('Gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
+                this.controlLog.trace('Gossiping state ' + hash + ' from ' + this.peerGroupAgent.getLocalPeer().endpoint);
                 this.gossipNewState(agentId, state);
             } else {
-                this.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.peerMesh.getLocalPeer().endpoint);
+                this.controlLog.trace('NOT gossiping state ' + hash + ' from ' + this.peerGroupAgent.getLocalPeer().endpoint);
             }
         }
 
@@ -182,8 +182,8 @@ class StateGossipAgent extends PeeringAgent {
         } else if (ev.type === PeerMeshEventType.NewPeer) {
             let newPeerEv = ev as NewPeerEvent;
 
-            if (newPeerEv.content.meshId === this.peerMesh.meshId) {
-                this.controlLog.trace(this.peerMesh.localPeer.endpoint + ' detected new peer: ' + newPeerEv.content.peer.endpoint)
+            if (newPeerEv.content.peerGroupId === this.peerGroupAgent.peerGroupId) {
+                this.controlLog.trace(this.peerGroupAgent.localPeer.endpoint + ' detected new peer: ' + newPeerEv.content.peer.endpoint)
                 this.sendFullState(newPeerEv.content.peer.endpoint);
             }
             
@@ -253,7 +253,7 @@ class StateGossipAgent extends PeeringAgent {
 
         Shuffle.array(peers);
 
-        this.controlLog.trace('Gossiping state to ' + count + ' peers on ' + this.peerMesh.getLocalPeer().endpoint);
+        this.controlLog.trace('Gossiping state to ' + count + ' peers on ' + this.peerGroupAgent.getLocalPeer().endpoint);
 
         for (let i=0; i<count; i++) {
             if (sender === undefined || sender !== peers[i].endpoint) {
@@ -327,7 +327,7 @@ class StateGossipAgent extends PeeringAgent {
             timestamp : timestamp
         };
 
-        this.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.peerMesh.getLocalPeer().endpoint + ' to ' + peerEndpoint);
+        this.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.peerGroupAgent.getLocalPeer().endpoint + ' to ' + peerEndpoint);
         let result = this.sendMessageToPeer(peerEndpoint, this.getAgentId(), stateUpdateMessage);
 
         if (!result) {

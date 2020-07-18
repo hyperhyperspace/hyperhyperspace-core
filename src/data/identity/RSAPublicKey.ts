@@ -4,7 +4,7 @@ import { RSAKeyPair } from './RSAKeyPair';
 
 class RSAPublicKey extends HashedObject {
 
-    static className = 'hhs/RSAPublicKey';
+    static className = 'hhs/v0/RSAPublicKey';
 
     static fromKeys(format: string, publicKey: string) : RSAPublicKey {
         

@@ -1,15 +1,20 @@
 
 import { HashedObject, Literal } from './HashedObject';
 import { Hash, Hashing } from './Hashing';
+import { Store } from 'data/storage/Store';
+import { Mesh } from 'mesh/service';
 
 type LiteralContext = { rootHashes: Array<Hash>, literals: any };
+
+type Resources = { store: Store, mesh: Mesh, config: any, aliasing: Map<Hash, HashedObject> };
 
 class Context {
 
     rootHashes : Array<Hash>;
     objects  : Map<Hash, HashedObject>;
     literals : Map<Hash, Literal>;
-    aliased?: Map<Hash, HashedObject>;
+    //aliased?: Map<Hash, HashedObject>;
+    resources?: Partial<Resources>;
 
     constructor() {
         this.rootHashes = [];
@@ -19,7 +24,7 @@ class Context {
 
     has(hash: Hash) {
         return this.literals.has(hash) || this.objects.has(hash) ||
-               (this.aliased !== undefined && this.aliased.has(hash));
+               (this?.resources?.aliasing!== undefined && this.resources.aliasing.has(hash));
     }
 
     toLiteralContext() : LiteralContext {
@@ -48,15 +53,19 @@ class Context {
             }
         }
 
-        if (other.aliased !== undefined) {
+        if (other?.resources?.aliasing !== undefined) {
             
-            if (this.aliased === undefined) {
-                this.aliased = new Map();
+            if (this.resources === undefined) {
+                this.resources = {};
             }
 
-            for (const [hash, aliased] of other.aliased.entries()) {
-                if (!this.aliased.has(hash)) {
-                    this.aliased.set(hash, aliased);
+            if (this.resources.aliasing === undefined) {
+                this.resources.aliasing = new Map();
+            }
+
+            for (const [hash, aliased] of other.resources.aliasing.entries()) {
+                if (!this.resources.aliasing.has(hash)) {
+                    this.resources.aliasing.set(hash, aliased);
                 }
             }
         }
@@ -124,4 +133,4 @@ class Context {
     }
 }
 
-export { Context, LiteralContext }
+export { Context, LiteralContext, Resources }

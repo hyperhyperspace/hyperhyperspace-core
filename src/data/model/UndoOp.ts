@@ -1,13 +1,13 @@
 import { MutationOp } from './MutationOp';
 import { MutableObject } from './MutableObject';
 import { ReversibleOp } from './ReversibleOp';
-import { Context } from './HashedObject';
+import { Context } from './Context';
 import { Hash } from './Hashing';
 
 
 class UndoOp extends MutationOp {
 
-    static className = 'hhs/UndoOp';
+    static className = 'hhs/v0/UndoOp';
 
     targetOp?: ReversibleOp;
     cascadeOf?: UndoOp;

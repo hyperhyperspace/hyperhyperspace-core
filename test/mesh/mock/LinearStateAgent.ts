@@ -4,7 +4,7 @@ import { AgentPod, Event } from 'mesh/common';
 import { HashedObject, Hash } from 'data/model';
 import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
-import { PeerMeshAgent, PeeringAgent } from 'mesh/agents/peer';
+import { PeerGroupAgent, PeeringAgent } from 'mesh/agents/peer';
 
 
 class LinearState extends HashedObject {
@@ -79,9 +79,9 @@ class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
     state?: LinearState;
     prevStates : Set<Hash>;
 
-    constructor(id: string, peerNetwork: PeerMeshAgent) {
+    constructor(id: string, peerNetwork: PeerGroupAgent) {
         super(peerNetwork);
-        this.topic = peerNetwork.meshId;
+        this.topic = peerNetwork.peerGroupId;
         this.id = id;
         this.prevStates = new Set();
     }
@@ -200,7 +200,7 @@ class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
             type: MessageType.RequestState
         }
 
-        this.peerMesh.sendToPeer(endpoint, this.getAgentId(), requestStateMessage);
+        this.peerGroupAgent.sendToPeer(endpoint, this.getAgentId(), requestStateMessage);
     }
 
     sendState(endpoint: Endpoint) {
@@ -209,7 +209,7 @@ class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
             state: (this.state as LinearState).toLiteral()
         }
 
-        this.peerMesh.sendToPeer(endpoint, this.getAgentId(), sendStateMessage);
+        this.peerGroupAgent.sendToPeer(endpoint, this.getAgentId(), sendStateMessage);
     }
 
 }

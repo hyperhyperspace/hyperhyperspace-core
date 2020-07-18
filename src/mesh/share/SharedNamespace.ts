@@ -2,7 +2,7 @@
 import { Peer, PeerSource } from '../agents/peer';
 import { MutableObject, Hash, HashedObject } from 'data/model';
 import { Store, IdbBackend } from 'data/storage';
-import { MeshService } from 'mesh/service/MeshService';
+import { Mesh } from 'mesh/service/Mesh';
 
 type Config = {
     syncDependencies?: boolean
@@ -10,7 +10,7 @@ type Config = {
 
 type Resources = {
     store: Store,
-    mesh: MeshService
+    mesh: Mesh
 }
 
 class SharedNamespace {
@@ -23,7 +23,7 @@ class SharedNamespace {
 
     store: Store;
 
-    mesh: MeshService;
+    mesh: Mesh;
 
     objects : Map<Hash, MutableObject>;
     definedKeys: Map<string, MutableObject>;
@@ -45,7 +45,7 @@ class SharedNamespace {
         if (resources?.mesh !== undefined) {
             this.mesh = resources.mesh;
         } else {
-            this.mesh = new MeshService();
+            this.mesh = new Mesh();
         }
 
         
@@ -66,7 +66,7 @@ class SharedNamespace {
             throw new Error("Cannot connect before setting a peerSource");
         }
 
-        this.mesh.joinMesh(this.spaceId, this.localPeer, this.peerSource);
+        this.mesh.joinPeerGroup(this.spaceId, this.localPeer, this.peerSource);
     }
 
     setPeerSource(peerSource: PeerSource) {
@@ -109,7 +109,7 @@ class SharedNamespace {
         if (!this.objects.has(hash)) {
             this.objects.set(mut.hash(), mut);
 
-            this.mesh.syncObjectWithMesh(this.spaceId, mut, this.syncDependencies)
+            this.mesh.syncObjectWithPeerGroup(this.spaceId, mut, this.syncDependencies)
         }
     }
 
