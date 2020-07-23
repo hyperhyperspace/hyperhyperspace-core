@@ -219,8 +219,19 @@ abstract class HashedObject {
     }
 
     addDerivedField(fieldName: string, object: HashedObject) {
-        object.setId(Hashing.forValue('#' + this.getId() + '.' + fieldName));
+        object.setId(this.getDerivedFieldId(fieldName));
         (this as any)[fieldName] = object;
+    }
+
+    checkDerivedField(fieldName: string) {
+        let field = (this as any)[fieldName];
+
+        return field !== undefined && field instanceof HashedObject &&
+               field.getId() === this.getDerivedFieldId(fieldName);
+    }
+
+    private getDerivedFieldId(fieldName: string) {
+        return Hashing.forValue('#' + this.getId() + '.' + fieldName);
     }
 
     setResources(resources: Partial<Resources>) : void {

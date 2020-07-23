@@ -1,26 +1,26 @@
 //import { WebRTCConnection } from './sync/transport';
 
 
-export { Identity, RSAKeyPair, RSAPublicKey } from './data/identity';
-export { HashedObject, MutableObject, MutationOp, HashReference, HashedSet, Hashing, Hash, Serialization, Namespace, Resources } from './data/model';
-export { Store, Backend, IdbBackend } from './data/storage';
-export { MutableReference, MutableSet } from './data/containers';
+export * from './data/identity';
+export * from './data/model';
+export * from './data/storage';
+export * from './data/containers';
 
 export * from './crypto/ciphers';
 export * from './crypto/hashing';
 export * from './crypto/random';
+export * from './crypto/hmac';
 
 //export * from 'rngpoly';
 //export * from 'webrtcpoly';
-//require('indexeddbpoly');
 
 export * from './net/linkup';
 export * from './net/transport';
 export * from './mesh/agents/network';
-export { Peer, PeerSource, GenericPeerSource } from './mesh/agents/peer';
+export * from './mesh/agents/peer';
 export * from './mesh/agents/state';
-export { Mesh, Agent, AgentPod } from './mesh/service';
-export { SharedNamespace } from './mesh/share';
+export * from './mesh/service';
+export * from './mesh/share';
 
 /*
 console.log(' it runs ');

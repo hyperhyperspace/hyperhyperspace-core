@@ -4,6 +4,7 @@ export { MutableObject } from './model/MutableObject';
 export { MutationOp } from './model/MutationOp';
 export { HashReference } from './model/HashReference';
 export { HashedSet } from './model/HashedSet';
+export { HashedLiteral } from './model/HashedLiteral';
 export { Hashing, Hash } from './model/Hashing';
 export { ReversibleObject } from './model/ReversibleObject';
 export { ReversibleOp } from './model/ReversibleOp';

@@ -31,8 +31,12 @@ class HashedSet<T> {
         return this.hasByHash(HashedObject.hashElement(element));
     }
 
-    hasByHash(hash: string) {
+    hasByHash(hash: Hash) {
         return this.hashedElements.has(hash);
+    }
+
+    get(hash: Hash) {
+        return this.hashedElements.get(hash);
     }
 
     values() : IterableIterator<T> {
