@@ -1,10 +1,10 @@
 import { Endpoint } from '../network/NetworkAgent';
-import { Peer } from './PeerGroupAgent';
+import { PeerInfo } from './PeerGroupAgent';
 
 interface PeerSource {
 
-    getPeers(count: number): Promise<Array<Peer>>;
-    getPeerForEndpoint(endpoint: Endpoint): Promise<Peer|undefined>;
+    getPeers(count: number): Promise<Array<PeerInfo>>;
+    getPeerForEndpoint(endpoint: Endpoint): Promise<PeerInfo|undefined>;
 
 }
 

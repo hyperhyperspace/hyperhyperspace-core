@@ -1,5 +1,5 @@
 
-import { Peer, PeerSource } from '../agents/peer';
+import { PeerInfo, PeerSource } from '../agents/peer';
 import { MutableObject, Hash, HashedObject } from 'data/model';
 import { Store, IdbBackend } from 'data/storage';
 import { Mesh } from 'mesh/service/Mesh';
@@ -16,7 +16,7 @@ type Resources = {
 class SharedNamespace {
 
     spaceId    : string;
-    localPeer  : Peer;
+    localPeer  : PeerInfo;
     peerSource? : PeerSource;
 
     syncDependencies: boolean;
@@ -31,7 +31,7 @@ class SharedNamespace {
 
 
 
-    constructor(spaceId: string, localPeer: Peer, config?: Config, resources?: Partial<Resources>) {
+    constructor(spaceId: string, localPeer: PeerInfo, config?: Config, resources?: Partial<Resources>) {
 
         this.spaceId   = spaceId;
         this.localPeer = localPeer;
@@ -66,7 +66,7 @@ class SharedNamespace {
             throw new Error("Cannot connect before setting a peerSource");
         }
 
-        this.mesh.joinPeerGroup(this.spaceId, this.localPeer, this.peerSource);
+        this.mesh.joinPeerGroup({id: this.spaceId, localPeer: this.localPeer, peerSource: this.peerSource});
     }
 
     setPeerSource(peerSource: PeerSource) {

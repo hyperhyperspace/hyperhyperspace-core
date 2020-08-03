@@ -16,11 +16,11 @@ import { Hash } from 'data/model';
 import { Identity } from 'data/identity';
 import { Logger, LogLevel } from 'util/logging';
 
-type Peer = { endpoint: Endpoint, identityHash: Hash, identity?: Identity };
+type PeerInfo = { endpoint: Endpoint, identityHash: Hash, identity?: Identity };
 
 type PeerConnection = {
     connId: ConnectionId;
-    peer: Peer,
+    peer: PeerInfo,
     status: PeerConnectionStatus,
     timestamp: number
 };
@@ -96,7 +96,7 @@ type NewPeerEvent = {
     type: PeerMeshEventType.NewPeer,
     content: {
         peerGroupId: string,
-        peer: Peer
+        peer: PeerInfo
     }
 }
 
@@ -118,7 +118,7 @@ class PeerGroupAgent implements Agent {
     static controlLog = new Logger(PeerGroupAgent.name, LogLevel.INFO);
 
     peerGroupId: string;
-    localPeer: Peer;
+    localPeer: PeerInfo;
 
     peerSource: PeerSource;
 
@@ -138,7 +138,7 @@ class PeerGroupAgent implements Agent {
 
     controlLog = PeerGroupAgent.controlLog;
 
-    constructor(peerGroupId: string, localPeer: Peer, peerSource: PeerSource, params?: Partial<Params>) {
+    constructor(peerGroupId: string, localPeer: PeerInfo, peerSource: PeerSource, params?: Partial<Params>) {
         this.peerGroupId = peerGroupId;
         this.localPeer = localPeer;
         
@@ -178,7 +178,7 @@ class PeerGroupAgent implements Agent {
         return this.peerGroupId;
     }
 
-    getLocalPeer(): Peer {
+    getLocalPeer(): PeerInfo {
         return this.localPeer;
     }
 
@@ -203,7 +203,7 @@ class PeerGroupAgent implements Agent {
 
                 if (this.shouldConnectToPeer(peer)) {
                     this.getNetworkAgent().acceptConnection(ci.connId, this.getAgentId());
-                    let pc = this.addPeerConnection(ci.connId, peer as Peer, PeerConnectionStatus.OfferSent);
+                    let pc = this.addPeerConnection(ci.connId, peer as PeerInfo, PeerConnectionStatus.OfferSent);
                     
                     this.sendOffer(pc);
                 }
@@ -215,10 +215,10 @@ class PeerGroupAgent implements Agent {
 
     }
 
-    getPeers() : Array<Peer> {
+    getPeers() : Array<PeerInfo> {
         
         let seen = new Set<Endpoint>();
-        let unique = new Array<Peer>();
+        let unique = new Array<PeerInfo>();
         for (const pc of this.connections.values()) {
             if (pc.status === PeerConnectionStatus.Ready && !seen.has(pc.peer.endpoint)) {
                 unique.push(pc.peer);
@@ -521,7 +521,7 @@ class PeerGroupAgent implements Agent {
 
 
     // Returns a peer corresponding to ep if we should connect, undefined otherwse.
-    private shouldConnectToPeer(p?: Peer) : boolean {
+    private shouldConnectToPeer(p?: PeerInfo) : boolean {
 
         if (p !== undefined &&                                           // - p is a peer
             this.connectionsPerEndpoint.size < this.params.minPeers &&   // - we're below minimum peers
@@ -546,7 +546,7 @@ class PeerGroupAgent implements Agent {
     }
 
     // Returns a peer corresponding to ep if we should accept the connection, undefined otherwise
-    private async shouldAcceptPeerConnection(p?: Peer) {
+    private async shouldAcceptPeerConnection(p?: PeerInfo) {
 
         return (
             p !== undefined &&                                         // - p is actually a peer
@@ -560,7 +560,7 @@ class PeerGroupAgent implements Agent {
 
     // Connection metadata: create / destroy a new PeerConnection
 
-    private addPeerConnection(connId: ConnectionId, peer: Peer, status: PeerConnectionStatus) {
+    private addPeerConnection(connId: ConnectionId, peer: PeerInfo, status: PeerConnectionStatus) {
 
         if (this.connections.get(connId) !== undefined) {
             throw new Error('Trying to add connection ' + connId + ', but it already exists.');
@@ -640,8 +640,8 @@ class PeerGroupAgent implements Agent {
 
         if (this.shouldConnectToPeer(peer)) {
             this.controlLog.debug(() => (this.localPeer.endpoint + ' will initiate peer connection to ' + ep + '.'));
-            let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as Peer).endpoint, this.getAgentId());
-            this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.Connecting);
+            let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as PeerInfo).endpoint, this.getAgentId());
+            this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.Connecting);
             this.connectionAttemptTimestamps.set(ep, Date.now());
         } else {
             this.controlLog.debug(() => (this.localPeer.endpoint + ' will NOT initiate peer connection to ' + ep + '.'));
@@ -658,7 +658,7 @@ class PeerGroupAgent implements Agent {
             if (this.shouldAcceptPeerConnection(peer)) {
                 this.controlLog.debug('Will accept!');
                 this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
-                this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.ReceivingConnection);
+                this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.ReceivingConnection);
             }
         }
 
@@ -704,7 +704,7 @@ class PeerGroupAgent implements Agent {
 
                 this.controlLog.debug('Will accept!');
                 // Act as if we had just received the connection, process offer below.
-                this.addPeerConnection(connId, peer as Peer, PeerConnectionStatus.WaitingForOffer);
+                this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.WaitingForOffer);
                 accept = true;
                 reply  = true;
 
@@ -967,7 +967,7 @@ class PeerGroupAgent implements Agent {
 
     // emitted events
 
-    private broadcastNewPeerEvent(peer: Peer) {
+    private broadcastNewPeerEvent(peer: PeerInfo) {
         let ev: NewPeerEvent = {
             type: PeerMeshEventType.NewPeer,
             content: {
@@ -999,4 +999,4 @@ class PeerGroupAgent implements Agent {
 
 }
 
-export { PeerGroupAgent, Peer, PeerMeshEventType, NewPeerEvent };
+export { PeerGroupAgent, PeerInfo, PeerMeshEventType, NewPeerEvent };

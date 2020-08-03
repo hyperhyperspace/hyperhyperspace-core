@@ -1,4 +1,4 @@
-import { PeerSource, Peer } from 'mesh/agents/peer';
+import { PeerSource, PeerInfo } from 'mesh/agents/peer';
 import { Store } from 'data/storage';
 import { SamplePeer } from './SamplePeer';
 import { Hash } from 'data/model';
@@ -19,10 +19,10 @@ class SamplePeerSource implements PeerSource {
         this.preload = preload;
     }
 
-    async getPeers(count: number): Promise<Array<Peer>> {
+    async getPeers(count: number): Promise<Array<PeerInfo>> {
         let search = await this.store.loadByClass(SamplePeer.className, {limit: count});
 
-        let result = new Array<Peer>();
+        let result = new Array<PeerInfo>();
 
         let seen = new Set<Hash>();
         for (let peer of search.objects) {
@@ -46,7 +46,7 @@ class SamplePeerSource implements PeerSource {
         return result;
     }
 
-    async getPeerForEndpoint(endpoint: string): Promise<Peer | undefined> {
+    async getPeerForEndpoint(endpoint: string): Promise<PeerInfo | undefined> {
 
         let hash = SamplePeer.hashForEndpoint(endpoint);
 

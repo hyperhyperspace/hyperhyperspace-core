@@ -147,7 +147,7 @@ test('2-node nested sync test', async (done) => {
     ticks = 0;
     while (lastInner !== undefined && ticks++ < 400 && lastInner?.size() === 0) {
         await new Promise(r => setTimeout(r, 50));
-        lastInner.loadAllOpsFromStore();
+        lastInner.loadAllChanges();
         //console.log('I'+ticks);
     }
 

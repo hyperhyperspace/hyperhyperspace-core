@@ -1,5 +1,5 @@
 import { AgentPod } from 'mesh/service/AgentPod';
-import { Peer, PeerGroupAgent } from 'mesh/agents/peer';
+import { PeerInfo, PeerGroupAgent } from 'mesh/agents/peer';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { TestPeerSource } from './TestPeerSource';
 import { RNGImpl } from 'crypto/random';
@@ -13,12 +13,12 @@ class TestPeerNetwork {
     
     static generate(topic: string, activePeers: number, totalPeers: number, peerConnCount: number): Array<AgentPod> {
 
-        let peers = new Array<Peer>();
+        let peers = new Array<PeerInfo>();
 
         for (let i=0; i<totalPeers; i++) {
             let id = Identity.fromKeyPair({'id':'peer' + i}, RSAKeyPair.generate(512));
             
-            let peer: Peer = {
+            let peer: PeerInfo = {
                 endpoint: LinkupManager.defaultLinkupServer + '/' + new RNGImpl().randomHexString(128),
                 identity: id,
                 identityHash: id.hash()

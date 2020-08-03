@@ -1,13 +1,13 @@
 import { PeerSource } from './PeerSource';
-import { Peer } from './PeerGroupAgent';
+import { PeerInfo } from './PeerGroupAgent';
 
 class EmptyPeerSource implements PeerSource {
-    async getPeers(count: number): Promise<Array<Peer>> {
+    async getPeers(count: number): Promise<Array<PeerInfo>> {
         count;
         return [];
     }
 
-    async getPeerForEndpoint(endpoint: string): Promise<Peer|undefined> {
+    async getPeerForEndpoint(endpoint: string): Promise<PeerInfo|undefined> {
         endpoint;
         return undefined;
     }

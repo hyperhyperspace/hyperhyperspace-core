@@ -1,10 +1,12 @@
-import { Peer, PeerSource, PeerGroupAgent } from '../agents/peer';
+import { PeerInfo, PeerSource, PeerGroupAgent } from '../agents/peer';
 import { MutableObject, HashedObject, Hash } from 'data/model';
 import { AgentPod } from './AgentPod';
 import { NetworkAgent, SecureNetworkAgent } from 'mesh/agents/network';
 import { StateGossipAgent } from 'mesh/agents/state';
 
 type gossipId  = string;
+
+type PeerGroup = { id: string, localPeer: PeerInfo, peerSource: PeerSource };
 
 class Mesh {
 
@@ -26,12 +28,12 @@ class Mesh {
         this.tracked = new Map();
     }
 
-    joinPeerGroup(peerGroupId: string, localPeer: Peer, peerSource: PeerSource) {
+    joinPeerGroup(pg: PeerGroup) {
 
-        let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId));
+        let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(pg.id));
 
         if (agent === undefined) {
-            agent = new PeerGroupAgent(peerGroupId, localPeer, peerSource);
+            agent = new PeerGroupAgent(pg.id, pg.localPeer, pg.peerSource);
         }
 
         this.pod.registerAgent(agent);
@@ -136,4 +138,4 @@ class Mesh {
 
 }
 
-export { Mesh }
+export { Mesh, PeerGroup }
