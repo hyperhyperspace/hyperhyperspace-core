@@ -33,7 +33,7 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
 
 
     async getPeers(count: number): Promise<PeerInfo[]> {
-        let peers =this.getPeersFromAllSources();
+        let peers = await this.getPeersFromAllSources();
         Shuffle.array(peers);
 
         if (peers.length > count) {
@@ -48,7 +48,7 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
     async getPeerForEndpoint(endpoint: Endpoint): Promise<PeerInfo | undefined> {
 
         for (const source of this.sources) {
-            let peerInfo = HashBasedPeerSource.lookupEndpointInSource(endpoint, source);
+            let peerInfo = await HashBasedPeerSource.lookupEndpointInSource(endpoint, source);
 
             if (peerInfo !== undefined) {
                 return peerInfo;
@@ -58,7 +58,7 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
         return undefined;
     }
 
-    private static lookupEndpointInSource<T extends HashedObject & Peer>(ep: Endpoint, source: HashedPeers<T>) : PeerInfo | undefined {
+    private static async lookupEndpointInSource<T extends HashedObject & Peer>(ep: Endpoint, source: HashedPeers<T>) : Promise<PeerInfo | undefined> {
         
         let hash = source.parseEndpoint(ep);
         let found: T|undefined = undefined;
@@ -74,10 +74,10 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
             }
         }
 
-        return found === undefined? found : found.asPeer();
+        return found !== undefined? await found.asPeer() : undefined;
     }
 
-    private getPeersFromSource(source: HashedPeers<T>) : Array<PeerInfo>{
+    private async getPeersFromSource(source: HashedPeers<T>) : Promise<Array<PeerInfo>> {
         
         let ts: Array<T>;
 
@@ -90,14 +90,22 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
             throw new Error('Unexpected type for peer source: ' + (typeof source));
         }
 
-        return ts.map((t:T) => t.asPeer());
+        let pis = new Array<PeerInfo>();
+
+        for (const t of ts) {
+            pis.push(await t.asPeer());
+        }
+
+        return pis;
+        //let x = ts.map((t:T) => t.asPeer());
+        //return x.map(async (p: Promise<PeerInfo>) => await p);
     }
 
-    private getPeersFromAllSources() : Array<PeerInfo> {
+    private async getPeersFromAllSources() : Promise<Array<PeerInfo>> {
         let result: Array<PeerInfo> = [];
 
         for (const source of this.sources) {
-            result = result.concat(this.getPeersFromSource(source));
+            result = result.concat(await this.getPeersFromSource(source));
         }
 
         return result;

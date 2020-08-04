@@ -22,18 +22,4 @@ export * from './mesh/agents/state';
 export * from './mesh/service';
 export * from './mesh/share';
 
-/*
-console.log(' it runs ');
-
-let b = new IdbBackend('test');
-let s = new Store(b);
-
-let kp = RSAKeyPair.generate(512);
-let id = Identity.fromKeyPair({'name': 'test'}, kp);
-
-s.save(kp).then(() => { s.save(id) });
-
-console.log(id.hash());
-*/
-//new Swarm('topic');
-//WebRTCConnection;
+export * from './util/shuffling';
