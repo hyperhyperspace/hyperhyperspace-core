@@ -5,3 +5,4 @@ export { PeerGroupAgent, PeerInfo, PeerMeshEventType, NewPeerEvent } from './pee
 export { Peer } from './peer/Peer';
 export { HashBasedPeerSource, HashBasedPeerContainer } from './peer/ContainerBasedPeerSource';
 export { ConstantPeerSource } from './peer/ConstantPeerSource';
+export { JoinPeerSources } from './peer/JoinPeerSources';

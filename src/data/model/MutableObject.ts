@@ -42,12 +42,14 @@ abstract class MutableObject extends HashedObject {
 
     abstract async mutate(op: MutationOp): Promise<void>;
 
-    watchForChanges(auto: boolean) {
+    watchForChanges(auto: boolean): boolean {
         if (auto) {
             this.bindToStore();
         } else {
             this.unbindFromStore();
         }
+
+        return this._boundToStore;
     }
 
     private bindToStore() {

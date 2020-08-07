@@ -1,21 +1,22 @@
-import { HashedObject } from "./HashedObject";
+import { HashedObject } from './HashedObject';
+import { MutableObject } from './MutableObject';
 
 class Namespace {
 
     id: string;
-    definitions: Map<string, HashedObject>;
+    definitions: Map<string, MutableObject>;
 
     constructor(id: string) {
         this.id = id;
         this.definitions = new Map();
     }
 
-    define(key: string, object: HashedObject) {
-        object.setId(HashedObject.generateIdForPath(this.id, key));
-        this.definitions.set(key, object);
+    define(key: string, mut: MutableObject) {
+        mut.setId(HashedObject.generateIdForPath(this.id, key));
+        this.definitions.set(key, mut);
     }
 
-    getAll() : IterableIterator<HashedObject> {
+    getAll() : IterableIterator<MutableObject> {
         return this.definitions.values();
     }    
 
