@@ -21,6 +21,15 @@ class MutableReference<T> extends MutableObject {
         this.setRandomId();
     }
 
+    getValue() : T | undefined {
+        return this._value;
+    }
+
+    async setValue(value: T) {
+        let op = new RefUpdateOp<T>(this, value, this._sequence);
+        await this.applyNewOp(op);
+    }
+
     async mutate(op: MutationOp): Promise<void> {
         let refUpdateOp = op as RefUpdateOp<T>;
 
@@ -62,8 +71,15 @@ class RefUpdateOp<T> extends MutationOp {
     value?: T;
 
 
-    constructor() {
-        super();
+    constructor(target?: MutableReference<T>, value?: T, sequence?: number) {
+        super(target);
+
+        if (target !== undefined) {
+            this.value = value;
+            this.sequence = sequence === undefined? 0 : sequence + 1;
+            this.timestamp = Timestamps.uniqueTimestamp();
+        }
+        
     }
 
     getClassName(): string {
