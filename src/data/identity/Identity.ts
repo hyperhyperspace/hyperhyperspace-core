@@ -9,13 +9,13 @@ class Identity extends HashedObject {
 
     static className = 'hss/Identity';
 
-    static fromKeyPair(info: object, keyPair: RSAKeyPair) : Identity {
+    static fromKeyPair(info: any, keyPair: RSAKeyPair) : Identity {
         let id = Identity.fromPublicKey(info, keyPair.makePublicKey());
         id.addKeyPair(keyPair);
         return id;
     }
 
-    static fromPublicKey(info: object, publicKey: RSAPublicKey) {
+    static fromPublicKey(info: any, publicKey: RSAPublicKey) {
         let id = new Identity();
 
         id.info = info;
@@ -24,7 +24,7 @@ class Identity extends HashedObject {
         return id;
     }
 
-    info?: object;
+    info?: any;
     publicKey?: RSAPublicKey;
 
     _keyPair?: RSAKeyPair;
