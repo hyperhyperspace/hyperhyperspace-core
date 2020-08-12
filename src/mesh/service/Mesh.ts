@@ -6,7 +6,7 @@ import { StateGossipAgent } from 'mesh/agents/state';
 
 type gossipId  = string;
 
-type PeerGroup = { id: string, localPeer: PeerInfo, peerSource: PeerSource };
+type PeerGroupInfo = { id: string, localPeer: PeerInfo, peerSource: PeerSource };
 
 class Mesh {
 
@@ -28,7 +28,7 @@ class Mesh {
         this.tracked = new Map();
     }
 
-    joinPeerGroup(pg: PeerGroup) {
+    joinPeerGroup(pg: PeerGroupInfo) {
 
         let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(pg.id));
 
@@ -138,4 +138,4 @@ class Mesh {
 
 }
 
-export { Mesh, PeerGroup }
+export { Mesh, PeerGroupInfo }

@@ -16,6 +16,10 @@ class Namespace {
         this.definitions.set(key, mut);
     }
 
+    get(key: string) : MutableObject | undefined {
+        return this.definitions.get(key);
+    }
+
     getAll() : IterableIterator<MutableObject> {
         return this.definitions.values();
     }    
