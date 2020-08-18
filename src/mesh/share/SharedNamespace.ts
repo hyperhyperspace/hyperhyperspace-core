@@ -2,7 +2,7 @@
 import { PeerInfo, PeerSource } from '../agents/peer';
 import { MutableObject, Hash, HashedObject } from 'data/model';
 import { Store, IdbBackend } from 'data/storage';
-import { Mesh } from 'mesh/service/Mesh';
+import { Mesh, SyncMode } from 'mesh/service/Mesh';
 
 type Config = {
     syncDependencies?: boolean
@@ -109,7 +109,7 @@ class SharedNamespace {
         if (!this.objects.has(hash)) {
             this.objects.set(mut.hash(), mut);
 
-            this.mesh.syncObjectWithPeerGroup(this.spaceId, mut, this.syncDependencies)
+            this.mesh.syncObjectWithPeerGroup(this.spaceId, mut, SyncMode.recursive);
         }
     }
 

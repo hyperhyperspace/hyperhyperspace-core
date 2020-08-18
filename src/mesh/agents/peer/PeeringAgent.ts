@@ -15,6 +15,7 @@ abstract class PeeringAgent implements Agent {
 
     abstract getAgentId(): string;
     abstract ready(pod: AgentPod): void;
+    abstract shutdown(): void;
 
     receiveLocalEvent(ev: Event): void {
         ev;

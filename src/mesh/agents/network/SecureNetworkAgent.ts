@@ -592,6 +592,10 @@ class SecureNetworkAgent implements Agent {
 
     }
 
+    shutdown() {
+        
+    }
+
     private sendAuthEvent(connId: ConnectionId, identityLocation: IdentityLocation, identityHash: Hash, status: IdentityAuthStatus, identity?: Identity) {
 
         let ev: ConnectionIdentityAuthEvent = {

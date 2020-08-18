@@ -60,16 +60,25 @@ class AgentPod {
 
     deregisterAgentById(id: AgentId) {
 
-        const ev: AgentSetChangeEvent = {
-            type: AgentPodEventType.AgentSetChange,
-            content: {
-                agentId: id,
-                change: AgentSetChange.Removal
+        let agent = this.agents.get(id);
+
+
+        if (agent !== undefined) {
+            const ev: AgentSetChangeEvent = {
+                type: AgentPodEventType.AgentSetChange,
+                content: {
+                    agentId: id,
+                    change: AgentSetChange.Removal
+                }
             }
+    
+            this.broadcastEvent(ev);
+            
+            agent.shutdown();
+
+            this.agents.delete(id);
         }
 
-        this.broadcastEvent(ev);
-        this.agents.delete(id);
     }
 
     getAgent(id: AgentId) {

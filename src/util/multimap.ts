@@ -34,6 +34,10 @@ class MultiMap<K, V> {
         return ret;
     }
 
+    deleteKey(key: K) : boolean {
+        return this.inner.delete(key);
+    }
+
     get(key: K) : Set<V> {
         let result = this.inner.get(key);
         

@@ -212,6 +212,9 @@ class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
         this.peerGroupAgent.sendToPeer(endpoint, this.getAgentId(), sendStateMessage);
     }
 
+    shutdown() {
+
+    }
 }
 
 export { LinearStateAgent }

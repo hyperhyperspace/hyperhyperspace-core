@@ -9,6 +9,8 @@ interface Agent {
     ready(pod: AgentPod) : void;
 
     receiveLocalEvent(ev: Event) : void;
+
+    shutdown() : void;
 }
 
 export { Agent, AgentId };

@@ -110,6 +110,9 @@ class TestConnectionAgent implements Agent {
         msgsLocalEP.add(source, content);
     }
 
+    shutdown() {
+        
+    }
 }
 
 export { TestConnectionAgent };

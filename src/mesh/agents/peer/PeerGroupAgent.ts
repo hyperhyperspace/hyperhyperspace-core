@@ -447,6 +447,13 @@ class PeerGroupAgent implements Agent {
 
     }
 
+    shutdown() {
+        if (this.tickTimerRef !== undefined) {
+            window.clearInterval(this.tickTimerRef);
+            this.tickTimerRef = undefined;
+        }
+    }
+
     // Deduplication messages.
 
     private sendChosenConnection(chosenConnId: ConnectionId, endpoint:Endpoint) {
@@ -849,7 +856,7 @@ class PeerGroupAgent implements Agent {
 
             let agent = this.getLocalAgent(agentId);
 
-            if (agent !== undefined && (agent as any).receivePeerMessage !== undefined) {
+            if (agent !== undefined && agent instanceof PeeringAgent) {
                 let peeringAgent = agent as PeeringAgent;
                 peeringAgent.receivePeerMessage(pc.peer.endpoint, sender, recipient, message);
             }

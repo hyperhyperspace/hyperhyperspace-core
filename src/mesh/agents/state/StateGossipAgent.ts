@@ -122,6 +122,12 @@ class StateGossipAgent extends PeeringAgent {
         this.trackedAgentIds.add(agentId);
     }
 
+    untrackAgentState(agentId: AgentId) {
+        this.trackedAgentIds.delete(agentId);
+        this.previousStatesCache.delete(agentId);
+        this.localState.delete(agentId);
+    }
+
     isTrackingState(agentId: AgentId) {
         return this.trackedAgentIds.has(agentId);
     }
@@ -200,6 +206,9 @@ class StateGossipAgent extends PeeringAgent {
         this.previousStatesCache.delete(agentId);
     }
 
+    shutdown() {
+        
+    }
 
     // cached states start at the front of the array and are
     // shifted right as new states to cache arrive.

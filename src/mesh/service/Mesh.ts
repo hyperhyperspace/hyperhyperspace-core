@@ -1,12 +1,23 @@
-import { PeerInfo, PeerSource, PeerGroupAgent } from '../agents/peer';
-import { MutableObject, HashedObject, Hash } from 'data/model';
-import { AgentPod } from './AgentPod';
+import { MutableObject, HashedObject, Hash, MutationOp } from 'data/model';
+
 import { NetworkAgent, SecureNetworkAgent } from 'mesh/agents/network';
-import { StateGossipAgent } from 'mesh/agents/state';
+import { StateGossipAgent, StateSyncAgent } from 'mesh/agents/state';
 
-type gossipId  = string;
+import { MultiMap } from 'util/multimap';
 
+import { PeerInfo, PeerSource, PeerGroupAgent } from '../agents/peer';
+import { AgentPod } from './AgentPod';
+import { Store } from 'data/storage';
+
+type GossipId  = string;
+type PeerGroupId = string;
 type PeerGroupInfo = { id: string, localPeer: PeerInfo, peerSource: PeerSource };
+
+enum SyncMode {
+    single    = 'single',     // just sync one object
+    full      = 'full',       // sync the object, and any mutable object referenced by it (possibly indirectly).
+    recursive = 'recursive'   // sync the object, and any mutable object referenced by it or its mutation ops.
+}
 
 class Mesh {
 
@@ -15,7 +26,26 @@ class Mesh {
     network: NetworkAgent;
     secured: SecureNetworkAgent;
 
-    tracked: Map<gossipId, Set<Hash>>;
+
+    // for each peer group, all the gossip ids we have created.
+    gossipIdsPerPeerGroup: MultiMap<string, GossipId>;
+
+    syncAgents: Map<PeerGroupId, Map<Hash, StateSyncAgent>>;
+
+    // for each gossip id, all the objects we've been explicitly asked to sync, and with which mode.
+    rootObjects: Map<GossipId, Map<Hash, SyncMode>>;
+
+    // given an object, all the gossip ids that are following it.
+    gossipIdsPerObject: MultiMap<Hash, GossipId>;
+
+    // keep track of callbacks for ALL objects we're monitoring (for recursive sync)
+    allNewOpCallbacks: Map<GossipId, Map<Hash, (opHash: Hash)  => Promise<void>>>;
+
+    // given an object, all the root objects it is being sync'd after.
+    allRootAncestors: Map<GossipId, MultiMap<Hash, Hash>>;
+
+    // given a root object, ALL the mut. objects that are being sync'd because of it.
+    allDependencyClosures: Map<GossipId, MultiMap<Hash, Hash>>;
 
     constructor() {
         this.pod = new AgentPod();
@@ -25,7 +55,18 @@ class Mesh {
         this.secured = new SecureNetworkAgent();
         this.pod.registerAgent(this.secured);
 
-        this.tracked = new Map();
+        this.gossipIdsPerPeerGroup = new MultiMap();
+
+        this.syncAgents         = new Map();
+
+        this.rootObjects        = new Map();
+
+        this.gossipIdsPerObject = new MultiMap();
+
+        this.allNewOpCallbacks     = new Map()
+        this.allRootAncestors      = new Map();
+        this.allDependencyClosures = new Map();
+        
     }
 
     joinPeerGroup(pg: PeerGroupInfo) {
@@ -34,15 +75,15 @@ class Mesh {
 
         if (agent === undefined) {
             agent = new PeerGroupAgent(pg.id, pg.localPeer, pg.peerSource);
+            this.pod.registerAgent(agent);
         }
 
-        this.pod.registerAgent(agent);
     }
 
-    syncObjectWithPeerGroup(peerGroupId: string, mut: MutableObject, recursive=true, gossipId?: string) {
+    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string) {
         
-        let mesh = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId)) as PeerGroupAgent | undefined;
-        if (mesh === undefined) {
+        let peerGroup = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId)) as PeerGroupAgent | undefined;
+        if (peerGroup === undefined) {
             throw new Error("Cannot sync object with mesh " + peerGroupId + ", need to join it first.");
         }
 
@@ -52,90 +93,348 @@ class Mesh {
 
         let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
         if (gossip === undefined) {
-            gossip = new StateGossipAgent(gossipId, mesh);
+            gossip = new StateGossipAgent(gossipId, peerGroup);
             this.pod.registerAgent(gossip);
+        } else if (gossip.getPeerControl().peerGroupId !== peerGroupId) {
+            throw new Error('The gossip id ' + gossipId + ' is already in use buy peer group ' + gossip.getPeerControl().peerGroupId);
         }
         
-        let t = this.tracked.get(gossipId)
-        if (t === undefined) {
-            t = new Set();
-            this.tracked.set(gossipId, t);
-        }
+        this.addRootSync(gossip, obj, mode);
+
+        this.gossipIdsPerPeerGroup.add(peerGroupId, gossipId);
+    }
         
-        let hash = mut.hash();
+    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, gossipId?: string) {
+        
+        for (const obj of objs) {
+            this.syncObjectWithPeerGroup(peerGroupId, obj, mode, gossipId);
+        }
 
-        if (!t.has(hash)) {
+    }
 
-            t.add(hash);
-            let sync = mut.createSyncAgent(mesh);
+    stopSyncObjectWithPeerGroup(peerGroupId: string, hash: Hash, store: Store, gossipId?: string) {
 
-            gossip.trackAgentState(sync.getAgentId());
-            this.pod.registerAgent(sync);
+        if (gossipId === undefined) {
+            gossipId = peerGroupId;
+        }
 
-            if (recursive) {
-                this.listenForNewOps(peerGroupId, gossipId, mut);
-                this.trackMutableDepsInOps(peerGroupId, gossipId, mut);
+        let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
+
+        if (gossip !== undefined) {
+            this.removeRootSync(gossip, hash, store);
+
+            let roots = this.rootObjects.get(gossipId);
+
+            if (roots === undefined || roots.size === 0) {
+                this.pod.deregisterAgent(gossip);
+                this.gossipIdsPerPeerGroup.delete(peerGroupId, gossipId);
+            }
+        }
+
+
+    }
+
+    stopSyncManyObjectsWithPeerGroup(peerGroupId: string, hashes: IterableIterator<Hash>, store: Store, gossipId?: string) {
+        
+        for (const hash of hashes) {
+            this.stopSyncObjectWithPeerGroup(peerGroupId, hash, store, gossipId);
+        }
+
+    }
+
+    private addRootSync(gossip: StateGossipAgent, obj: HashedObject, mode: SyncMode) {
+
+        const gossipId = gossip.gossipId;
+
+        let roots = this.rootObjects.get(gossipId)
+        if (roots === undefined) {
+            roots = new Map();
+            this.rootObjects.set(gossipId, roots);
+        }
+
+        let hash = obj.hash();
+        let oldMode = roots.get(hash);
+
+
+        if (oldMode === undefined) {
+            roots.set(hash, mode);
+
+            if (mode === SyncMode.single) {
+                if (obj instanceof MutableObject) {
+                    this.addSingleObjectSync(gossip, hash, obj);
+                } else {
+                    throw new Error('Asked to sync object in single mode, but it is not mutable, so there is nothing to do.');
+                }
+            } else {
+                this.addFullObjectSync(gossip, obj, hash, mode);
+            }
+
+        } else if (oldMode !== mode) {
+
+            throw new Error('The object ' + hash + ' was already being gossiped on ' + gossipId + ', but with a different mode. Gossiping with more than one mode is not supported.');
+        }
+    }
+
+    private removeRootSync(gossip: StateGossipAgent, objHash: Hash, store: Store) {
+
+        let roots = this.rootObjects.get(gossip.gossipId);
+        
+
+        if (roots !== undefined) {
+            let oldMode = roots.get(objHash);
+            
+            if (oldMode !== undefined) {
+                roots.delete(objHash);
+
+                if (oldMode === SyncMode.single) {
+                    let modes = this.getAllModesForObject(gossip, objHash);
+
+                    if (modes.size === 0) {
+                        this.removeSingleObjectSync(gossip, objHash);
+                    }
+                } else {
+                    this.removeFullObjectSync(gossip, objHash, objHash, oldMode, store);
+                }
+                
+            }
+        }
+
+    }
+
+    // get all the modes this objHash is being synced within all gossip ids
+    // that share their peer group with the provided one.
+
+    private getAllModesForObject(gossip: StateGossipAgent, objHash: Hash) : Set<SyncMode> {
+
+        let modes = new Set<SyncMode>();
+
+        if (gossip !== undefined) {
+            let peerGroupId = gossip.peerGroupAgent.peerGroupId;
+
+            let matchGossipIds = this.gossipIdsPerPeerGroup.get(peerGroupId);
+
+            if (matchGossipIds !== undefined) {
+                for (const matchGossipId of matchGossipIds) {
+                    let roots = this.rootObjects.get(matchGossipId);
+                    let mode = roots?.get(objHash);
+                    if (mode !== undefined) {
+                        modes.add(mode);
+                    }
+
+                    let rootAncestors = this.allRootAncestors.get(matchGossipId)?.get(objHash);
+
+                    if (rootAncestors !== undefined) {
+                        for (const rootHash of rootAncestors) {
+                            let rootMode = roots?.get(rootHash);
+                            if (rootMode !== undefined) {
+                                modes.add(rootMode);
+                            }
+                        }
+                    } 
+                }
+            }
+
+            return modes;
+        }
+
+        
+
+        return modes;
+
+    }
+
+    private addFullObjectSync(gossip: StateGossipAgent, obj: HashedObject, root: Hash, mode: SyncMode) {
+
+        const gossipId = gossip.gossipId;
+
+        let hash = obj.hash();
+
+        let dependencies = this.allDependencyClosures.get(gossipId);
+
+        if (dependencies === undefined) {
+            dependencies = new MultiMap();
+            this.allDependencyClosures.set(gossipId, dependencies);
+        }
+
+        if (!dependencies.get(root).has(hash)) {
+            
+
+            let rootAncestors = this.allRootAncestors.get(gossipId);
+    
+            if (rootAncestors === undefined) {
+                rootAncestors = new MultiMap();
+                this.allRootAncestors.set(gossipId, rootAncestors);
+            }
+
+            let targets = new Map<Hash , MutableObject>();
+    
+            if (mode === SyncMode.single) {
+                if (obj instanceof MutableObject) {
+                    targets.set(hash, obj);
+                }
+            } else {
+
+            // (mode === SyncMode.subobjects || mode === SyncMode.mutations)
+
+                let context = obj.toContext();
+
+                for (let [hash, dep] of context.objects.entries()) {
+                    if (dep instanceof MutableObject) {
+                        targets.set(hash, dep);
+                    }
+                }
+            }
+            
+            for (const [thash, target] of targets.entries()) {
+
+                this.addSingleObjectSync(gossip, thash, target);
+                
+                dependencies.add(root, thash);
+                rootAncestors.add(thash, root);
+
+                if (mode === SyncMode.recursive) {
+                    this.watchForNewOps(gossip, target);
+                    this.trackOps(gossip, target, root);
+                }
             }
         }
     }
 
-    syncManyObjectsWithPeerGroup(peerGroupId: string, muts: IterableIterator<MutableObject>, recursive = true, gossipId?: string) {
+    private removeFullObjectSync(gossip: StateGossipAgent, mutHash: Hash, oldRootHash: Hash, oldMode: SyncMode, store: Store) {
         
-        for (const mut of muts) {
-            this.syncObjectWithPeerGroup(peerGroupId, mut, recursive, gossipId);
+        let depClosures = this.allDependencyClosures.get(gossip.gossipId);
+        
+        let depClosure = depClosures?.get(mutHash);
+
+        if (depClosure !== undefined) {
+
+            depClosures?.deleteKey(mutHash);
+
+            for (const depHash of depClosure) {
+                this.allRootAncestors.get(gossip.gossipId)?.delete(depHash, oldRootHash);
+            }
+
+            for (const depHash of depClosure) {
+                const modes = this.getAllModesForObject(gossip, depHash);
+
+                if (modes.size === 0) {
+                    this.removeSingleObjectSync(gossip, depHash);
+                }
+
+                if (oldMode === SyncMode.recursive && !modes.has(SyncMode.recursive)) {
+                    this.unwatchForNewOps(gossip, depHash, store);
+                }
+            }
+        }
+    }
+
+    private addSingleObjectSync(gossip: StateGossipAgent, mutHash: Hash, mut: MutableObject) {
+
+        const peerGroup = gossip.peerGroupAgent;
+        const peerGroupId = peerGroup.peerGroupId;
+
+        let peerGroupSyncAgents = this.syncAgents.get(peerGroupId);
+        
+        if (peerGroupSyncAgents === undefined) {
+            peerGroupSyncAgents = new Map();
+            this.syncAgents.set(peerGroupId, peerGroupSyncAgents);
         }
 
+        let sync = peerGroupSyncAgents.get(mutHash);
+    
+        if (sync === undefined) {
+            sync = mut.createSyncAgent(gossip.peerGroupAgent);
+            this.pod.registerAgent(sync);
+            peerGroupSyncAgents.set(mutHash, sync);
+        }
+    
+        gossip.trackAgentState(sync.getAgentId());
     }
+
+    private removeSingleObjectSync(gossip: StateGossipAgent, mutHash: Hash) {
+
+        if (gossip !== undefined) {
+            const peerGroup = gossip.peerGroupAgent;
+            const peerGroupId = peerGroup.peerGroupId;
+    
+            let peerGroupSyncAgents = this.syncAgents.get(peerGroupId);
+            let sync = peerGroupSyncAgents?.get(mutHash);
+    
+            if (sync !== undefined) {
+                gossip.untrackAgentState(sync.getAgentId());
+                this.pod.deregisterAgent(sync);
+                peerGroupSyncAgents?.delete(mutHash);
+            }
+        }
+    }
+
 
     // recursive tracking of subobjects for state gossip & sync
 
 
     // Fetch existing ops on the databse and check if there are any mutable
     // references to track.
-    private async trackMutableDepsInOps(peerGroupId: string, gossipId: string, mut: MutableObject) {
-        let prev = await mut.getStore().loadByReference('target', mut.getLastHash());
-
-        for (let obj of prev.objects) {
-            this.trackMutableDeps(peerGroupId, gossipId, obj);
-        }
-    }
-
-    // Check the deps of obj for mutable objects and track them.
-    private async trackMutableDeps(peerGroupId: string, gossipId: string, obj: HashedObject) {
+    private async trackOps(gossip: StateGossipAgent, mut: MutableObject, root: Hash) {
         
-        let context = obj.toContext();
+        let validOpClasses = mut.getAcceptedMutationOpClasses();
+        let refs = await mut.getStore().loadByReference('target', mut.hash());
 
-        for (let [hash, dep] of context.objects.entries()) {
-            if (context.rootHashes.indexOf(hash) < 0) {
-                if (dep instanceof MutableObject &&
-                    !this.tracked.get(gossipId)?.has(hash)) {
-                    this.syncObjectWithPeerGroup(peerGroupId, dep, true, gossipId);
-                }
+
+        for (let obj of refs.objects) {
+
+            if (validOpClasses.indexOf(obj.getClassName()) >= 0) {
+                this.addFullObjectSync(gossip, mut, root, SyncMode.recursive); 
             }
         }
-
-        let externalDeps = context.findMissingDeps(context.rootHashes[0]);
-
-        const store = obj.getStore();
-        for (let hash of externalDeps.keys()) {
-            let dep = await store.load(hash) as HashedObject;
-            this.trackMutableDeps(peerGroupId, gossipId, dep);
-        }
-
     }
 
-    private listenForNewOps(peerGroupId: string, gossipId:string, mut: MutableObject) {
+    private watchForNewOps(gossip: StateGossipAgent, mut: MutableObject) {
 
-        mut.getStore().watchReferences('target', mut.getLastHash(), async (opHash: Hash) => {
-            let op = await mut.getStore().load(opHash);
-            if (op !== undefined && 
-                mut.getAcceptedMutationOpClasses().indexOf(op?.getClassName()) >= 0) {
+        let newOpCallbacks = this.allNewOpCallbacks.get(gossip.gossipId);
 
-                this.trackMutableDeps(peerGroupId, gossipId, op);
-            }
-        });
+        if (newOpCallbacks === undefined) {
+            newOpCallbacks = new Map();
+            this.allNewOpCallbacks.set(gossip.gossipId, newOpCallbacks);
+        }
+
+        let hash = mut.hash();
+
+        if (!newOpCallbacks.has(hash)) {
+            let callback = async (opHash: Hash) => {
+                let op = await mut.getStore().load(opHash);
+                if (op !== undefined && 
+                    mut.getAcceptedMutationOpClasses().indexOf(op.getClassName()) >= 0) {
+                        let mutOp = op as MutationOp;
+                        const roots = this.allRootAncestors.get(gossip.gossipId)?.get(mutOp.getTarget().hash())
+
+                        if (roots !== undefined) {
+                            for (const rootHash of roots) {
+                                if (this.rootObjects.get(gossip.gossipId)?.get(rootHash) === SyncMode.recursive) {
+                                    this.addFullObjectSync(gossip, op, rootHash, SyncMode.recursive);
+                                }
+                            }
+                        }
+                        
+                }
+            };
+
+            newOpCallbacks.set(hash, callback);
+
+            mut.getStore().watchReferences('target', mut.hash(), callback);
+        }
+    }
+
+    private unwatchForNewOps(gossip: StateGossipAgent, mutHash: Hash, store: Store) {
+        let newOpCallbacks = this.allNewOpCallbacks.get(gossip.gossipId);
+
+        const callback = newOpCallbacks?.get(mutHash);
+        
+        if (callback !== undefined) {
+            store.removeReferencesWatch('target', mutHash, callback);
+            newOpCallbacks?.delete(mutHash);
+        }   
     }
 
 }
 
-export { Mesh, PeerGroupInfo }
+export { Mesh, PeerGroupInfo, SyncMode }

@@ -72,8 +72,8 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
     static peerMessageLog = new Logger(TerminalOpsSyncAgent.name, LogLevel.INFO);
     static opTransferLog  = new Logger(TerminalOpsSyncAgent.name, LogLevel.INFO);
 
-    static idForObjectHash(objHash: Hash) {
-        return 'terminal-ops-for-' + objHash;
+    static syncAgentIdFor(objHash: Hash, peerGroupId: string) {
+        return 'terminal-ops-for-' + objHash + '-in-peer-group-' + peerGroupId;
     }
 
     params: TerminalOpsSyncAgentParams;
@@ -207,7 +207,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
     }
 
     getAgentId(): string {
-        return TerminalOpsSyncAgent.idForObjectHash(this.objHash);
+        return TerminalOpsSyncAgent.syncAgentIdFor(this.objHash, this.peerGroupAgent.peerGroupId);
     }
 
     ready(pod: AgentPod): void {
@@ -314,6 +314,13 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
 
     getObjectHash(): string {
         return this.objHash;
+    }
+
+    shutdown() {
+        this.unwatchStoreForOps();
+        if (this.opShippingInterval !== undefined) {
+            window.clearInterval(this.opShippingInterval);
+        } 
     }
 
     private async loadStoredState() : Promise<void> {
