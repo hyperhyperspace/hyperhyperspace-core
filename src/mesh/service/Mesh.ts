@@ -34,6 +34,7 @@ class Mesh {
 
     // for each gossip id, all the objects we've been explicitly asked to sync, and with which mode.
     rootObjects: Map<GossipId, Map<Hash, SyncMode>>;
+    rootObjectStores: Map<GossipId, Map<Hash, Store>>;
 
     // given an object, all the gossip ids that are following it.
     gossipIdsPerObject: MultiMap<Hash, GossipId>;
@@ -60,6 +61,7 @@ class Mesh {
         this.syncAgents         = new Map();
 
         this.rootObjects        = new Map();
+        this.rootObjectStores   = new Map();
 
         this.gossipIdsPerObject = new MultiMap();
 
@@ -79,6 +81,30 @@ class Mesh {
         }
 
     }
+
+    leavePeerGroup(peerGroupId: string) {
+
+        const gossipIds = this.gossipIdsPerPeerGroup.get(peerGroupId);
+
+        if (gossipIds !== undefined) {
+            for (const gossipId of gossipIds) {
+                const roots = this.rootObjects.get(gossipId);
+                if (roots !== undefined) {
+                    for (const hash of roots.keys()) {
+                        this.stopSyncObjectWithPeerGroup(peerGroupId, hash, gossipId);
+                    }
+                }
+                
+            }
+        }
+
+        let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId));
+
+        if (agent !== undefined) {
+            this.pod.deregisterAgent(agent);
+        }
+    }
+        
 
     syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string) {
         
@@ -112,7 +138,7 @@ class Mesh {
 
     }
 
-    stopSyncObjectWithPeerGroup(peerGroupId: string, hash: Hash, store: Store, gossipId?: string) {
+    stopSyncObjectWithPeerGroup(peerGroupId: string, hash: Hash, gossipId?: string) {
 
         if (gossipId === undefined) {
             gossipId = peerGroupId;
@@ -121,7 +147,7 @@ class Mesh {
         let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
 
         if (gossip !== undefined) {
-            this.removeRootSync(gossip, hash, store);
+            this.removeRootSync(gossip, hash);
 
             let roots = this.rootObjects.get(gossipId);
 
@@ -134,10 +160,10 @@ class Mesh {
 
     }
 
-    stopSyncManyObjectsWithPeerGroup(peerGroupId: string, hashes: IterableIterator<Hash>, store: Store, gossipId?: string) {
+    stopSyncManyObjectsWithPeerGroup(peerGroupId: string, hashes: IterableIterator<Hash>, gossipId?: string) {
         
         for (const hash of hashes) {
-            this.stopSyncObjectWithPeerGroup(peerGroupId, hash, store, gossipId);
+            this.stopSyncObjectWithPeerGroup(peerGroupId, hash, gossipId);
         }
 
     }
@@ -152,12 +178,19 @@ class Mesh {
             this.rootObjects.set(gossipId, roots);
         }
 
+        let rootStores = this.rootObjectStores.get(gossipId);
+        if (rootStores === undefined) {
+            rootStores = new Map();
+            this.rootObjectStores.set(gossipId, rootStores);
+        }
+
         let hash = obj.hash();
         let oldMode = roots.get(hash);
 
 
         if (oldMode === undefined) {
             roots.set(hash, mode);
+            rootStores.set(hash, obj.getResources()?.store as Store);
 
             if (mode === SyncMode.single) {
                 if (obj instanceof MutableObject) {
@@ -175,9 +208,10 @@ class Mesh {
         }
     }
 
-    private removeRootSync(gossip: StateGossipAgent, objHash: Hash, store: Store) {
+    private removeRootSync(gossip: StateGossipAgent, objHash: Hash) {
 
         let roots = this.rootObjects.get(gossip.gossipId);
+        let rootStores = this.rootObjectStores.get(gossip.gossipId);
         
 
         if (roots !== undefined) {
@@ -193,6 +227,7 @@ class Mesh {
                         this.removeSingleObjectSync(gossip, objHash);
                     }
                 } else {
+                    const store = rootStores?.get(objHash) as Store;
                     this.removeFullObjectSync(gossip, objHash, objHash, oldMode, store);
                 }
                 
