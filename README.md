@@ -1,7 +1,5 @@
 # The Hyper Hyper Space core library
 
-
-
 > An offline-first shared data library for creating p2p apps in the browser.
 
 ## Intro
@@ -47,7 +45,7 @@ Apps will configure groups of peers, and the HHS mesh provides primitves for eff
 
 ## Project status
 
-There is a demo of a simple fully in-browser p2p chat app running [here](https://hyperhper.space). However, the library has been fully rewritten since that demo was created.
+There is a demo of a simple fully in-browser p2p chat app running [here](https://hyperhyper.space). However, the library has been fully rewritten since that demo was created.
 
 Re-wiring the demo to use the current version of the library is currently WIP. Check out the `Account` library in the next section.
 
