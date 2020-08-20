@@ -29,7 +29,7 @@ by default.
 To enable the eventual sharing and synchronizing of local data, the HHS store follows the following considerations:
 
  - **The store saves only typed objects.** This allows performing basic semantic validation when new information is received from untrusted sources.
- - **Objects are retrieved using content-based addressing.** HHS provides a standard way to hash objects, and this hashes are the only way to refer to them. The store works as a key-value store, with hashes as keys, and objects are thus immutable.
+ - **Objects are retrieved using content-based addressing.** HHS provides a standard way to hash objects, and these hashes are the only way to refer to them. The store works as a key-value store, with hashes as keys, and objects are thus immutable.
  - **Objects can reference each other explicitly using their hashes.** Objects and their references thus form an immutable append-only DAG.
  - **Mutability is modelled through operational [CRDT](https://crdt.tech/)s.** Mutation ops are also represented as objects in the store. The type of the object determines how the operations will be interpeted, and how to derive state from them. 
  - **Identities are cryptographic.** HHS identities combine a public key with optional infornation about its holder. They are represented as an object in the store, and are referenced by their hash.
