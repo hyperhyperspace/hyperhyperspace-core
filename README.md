@@ -1,5 +1,7 @@
 # The Hyper Hyper Space core library
 
+
+
 > An offline-first shared data library for creating p2p apps in the browser.
 
 ## Intro
