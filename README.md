@@ -42,7 +42,7 @@ A peer in the HHS mesh network is a pair containing an identity (i.e. a typed id
 
 Peer groups use simple randomized algorithms to choose how peers interconnect to each other within the group, epidemic gossip to discover any new state, and cryptographically secured deltas to send missing operations back and forth.
 
-Apps will configure groups of peers, and the HHS mesh provides primitves for effortlessly synchronizing objects within each peer group (this boils down to syncrhonizing their sets of CRDT operations for each shared object).
+Apps will configure groups of peers, and the HHS mesh provides primitives for effortlessly synchronizing objects within each peer group (this boils down to syncrhonizing their sets of CRDT operations for each shared object).
 
 
 ## Project status
