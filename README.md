@@ -22,8 +22,7 @@ Enable the creation of p2p apps that work in-browser, without requiring _any_ in
 
 by default.
 
-
-## Data model
+## Data model
 
 To enable the eventual sharing and synchronizing of local data, the HHS store follows the following considerations:
 
@@ -51,7 +50,7 @@ There is a demo of a simple fully in-browser p2p chat app running [here](https:/
 Re-wiring the demo to use the current version of the library is currently WIP. Check out the `Account` library in the next section.
 
 
-## Libraries
+## Libraries
 
  - [Account](https://github.com/hyperhyperspace/hyperhyperspace-account): This library allows your app to creates a personal cloud using all your devices, based on your HHS identity, and syncrhonizing information across them using the HHS store. It also allows you to add other HHS identities to a personal `Contacts` list, and slectively share information with them through mingling your and one of your contacts' devices (forming a shared cloud just for you two).
 
