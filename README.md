@@ -17,7 +17,7 @@ Apps will most of the time work on the local store as if it were universal (i.e.
 
 ## Objectives
 
-Enable the creation of p2p apps that work in-browser, without requiring _any_ infrastructure, and that are as practical and functional as centralized apps. Find abstractions and algorithms that make creating and reasoning about these apps intuitive and predictable. Explore new models for online collaboration platforms that follow the p2p model while are frictionless to use for the general public, and are
+Enable the creation of p2p apps that work in-browser, without requiring _any_ infrastructure, and that are as practical and functional as centralized apps. Find abstractions and algorithms that make creating and reasoning about these apps intuitive and predictable. Explore new models for online collaboration platforms that follow the p2p model yet are frictionless to use for the general public, and are
 
 - respectful of everyone's privacy and data ownership rights
 - transparent in their handling of information
