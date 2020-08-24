@@ -4,13 +4,19 @@
 
 An HHS application persists data into a local store, that is similar to a key-value store. It uses a well defined data model that imposes some constraints on the information being saved, with the intention of making synchronization with other stores in HHS's [p2p mesh](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/MESH.md) possible. 
 
-The store is implemented in [src/data/storage/Store.ts](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/storage/Store.ts). It works as an object store, and is type-aware. This enables the store to perform same basic sanity checks on the data it is receiving, and the type it is expecting. 
+The store is implemented in [src/data/storage/Store.ts](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/storage/Store.ts). It works as an object store, and is type-aware. This enables it to perform same basic sanity checks on the data it is receiving, based on the type it is expecting.
+
+Note: to try these examples out, you need to install Hyper Hyper Space's core library. We recommend using the alias ```hhs``` for the core module, like this:
+
+```
+yarn add hhs@npm:@hyper-hyper-space/core
+```
 
 ### Content-based addressing
 
-Stored objects can be retreived from the store by using a hash of their contents. 
+Stored objects can be retreived from the store by using a hash of their contents as the key. 
 
-To indicate a given class is meant to be stored, it should extend [HashedObject](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/model/HashedObject.ts). Take a look at the example below. To work around Typescript type erasure on compilation, we'll add some explicit type information.
+To indicate a given class is meant to be stored, a base class [HashedObject](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/model/HashedObject.ts) is provided. Take a look at the example below (to work around Typescript type erasure on compilation, we'll add some explicit type information).
 
 ```
 import { Hash, HashedObject } from 'hhs';
@@ -43,11 +49,11 @@ class Person extends HashedObject {
 HashedObject.registerClass(Person.className, Person);
 ```
 
-Notice that Typescript's compile time checks are not very helpful in this scenario: we want to be able to send and receive instances of ```Person``` over the network, so we need to validate them in runtime. In this case, we are making the instance members ```name``` and ```birthday``` mandatory. The store will refuse to accept an instance of ```Person``` whose contents do not comply to its ```validate``` method. We're also declaring a meta-type name ```hhs-exaple/Person``` and later declaring that Person is our implementation for that type. The peer on the other end of the network may be using another implementation of this ```hhs-exaple/Person``` meta-type, and its explicit declaration enables interoperation.
+Notice that Typescript's compile time checks are not very helpful in this scenario: we want to be able to send instances of ```Person``` over an untrusted network, so we need to validate them in runtime as they are received. In this case, we are making the instance members ```name``` and ```birthday``` mandatory. The store will refuse to accept an instance of ```Person``` whose contents do not comply to its ```validate``` method. We're also declaring a meta-type name ```hhs-exaple/Person``` and later declaring that Person is our implementation for that type. The peer on the other end of the network may be using another implementation of this ```hhs-exaple/Person``` meta-type, and this explicit declaration enables interoperation.
 
-If this library is implemented using a programming language with a richer type system, some of this annotations could be automatically derived.
+If this library is implemented using a programming language with a richer type system in the future, some of these annotations could be automatically derived.
 
-Let's see an exaple using our ```Person``` type and a local Store backed by the default HHS storage backend (which is IndexedDB-based, from use in the browser):
+Let's see an exaple of using our ```Person``` type and a local Store backed by the default storage backend (which is IndexedDB-based, for use in the browser):
 
 ```
 import { Store, IdbBackend } from 'hhs';
