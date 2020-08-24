@@ -89,7 +89,7 @@ class Country extends HashedObject {
 
 In the example above, a given person would be stored only once in the store, and the ```president``` instance member above would be just a typed reference to its hash.
 
-### Mutability
+### Mutability
 
 However, what we've described so far presents a problem: while we can modify any of these objects and store it again, that would also change the object's hash. Therefore, we'd be creating a second, independnent object in the store.
 
@@ -120,7 +120,7 @@ argentina.save();
 // This saves the op setting hte value of argentina.president to charly.
 ```
 
-### Identity and authentication
+### Identity and authentication
 
 HHS has a native [Identity](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/identity/Identity.ts) implementation, that combines a public key with optional immutable information about its holder. It conforms to the ```HashedObject``` type described above:
 
@@ -146,7 +146,7 @@ ms.setAuthor(me);
 store.save(ms);
 ```
 
-### Summary
+### Summary
 
 Summing up, in oder too enable the eventual sharing and synchronizing of local data, the HHS store follows the following considerations:
 
