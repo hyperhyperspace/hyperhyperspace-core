@@ -8,9 +8,9 @@
 
 In the same way in which the Internet bridges networks together, the HHS attempts to decouple data from the apps used to manage it, thus enabling individuals to have better ownership and control over their information.
 
-Apps that use the HHS model store infromation locally (the current implementation works in a modern web browser, effectively turning it into an autonomus node in a p2p network).
+Apps that use the HHS model store information locally (the current implementation works in a modern web browser, effectively turning it into an autonomus node in a p2p network).
 
-Apps will most of the time work on the local store as if it were universal (i.e. a magic database that contains all the needed information from everybody). The HHS library contains networking primitives that allow apps to from ad-hoc groups of peers that make the necessary information flow from one local store to another. Usually each app module can be split in two, cleanly separating all the information handling from the synchronization logic.
+Apps will most of the time work on the local store as if it were universal (i.e. a magic database that contains all the needed information from everybody). The HHS library contains networking primitives that allow apps to form ad-hoc groups of peers that make the necessary information flow from one local store to another. Usually each app module can be split in two, cleanly separating all the information handling from the synchronization logic.
 
 **This project is experimental. All APIs may change, bugs exist and the crypto has not been audited.**
 
