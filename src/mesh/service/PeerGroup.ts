@@ -8,11 +8,19 @@ import { PeerGroupInfo } from './Mesh';
 
 abstract class PeerGroup {
 
-    abstract getResources(): Resources;
+    resources?: Resources;
+
+    getResources(): Resources | undefined {
+        return this.resources;
+    }
 
     abstract getPeerGroupId(): string;
     abstract getLocalPeer(): Promise<PeerInfo>;
     abstract getPeerSource(): Promise<PeerSource>;
+
+    async init(resources?: Resources): Promise<void> {
+        this.resources = resources;
+    }
 
     async getPeerGroupInfo(): Promise<PeerGroupInfo> {
         return {
