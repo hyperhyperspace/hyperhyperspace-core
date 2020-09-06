@@ -12,7 +12,7 @@ import { Backend, BackendSearchParams, BackendSearchResults } from './Backend';
 IndexedDbShim;
 
 type IdbStorageFormat = {
-    literal    : Literal,
+    literal   : Literal,
     indexes   : any,
     timestamp : string,
     sequence  : number

@@ -48,6 +48,15 @@ class MultiMap<K, V> {
         }
     }
 
+    hasKey(key: K) : boolean {
+        return this.inner.has(key);
+    }
+
+    has(key: K, value: V) : boolean {
+        const kv = this.inner.get(key);
+        return kv !== undefined && kv.has(value);
+    }
+
     asMap() {
         return new Map(this.inner.entries());
     }
