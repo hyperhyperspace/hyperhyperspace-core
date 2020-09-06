@@ -1,7 +1,8 @@
+import { Store } from 'storage/store';
+
 import { RNGImpl } from 'crypto/random';
 
 import { Identity } from '../identity/Identity';
-import { Store } from '../storage/Store';
 
 import { Hashing, Hash } from './Hashing';
 

@@ -1,8 +1,9 @@
-import { Store, IdbBackend } from 'data/storage';
+import { Store } from 'storage/store';
+import { IdbBackend } from 'storage/backends';
 import { HashedObject, HashedSet, HashReference, MutationOp } from 'data/model';
 
-import { SomethingHashed, createHashedObjects } from './types/SomethingHashed';
-import { SomethingMutable, SomeMutation } from './types/SomethingMutable';
+import { SomethingHashed, createHashedObjects } from '../data/types/SomethingHashed';
+import { SomethingMutable, SomeMutation } from '../data//types/SomethingMutable';
 import { describeProxy } from 'config';
 
 

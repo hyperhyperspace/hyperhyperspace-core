@@ -1,7 +1,7 @@
 
 import { HashedObject, Literal } from './HashedObject';
 import { Hash, Hashing } from './Hashing';
-import { Store } from 'data/storage/Store';
+import { Store } from 'storage/store';
 import { Mesh } from 'mesh/service';
 
 type LiteralContext = { rootHashes: Array<Hash>, literals: any };

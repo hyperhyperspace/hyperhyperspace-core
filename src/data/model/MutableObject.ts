@@ -1,9 +1,10 @@
+import { Store } from 'storage/store';
+
 import { HashedObject } from './HashedObject';
 import { Context } from './Context';
 import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
-import { Store } from 'data/storage/Store';
 import { Logger, LogLevel } from 'util/logging';
 import { StateSyncAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
 import { PeerGroupAgent } from 'mesh/agents/peer';

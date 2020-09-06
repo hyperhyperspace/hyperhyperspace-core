@@ -3,8 +3,10 @@
 
 export * from './data/identity';
 export * from './data/model';
-export * from './data/storage';
 export * from './data/containers';
+
+export * from './storage/backends';
+export * from './storage/store';
 
 export * from './crypto/ciphers';
 export * from './crypto/hashing';

@@ -1,7 +1,8 @@
 
 import { PeerInfo, PeerSource } from '../agents/peer';
 import { MutableObject, Hash, HashedObject } from 'data/model';
-import { Store, IdbBackend } from 'data/storage';
+import { Store } from 'storage/store';
+import { IdbBackend } from 'storage/backends';
 import { Mesh, SyncMode } from 'mesh/service/Mesh';
 
 type Config = {

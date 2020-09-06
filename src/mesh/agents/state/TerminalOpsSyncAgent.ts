@@ -2,7 +2,8 @@
 import { HashedObject, HashedSet, Hash } from 'data/model';
 import { MutationOp } from 'data/model';
 import { Context, Literal, LiteralContext, Dependency } from 'data/model';
-import { Store } from 'data/storage';
+
+import { Store } from 'storage/store';
 
 import { AgentPod } from '../../service/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';

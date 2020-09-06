@@ -1,13 +1,13 @@
 //require('indexeddbpoly');
 
-
-import { IndexedDbShim } from 'poly/indexeddbpoly';
-import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
-import { Literal } from 'data/model';
-import { Hash } from 'data/model/Hashing';
-
 import { openDB, IDBPDatabase } from 'idb';
 import { Logger, LogLevel } from 'util/logging';
+
+import { IndexedDbShim } from 'poly/indexeddbpoly';
+import { Literal, Hash } from 'data/model';
+
+
+import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
 
 IndexedDbShim;
 
@@ -275,4 +275,4 @@ class IdbBackend implements Backend {
     }
 }
 
-export { IdbBackend }
+export { IdbBackend };

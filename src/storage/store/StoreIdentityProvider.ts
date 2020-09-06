@@ -1,9 +1,7 @@
-import { LiteralContext, Context } from '../model/Context';
-import { Literal, HashedObject } from '../model/HashedObject';
+import { Literal, HashedObject, LiteralContext, Context } from 'data/model';
 
-import { IdentityProvider } from '../identity/IdentityProvider';
-import { Identity } from '../identity/Identity';
-import { RSAKeyPair } from '../identity/RSAKeyPair';
+import { IdentityProvider } from 'data/identity/IdentityProvider';
+import { Identity, RSAKeyPair } from 'data/identity';
 
 import { Store } from './Store';
 

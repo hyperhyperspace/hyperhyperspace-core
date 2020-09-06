@@ -20,4 +20,4 @@ interface Backend {
     searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
 }
 
-export { Backend, BackendSearchParams, BackendSearchResults }
+export { Backend, BackendSearchParams, BackendSearchResults };

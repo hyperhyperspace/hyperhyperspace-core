@@ -1,5 +1,5 @@
 import { PeerSource, PeerInfo } from 'mesh/agents/peer';
-import { Store } from 'data/storage';
+import { Store } from 'storage/store';
 import { SamplePeer } from './SamplePeer';
 import { Hash } from 'data/model';
 

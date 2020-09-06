@@ -1,4 +1,4 @@
-import { Backend, BackendSearchParams, BackendSearchResults } from 'data/storage/Backend'; 
+import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
 import { HashedObject, MutableObject, Literal, Context } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 

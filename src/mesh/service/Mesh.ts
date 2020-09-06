@@ -7,7 +7,8 @@ import { MultiMap } from 'util/multimap';
 
 import { PeerInfo, PeerSource, PeerGroupAgent } from '../agents/peer';
 import { AgentPod } from './AgentPod';
-import { Store } from 'data/storage';
+
+import { Store } from 'storage/store';
 
 type GossipId  = string;
 type PeerGroupId = string;
