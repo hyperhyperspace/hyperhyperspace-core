@@ -5,59 +5,87 @@ import { describeProxy } from 'config';
 import { Logger, LogLevel } from 'util/logging';
 
 describeProxy('Peer group management', () => {
-    test('2-peer group set up', async (done) => {
+    test('2-peer group set up (wrtc)', async (done) => {
 
-
-        let peerNetworkId = new RNGImpl().randomHexString(64);
-        let networks = TestPeerNetwork.generate(peerNetworkId, 2, 2, 1);
-        networks;
-
-        let control0 = networks[0].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
-
-        let checks = 0;
-        let stats = control0.getStats();
-        while (stats.peers < 1 || stats.peers !== stats.connections) {
-            await new Promise(r => setTimeout(r, 50));
-            if (checks>400) {
-                break;
-            }
-            checks++;
-            stats = control0.getStats();
-        }
-
-
-        expect(control0.getPeers().length).toEqual(1);
-        expect(stats.connections).toEqual(stats.peers);
-
-        done();
+        await twoPeerGroupTest(done, false);
+        
     }, 25000);
-    test('4-peer group clique set up', async (done) => {
 
+    test('2-peer group set up (ws)', async (done) => {
 
-        let peerNetworkId = new RNGImpl().randomHexString(64);
-        let networks = TestPeerNetwork.generate(peerNetworkId, 4, 4, 3);
-        networks;
+        await twoPeerGroupTest(done, true);
 
-        let control0 = networks[0].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
+    }, 25000);
 
-        control0.controlLog = new Logger('mesh-debug', LogLevel.INFO);
+    test('4-peer group clique set up (wrtc)', async (done) => {
 
-        let checks = 0;
-        let stats = control0.getStats();
-        while (stats.peers < 3 || stats.peers !== stats.connections) {
-            await new Promise(r => setTimeout(r, 50));
-            if (checks>400) {
-                
-                break;
-            }
-            checks++;
-            stats = control0.getStats();
-        }
+        await fourPeerCliqueGroupTest(done, false);
 
+    }, 35000);
 
-        expect(control0.getPeers().length).toEqual(3);
-        expect(stats.connections).toEqual(stats.peers);
+    test('4-peer group clique set up (ws)', async (done) => {
 
-        done();
+        await fourPeerCliqueGroupTest(done, true);
+
     }, 35000);
 });
+
+async function twoPeerGroupTest(done: (() => void), useWebsockets: boolean) {
+
+    const basePort = 5000;
+    let peerNetworkId = new RNGImpl().randomHexString(64);
+    let networks = TestPeerNetwork.generate(peerNetworkId, 2, 2, 1, useWebsockets, basePort);
+    networks;
+
+
+
+    let control0 = networks[0].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
+
+    let checks = 0;
+    let stats = control0.getStats();
+    while (stats.peers < 1 || stats.peers !== stats.connections) {
+        await new Promise(r => setTimeout(r, 50));
+        if (checks>400) {
+            break;
+        }
+        checks++;
+        stats = control0.getStats();
+    }
+
+
+    expect(control0.getPeers().length).toEqual(1);
+    expect(stats.connections).toEqual(stats.peers);
+
+    done();
+}
+
+async function fourPeerCliqueGroupTest(done: () => void, useWebsockets: boolean) {
+
+
+    const basePort = 5100;
+    let peerNetworkId = new RNGImpl().randomHexString(64);
+    let networks = TestPeerNetwork.generate(peerNetworkId, 4, 4, 3, useWebsockets, basePort);
+    networks;
+
+    let control0 = networks[0].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
+
+    control0.controlLog = new Logger('mesh-debug', LogLevel.INFO);
+
+    let checks = 0;
+    let stats = control0.getStats();
+    while (stats.peers < 3 || stats.peers !== stats.connections) {
+        await new Promise(r => setTimeout(r, 50));
+        if (checks>400) {
+            
+            break;
+        }
+        checks++;
+        stats = control0.getStats();
+    }
+
+
+    expect(control0.getPeers().length).toEqual(3);
+    expect(stats.connections).toEqual(stats.peers);
+
+    done();
+}

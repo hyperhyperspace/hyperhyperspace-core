@@ -50,10 +50,16 @@ class TestConnectionAgent implements Agent {
                     this.networkAgent?.sendMessage(connId, this.getAgentId(), message);
                     
                     return true;
+                } else {
+                    console.log('CONNECTION IS NOT READY: ' + connId);
                 }
                 
             }   
         }
+
+        console.log('HERE HERE');
+        console.log((this.established.get(local) as MultiMap<Endpoint, ConnectionId>).get(remote));
+
 
         return false;
     }

@@ -3,6 +3,8 @@ import { Logger, LogLevel } from '../../util/logging';
 
 import { WebRTCShim } from 'poly/webrtcpoly';
 
+import { Connection } from './Connection';
+
 /* A WebRTC Connection is used to create a bi-directional
    DataChannel between two hosts. A LinkupManager object 
    is used to send signalling messages between the two parties
@@ -11,7 +13,7 @@ import { WebRTCShim } from 'poly/webrtcpoly';
 const RTC_CONN_DESCRIPTION = 'RTC_CONN_DESCRIPTION';
 const ICE_CANDIDATE = 'ICE_CANDIDATE';
 
-class WebRTCConnection {
+class WebRTCConnection implements Connection {
 
     static logger = new Logger(WebRTCConnection.name, LogLevel.INFO);
 
@@ -26,8 +28,8 @@ class WebRTCConnection {
     initiator    : boolean;
     gatheredICE  : boolean;
 
-    readyCallback   : (conn: WebRTCConnection) => void;
-    messageCallback : ((data: any, conn:WebRTCConnection) => void) | null;
+    readyCallback   : (conn: Connection) => void;
+    messageCallback : ((data: any, conn: Connection) => void) | undefined;
 
     incomingMessages : any[];
 
@@ -37,7 +39,7 @@ class WebRTCConnection {
 
     private handleSignallingMessage : (message: any) => void;
 
-    constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: WebRTCConnection) => void) {
+    constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void) {
 
         this.linkupManager = linkupManager;
         this.localAddress  = local;
@@ -48,7 +50,7 @@ class WebRTCConnection {
         this.gatheredICE  = false;
 
         this.readyCallback   = readyCallback;
-        this.messageCallback = null;
+        this.messageCallback = undefined;
 
         this.incomingMessages = [];
 
@@ -94,7 +96,7 @@ class WebRTCConnection {
             };
     }
 
-    getCallId() {
+    getConnectionId() {
         return this.callId;
     }
 
@@ -115,7 +117,7 @@ class WebRTCConnection {
         return this.channel !== undefined && this.channel.readyState === 'open';
     }
 
-    setMessageCallback(messageCallback: (message: any, conn: WebRTCConnection) => void) {
+    setMessageCallback(messageCallback: (message: any, conn: Connection) => void) {
         this.messageCallback = messageCallback;
 
         if (messageCallback != null) {
@@ -129,7 +131,7 @@ class WebRTCConnection {
     /* To initiate a connection, an external entity must create
         a WebRTCConnection object and call the open() method. */
 
-    open(channelName: string) {
+    open(channelName='mesh-network-channel') {
         this.init();
         this.initiator   = true;
         this.channelName = channelName;

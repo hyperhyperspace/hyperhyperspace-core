@@ -3,8 +3,11 @@ import { Event, AgentPod } from '../../service/AgentPod';
 import { Logger, LogLevel } from 'util/logging';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { LinkupManager } from 'net/linkup/LinkupManager';
+import { Connection } from 'net/transport/Connection';
 import { WebRTCConnection } from 'net/transport/WebRTCConnection';
 import { RNGImpl } from 'crypto/random';
+import { LinkupServerConnection } from 'net/linkup/LinkupServerConnection';
+import { WebSocketConnection } from 'net/transport/WebSocketConnection';
 
 type Endpoint = string;
 
@@ -88,14 +91,14 @@ class NetworkAgent implements Agent {
     linkupManager : LinkupManager;
 
     listening   : Set<Endpoint>;
-    connections : Map<ConnectionId, WebRTCConnection>;
+    connections : Map<ConnectionId, Connection>;
 
     connectionInfo : Map<ConnectionId, ConnectionInfo>;
     deferredInitialMessages : Map<ConnectionId, Array<any>>;
     
-    messageCallback : (data: any, conn: WebRTCConnection) => void;
+    messageCallback : (data: any, conn: Connection) => void;
 
-    connectionReadyCallback : (conn: WebRTCConnection) => void;
+    connectionReadyCallback : (conn: Connection) => void;
 
     newConnectionRequestCallback : (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => void;
 
@@ -123,11 +126,11 @@ class NetworkAgent implements Agent {
         this.connectionInfo          = new Map();
         this.deferredInitialMessages = new Map();
 
-        this.messageCallback = (data: any, conn: WebRTCConnection) => {
+        this.messageCallback = (data: any, conn: Connection) => {
 
-            this.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getCallId())?.localEndpoint + ' received message: ' + data);
+            this.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getConnectionId())?.localEndpoint + ' received message: ' + data);
 
-            const connectionId = conn.getCallId(); 
+            const connectionId = conn.getConnectionId(); 
             const connInfo = this.connectionInfo.get(connectionId);
 
             const message = JSON.parse(data);
@@ -152,12 +155,15 @@ class NetworkAgent implements Agent {
             }
         };
 
-        this.connectionReadyCallback = (conn: WebRTCConnection) => {
-            const connectionId = conn.getCallId();
+        this.connectionReadyCallback = (conn: Connection) => {
+            const connectionId = conn.getConnectionId();
             const connInfo = this.connectionInfo.get(connectionId);
             if (connInfo === undefined) {
+                NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', but conn. info not present. Attempting to close.');
                 conn.close();
             } else {
+
+                NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', status was ' + connInfo.status + ' in ' + connInfo.localEndpoint);
 
                 if (connInfo.status !== ConnectionStatus.Ready) {
                     this.connections.set(connectionId, conn);
@@ -171,6 +177,9 @@ class NetworkAgent implements Agent {
                             status          : ConnectionStatus.Ready
                         }
                     };
+
+                    NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', status now is ' + connInfo.status + ' in ' + connInfo.localEndpoint);
+
                     this.pod?.broadcastEvent(ev);
                 }
 
@@ -231,7 +240,7 @@ class NetworkAgent implements Agent {
             // check agent set request timeout if connection is healthy
 
             for (const conn of this.connections.values()) {
-                let callId = conn.getCallId();
+                let callId = conn.getConnectionId();
 
                 let info = this.connectionInfo.get(callId) as ConnectionInfo;
 
@@ -286,20 +295,24 @@ class NetworkAgent implements Agent {
                 if (conn === undefined) {
                     const receiver = LinkupAddress.fromURL(connInfo.localEndpoint);
                     const sender   = LinkupAddress.fromURL(connInfo.remoteEndpoint);
-                    conn = new WebRTCConnection(this.linkupManager, receiver, sender, connId, this.connectionReadyCallback);
 
+                    if (LinkupServerConnection.isWebRTCBased(connInfo.remoteEndpoint)) {
+                        conn = new WebRTCConnection(this.linkupManager, receiver, sender, connId, this.connectionReadyCallback);
+                    } else {
+                        conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback);
+                    }
+                    
                 }
 
-                conn.setMessageCallback(this.messageCallback);
-                conn.answer(message);
+                if (conn instanceof WebRTCConnection || conn instanceof WebSocketConnection) {
+                    conn.setMessageCallback(this.messageCallback);
+                    conn.answer(message);
+                }
             } else {
-                conn.receiveSignallingMessage(message);
+                if (conn instanceof WebRTCConnection) {
+                    conn.receiveSignallingMessage(message);
+                }   
             }
-        }
-
-        if (message !== undefined) {
-
-
         }
     }
 
@@ -323,6 +336,7 @@ class NetworkAgent implements Agent {
 
         this.listening.add(endpoint);
 
+
         this.linkupManager.listenForQueryResponses(endpoint, (ep: string, addresses: Array<LinkupAddress>) => {
 
             if (this.listening.has(ep)) {
@@ -344,10 +358,13 @@ class NetworkAgent implements Agent {
 
         });
 
+
+
         this.logger.debug('Listening for endpoint ' + endpoint);
         this.linkupManager.listenForMessagesNewCall(address, this.newConnectionRequestCallback);
     }
 
+    //FIXME: remainder: do ws cleanup for not-yet-accepted connections here as well.
     shutdown() {
         this.linkupManager.shutdown();
         if (this.intervalRef !== undefined) {
@@ -355,8 +372,8 @@ class NetworkAgent implements Agent {
             this.intervalRef = undefined;
         }  
         for (const conn of this.connections.values()) {
-            this.connectionInfo.delete(conn.getCallId());
-            this.connections.delete(conn.getCallId());
+            this.connectionInfo.delete(conn.getConnectionId());
+            this.connections.delete(conn.getConnectionId());
             conn.close();
         }
     }
@@ -365,25 +382,6 @@ class NetworkAgent implements Agent {
     //                        at the moment, recover the endpoint for a current callId.
 
     connect(local: Endpoint, remote: Endpoint, requestedBy: AgentId) : ConnectionId {
-
-
-        /*
-        let est = 0;
-        let val = 0;
-        let ok  = 0;
-
-        for (const info of this.connectionInfo.values()) {
-            if (info.status === ConnectionStatus.Establishment) {
-                est = est + 1;
-            } else if (info.status === ConnectionStatus.PeerValidation) {
-                val = val + 1;
-            } else if (info.status === ConnectionStatus.PeerReady) {
-                ok = ok + 1;
-            }
-        }
-
-        console.log('stats: established='+est+' in validation='+val+' validated='+ok);
-        */
 
         this.connLogger.debug(local + ' is asking for connection to ' + remote);
 
@@ -402,13 +400,20 @@ class NetworkAgent implements Agent {
                 requestedBy: new Set([requestedBy])
             });
 
-        let conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
+
+        let conn: WebRTCConnection | WebSocketConnection;
+
+        if (LinkupServerConnection.isWebRTCBased(remoteAddress.url())) {
+            conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
+        } else {
+            conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback);
+        }
 
         conn.setMessageCallback(this.messageCallback);
 
         this.connections.set(callId, conn);
 
-        conn.open('mesh-network-channel');
+        conn.open();
 
         return callId;
     }
@@ -422,11 +427,14 @@ class NetworkAgent implements Agent {
         }
 
         if (connInfo.status === ConnectionStatus.Received) {
-            this.acceptReceivedConnectionMessages(connId);
+            // FIRST set connection status to Establishing
             connInfo.status = ConnectionStatus.Establishing;
+            // THEN invoke accept (since it may set status to something else, like Ready)
+            this.acceptReceivedConnectionMessages(connId);
         }
 
         if (connInfo.status !== ConnectionStatus.Closed) {
+
             connInfo.requestedBy.add(requestedBy);
         }
     }
@@ -482,11 +490,12 @@ class NetworkAgent implements Agent {
 
     queryForListeningAddresses(source: LinkupAddress, targets: Array<LinkupAddress>) {
 
-        this.connLogger.log(source.url() + ' asking if any is online: ' + targets.map((l: LinkupAddress) => l.url()), LogLevel.DEBUG);
-
+        
         if (this.listening.has(source.url())) {
+            this.connLogger.log(source.url() + ' asking if any is online: ' + targets.map((l: LinkupAddress) => l.url()), LogLevel.DEBUG);
             this.linkupManager.queryForListeningAddresses(source.url(), targets);
         } else {
+            this.connLogger.error(source.url() + ' is querying for online addresses, but it is not listening on this network.');
             throw new Error('Looking for online targets for endpoint ' + source.url() + ' but that endpoint is not listening on this network.');
         }
 

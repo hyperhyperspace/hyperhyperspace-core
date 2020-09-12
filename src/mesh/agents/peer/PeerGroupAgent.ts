@@ -166,7 +166,7 @@ class PeerGroupAgent implements Agent {
         this.tick = async () => {
             this.cleanUp();
             this.queryForOnlinePeers();
-            if (false) { this.deduplicateConnections() };
+            this.deduplicateConnections();
         };
     }
 
@@ -361,7 +361,6 @@ class PeerGroupAgent implements Agent {
                 if (lastAttemptTimestamp !== undefined &&
                     now < lastAttemptTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
 
-                    
                     continue
                 }
 
@@ -409,7 +408,7 @@ class PeerGroupAgent implements Agent {
     
                 // And in that case, if it is still working.
                 if (chosenConnId !== undefined &&
-                    this.getNetworkAgent().checkConnection(chosenConnId)) {
+                    !this.getNetworkAgent().checkConnection(chosenConnId)) {
                         
                     chosenConnId = undefined;
                     this.chosenForDeduplication.delete(endpoint);
@@ -433,10 +432,11 @@ class PeerGroupAgent implements Agent {
                     
     
                     if (ready.length > 1) {
+                        PeerGroupAgent.controlLog.trace('Connection duplication detecetd (' + ready.length + ') to ' + endpoint);
                         ready.sort();
                         chosenConnId = ready[0];
                         this.chosenForDeduplication.set(endpoint, chosenConnId);
-                        this.sendChosenConnection(chosenConnId, endpoint);
+                        this.sendChosenConnection(chosenConnId);
                     }
                 }
 
@@ -456,27 +456,29 @@ class PeerGroupAgent implements Agent {
 
     // Deduplication messages.
 
-    private sendChosenConnection(chosenConnId: ConnectionId, endpoint:Endpoint) {
+    private sendChosenConnection(chosenConnId: ConnectionId) {
 
-        this.sendConnectionSelectionMessage(chosenConnId, endpoint, SecureMessageTypes.ChooseConnection);
+        this.sendConnectionSelectionMessage(chosenConnId, SecureMessageTypes.ChooseConnection);
     }
 
-    private sendChosenConnectionConfirmation(chosenConnId: ConnectionId, endpoint: Endpoint) {
+    private sendChosenConnectionConfirmation(chosenConnId: ConnectionId) {
 
-        this.sendConnectionSelectionMessage(chosenConnId, endpoint, SecureMessageTypes.ConfirmChosenConnection);
+        this.sendConnectionSelectionMessage(chosenConnId, SecureMessageTypes.ConfirmChosenConnection);
     }
 
-    private sendConnectionSelectionMessage(chosenConnId: ConnectionId, endpoint: Endpoint, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection)) {
+    private sendConnectionSelectionMessage(chosenConnId: ConnectionId, type: (SecureMessageTypes.ChooseConnection | SecureMessageTypes.ConfirmChosenConnection)) {
         let connSelectionMsg: ConnectionSelectionMessage = {
             type: type,
             peerGroupId: this.peerGroupId,
         };
 
+        let pc = this.connections.get(chosenConnId) as PeerConnection;
         let secureConnAgent = this.getSecureConnAgent();
+
         secureConnAgent.sendSecurely(
             chosenConnId, 
-            this.localPeer.endpoint, 
-            endpoint, 
+            this.localPeer.identityHash,
+            pc.peer.identityHash,
             this.getAgentId(), 
             connSelectionMsg
         );
@@ -493,6 +495,7 @@ class PeerGroupAgent implements Agent {
         if (allConnIds !== undefined) {
             for (const connId of allConnIds) {
                 if (connId !== chosenConnId) {
+                    PeerGroupAgent.controlLog.debug(() => 'Closing connection due to deduplication: ' + connId + ' (the chosen one is ' + chosenConnId + ')');
                     this.getNetworkAgent().releaseConnection(connId, this.getAgentId());
                     this.removePeerConnection(connId);
                 }
@@ -643,8 +646,9 @@ class PeerGroupAgent implements Agent {
 
         this.controlLog.debug(() => (this.localPeer.endpoint + ' has discovered that ' + ep + ' is online.'));
 
+        
         let peer = await this.peerSource.getPeerForEndpoint(ep);
-
+        
         if (this.shouldConnectToPeer(peer)) {
             this.controlLog.debug(() => (this.localPeer.endpoint + ' will initiate peer connection to ' + ep + '.'));
             let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as PeerInfo).endpoint, this.getAgentId());
@@ -663,9 +667,9 @@ class PeerGroupAgent implements Agent {
             this.controlLog.trace(() => this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
 
             if (this.shouldAcceptPeerConnection(peer)) {
-                this.controlLog.debug('Will accept!');
-                this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
+                this.controlLog.debug('Will accept requested connection ' + connId + '!');
                 this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.ReceivingConnection);
+                this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
             }
         }
 
@@ -674,7 +678,7 @@ class PeerGroupAgent implements Agent {
     private onConnectionEstablishment(connId: ConnectionId, local: Endpoint, remote: Endpoint) {
         let pc = this.connections.get(connId);
 
-        this.controlLog.trace(() => this.localPeer.endpoint + 'is receiving a connection from ' + remote + ' connId is ' + connId);
+        this.controlLog.trace(() => this.localPeer.endpoint + ' is receiving a connection from ' + remote + ' connId is ' + connId);
 
         if (pc !== undefined && this.localPeer.endpoint === local && pc.peer.endpoint === remote) {
             if (pc.status === PeerConnectionStatus.Connecting) {
@@ -684,7 +688,7 @@ class PeerGroupAgent implements Agent {
                 pc.status = PeerConnectionStatus.WaitingForOffer;
             }
         } else {
-            this.controlLog.trace('Unknown connection, ignoring. pc=' + pc + ' local=' + local + ' remote='+ remote);
+            this.controlLog.trace(() => 'Unknown connection ' + connId + ', ignoring. pc=' + pc + ' local=' + local + ' remote='+ remote);
         }
     }
 
@@ -709,7 +713,7 @@ class PeerGroupAgent implements Agent {
 
             if (this.shouldAcceptPeerConnection(peer)) {
 
-                this.controlLog.debug('Will accept!');
+                this.controlLog.debug('Will accept offer ' + connId + '!');
                 // Act as if we had just received the connection, process offer below.
                 this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.WaitingForOffer);
                 accept = true;
@@ -717,7 +721,7 @@ class PeerGroupAgent implements Agent {
 
             } else {
 
-                this.controlLog.debug('Will NOT accept!');
+                this.controlLog.debug('Will NOT accept offer ' + connId + '!');
                 if (peer !== undefined && 
                     peer.identityHash === remoteIdentityHash &&
                     this.peerGroupId === peerGroupId) {
@@ -769,6 +773,7 @@ class PeerGroupAgent implements Agent {
             }
             
         } else {
+            PeerGroupAgent.controlLog.debug('Dropping connection ' + connId + ': offer was rejected');
             this.removePeerConnection(connId);
             this.getNetworkAgent().releaseConnectionIfExists(connId, this.getAgentId());
         }
@@ -872,6 +877,8 @@ class PeerGroupAgent implements Agent {
         
         connId; sender; recipient; type; peerGroupId;
 
+        PeerGroupAgent.controlLog.trace('Connection selection for ' + connId + ' sender=' + sender + ', recipient=' + recipient + ', type=' + type);
+
         let pc = this.connections.get(connId);
 
         // If connId represents an acceptable option (a working connection in Ready state):
@@ -900,7 +907,7 @@ class PeerGroupAgent implements Agent {
             if (accept) {
                 this.chooseConnection(connId);
                 if (type === SecureMessageTypes.ChooseConnection) {
-                    this.sendChosenConnectionConfirmation(connId, pc.peer.endpoint);
+                    this.sendChosenConnectionConfirmation(connId);
                 }  
             }
         }

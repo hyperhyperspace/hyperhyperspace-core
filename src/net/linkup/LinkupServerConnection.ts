@@ -1,16 +1,23 @@
 import { Logger, LogLevel } from 'util/logging';
 
+import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
 import { LinkupAddress } from './LinkupAddress';
 
-type NewCallMessageCallback = (sender: LinkupAddress, recipient: LinkupAddress, callId: string, message: any) => void;
-type MessageCallback        = (message: any) => void;
-type ListeningAddressesQueryCallback  = (queryId: string, matches: Array<LinkupAddress>) => void;
-
-class LinkupServerConnection {
-
-    readonly serverURL : string;
+class LinkupServerConnection implements LinkupServer {
 
     static logger = new Logger(LinkupServerConnection.name, LogLevel.INFO);
+
+    static WRTC_URL_PREFIX = 'wrtc+';
+
+    static isWebRTCBased(serverURL: string) {
+        return serverURL.startsWith(LinkupServerConnection.WRTC_URL_PREFIX);
+    }
+
+    static getRealServerURL(serverURL: string) {
+        return serverURL.slice(LinkupServerConnection.WRTC_URL_PREFIX.length);
+    }
+
+    readonly serverURL : string;
 
     ws : WebSocket | null;
 
@@ -24,6 +31,11 @@ class LinkupServerConnection {
     messageQueue     : string[];
 
     constructor(serverURL : string) {
+
+        if (!LinkupServerConnection.isWebRTCBased(serverURL)) {
+            throw new Error('LinkupServerConnection expects a URL that starts with "' + LinkupServerConnection.WRTC_URL_PREFIX + '", bailing out.');
+        }
+
         this.serverURL = serverURL;
 
         this.ws = null;
@@ -153,7 +165,7 @@ class LinkupServerConnection {
                  this.ws.readyState === WebSocket.CLOSED)) {
                 
                 LinkupServerConnection.logger.debug('creating websocket to server ' + this.serverURL);
-                this.ws = new WebSocket(this.serverURL);
+                this.ws = new WebSocket(LinkupServerConnection.getRealServerURL(this.serverURL));
       
                 this.ws.onmessage = (ev) => {
                     const message = JSON.parse(ev.data);
@@ -272,4 +284,4 @@ class LinkupServerConnection {
 
 }
 
-export { LinkupServerConnection, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback as LinkupIdQueryCallback };
+export { LinkupServerConnection };

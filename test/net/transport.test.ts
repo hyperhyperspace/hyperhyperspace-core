@@ -1,7 +1,8 @@
 
-import { WebRTCConnection } from 'net/transport';
+import { WebRTCConnection, WebSocketConnection } from 'net/transport';
 import { LinkupManager, LinkupAddress } from 'net/linkup';
 import { describeProxy } from 'config';
+import { Connection } from 'net/transport/Connection';
 
 describeProxy('Transports', () => {
 
@@ -20,18 +21,18 @@ describeProxy('Transports', () => {
 
         linkupManager2.listenForMessagesNewCall(address2, (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => {
             receiver;
-            let conn2 = new WebRTCConnection(linkupManager2, address2, sender, callId, (conn: WebRTCConnection) => {
+            let conn2 = new WebRTCConnection(linkupManager2, address2, sender, callId, (conn: Connection) => {
                 expect(sender.linkupId).toEqual(address1.linkupId);
-                expect(conn.getCallId()).toEqual(theCallId);
+                expect(conn.getConnectionId()).toEqual(theCallId);
             });
-            conn2.setMessageCallback((message: any, _conn: WebRTCConnection) => {
+            conn2.setMessageCallback((message: any, _conn: Connection) => {
                 expect(message).toEqual("hola");
                 conn2.send("chau");
             });
             conn2.answer(message);
         });
 
-        let conn1 = new WebRTCConnection(linkupManager1, address1, address2, theCallId, (conn: WebRTCConnection) => {
+        let conn1 = new WebRTCConnection(linkupManager1, address1, address2, theCallId, (conn: Connection) => {
             conn.send("hola");
         });
 
@@ -41,5 +42,50 @@ describeProxy('Transports', () => {
         });
 
         conn1.open(channelName);
+    }, 15000);
+
+    test('WebSocket send / answer', (done) => {
+
+        //let linkupManager1 = new LinkupManager();
+        let linkupManager2 = new LinkupManager();
+
+        //let linkupServer2 = LinkupManager.defaultLinkupServer;
+
+        let listenAddress1 = 'ws://localhost:10000';
+        let listenAddress2 = 'ws://localhost:10001';
+
+        let address1 = new LinkupAddress(listenAddress1, 'addressOne_C');
+        let address2 = new LinkupAddress(listenAddress2, 'addressTwo_C');
+
+        let theCallId = 'DUMMY_CALL_ID_TEST_C';
+
+        linkupManager2.listenForMessagesNewCall(address2, (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => {
+            receiver;
+            let conn2 = new WebSocketConnection(callId, address2, sender, (conn: Connection) => {
+                expect(sender.linkupId).toEqual(address1.linkupId);
+                expect(conn.getConnectionId()).toEqual(theCallId);
+            });
+
+            conn2.setMessageCallback((message: any, _conn: Connection) => {
+                expect(message).toEqual("hola");
+                conn2.send("chau");
+            });
+
+            conn2.answer(message);
+        });
+
+        let conn1 = new WebSocketConnection(theCallId, address1, address2, (conn: Connection) => {
+            conn.send("hola");
+        });
+
+        conn1.setMessageCallback((message: any) => {
+            expect(message).toEqual("chau");
+            done();
+        });
+
+        setTimeout(() => { conn1.open(); }, 100);
+        
+
+
     }, 15000);
 });

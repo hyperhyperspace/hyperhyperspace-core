@@ -11,15 +11,21 @@ import { LinkupManager } from 'net/linkup';
 
 class TestPeerNetwork {
     
-    static generate(topic: string, activePeers: number, totalPeers: number, peerConnCount: number): Array<AgentPod> {
+    static generate(topic: string, activePeers: number, totalPeers: number, peerConnCount: number, useWebsockets=false, basePort?: number): Array<AgentPod> {
 
         let peers = new Array<PeerInfo>();
 
         for (let i=0; i<totalPeers; i++) {
             let id = Identity.fromKeyPair({'id':'peer' + i}, RSAKeyPair.generate(512));
             
+            let host = LinkupManager.defaultLinkupServer;
+
+            if (useWebsockets) {
+                host = 'ws://localhost:' + (basePort as number + i);
+            }
+
             let peer: PeerInfo = {
-                endpoint: LinkupManager.defaultLinkupServer + '/' + new RNGImpl().randomHexString(128),
+                endpoint: host  + '/' + new RNGImpl().randomHexString(128),
                 identity: id,
                 identityHash: id.hash()
             };

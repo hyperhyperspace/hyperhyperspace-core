@@ -586,7 +586,7 @@ class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
                         }
 
                     } catch (e) {
-                        console.log(e);
+                        TerminalOpsSyncAgent.controlLog.warning(e);
                     }
                     this.incomingObjects.delete(hash);
                 } else {
