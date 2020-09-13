@@ -9,7 +9,9 @@ import { MultiMap } from 'util/multimap';
 enum Params {
     CONN_ID   = 'connId',
     SENDER    = 'sender',
-    RECIPIENT = 'recipient'
+    RECIPIENT = 'recipient',
+    REVERSE   = 'reverse'
+
 }
 
 class LinkupServerListener implements LinkupServer {
@@ -64,6 +66,7 @@ class LinkupServerListener implements LinkupServer {
                     const connId = decodeURIComponent(params[Params.CONN_ID]);
                     const sender  = LinkupAddress.fromURL(decodeURIComponent(params[Params.SENDER]));
                     const recipient = LinkupAddress.fromURL(decodeURIComponent(params[Params.RECIPIENT]));
+                    const reverse   = params[Params.REVERSE];
 
                     if (recipient.serverURL === this.serverUrl) {
                         
@@ -71,7 +74,7 @@ class LinkupServerListener implements LinkupServer {
 
                         if (callbacks.size > 0) {
                             for (const callback of callbacks) {
-                                callback(sender, recipient, connId, {ws: socket});
+                                callback(sender, recipient, connId, {ws: socket, reverse: reverse});
                                 parseOK = true;
                             }
                         } else {

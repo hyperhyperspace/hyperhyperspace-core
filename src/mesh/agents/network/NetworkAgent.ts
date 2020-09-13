@@ -297,7 +297,11 @@ class NetworkAgent implements Agent {
                     const sender   = LinkupAddress.fromURL(connInfo.remoteEndpoint);
 
                     if (LinkupServerConnection.isWebRTCBased(connInfo.remoteEndpoint)) {
-                        conn = new WebRTCConnection(this.linkupManager, receiver, sender, connId, this.connectionReadyCallback);
+                        if (LinkupServerConnection.isWebRTCBased(connInfo.localEndpoint)) {
+                            conn = new WebRTCConnection(this.linkupManager, receiver, sender, connId, this.connectionReadyCallback);
+                        } else {
+                            conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback);    
+                        }
                     } else {
                         conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback);
                     }
@@ -311,7 +315,9 @@ class NetworkAgent implements Agent {
             } else {
                 if (conn instanceof WebRTCConnection) {
                     conn.receiveSignallingMessage(message);
-                }   
+                } else if (conn instanceof WebSocketConnection) {
+                    conn.answer(message);
+                }
             }
         }
     }
@@ -404,6 +410,9 @@ class NetworkAgent implements Agent {
         let conn: WebRTCConnection | WebSocketConnection;
 
         if (LinkupServerConnection.isWebRTCBased(remoteAddress.url())) {
+            if (!LinkupServerConnection.isWebRTCBased(localAddress.url())) {
+                conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback, this.linkupManager);
+            }
             conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
         } else {
             conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback);
