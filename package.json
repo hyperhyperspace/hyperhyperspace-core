@@ -18,7 +18,7 @@
     "@types/ws": "^7.2.6",
     "dts-generator": "^3.0.0",
     "fake-indexeddb": "^3.0.2",
-    "jest": "^26.0.1",
+    "jest": "^26.4.2",
     "microbundle-crl": "^0.13.10",
     "ts-jest": "^26.1.0",
     "typescript": "^3.9.6",
