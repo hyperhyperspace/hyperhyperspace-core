@@ -7,34 +7,45 @@ import { Logger, LogLevel } from 'util/logging';
 describeProxy('Peer group management', () => {
     test('2-peer group set up (wrtc)', async (done) => {
 
-        await twoPeerGroupTest(done, false);
+        await twoPeerGroupTest(done, 'wrtc');
         
     }, 25000);
 
     test('2-peer group set up (ws)', async (done) => {
 
-        await twoPeerGroupTest(done, true);
+        await twoPeerGroupTest(done, 'ws', 5000);
+
+    }, 25000);
+
+    test('2-peer group set up (mix)', async (done) => {
+
+        await twoPeerGroupTest(done, 'mix', 5010);
 
     }, 25000);
 
     test('4-peer group clique set up (wrtc)', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, false);
+        await fourPeerCliqueGroupTest(done, 'wrtc');
 
     }, 35000);
 
     test('4-peer group clique set up (ws)', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, true);
+        await fourPeerCliqueGroupTest(done, 'ws', 5100);
+
+    }, 35000);
+
+    test('4-peer group clique set up (mix)', async (done) => {
+
+        await fourPeerCliqueGroupTest(done, 'mix', 5110);
 
     }, 35000);
 });
 
-async function twoPeerGroupTest(done: (() => void), useWebsockets: boolean) {
+async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
 
-    const basePort = 5000;
     let peerNetworkId = new RNGImpl().randomHexString(64);
-    let networks = TestPeerNetwork.generate(peerNetworkId, 2, 2, 1, useWebsockets, basePort);
+    let networks = TestPeerNetwork.generate(peerNetworkId, 2, 2, 1, network, basePort);
     networks;
 
 
@@ -59,12 +70,10 @@ async function twoPeerGroupTest(done: (() => void), useWebsockets: boolean) {
     done();
 }
 
-async function fourPeerCliqueGroupTest(done: () => void, useWebsockets: boolean) {
+async function fourPeerCliqueGroupTest(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
 
-
-    const basePort = 5100;
     let peerNetworkId = new RNGImpl().randomHexString(64);
-    let networks = TestPeerNetwork.generate(peerNetworkId, 4, 4, 3, useWebsockets, basePort);
+    let networks = TestPeerNetwork.generate(peerNetworkId, 4, 4, 3, network, basePort);
     networks;
 
     let control0 = networks[0].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;

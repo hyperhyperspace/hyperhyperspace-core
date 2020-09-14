@@ -11,7 +11,7 @@ import { LinkupManager } from 'net/linkup';
 
 class TestPeerNetwork {
     
-    static generate(topic: string, activePeers: number, totalPeers: number, peerConnCount: number, useWebsockets=false, basePort?: number): Array<AgentPod> {
+    static generate(topic: string, activePeers: number, totalPeers: number, peerConnCount: number, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number): Array<AgentPod> {
 
         let peers = new Array<PeerInfo>();
 
@@ -20,7 +20,7 @@ class TestPeerNetwork {
             
             let host = LinkupManager.defaultLinkupServer;
 
-            if (useWebsockets) {
+            if (network === 'ws' || (network === 'mix' && i < totalPeers / 2)) {
                 host = 'ws://localhost:' + (basePort as number + i);
             }
 

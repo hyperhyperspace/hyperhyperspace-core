@@ -14,13 +14,19 @@ describeProxy('Basic networking', () => {
 
         await twoNodeNetworkTest(linkupServer, linkupServer, done);
 
-    }, 25000);
+    }, 35000);
 
     test('2-node network test (ws)', async (done) => {
 
-        await twoNodeNetworkTest('ws://localhost:10010', 'ws://localhost:10011', done);
+        await twoNodeNetworkTest('ws://localhost:10110', 'ws://localhost:10111', done);
 
-    }, 25000);
+    }, 35000);
+
+    test('2-node network test (mixed)', async (done) => {
+
+        await twoNodeNetworkTest( 'ws://localhost:10112', linkupServer, done);
+
+    }, 35000);
 });
 
 async function twoNodeNetworkTest(linkupHost1: string, linkupHost2: string, done: () => void) {

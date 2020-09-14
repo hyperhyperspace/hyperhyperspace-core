@@ -17,33 +17,43 @@ import { describeProxy } from 'config';
 describeProxy('State sync', () => {
     test('Gossip agent in small peer group (wrtc)', async (done) => {
 
-        await gossipInSmallPeerGroup(done, false);
+        await gossipInSmallPeerGroup(done, 'wrtc');
 
     }, 35000);
 
     test('Gossip agent in small peer group (ws)', async (done) => {
 
-        await gossipInSmallPeerGroup(done, true);
+        await gossipInSmallPeerGroup(done, 'ws', 5200);
+
+    }, 35000);
+
+    test('Gossip agent in small peer group (mix)', async (done) => {
+
+        await gossipInSmallPeerGroup(done, 'mix', 5210);
 
     }, 35000);
 
     test('Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
 
-        await syncInSmallPeerGroup(done, true);
+        await syncInSmallPeerGroup(done, 'wrtc');
 
     }, 45000);
 
     test('Terminal ops agent-based set sync in small peer group (ws)', async (done) => {
 
-        await syncInSmallPeerGroup(done, false);
+        await syncInSmallPeerGroup(done, 'ws', 5300);
+    }, 45000);
+
+    test('Terminal ops agent-based set sync in small peer group (mix)', async (done) => {
+
+        await syncInSmallPeerGroup(done, 'mix', 5310);
     }, 45000);
 });
 
-async function gossipInSmallPeerGroup(done: () => void, useWebsockets: boolean) {
+async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
 
-    const basePort = 5200;
     let peerGroupId = new RNGImpl().randomHexString(64);
-    let pods = TestPeerNetwork.generate(peerGroupId, 3, 3, 2, useWebsockets, basePort);
+    let pods = TestPeerNetwork.generate(peerGroupId, 3, 3, 2, network, basePort);
 
     const objCount = 3;
     const objIds   = new Array<Hash>();
@@ -129,15 +139,13 @@ async function gossipInSmallPeerGroup(done: () => void, useWebsockets: boolean) 
 
 }
 
-async function syncInSmallPeerGroup(done: () => void, useWebsockets: boolean) {
-
-    const basePort = 5300;
+async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
 
     const size = 3;
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = TestPeerNetwork.generate(peerNetworkId, size, size, size-1, useWebsockets, basePort);
+    let pods = TestPeerNetwork.generate(peerNetworkId, size, size, size-1, network, basePort);
 
     let stores : Array<Store> = [];
     

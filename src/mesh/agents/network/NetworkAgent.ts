@@ -410,10 +410,11 @@ class NetworkAgent implements Agent {
         let conn: WebRTCConnection | WebSocketConnection;
 
         if (LinkupServerConnection.isWebRTCBased(remoteAddress.url())) {
-            if (!LinkupServerConnection.isWebRTCBased(localAddress.url())) {
+            if (LinkupServerConnection.isWebRTCBased(localAddress.url())) {
+                conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
+            } else {
                 conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback, this.linkupManager);
             }
-            conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
         } else {
             conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback);
         }
