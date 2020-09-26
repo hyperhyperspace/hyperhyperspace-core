@@ -3,18 +3,18 @@ import { Logger, LogLevel } from 'util/logging';
 import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
 import { LinkupAddress } from './LinkupAddress';
 
-class LinkupServerConnection implements LinkupServer {
+class SignallingServerConnection implements LinkupServer {
 
-    static logger = new Logger(LinkupServerConnection.name, LogLevel.INFO);
+    static logger = new Logger(SignallingServerConnection.name, LogLevel.INFO);
 
     static WRTC_URL_PREFIX = 'wrtc+';
 
     static isWebRTCBased(serverURL: string) {
-        return serverURL.startsWith(LinkupServerConnection.WRTC_URL_PREFIX);
+        return serverURL.startsWith(SignallingServerConnection.WRTC_URL_PREFIX);
     }
 
     static getRealServerURL(serverURL: string) {
-        return serverURL.slice(LinkupServerConnection.WRTC_URL_PREFIX.length);
+        return serverURL.slice(SignallingServerConnection.WRTC_URL_PREFIX.length);
     }
 
     readonly serverURL : string;
@@ -32,8 +32,8 @@ class LinkupServerConnection implements LinkupServer {
 
     constructor(serverURL : string) {
 
-        if (!LinkupServerConnection.isWebRTCBased(serverURL)) {
-            throw new Error('LinkupServerConnection expects a URL that starts with "' + LinkupServerConnection.WRTC_URL_PREFIX + '", bailing out.');
+        if (!SignallingServerConnection.isWebRTCBased(serverURL)) {
+            throw new Error('LinkupServerConnection expects a URL that starts with "' + SignallingServerConnection.WRTC_URL_PREFIX + '", bailing out.');
         }
 
         this.serverURL = serverURL;
@@ -57,7 +57,7 @@ class LinkupServerConnection implements LinkupServer {
                               recipient.serverURL + 
                               ' but this is a connection to ' +
                               this.serverURL);
-            LinkupServerConnection.logger.error(e);
+            SignallingServerConnection.logger.error(e);
             throw e;
         }
 
@@ -80,7 +80,7 @@ class LinkupServerConnection implements LinkupServer {
                               recipient.serverURL + 
                               ' but this is a connection to ' +
                               this.serverURL);
-            LinkupServerConnection.logger.error(e);
+            SignallingServerConnection.logger.error(e);
             throw e;
         }
 
@@ -114,7 +114,7 @@ class LinkupServerConnection implements LinkupServer {
                               recipient.serverURL + 
                               ' but this is a connection to ' +
                               this.serverURL);
-            LinkupServerConnection.logger.error(e);
+            SignallingServerConnection.logger.error(e);
             throw e;
         }
 
@@ -140,7 +140,7 @@ class LinkupServerConnection implements LinkupServer {
                                   address.serverURL + 
                                   ' but this is a connection to ' +
                                   this.serverURL);
-                LinkupServerConnection.logger.error(e);
+                SignallingServerConnection.logger.error(e);
                 throw e;
             }
 
@@ -164,15 +164,15 @@ class LinkupServerConnection implements LinkupServer {
                 (this.ws.readyState === WebSocket.CLOSING ||
                  this.ws.readyState === WebSocket.CLOSED)) {
                 
-                LinkupServerConnection.logger.debug('creating websocket to server ' + this.serverURL);
-                this.ws = new WebSocket(LinkupServerConnection.getRealServerURL(this.serverURL));
+                SignallingServerConnection.logger.debug('creating websocket to server ' + this.serverURL);
+                this.ws = new WebSocket(SignallingServerConnection.getRealServerURL(this.serverURL));
       
                 this.ws.onmessage = (ev) => {
                     const message = JSON.parse(ev.data);
                     const ws = this.ws as WebSocket;
         
                     if (message['action'] === 'ping') {
-                        LinkupServerConnection.logger.trace('sending pong to ' + this.serverURL);
+                        SignallingServerConnection.logger.trace('sending pong to ' + this.serverURL);
                         ws.send(JSON.stringify({'action' : 'pong'}));
                     } else if (message['action'] === 'send') {
                         const linkupId = message['linkupId'];
@@ -184,7 +184,7 @@ class LinkupServerConnection implements LinkupServer {
                             let callMessageCallbacks = linkupIdCalls.get(callId);
                             if (callMessageCallbacks !== undefined) {
                                 callMessageCallbacks.forEach((callback: MessageCallback) => {
-                                    LinkupServerConnection.logger.debug('Delivering linkup message to ' + linkupId + ' on call ' + message['callId']);
+                                    SignallingServerConnection.logger.debug('Delivering linkup message to ' + linkupId + ' on call ' + message['callId']);
                                     callback(message['data']);
                                     found = true;
                                 });
@@ -196,14 +196,14 @@ class LinkupServerConnection implements LinkupServer {
                             let linkupIdCallbacks = this.newCallMessageCallbacks.get(linkupId);
                             if (linkupIdCallbacks !== undefined) {
                                 linkupIdCallbacks.forEach((callback: NewCallMessageCallback) => {
-                                    LinkupServerConnection.logger.debug('Calling default callback for linkupId ' + linkupId + ', unlistened callId is ' + callId);
+                                    SignallingServerConnection.logger.debug('Calling default callback for linkupId ' + linkupId + ', unlistened callId is ' + callId);
                                     callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), callId, message['data']);
                                     found = true;
                                 })
                             }
 
                             if (!found) {
-                                LinkupServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId);
+                                SignallingServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId);
                             }
                         }
                     } else if (message['action'] === 'query-reply') {
@@ -221,12 +221,12 @@ class LinkupServerConnection implements LinkupServer {
                             callback(queryId, matchingLinkupAddresses);
                         }
                     } else {
-                        LinkupServerConnection.logger.info('received unknown message on ' + this.serverURL + ': ' + ev.data);
+                        SignallingServerConnection.logger.info('received unknown message on ' + this.serverURL + ': ' + ev.data);
                     }
                 }
       
                 this.ws.onopen = () => {
-                    LinkupServerConnection.logger.debug('done creating websocket to URL ' + this.serverURL);
+                    SignallingServerConnection.logger.debug('done creating websocket to URL ' + this.serverURL);
                     this.setUpListeners();
                     this.emptyMessageQueue();
                 }
@@ -254,20 +254,20 @@ class LinkupServerConnection implements LinkupServer {
         // check if we need to send a LISTEN message
         if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
             this.ws.send(JSON.stringify({'action': 'listen', 'linkupId': linkupId}));
-            LinkupServerConnection.logger.debug('sending listen command through websocket for linkupId ' + linkupId);
+            SignallingServerConnection.logger.debug('sending listen command through websocket for linkupId ' + linkupId);
         }
     }
 
     private emptyMessageQueue() {
         if (this.checkWebsocket()) {
-            LinkupServerConnection.logger.debug('about to empty message queue to ' +
+            SignallingServerConnection.logger.debug('about to empty message queue to ' +
                                             this.serverURL + ' (' + this.messageQueue.length +
                                             ' messages to send)');
             while (this.messageQueue.length > 0) {
                 let message = this.messageQueue.shift() as string;
                 let ws      = this.ws as WebSocket;
-                LinkupServerConnection.logger.trace('about to send this to ' + this.serverURL);
-                LinkupServerConnection.logger.trace(message);
+                SignallingServerConnection.logger.trace('about to send this to ' + this.serverURL);
+                SignallingServerConnection.logger.trace(message);
                 ws.send(message);
             }
         }
@@ -284,4 +284,4 @@ class LinkupServerConnection implements LinkupServer {
 
 }
 
-export { LinkupServerConnection };
+export { SignallingServerConnection };

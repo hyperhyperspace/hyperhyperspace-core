@@ -6,7 +6,7 @@ import { LinkupManager } from 'net/linkup/LinkupManager';
 import { Connection } from 'net/transport/Connection';
 import { WebRTCConnection } from 'net/transport/WebRTCConnection';
 import { RNGImpl } from 'crypto/random';
-import { LinkupServerConnection } from 'net/linkup/LinkupServerConnection';
+import { SignallingServerConnection } from 'net/linkup/SignallingServerConnection';
 import { WebSocketConnection } from 'net/transport/WebSocketConnection';
 
 type Endpoint = string;
@@ -296,8 +296,8 @@ class NetworkAgent implements Agent {
                     const receiver = LinkupAddress.fromURL(connInfo.localEndpoint);
                     const sender   = LinkupAddress.fromURL(connInfo.remoteEndpoint);
 
-                    if (LinkupServerConnection.isWebRTCBased(connInfo.remoteEndpoint)) {
-                        if (LinkupServerConnection.isWebRTCBased(connInfo.localEndpoint)) {
+                    if (SignallingServerConnection.isWebRTCBased(connInfo.remoteEndpoint)) {
+                        if (SignallingServerConnection.isWebRTCBased(connInfo.localEndpoint)) {
                             conn = new WebRTCConnection(this.linkupManager, receiver, sender, connId, this.connectionReadyCallback);
                         } else {
                             conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback);    
@@ -409,8 +409,8 @@ class NetworkAgent implements Agent {
 
         let conn: WebRTCConnection | WebSocketConnection;
 
-        if (LinkupServerConnection.isWebRTCBased(remoteAddress.url())) {
-            if (LinkupServerConnection.isWebRTCBased(localAddress.url())) {
+        if (SignallingServerConnection.isWebRTCBased(remoteAddress.url())) {
+            if (SignallingServerConnection.isWebRTCBased(localAddress.url())) {
                 conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
             } else {
                 conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback, this.linkupManager);

@@ -14,9 +14,9 @@ enum Params {
 
 }
 
-class LinkupServerListener implements LinkupServer {
+class WebSocketListener implements LinkupServer {
 
-    static logger = new Logger(LinkupServerListener.name, LogLevel.INFO);
+    static logger = new Logger(WebSocketListener.name, LogLevel.INFO);
 
 
     serverUrl: string;
@@ -78,20 +78,20 @@ class LinkupServerListener implements LinkupServer {
                                 parseOK = true;
                             }
                         } else {
-                            LinkupServerListener.logger.debug('Received websocket request for linkupId ' + recipient.linkupId + ' but there are no registered listeners for it.');
+                            WebSocketListener.logger.debug('Received websocket request for linkupId ' + recipient.linkupId + ' but there are no registered listeners for it.');
                         }
                         
                     } else {
-                        LinkupServerListener.logger.warning('Received websocket request for server ' + recipient.serverURL + ', but this is ' + this.serverUrl + ', rejecting.');
+                        WebSocketListener.logger.warning('Received websocket request for server ' + recipient.serverURL + ', but this is ' + this.serverUrl + ', rejecting.');
                     }
                 }
                 
                 if (!parseOK) {
-                    LinkupServerListener.logger.error('Could not parse websocket request with url ' + request?.url);
+                    WebSocketListener.logger.error('Could not parse websocket request with url ' + request?.url);
                     socket.close();
                 }
             } catch (e) {
-                LinkupServerListener.logger.error('Error configuring websocket connection, url was: ' + request?.url + ', error: ' + e);
+                WebSocketListener.logger.error('Error configuring websocket connection, url was: ' + request?.url + ', error: ' + e);
                 
                 socket.close();
             }
@@ -131,4 +131,4 @@ class LinkupServerListener implements LinkupServer {
     }
 }
 
-export { LinkupServerListener, Params };
+export { WebSocketListener, Params };

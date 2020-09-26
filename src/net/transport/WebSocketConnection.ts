@@ -1,8 +1,8 @@
 import { Connection } from './Connection';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
-import { Params } from '../linkup/LinkupServerListener';
+import { Params } from '../linkup/WebSocketListener';
 import { LinkupManager } from 'net/linkup/LinkupManager';
-import { LinkupServerConnection } from 'net/linkup/LinkupServerConnection';
+import { SignallingServerConnection } from 'net/linkup/SignallingServerConnection';
 import { Logger, LogLevel } from 'util/logging';
 
 
@@ -65,7 +65,7 @@ class WebSocketConnection implements Connection {
 
     open() {
         this.initiated = true;
-        if (LinkupServerConnection.isWebRTCBased(this.remoteAddress.url())) {
+        if (SignallingServerConnection.isWebRTCBased(this.remoteAddress.url())) {
             if (this.linkupManager !== undefined) {
                 this.reverse = true;
                 this.linkupManager.sendMessageOnCall(this.localAddress, this.remoteAddress, this.connectionId, { reverseconnection: 'true' });
@@ -97,7 +97,7 @@ class WebSocketConnection implements Connection {
 
         if (this.ws === undefined) {
             if (!this.reverse &&
-                LinkupServerConnection.isWebRTCBased(this.localAddress.url()) && 
+                SignallingServerConnection.isWebRTCBased(this.localAddress.url()) && 
                 message.reverseconnection !== undefined &&
                 message.reverseconnection === 'true') {
                 WebSocketConnection.logger.trace(() => 'Creating websocket to ' + this.remoteAddress.url() + ' for reverse connection');

@@ -1,8 +1,8 @@
 
 import { LinkupAddress } from './LinkupAddress';
-import { LinkupServerConnection } from './LinkupServerConnection';
+import { SignallingServerConnection } from './SignallingServerConnection';
 import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
-import { LinkupServerListener } from './LinkupServerListener';
+import { WebSocketListener } from './WebSocketListener';
 import { Logger, LogLevel } from 'util/logging';
 
 type QueryCallback = (queryId: string, listening: Array<LinkupAddress>) => void;
@@ -60,7 +60,7 @@ class LinkupManager {
         let direct: LinkupAddress[]  = [];
 
         for (const address of addresses) {
-            if (LinkupServerConnection.isWebRTCBased(address.serverURL)) {
+            if (SignallingServerConnection.isWebRTCBased(address.serverURL)) {
                 let q = queries.get(address.serverURL);
                 if (q === undefined) {
                     q = new Array<LinkupAddress>();
@@ -91,11 +91,11 @@ class LinkupManager {
         let serverConnection = this.serverConnections.get(serverURL);
 
         if (serverConnection === undefined) {
-            if (LinkupServerConnection.isWebRTCBased(serverURL)) {
-                serverConnection = new LinkupServerConnection(serverURL);
+            if (SignallingServerConnection.isWebRTCBased(serverURL)) {
+                serverConnection = new SignallingServerConnection(serverURL);
                 serverConnection.listenForLinkupAddressQueries(this.serverQueryCallback);
             } else {
-                serverConnection = new LinkupServerListener(serverURL);
+                serverConnection = new WebSocketListener(serverURL);
             }
 
             this.serverConnections.set(serverURL, serverConnection);
