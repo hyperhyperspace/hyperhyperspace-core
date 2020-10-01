@@ -1,5 +1,7 @@
-import WebSocket  from 'ws';
+/*import WebSocket  from 'ws';
 import * as http from 'http';
+*/
+//import 'env/Environment';
 import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
 import { LinkupAddress } from './LinkupAddress';
 import { LogLevel, Logger } from 'util/logging';
@@ -14,22 +16,35 @@ enum Params {
 
 }
 
+interface WebSocketServer {
+    onConnection: (ws: WebSocket, url: string) => void;
+    close(): void;
+}
+
 class WebSocketListener implements LinkupServer {
 
     static logger = new Logger(WebSocketListener.name, LogLevel.INFO);
 
 
+    static isAvailable() {
+        return (global !== undefined && (global as any).WebSocketServerImpl !== undefined);
+    }
+
     serverUrl: string;
     host: string;
     port: number;
 
-    listener: WebSocket.Server;
+    listener: WebSocketServer;
     
     newCallMessageCallbacks: MultiMap<string, NewCallMessageCallback>;
 
-    onConnection: (socket: WebSocket, request: http.IncomingMessage) => void;
+    onConnection: (socket: WebSocket, url: string) => void;
     
     constructor(serverUrl: string) {
+
+        if (!WebSocketListener.isAvailable()) {
+            throw new Error('WebSocketServer is not available in this platform');
+        }
 
         let parsed = new URL(serverUrl);
 
@@ -37,17 +52,17 @@ class WebSocketListener implements LinkupServer {
         this.host = parsed.hostname;
         this.port = Number.parseInt(parsed.port);
 
-        this.listener = new WebSocket.Server({host: this.host, port: this.port});
+        this.listener = new (global as any).WebSocketServerImpl({host: this.host, port: this.port}) as WebSocketServer;
 
         this.newCallMessageCallbacks = new MultiMap();
 
-        this.onConnection = (socket: WebSocket, request: http.IncomingMessage) => {
+        this.onConnection = (socket: WebSocket, url: string) => {
 
             try {
 
                 let parseOK = false;
 
-                const parts = request.url?.split('?');
+                const parts = url.split('?');
                 const params: any = {};
                 if (parts !== undefined && parts.length === 2) {
                     for (const param of parts[1].split('&')) {
@@ -87,11 +102,11 @@ class WebSocketListener implements LinkupServer {
                 }
                 
                 if (!parseOK) {
-                    WebSocketListener.logger.error('Could not parse websocket request with url ' + request?.url);
+                    WebSocketListener.logger.error('Could not parse websocket request with url ' + url);
                     socket.close();
                 }
             } catch (e) {
-                WebSocketListener.logger.error('Error configuring websocket connection, url was: ' + request?.url + ', error: ' + e);
+                WebSocketListener.logger.error('Error configuring websocket connection, url was: ' + url + ', error: ' + e);
                 
                 socket.close();
             }
@@ -99,7 +114,7 @@ class WebSocketListener implements LinkupServer {
             
         };
 
-        this.listener.on('connection', this.onConnection);
+        this.listener.onConnection = this.onConnection;
     }
     
     listenForMessagesNewCall(recipient: LinkupAddress, callback: NewCallMessageCallback): void {

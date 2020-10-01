@@ -50,6 +50,9 @@ There is a demo of a simple fully in-browser p2p chat app running [here](https:/
 
 Re-wiring the demo to use the current version of the library is currently WIP. Check out the `Account` library in the next section.
 
+## Using outside the browser
+
+If you need to use this library directly in NodeJs, outside of a web browser, you need to import [@hyper-hyper-space/node-env](https://www.npmjs.com/package/@hyper-hyper-space/node-env).
 
 ## Libraries
 

@@ -1,7 +1,0 @@
-//
-
-class IndexedDbShim {
-    
-}
-
-export { IndexedDbShim }

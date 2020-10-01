@@ -1,7 +1,7 @@
 import { LinkupAddress, LinkupManager } from '../linkup';
 import { Logger, LogLevel } from '../../util/logging';
 
-import { WebRTCShim } from 'poly/webrtcpoly';
+//import 'poly/webrtcpoly';
 
 import { Connection } from './Connection';
 
@@ -187,7 +187,7 @@ class WebRTCConnection implements Connection {
     private init(ICEServers? : any) {
         let servers     = ICEServers === undefined ? {iceServers : [{urls : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}]} : ICEServers;
 
-        this.connection     = WebRTCShim.getNewRTCPeerConnection(servers);
+        this.connection     = new RTCPeerConnection(servers);//WebRTCShim.getNewRTCPeerConnection(servers);
         this.gatheredICE    = false;
 
         this.connection.onicecandidate = (ev) => {

@@ -1,7 +1,7 @@
 dist/
 dist-test/
+decl/
 node_modules
-yarn.lock
 package-lock.json
 notes.txt
 .rts2_cache_cjs/

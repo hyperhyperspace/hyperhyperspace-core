@@ -3,8 +3,6 @@ import { PeerGroup } from './PeerGroup';
 import { SyncMode, Mesh } from './Mesh';
 
 
-
-
 class PeerGroupSync {
 
     resources?: Resources;
