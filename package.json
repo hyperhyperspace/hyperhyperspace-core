@@ -34,7 +34,7 @@
     "idb": "^5.0.4",
     "jsencrypt": "^3.0.0-rc.1",
     "jshashes": "^1.0.8",
-    "tslib": "^2.0.0"
+    "tslib": "^2.0.1"
   },
   "jest": {
     "preset": "ts-jest",
