@@ -12,7 +12,7 @@ import { GossipEventTypes, AgentStateUpdateEvent } from './StateGossipAgent';
 import { StateSyncAgent } from './StateSyncAgent';
 import { TerminalOpsState } from './TerminalOpsState';
 import { Logger, LogLevel } from 'util/logging';
-import { PeeringAgent } from '../peer/PeeringAgent';
+import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
@@ -67,7 +67,7 @@ type OwnershipProof  = { hash: Hash, ownershipProofHash: Hash };
  
 type IncompleteOp = { source: Endpoint, context: Context, missingObjects: Map<Hash, ObjectRequest>, timeout: number };
 
-class TerminalOpsSyncAgent extends PeeringAgent implements StateSyncAgent {
+class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     static controlLog     = new Logger(TerminalOpsSyncAgent.name, LogLevel.INFO);
     static peerMessageLog = new Logger(TerminalOpsSyncAgent.name, LogLevel.INFO);

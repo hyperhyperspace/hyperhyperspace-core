@@ -1,5 +1,5 @@
 import { StateSyncAgent } from '../state/StateSyncAgent';
-import { PeeringAgent } from '../peer/PeeringAgent';
+import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { SecureMessageReceivedEvent, SecureNetworkEventType } from '../network/SecureNetworkAgent';
 
 import { AgentPod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../service/AgentPod';
@@ -59,7 +59,7 @@ type AgentStateUpdateEvent = {
     content: { agentId: AgentId, state: HashedObject }
 }
 
-class StateGossipAgent extends PeeringAgent {
+class StateGossipAgent extends PeeringAgentBase {
 
     static agentIdForGossip(gossipId: string) {
         return 'state-gossip-agent-for-' + gossipId;

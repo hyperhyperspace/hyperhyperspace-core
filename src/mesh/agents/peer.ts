@@ -1,6 +1,5 @@
 export { PeerSource } from './peer/PeerSource';
-
-export { PeeringAgent as PeeringAgent } from './peer/PeeringAgent';
+export { PeeringAgentBase } from './peer/PeeringAgentBase';
 export { PeerGroupAgent, PeerInfo, PeerMeshEventType, NewPeerEvent } from './peer/PeerGroupAgent';
 export { Peer } from './peer/Peer';
 export { HashBasedPeerSource, HashBasedPeerContainer } from './peer/sources/ContainerBasedPeerSource';

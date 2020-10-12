@@ -5,7 +5,7 @@ import { Endpoint } from '../network/NetworkAgent';
 
 import { Hash } from 'data/model';
 
-abstract class PeeringAgent implements Agent {
+abstract class PeeringAgentBase implements Agent {
 
     peerGroupAgent: PeerGroupAgent;
 
@@ -33,4 +33,4 @@ abstract class PeeringAgent implements Agent {
 
 }
 
-export { PeeringAgent }
+export { PeeringAgentBase };
