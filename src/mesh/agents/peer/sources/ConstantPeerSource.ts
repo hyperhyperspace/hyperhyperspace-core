@@ -1,6 +1,6 @@
-import { PeerSource } from './PeerSource';
-import { Endpoint } from '../network/NetworkAgent';
-import { PeerInfo } from './PeerGroupAgent';
+import { PeerSource } from '../PeerSource';
+import { Endpoint } from '../../network/NetworkAgent';
+import { PeerInfo } from '../PeerGroupAgent';
 import { Shuffle } from 'util/shuffling';
 
 

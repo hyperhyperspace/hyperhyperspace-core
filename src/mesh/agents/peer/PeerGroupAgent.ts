@@ -1,5 +1,5 @@
 import { PeerSource } from './PeerSource';
-import { PeeringAgent } from './PeeringAgent';
+import { PeeringAgentBase } from './PeeringAgentBase';
 
 import { SecureNetworkAgent, SecureNetworkEventType, ConnectionIdentityAuthEvent, 
     IdentityLocation, IdentityAuthStatus, SecureMessageReceivedEvent } from '../network/SecureNetworkAgent';
@@ -861,8 +861,8 @@ class PeerGroupAgent implements Agent {
 
             let agent = this.getLocalAgent(agentId);
 
-            if (agent !== undefined && agent instanceof PeeringAgent) {
-                let peeringAgent = agent as PeeringAgent;
+            if (agent !== undefined && agent instanceof PeeringAgentBase) {
+                let peeringAgent = agent as PeeringAgentBase;
                 peeringAgent.receivePeerMessage(pc.peer.endpoint, sender, recipient, message);
             }
         }

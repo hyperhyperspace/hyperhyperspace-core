@@ -4,7 +4,7 @@ import { AgentPod, Event } from 'mesh/common';
 import { HashedObject, Hash } from 'data/model';
 import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
-import { PeerGroupAgent, PeeringAgent } from 'mesh/agents/peer';
+import { PeerGroupAgent, PeeringAgentBase } from 'mesh/agents/peer';
 
 
 class LinearState extends HashedObject {
@@ -59,7 +59,7 @@ type LinearStateMessage = RequestStateMessage | SendStateMessage;
 
 HashedObject.registerClass(LinearState.className, LinearState);
 
-class LinearStateAgent extends PeeringAgent implements StateSyncAgent {
+class LinearStateAgent extends PeeringAgentBase implements StateSyncAgent {
 
     static logger = new Logger(LinearState.name, LogLevel.INFO);
 

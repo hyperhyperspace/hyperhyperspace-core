@@ -1,5 +1,5 @@
-import { PeerSource } from './PeerSource';
-import { PeerInfo } from './PeerGroupAgent';
+import { PeerSource } from '../PeerSource';
+import { PeerInfo } from '../PeerGroupAgent';
 
 class EmptyPeerSource implements PeerSource {
     async getPeers(count: number): Promise<Array<PeerInfo>> {

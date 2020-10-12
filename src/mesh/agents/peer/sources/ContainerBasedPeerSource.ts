@@ -1,10 +1,10 @@
-import { PeerSource } from './PeerSource';
-import { PeerInfo } from './PeerGroupAgent';
+import { PeerSource } from '../PeerSource';
+import { PeerInfo } from '../PeerGroupAgent';
 import { Shuffle } from 'util/shuffling';
 import { MutableSet } from 'data/containers';
 import { HashedObject, HashedSet, Hash } from 'data/model';
-import { Endpoint } from '../network/NetworkAgent';
-import { Peer } from './Peer';
+import { Endpoint } from '../../network/NetworkAgent';
+import { Peer } from '../Peer';
 
 type HashBasedPeerContainer<T extends HashedObject & Peer> = { items: (IterableIterator<T> | Map<Hash, T> | MutableSet<T> | HashedSet<T>), parseEndpoint:(ep: Endpoint) => Hash | undefined};
 
