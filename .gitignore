@@ -7,3 +7,4 @@ notes.txt
 .rts2_cache_cjs/
 .rts2_cache_esm/
 coverage/
+yarn-error.log
