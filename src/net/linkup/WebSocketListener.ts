@@ -2,7 +2,7 @@
 import * as http from 'http';
 */
 //import 'env/Environment';
-import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
+import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback, RawMessageCallback } from './LinkupServer';
 import { LinkupAddress } from './LinkupAddress';
 import { LogLevel, Logger } from 'util/logging';
 import { MultiMap } from 'util/multimap';
@@ -139,6 +139,14 @@ class WebSocketListener implements LinkupServer {
     
     sendListeningAddressesQuery(_queryId: string, _addresses: import("./LinkupAddress").LinkupAddress[]): void {
         throw new Error("Listening address queries are not supported on plain websocket listeners, just try to connect and see if it works.");
+    }
+
+    listenForRawMessages(_recipient: LinkupAddress, _callback: RawMessageCallback): void {
+        throw new Error("Listening for raw messages is not supported in WebSocket-listener based LinkupServers");
+    }
+    
+    sendRawMessage(_sender: LinkupAddress, _recipient: LinkupAddress, _data: any): void {
+        throw new Error("Sending raw messages is not supported in WebSocket-listener based LinkupServers");
     }
 
     close() {

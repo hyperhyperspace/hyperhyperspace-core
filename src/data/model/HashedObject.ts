@@ -397,7 +397,7 @@ abstract class HashedObject {
                     let dependency : Dependency = { path: fieldPath, hash: reference.hash, className: reference.className, type: 'reference'};
                     dependencies.add(dependency);
 
-                    value = { _type: 'hashed_object_reference', _hash: reference.hash, _class: reference.className};
+                    value = reference.literalize();
                 } else if (something instanceof HashedObject) {
                     let hashedObject = something as HashedObject;
 
@@ -597,7 +597,7 @@ abstract class HashedObject {
                 } else if (value['_type'] === 'hashed_map') { 
                     something = HashedMap.deliteralize(value, context);
                 } else if (value['_type'] === 'hashed_object_reference') {
-                    something = new HashReference(value['_hash'], value['_class']);
+                    something = HashReference.deliteralize(value);
                 } else if (value['_type'] === 'hashed_object_dependency') {
                     let hash = value['_hash'];
 

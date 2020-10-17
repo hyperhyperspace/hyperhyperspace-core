@@ -1,6 +1,6 @@
 import { Logger, LogLevel } from 'util/logging';
 
-import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
+import { LinkupServer, RawMessageCallback, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
 import { LinkupAddress } from './LinkupAddress';
 
 class SignallingServerConnection implements LinkupServer {
@@ -21,6 +21,7 @@ class SignallingServerConnection implements LinkupServer {
 
     ws : WebSocket | null;
 
+    rawMessageCallbacks     : Map<string, Set<RawMessageCallback>>;
     newCallMessageCallbacks : Map<string, Set<NewCallMessageCallback>>;
     messageCallbacks        : Map<string, Map<string, Set<MessageCallback>>>;
 
@@ -40,8 +41,9 @@ class SignallingServerConnection implements LinkupServer {
 
         this.ws = null;
 
-        this.newCallMessageCallbacks    = new Map();
-        this.messageCallbacks = new Map();
+        this.rawMessageCallbacks     = new Map();
+        this.newCallMessageCallbacks = new Map();
+        this.messageCallbacks        = new Map();
 
         this.linkupIdsToListen = new Set();
 
@@ -70,6 +72,29 @@ class SignallingServerConnection implements LinkupServer {
 
         recipientCallCallbacks.add(callback);
 
+        this.setUpListenerIfNew(recipient.linkupId);
+    }
+
+    listenForRawMessages(recipient: LinkupAddress, callback: (sender: LinkupAddress, recipient: LinkupAddress, message: any) => void): void {
+        
+        if (recipient.serverURL !== this.serverURL) {
+            let e = new Error('Trying to listen for raw messages to server ' + 
+                              recipient.serverURL + 
+                              ' but this is a connection to ' +
+                              this.serverURL);
+            SignallingServerConnection.logger.error(e);
+            throw e;
+        }
+
+        let recipientRawCallbacks = this.rawMessageCallbacks.get(recipient.linkupId);
+
+        if (recipientRawCallbacks === undefined) {
+            recipientRawCallbacks = new Set();
+            this.rawMessageCallbacks.set(recipient.linkupId, recipientRawCallbacks);
+        }
+
+        recipientRawCallbacks.add(callback);
+        
         this.setUpListenerIfNew(recipient.linkupId);
     }
 
@@ -130,6 +155,28 @@ class SignallingServerConnection implements LinkupServer {
         this.enqueueAndSend(JSON.stringify(message));
     }
 
+    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any): void {
+        if (recipient.serverURL !== this.serverURL) {
+            let e = new Error('Trying to send a linkup message to ' + 
+                              recipient.serverURL + 
+                              ' but this is a connection to ' +
+                              this.serverURL);
+            SignallingServerConnection.logger.error(e);
+            throw e;
+        }
+
+        var message = {
+                    'action'         :  'send',
+                    'linkupId'       :  recipient.linkupId,
+                    'raw'            :  'true',
+                    'data'           :  data,
+                    'replyServerUrl' :  sender.serverURL,
+                    'replyLinkupId'  :  sender.linkupId,
+                  };
+        
+        this.enqueueAndSend(JSON.stringify(message));
+    }
+
     sendListeningAddressesQuery(queryId: string, addresses: Array<LinkupAddress>) {
 
         let linkupIds = new Array<string>();
@@ -177,35 +224,51 @@ class SignallingServerConnection implements LinkupServer {
                     } else if (message['action'] === 'send') {
                         const linkupId = message['linkupId'];
                         const callId   = message['callId'];
+                        const raw      = message['raw'];
 
-                        const linkupIdCalls = this.messageCallbacks.get(linkupId);
-                        let found = false;
-                        if (linkupIdCalls !== undefined) {
-                            let callMessageCallbacks = linkupIdCalls.get(callId);
-                            if (callMessageCallbacks !== undefined) {
-                                callMessageCallbacks.forEach((callback: MessageCallback) => {
-                                    SignallingServerConnection.logger.debug('Delivering linkup message to ' + linkupId + ' on call ' + message['callId']);
-                                    callback(message['data']);
-                                    found = true;
-                                });
-                            }
-                        }
-
-                        if (!found) {
-                            found = false;
-                            let linkupIdCallbacks = this.newCallMessageCallbacks.get(linkupId);
-                            if (linkupIdCallbacks !== undefined) {
-                                linkupIdCallbacks.forEach((callback: NewCallMessageCallback) => {
-                                    SignallingServerConnection.logger.debug('Calling default callback for linkupId ' + linkupId + ', unlistened callId is ' + callId);
-                                    callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), callId, message['data']);
-                                    found = true;
-                                })
+                        if (callId !== undefined) {
+                            const linkupIdCalls = this.messageCallbacks.get(linkupId);
+                            let found = false;
+                            if (linkupIdCalls !== undefined) {
+                                let callMessageCallbacks = linkupIdCalls.get(callId);
+                                if (callMessageCallbacks !== undefined) {
+                                    callMessageCallbacks.forEach((callback: MessageCallback) => {
+                                        SignallingServerConnection.logger.debug('Delivering linkup message to ' + linkupId + ' on call ' + message['callId']);
+                                        callback(message['data']);
+                                        found = true;
+                                    });
+                                }
                             }
 
                             if (!found) {
-                                SignallingServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId);
+                                found = false;
+                                let linkupIdCallbacks = this.newCallMessageCallbacks.get(linkupId);
+                                if (linkupIdCallbacks !== undefined) {
+                                    linkupIdCallbacks.forEach((callback: NewCallMessageCallback) => {
+                                        SignallingServerConnection.logger.debug('Calling default callback for linkupId ' + linkupId + ', unlistened callId is ' + callId);
+                                        callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), callId, message['data']);
+                                        found = true;
+                                    })
+                                }
+    
+                                if (!found) {
+                                    SignallingServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId);
+                                }
+                            }
+                        } else if (raw !== undefined && raw === 'true') {
+
+                            let callbacks = this.rawMessageCallbacks.get(linkupId);
+
+                            if (callbacks !== undefined) {
+                                callbacks.forEach((callback: RawMessageCallback) => {
+                                    SignallingServerConnection.logger.debug('Calling raw message callback for linkupId ' + linkupId);
+                                    callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), message['data']);
+                                });
                             }
                         }
+                        
+
+                        
                     } else if (message['action'] === 'query-reply') {
 
                         const queryId = message['queryId'];

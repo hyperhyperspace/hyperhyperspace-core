@@ -1,16 +1,19 @@
 import { LinkupManager, LinkupAddress } from 'net/linkup';
 import { describeProxy } from 'config';
+import { RNGImpl } from 'crypto/random';
 
 describeProxy('Single-host LinkupManager', () => {
     test('Call starting', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
-        let address1 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressOne_A');
-        let address2 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressTwo_A');
+        const rnd = new RNGImpl().randomHexString(64);
+
+        let address1 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressOne_A_' + rnd);
+        let address2 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressTwo_A_' + rnd);
 
         let callId = 'DUMMY_CALL_ID_TEST_A';
-        let message = 'MESSAGE';
+        let message = 'MESSAGE_' + rnd;
 
         // one is going to listen for a message in a new call
         // two is going to send a message in a new call DUMMY_CALL_ID_TEST_A
@@ -38,11 +41,13 @@ describeProxy('Single-host LinkupManager', () => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
-        let address1 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressOne_B');
-        let address2 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressTwo_B');
+        const rnd = new RNGImpl().randomHexString(64);
+
+        let address1 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressOne_B_' + rnd);
+        let address2 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressTwo_B_' + rnd);
 
         let callId =  'DUMMY_CALL_ID_TEST_B';
-        let message = 'MESSAGE';
+        let message = 'MESSAGE_' + rnd;
         let reply   = 'REPLY';
 
         // one is going to listen for a message in a new call
@@ -72,4 +77,29 @@ describeProxy('Single-host LinkupManager', () => {
         
 
     }, 20000);
+
+    test('Raw messaging', (done) => {
+        let linkupManager1 = new LinkupManager();
+        let linkupManager2 = new LinkupManager();
+
+        const rnd = new RNGImpl().randomHexString(64);
+
+        let address1 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressOne_C_' + rnd);
+        let address2 = new LinkupAddress(LinkupManager.defaultLinkupServer, 'addressTwo_C_' + rnd);
+
+        let message = 'MESSAGE_' + rnd;
+
+        linkupManager1.listenForRawMessages(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdMessage: any) => {
+            expect(sender.linkupId).toEqual(address2.linkupId);
+            expect(sender.serverURL).toEqual(address2.serverURL);
+            expect(recipient.linkupId).toEqual(address1.linkupId);
+            expect(recipient.serverURL).toEqual(address1.serverURL);
+            expect(rcvdMessage).toEqual(message);
+            done();
+        });
+
+        window.setTimeout(() => {
+            linkupManager2.sendRawMessage(address2, address1, message);
+        }, 100);
+    });
 });

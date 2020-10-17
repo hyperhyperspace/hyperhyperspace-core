@@ -5,6 +5,7 @@ type MessageCallback        = (message: any) => void;
 
 type ListeningAddressesQueryCallback  = (queryId: string, matches: Array<LinkupAddress>) => void;
 
+type RawMessageCallback = (sender: LinkupAddress, recipient: LinkupAddress, message: any) => void;
 
 interface LinkupServer {
     listenForMessagesNewCall(recipient: LinkupAddress, callback: NewCallMessageCallback): void;
@@ -12,7 +13,11 @@ interface LinkupServer {
     listenForLinkupAddressQueries(callback: ListeningAddressesQueryCallback): void;
     sendMessage(sender: LinkupAddress, recipient: LinkupAddress, callId: string, data: any): void;
     sendListeningAddressesQuery(queryId: string, addresses: Array<LinkupAddress>): void;
+
+    listenForRawMessages(recipient: LinkupAddress, callback: RawMessageCallback): void;
+    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any): void;
+
     close(): void;
 }
 
-export { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback };
+export { LinkupServer, RawMessageCallback, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback };

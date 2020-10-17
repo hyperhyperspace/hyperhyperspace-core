@@ -1,7 +1,7 @@
 
 import { LinkupAddress } from './LinkupAddress';
 import { SignallingServerConnection } from './SignallingServerConnection';
-import { LinkupServer, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
+import { LinkupServer, RawMessageCallback, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
 import { WebSocketListener } from './WebSocketListener';
 import { Logger, LogLevel } from 'util/logging';
 
@@ -45,10 +45,22 @@ class LinkupManager {
         connection.listenForMessagesOnCall(recipient, callId, callback);
     }
 
+    listenForRawMessages(recipient: LinkupAddress, callback: RawMessageCallback) {
+        let connection = this.getLinkupServer(recipient.serverURL);
+
+        connection.listenForRawMessages(recipient, callback);
+    }
+
     sendMessageOnCall(sender: LinkupAddress, recipient: LinkupAddress, callId: string, data: any) {
         let connection = this.getLinkupServer(recipient.serverURL);
         
         connection.sendMessage(sender, recipient, callId, data);
+    }
+
+    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any) {
+        let connection = this.getLinkupServer(recipient.serverURL);
+
+        connection.sendRawMessage(sender, recipient, data);
     }
 
     listenForQueryResponses(queryId: string, callback: QueryCallback) {

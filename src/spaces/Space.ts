@@ -1,28 +1,21 @@
-import { HashedObject, Resources } from "data/model";
-import { PeerGroup } from "mesh/service";
-
-
-type SpaceHashKey = { 
-    type:'full'|'partial', 
-    hash: string
-};
+import { HashedObject, HashReference, Resources } from 'data/model';
+import { PeerGroup } from 'mesh/service';
 
 class Space {
 
-    key: SpaceHashKey;
-    resources: Resources;
-
+    rootHashRef?: HashReference<HashedObject>;
     initialPeers?: PeerGroup;
+    
+    
     root?: HashedObject;
 
+    resources: Resources;
 
-    constructor(key: SpaceHashKey, resources: Resources) {
-        this.key = key;
+    constructor(rootHashRef: HashReference<HashedObject>, initialPeers: PeerGroup, resources: Resources) {
+        this.rootHashRef = rootHashRef;
+        this.initialPeers = initialPeers;
         this.resources = resources;
     }
-
-    
-
 
 }
 
