@@ -412,11 +412,7 @@ class NetworkAgent implements Agent {
     listenForLinkupMessages(endpoint: Endpoint) {
         let address = LinkupAddress.fromURL(endpoint);
         this.linkupMessageListening.add(endpoint);
-        this.linkupManager.listenForRawMessages(address, (sender: LinkupAddress, receiver: LinkupAddress, message: any) => {
-            if (receiver.url() === endpoint) {
-
-            }
-        });
+        this.linkupManager.listenForRawMessages(address, this.linkupMessageCallback);
     }
 
     //FIXME: remainder: do ws cleanup for not-yet-accepted connections here as well.
