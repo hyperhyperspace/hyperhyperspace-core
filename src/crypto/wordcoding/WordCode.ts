@@ -1,38 +1,38 @@
+import { dictName as englishDictName,
+         words as englishWords } from './dicts/english';
+import { dictName as spanishDictName, 
+         normalizer as spanishNormalizer, 
+         words as spanishWords } from './dicts/spanish';
+
 
 
 class WordCode {
 
-    words: string[];
+    static english = new WordCode(englishDictName, englishWords);
+    static spanish = new WordCode(spanishDictName, spanishWords, spanishNormalizer);
+
+    dictName : string;
+    words    : string[];
+
     wordPositions?: Map<string, number>;
-    normalizedWordPositions?: Map<string, number>;
 
     bitsPerWord: number;
-    normalizer?: (word: string) => string;
-    
+    normalizer: (word: string) => string;
 
-    
-
-    constructor(words: string[], normalizer?: (word: string) => string) {
-        this.words = words;
+    constructor(dictName: string, words: string[], normalizer?: (word: string) => string) {
+        this.dictName = dictName;
+        this.words    = words;
         this.bitsPerWord = Math.log2(this.words.length);
-        this.normalizer = normalizer;
+        this.normalizer = normalizer === undefined? (x: string) => x.toLowerCase() : normalizer;
     }
 
     private fillWordPositions(): void {
         if (this.wordPositions === undefined) {
-            if (this.normalizer !== undefined) {
-                this.normalizedWordPositions = new Map<string, number>();
-            }
+
             this.wordPositions = new Map<string, number>();
             let pos=0;
             for (const word of this.words) {
-                this.wordPositions.set(word, pos);
-                if (this.normalizer !== undefined) {
-                    const norm = this.normalizer(word);
-                    if (norm !== word) {
-                        this.normalizedWordPositions?.set(norm, pos);
-                    }
-                }
+                this.wordPositions.set(this.normalizer(word), pos);
                 pos = pos + 1;
             }
         }
@@ -79,12 +79,26 @@ class WordCode {
 
         let result = '';
 
+        const nibblesPerWord = this.bitsPerWord / 4;
+
         for (let word of words) {
-            
+            let position = this.wordPositions?.get(this.normalizer(word));
+
+            if (position === undefined) {
+                throw new Error('Trying to decode wordcoded number but received a word that is not in the dictionary "' + this.dictName + '":' + word);
+            }
+
+           if (position.toString(16).length > 3) {
+               console.log(position);
+               console.log(position.toString(16));
+           }
+
+            result = result + position.toString(16).padStart(nibblesPerWord, '0');
         }
 
-        return '';
+        return result;
     }
-
     
 }
+
+export { WordCode };

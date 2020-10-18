@@ -12,9 +12,7 @@ export * from './crypto/ciphers';
 export * from './crypto/hashing';
 export * from './crypto/random';
 export * from './crypto/hmac';
-
-//export * from 'rngpoly';
-//export * from 'webrtcpoly';
+export * from './crypto/wordcoding';
 
 export * from './net/linkup';
 export * from './net/transport';
