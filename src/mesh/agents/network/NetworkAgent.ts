@@ -16,9 +16,10 @@ type ConnectionId  = string;
 const BITS_FOR_CONN_ID = 128;
 
 enum NetworkEventType {
-    ConnectionStatusChange  = 'connection-status-change',
-    RemoteAddressListening  = 'remote-address-listening',
-    MessageReceived         = 'message-received'
+    ConnectionStatusChange = 'connection-status-change',
+    RemoteAddressListening = 'remote-address-listening',
+    MessageReceived        = 'message-received',
+    LinkupMessageReceived  = 'linkup-message-received'
 };
 
 enum ConnectionStatus {
@@ -58,6 +59,18 @@ type Message = {
     content: any 
 };
 
+type LinkupMessageReceivedEvent = {
+    type: NetworkEventType.LinkupMessageReceived,
+    content: LinkupMessage
+}
+
+type LinkupMessage = {
+    source: Endpoint,
+    destination: Endpoint,
+    agentId: AgentId,
+    content: any
+}
+
 type ConnectionInfo = { 
     localEndpoint: Endpoint,
     remoteEndpoint: Endpoint, 
@@ -90,8 +103,9 @@ class NetworkAgent implements Agent {
 
     linkupManager : LinkupManager;
 
-    listening   : Set<Endpoint>;
-    connections : Map<ConnectionId, Connection>;
+    listening    : Set<Endpoint>;
+    linkupMessageListening : Set <Endpoint>;
+    connections  : Map<ConnectionId, Connection>;
 
     connectionInfo : Map<ConnectionId, ConnectionInfo>;
     deferredInitialMessages : Map<ConnectionId, Array<any>>;
@@ -102,6 +116,8 @@ class NetworkAgent implements Agent {
 
     newConnectionRequestCallback : (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => void;
 
+    linkupMessageCallback : (sender: LinkupAddress, receiver: LinkupAddress, message: any) => void;
+
     tick : () => void;
 
     intervalRef : any;
@@ -109,7 +125,7 @@ class NetworkAgent implements Agent {
 
 
     getAgentId(): string {
-        return NetworkAgent.AgentId;
+        return NetworkAgent.AgentId; 
     }
 
     constructor(linkupManager = new LinkupManager()) {
@@ -120,8 +136,9 @@ class NetworkAgent implements Agent {
 
         this.linkupManager = linkupManager;
 
-        this.listening   = new Set();
-        this.connections = new Map();
+        this.listening    = new Set();
+        this.linkupMessageListening = new Set();
+        this.connections  = new Map();
 
         this.connectionInfo          = new Map();
         this.deferredInitialMessages = new Map();
@@ -230,6 +247,28 @@ class NetworkAgent implements Agent {
                     }
 
                 }          
+        };
+
+        this.linkupMessageCallback = (sender: LinkupAddress, receiver: LinkupAddress, message: any) => {
+
+            if (this.linkupMessageListening.has(receiver.url())) {
+                const msg = message as LinkupMessage;
+
+                if (sender.url() === msg.source && receiver.url() === msg.destination) {
+                    const destAgentId = msg.agentId;
+                    const destAgent   = this.pod?.getAgent(destAgentId);
+
+                    if (destAgent !== undefined) {
+                        let ev: LinkupMessageReceivedEvent = {
+                            type: NetworkEventType.LinkupMessageReceived,
+                            content: msg
+                        }
+                        destAgent.receiveLocalEvent(ev);
+                    }
+
+                }
+            }
+
         };
 
         this.tick = () => {
@@ -368,6 +407,16 @@ class NetworkAgent implements Agent {
 
         this.logger.debug('Listening for endpoint ' + endpoint);
         this.linkupManager.listenForMessagesNewCall(address, this.newConnectionRequestCallback);
+    }
+
+    listenForLinkupMessages(endpoint: Endpoint) {
+        let address = LinkupAddress.fromURL(endpoint);
+        this.linkupMessageListening.add(endpoint);
+        this.linkupManager.listenForRawMessages(address, (sender: LinkupAddress, receiver: LinkupAddress, message: any) => {
+            if (receiver.url() === endpoint) {
+
+            }
+        });
     }
 
     //FIXME: remainder: do ws cleanup for not-yet-accepted connections here as well.
@@ -545,7 +594,7 @@ class NetworkAgent implements Agent {
     }
 
 
-    // Sends a raw message, even if no peer has been configured for that connection.
+    // Sends a cleartext message, even if no peer has been configured for that connection.
     // Meant to be used in peer authentication & set up.
 
     sendMessage(connId: ConnectionId, agentId: AgentId, content: any) {
@@ -567,6 +616,18 @@ class NetworkAgent implements Agent {
 
         conn.send(JSON.stringify(message));
 
+    }
+
+    sendLinkupMessage(sourceAddress: LinkupAddress, destinationAddress: LinkupAddress, agentId: AgentId, content: any) {
+
+        let linkupMessage: LinkupMessage = {
+            source: sourceAddress.url(),
+            destination: destinationAddress.url(),
+            agentId: agentId,
+            content: content
+        };
+
+        this.linkupManager.sendRawMessage(sourceAddress, destinationAddress, linkupMessage);
     }
 
     private connectionCloseCleanup(id: ConnectionId) {
@@ -615,4 +676,4 @@ class NetworkAgent implements Agent {
     }
 }
 
-export { NetworkAgent, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent, Endpoint }
+export { NetworkAgent, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent, LinkupMessageReceivedEvent, LinkupMessage, Endpoint }
