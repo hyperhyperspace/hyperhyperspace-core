@@ -6,3 +6,5 @@ export { HashBasedPeerSource, HashBasedPeerContainer } from './peer/sources/Cont
 export { ConstantPeerSource } from './peer/sources/ConstantPeerSource';
 export { JoinPeerSources } from './peer/sources/JoinPeerSources';
 export { EmptyPeerSource } from './peer/sources/EmptyPeerSource';
+export { PeerBroadcastAgent } from './peer/PeerBroadcastAgent';
+export { PeerDiscoveryAgent } from './peer/PeerDiscoveryAgent';

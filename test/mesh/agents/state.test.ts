@@ -1,4 +1,4 @@
-import { TestPeerNetwork } from '../mock/TestPeerNetwork';
+import { TestPeerGroupPods } from '../mock/TestPeerGroupPods';
 
 import { TestIdentity } from 'data/types/TestIdentity';
 
@@ -53,7 +53,7 @@ describeProxy('State sync', () => {
 async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
 
     let peerGroupId = new RNGImpl().randomHexString(64);
-    let pods = TestPeerNetwork.generate(peerGroupId, 3, 3, 2, network, basePort);
+    let pods = TestPeerGroupPods.generate(peerGroupId, 3, 3, 2, network, 'no-discovery', basePort);
 
     const objCount = 3;
     const objIds   = new Array<Hash>();
@@ -145,7 +145,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = TestPeerNetwork.generate(peerNetworkId, size, size, size-1, network, basePort);
+    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort);
 
     let stores : Array<Store> = [];
     

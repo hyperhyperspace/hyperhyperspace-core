@@ -7,7 +7,7 @@ import { RSAPublicKey } from './RSAPublicKey';
 
 class Identity extends HashedObject {
 
-    static className = 'hss/Identity';
+    static className = 'hhs/v0/Identity';
 
     static fromKeyPair(info: any, keyPair: RSAKeyPair) : Identity {
         let id = Identity.fromPublicKey(info, keyPair.makePublicKey());

@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
-import { HashedObject, MutableObject, Literal, Context } from 'data/model';
+import { HashedObject, MutableObject, Literal, Context, HashReference } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { MultiMap } from 'util/multimap';
@@ -216,6 +216,16 @@ class Store {
 
     async loadLiteral(hash: Hash) {
         return this.backend.load(hash);
+    }
+    
+    async loadRef<T extends HashedObject>(ref: HashReference<T>) : Promise<T | undefined> {
+        let obj = await this.load(ref.hash);
+
+        if (obj !== undefined && ref.className !== obj.getClassName()) {
+            throw new Error('Error loading reference to ' + ref.className + ': object with hash ' + ref.hash + ' has class ' + obj.getClassName() + ' instead.');
+        }
+
+        return obj as T | undefined;
     }
 
     async load(hash: Hash) : Promise<HashedObject | undefined> {
