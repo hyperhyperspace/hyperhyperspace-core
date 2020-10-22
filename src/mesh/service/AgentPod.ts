@@ -101,6 +101,11 @@ class AgentPod {
         }
     }
     
+    shutdown() {
+        for (const agent of this.agents.values()) {
+            agent.shutdown();
+        }
+    }
 }
 
 export { AgentPod, Event, AgentPodEventType, AgentSetChangeEvent, AgentSetChange };

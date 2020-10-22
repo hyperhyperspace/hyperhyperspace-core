@@ -10,11 +10,11 @@ import { PeerGroupAgent } from 'mesh/agents/peer';
 import { NetworkAgent } from 'mesh/agents/network';
 import { describeProxy } from 'config';
 
-describeProxy('Group shared spaces', () => {
+describeProxy('[SPA] Group shared spaces', () => {
 
     connectSpaceWithLogger;
 
-    test('3-node sync test', async (done) => {
+    test('[SPA01] 3-node sync test', async (done) => {
 
         const size = 3;
 
@@ -74,10 +74,16 @@ describeProxy('Group shared spaces', () => {
 
         expect((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length).toEqual(size-1);
         expect(peers.size()).toEqual(size);
+        
+        for (const space of spaces) {
+            space.mesh.pod.shutdown();
+        }
+        
         done();
-    }, 35000);
+        
+    }, 45000);
 
-test('2-node nested sync test', async (done) => {
+test('[SPA02] 2-node nested sync test', async (done) => {
 
     const size = 2;
 
@@ -157,8 +163,13 @@ test('2-node nested sync test', async (done) => {
     expect(lastThings.size()).toEqual(1);
     expect(lastInner.size()).toEqual(1);
     expect(samplePeer?.hash()).toEqual(samplePeers[0].hash());
+
+    for (const space of spaces) {
+        space.mesh.pod.shutdown();
+    }
+
     done();
-}, 35000);
+}, 45000);
 });
 
 

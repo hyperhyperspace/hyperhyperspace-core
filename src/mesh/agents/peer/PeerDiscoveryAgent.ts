@@ -35,7 +35,7 @@ class PeerDiscoveryPeerSource implements PeerSource {
         this.agent.queryForPeers();
         const peers = await this.agent.getPeers(count);
 
-        PeerDiscoveryAgent.log.trace(() =>'Returning discovered endpoints: ' + peers.map((pi: PeerInfo) => pi.endpoint));
+        PeerDiscoveryAgent.log.debug(() =>'Returning discovered endpoints at ' + this.agent.localEndpoint + ': ' + peers.map((pi: PeerInfo) => pi.endpoint));
 
         return peers;
     }
@@ -48,19 +48,16 @@ class PeerDiscoveryPeerSource implements PeerSource {
 
 class PeerDiscoveryAgent implements Agent {
 
-    static log = new Logger(PeerDiscoveryAgent.name, LogLevel.TRACE);
+    static log = new Logger(PeerDiscoveryAgent.name, LogLevel.INFO);
 
     static agentIdForHashPrefix(prefix: string) {
         return 'peer-discovery-for-' + prefix;
     }
 
-    static linkupIdForHashPrefix(prefix: string) {
-        return 'peer-collection-for-' + prefix;
-    }
-
     pod?: AgentPod;
 
     hashSuffix: string;
+    localEndpoint: Endpoint;
     parseEndpoint : (ep: Endpoint) => Promise<PeerInfo | undefined>
 
     params: Params;
@@ -71,8 +68,9 @@ class PeerDiscoveryAgent implements Agent {
 
     peerSource: PeerSource;
 
-    constructor(hashSuffix: string, parseEndpoint : (ep: Endpoint) => Promise<PeerInfo | undefined>, params?: Partial<Params>) {
+    constructor(hashSuffix: string, localEndpoint: Endpoint, parseEndpoint : (ep: Endpoint) => Promise<PeerInfo | undefined>, params?: Partial<Params>) {
         this.hashSuffix = hashSuffix;
+        this.localEndpoint = localEndpoint;
         this.parseEndpoint = parseEndpoint;
         
         if (params === undefined) {
@@ -98,11 +96,7 @@ class PeerDiscoveryAgent implements Agent {
     ready(pod: AgentPod): void {
         this.pod = pod;
         
-        for (const linkupServer of this.params.targetLinkupServers) {
-            this.getNetworkAgent().listenForLinkupMessages(
-                new LinkupAddress(linkupServer, PeerDiscoveryAgent.linkupIdForHashPrefix(this.hashSuffix)).url(),
-            );
-        }
+        this.getNetworkAgent().listenForLinkupMessages(this.localEndpoint);
     }
 
     queryForPeers() {
@@ -118,20 +112,18 @@ class PeerDiscoveryAgent implements Agent {
             currentTime > this.lastQueryingTime + this.params.maxQueryFreq * 1000) {
                 
             this.lastQueryingTime = currentTime;
-            
-            this.currentPeers = new Map();
 
             for (const linkupServer of this.params.targetLinkupServers) {
                 
                 PeerDiscoveryAgent.log.trace(() => 
                     'Sending peer query from endpoint ' + 
-                    new LinkupAddress(linkupServer, PeerDiscoveryAgent.linkupIdForHashPrefix(this.hashSuffix)).url() + 
+                    this.localEndpoint + 
                     ' to endpoint ' + 
                     new LinkupAddress(linkupServer, PeerBroadcastAgent.linkupIdForHashSuffix(this.hashSuffix)).url() +
                     ' for suffix ' + this.hashSuffix);
                 
                 this.getNetworkAgent().sendLinkupMessage(
-                    new LinkupAddress(linkupServer, PeerDiscoveryAgent.linkupIdForHashPrefix(this.hashSuffix)),
+                    LinkupAddress.fromURL(this.localEndpoint),
                     new LinkupAddress(linkupServer, PeerBroadcastAgent.linkupIdForHashSuffix(this.hashSuffix)),
                     PeerBroadcastAgent.agentIdForHashSuffix(this.hashSuffix),
                     request
@@ -151,6 +143,8 @@ class PeerDiscoveryAgent implements Agent {
 
 
         let result : PeerInfo[] = [];
+
+        //console.log('get peers at ' + this.localEndpoint + ' size: ' + this.currentPeers.size);
 
         const now = Date.now();
 
@@ -176,9 +170,10 @@ class PeerDiscoveryAgent implements Agent {
             const reply = msg.content as PeerBroadcastReply;
 
             if (this.hashSuffix === reply.hash.slice(-this.hashSuffix.length)) {
-                PeerDiscoveryAgent.log.debug('Received peers ' + reply.peers);
+                PeerDiscoveryAgent.log.trace('Received peers ' + reply.peers + ' at ' + this.localEndpoint);
 
                 if (this.currentPeers.size + reply.peers.length > this.params.maxPeers) {
+                    //console.log('making room');
                     PeerDiscoveryAgent.log.trace('Attempting to make room for received peers');
 
                     let toRemove = [];
@@ -196,15 +191,18 @@ class PeerDiscoveryAgent implements Agent {
 
                 for (const endpoint of reply.peers) {
                     if (this.currentPeers.size < this.params.maxPeers) {
+                        //console.log('found room, adding');
                         this.currentPeers.set(endpoint , {hash: reply.hash, extra: reply.extraInfo, timestamp: Date.now()});
                     }
                 }
+
+                //console.log('size in ' + this.localEndpoint + ' is ' + this.currentPeers.size);
             }
         }
     }
 
     shutdown(): void {
-        throw new Error('Method not implemented.');
+        
     }
 
 

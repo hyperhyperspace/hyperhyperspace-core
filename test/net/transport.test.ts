@@ -3,31 +3,36 @@ import { WebRTCConnection, WebSocketConnection } from 'net/transport';
 import { LinkupManager, LinkupAddress } from 'net/linkup';
 import { describeProxy } from 'config';
 import { Connection } from 'net/transport/Connection';
+import { RNGImpl } from 'crypto/random';
 
-describeProxy('Transports', () => {
+describeProxy('[TRA] Transports', () => {
 
-    test('WebRTC send / answer', (done) => {
+    test('[TRA01] WebRTC send / answer', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
         //let linkupServer2 = LinkupManager.defaultLinkupServer;
         let linkupServer1 = LinkupManager.defaultLinkupServer;
 
-        let address1 = new LinkupAddress(linkupServer1, 'addressOne_C');
-        let address2 = new LinkupAddress(linkupServer1, 'addressTwo_C');
+        const rnd = new RNGImpl().randomHexString(64);
 
-        let theCallId = 'DUMMY_CALL_ID_TEST_C';
+        let address1 = new LinkupAddress(linkupServer1, 'addressOne_C_' + rnd);
+        let address2 = new LinkupAddress(linkupServer1, 'addressTwo_C_' + rnd);
+
+        let theCallId = 'DUMMY_CALL_ID_TEST_C_' + rnd;
         let channelName = "test_data_channel";
+
+        let conn2: WebRTCConnection|undefined = undefined;
 
         linkupManager2.listenForMessagesNewCall(address2, (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => {
             receiver;
-            let conn2 = new WebRTCConnection(linkupManager2, address2, sender, callId, (conn: Connection) => {
+            conn2 = new WebRTCConnection(linkupManager2, address2, sender, callId, (conn: Connection) => {
                 expect(sender.linkupId).toEqual(address1.linkupId);
                 expect(conn.getConnectionId()).toEqual(theCallId);
             });
             conn2.setMessageCallback((message: any, _conn: Connection) => {
                 expect(message).toEqual("hola");
-                conn2.send("chau");
+                conn2?.send("chau");
             });
             conn2.answer(message);
         });
@@ -38,13 +43,17 @@ describeProxy('Transports', () => {
 
         conn1.setMessageCallback((message: any) => {
             expect(message).toEqual("chau");
+            conn1.close();
+            conn2?.close();
+            linkupManager1.shutdown();
+            linkupManager2.shutdown();
             done();
         });
 
         conn1.open(channelName);
     }, 15000);
 
-    test('WebSocket send / answer', (done) => {
+    test('[TRA02] WebSocket send / answer', (done) => {
 
         //let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
@@ -54,21 +63,25 @@ describeProxy('Transports', () => {
         let listenAddress1 = 'ws://localhost:10000';
         let listenAddress2 = 'ws://localhost:10001';
 
-        let address1 = new LinkupAddress(listenAddress1, 'addressOne_D');
-        let address2 = new LinkupAddress(listenAddress2, 'addressTwo_D');
+        const rnd = new RNGImpl().randomHexString(64);
 
-        let theCallId = 'DUMMY_CALL_ID_TEST_D';
+        let address1 = new LinkupAddress(listenAddress1, 'addressOne_D_' + rnd);
+        let address2 = new LinkupAddress(listenAddress2, 'addressTwo_D_' + rnd);
+
+        let theCallId = 'DUMMY_CALL_ID_TEST_D_' + rnd;
+
+        let conn2: WebSocketConnection|undefined = undefined;
 
         linkupManager2.listenForMessagesNewCall(address2, (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => {
             receiver;
-            let conn2 = new WebSocketConnection(callId, address2, sender, (conn: Connection) => {
+            conn2 = new WebSocketConnection(callId, address2, sender, (conn: Connection) => {
                 expect(sender.linkupId).toEqual(address1.linkupId);
                 expect(conn.getConnectionId()).toEqual(theCallId);
             });
 
             conn2.setMessageCallback((message: any, _conn: Connection) => {
                 expect(message).toEqual("hola");
-                conn2.send("chau");
+                conn2?.send("chau");
             });
 
             conn2.answer(message);
@@ -80,6 +93,9 @@ describeProxy('Transports', () => {
 
         conn1.setMessageCallback((message: any) => {
             expect(message).toEqual("chau");
+            conn1.close();
+            conn2?.close();
+            linkupManager2.shutdown();
             done();
         });
 
@@ -90,7 +106,7 @@ describeProxy('Transports', () => {
     }, 15000);
 
 
-    test('WebRTC -> WebSocket send / answer', (done) => {
+    test('[TRA03] WebRTC -> WebSocket send / answer', (done) => {
 
         //let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
@@ -100,21 +116,25 @@ describeProxy('Transports', () => {
         let listenAddress1 = LinkupManager.defaultLinkupServer;
         let listenAddress2 = 'ws://localhost:10011';
 
-        let address1 = new LinkupAddress(listenAddress1, 'addressOne_F');
-        let address2 = new LinkupAddress(listenAddress2, 'addressTwo_F');
+        const rnd = new RNGImpl().randomHexString(64);
 
-        let theCallId = 'DUMMY_CALL_ID_TEST_F';
+        let address1 = new LinkupAddress(listenAddress1, 'addressOne_F_' + rnd);
+        let address2 = new LinkupAddress(listenAddress2, 'addressTwo_F_' + rnd);
+
+        let theCallId = 'DUMMY_CALL_ID_TEST_F_' + rnd;
+
+        let conn2: WebSocketConnection|undefined = undefined;
 
         linkupManager2.listenForMessagesNewCall(address2, (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => {
             receiver;
-            let conn2 = new WebSocketConnection(callId, address2, sender, (conn: Connection) => {
+            conn2 = new WebSocketConnection(callId, address2, sender, (conn: Connection) => {
                 expect(sender.linkupId).toEqual(address1.linkupId);
                 expect(conn.getConnectionId()).toEqual(theCallId);
             });
 
             conn2.setMessageCallback((message: any, _conn: Connection) => {
                 expect(message).toEqual("hola");
-                conn2.send("chau");
+                conn2?.send("chau");
             });
 
             conn2.answer(message);
@@ -126,6 +146,9 @@ describeProxy('Transports', () => {
 
         conn1.setMessageCallback((message: any) => {
             expect(message).toEqual("chau");
+            conn1.close();
+            conn2?.close();
+            linkupManager2.shutdown();
             done();
         });
 
@@ -136,7 +159,7 @@ describeProxy('Transports', () => {
     }, 15000);
 
 
-    test('WebSocket -> WebRTC send / answer w/reverse connection', (done) => {
+    test('[TRA04] WebSocket -> WebRTC send / answer w/reverse connection', (done) => {
 
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
@@ -146,14 +169,18 @@ describeProxy('Transports', () => {
         let listenAddress1 = 'ws://localhost:10020';
         let listenAddress2 = LinkupManager.defaultLinkupServer;
 
-        let address1 = new LinkupAddress(listenAddress1, 'addressOne_E');
-        let address2 = new LinkupAddress(listenAddress2, 'addressTwo_E');
+        const rnd = new RNGImpl().randomHexString(64);
 
-        let theCallId = 'DUMMY_CALL_ID_TEST_E';
+        let address1 = new LinkupAddress(listenAddress1, 'addressOne_E_' + rnd);
+        let address2 = new LinkupAddress(listenAddress2, 'addressTwo_E_' + rnd);
+
+        let theCallId = 'DUMMY_CALL_ID_TEST_E_' + rnd;
+
+        let conn2: WebSocketConnection|undefined = undefined;
 
         linkupManager2.listenForMessagesNewCall(address2, (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => {
             receiver;
-            let conn2 = new WebSocketConnection(callId, address2, sender, (conn: Connection) => {
+            conn2 = new WebSocketConnection(callId, address2, sender, (conn: Connection) => {
                 expect(sender.linkupId).toEqual(address1.linkupId);
                 expect(conn.getConnectionId()).toEqual(theCallId);
                 expect(conn.initiatedLocally()).toBeFalsy();
@@ -161,7 +188,7 @@ describeProxy('Transports', () => {
 
             conn2.setMessageCallback((message: any, _conn: Connection) => {
                 expect(message).toEqual("hola");
-                conn2.send("chau");
+                conn2?.send("chau");
             });
 
             conn2.answer(message);
@@ -189,6 +216,10 @@ describeProxy('Transports', () => {
         conn1.setMessageCallback((message: any) => {
             expect(message).toEqual("chau");
             expect(conn1.initiatedLocally()).toBeTruthy();
+            conn1.close();
+            conn2?.close();
+            linkupManager1.shutdown();
+            linkupManager2.shutdown();
             done();
         });
 

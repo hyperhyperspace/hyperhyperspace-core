@@ -108,9 +108,16 @@ type Params = {
     tickInterval: number
 };
 
+type CumulativeStats = {
+    connectionInit: number;
+    connectionAccpt: number;
+    connectionTimeouts: number;
+}
+
 type Stats = {
     peers: number;
     connections: number;
+    connectionsPerStatus: Map<PeerConnectionStatus, number>;
 }
 
 class PeerGroupAgent implements Agent {
@@ -135,6 +142,8 @@ class PeerGroupAgent implements Agent {
 
     tick: () => Promise<void>;
     tickTimerRef: any;
+
+    stats: CumulativeStats;
 
     controlLog = PeerGroupAgent.controlLog;
 
@@ -168,6 +177,8 @@ class PeerGroupAgent implements Agent {
             this.queryForOnlinePeers();
             this.deduplicateConnections();
         };
+
+        this.stats = { connectionInit: 0, connectionAccpt: 0, connectionTimeouts: 0 };
     }
 
     getAgentId(): string {
@@ -280,13 +291,22 @@ class PeerGroupAgent implements Agent {
     getStats() : Stats {
         let stats: Stats = {
             peers: 0,
-            connections: this.connections.size
+            connections: this.connections.size,
+            connectionsPerStatus: new Map()
         };
 
         for (const ep of this.connectionsPerEndpoint.keys()) {
             if (this.findWorkingConnectionId(ep) !== undefined) {
                 stats.peers += 1;
             }
+        }
+
+        for (const conn of this.connections.values()) {
+            let c = stats.connectionsPerStatus.get(conn.status);
+            if (c === undefined) {
+                c = 0;
+            }
+            stats.connectionsPerStatus.set(conn.status, c + 1);
         }
 
         return stats;
@@ -309,7 +329,7 @@ class PeerGroupAgent implements Agent {
                 }
             } else {                
                 if (now > pc.timestamp + this.params.peerConnectionTimeout * 1000) {
-                        
+                    this.stats.connectionTimeouts += 1;
                     this.removePeerConnection(pc.connId);
                 }
             }
@@ -548,7 +568,16 @@ class PeerGroupAgent implements Agent {
                 
                 // OK just do it.
                 return true;
+            } else {
+                PeerGroupAgent.controlLog.trace('Will not connect, there is a recent connection attempt to the same endpoint.');
             }
+        } else {
+            PeerGroupAgent.controlLog.trace(
+                () => 'will not connect, resons: ' + 
+                '\np!==undefined => ' + (p !== undefined) + 
+                '\nthis.connectionsPerEndpoint.size < this.params.minPeers => ' + (this.connectionsPerEndpoint.size < this.params.minPeers) + 
+                '\nthis.connectionsPerEndpoint.get(p.endpoint) === undefined => ' + (p !== undefined && this.connectionsPerEndpoint.get(p.endpoint) === undefined) + 
+                '\nthis.localPeer.endpoint !== p.endpoint => ' + (p !== undefined && this.localPeer.endpoint !== p.endpoint));
         }
 
         // if conditions above are not met, don't connect.
@@ -573,6 +602,7 @@ class PeerGroupAgent implements Agent {
     private addPeerConnection(connId: ConnectionId, peer: PeerInfo, status: PeerConnectionStatus) {
 
         if (this.connections.get(connId) !== undefined) {
+            PeerGroupAgent.controlLog.warning(() => 'Trying to add connection ' + connId + ', but it already exists.')
             throw new Error('Trying to add connection ' + connId + ', but it already exists.');
         }
 
@@ -654,6 +684,7 @@ class PeerGroupAgent implements Agent {
             let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as PeerInfo).endpoint, this.getAgentId());
             this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.Connecting);
             this.connectionAttemptTimestamps.set(ep, Date.now());
+            this.stats.connectionInit += 1;
         } else {
             this.controlLog.debug(() => (this.localPeer.endpoint + ' will NOT initiate peer connection to ' + ep + '.'));
         }
@@ -670,6 +701,7 @@ class PeerGroupAgent implements Agent {
                 this.controlLog.debug('Will accept requested connection ' + connId + '!');
                 this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.ReceivingConnection);
                 this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
+                this.stats.connectionAccpt += 1;
             }
         }
 
@@ -982,6 +1014,9 @@ class PeerGroupAgent implements Agent {
     // emitted events
 
     private broadcastNewPeerEvent(peer: PeerInfo) {
+        
+        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' hasa new peer: ' + peer.endpoint);
+
         let ev: NewPeerEvent = {
             type: PeerMeshEventType.NewPeer,
             content: {

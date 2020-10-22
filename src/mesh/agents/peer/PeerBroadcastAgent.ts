@@ -29,7 +29,7 @@ const DEFAULT_SUFFIX_BITS = 36;
 
 class PeerBroadcastAgent implements Agent {
 
-    static log = new Logger(PeerBroadcastAgent.name, LogLevel.TRACE);
+    static log = new Logger(PeerBroadcastAgent.name, LogLevel.INFO);
 
     static getSuffix(hash: string, suffixBits=DEFAULT_SUFFIX_BITS): string {
         
@@ -61,7 +61,7 @@ class PeerBroadcastAgent implements Agent {
     extraInfo?: any;
 
     constructor(hash: Hash, peers: Endpoint[], targetLinkupServers=[LinkupManager.defaultLinkupServer], suffixBits = 36, extraInfo?: any) {
-        this.mode = OperatingMode.broadcasting;
+        this.mode = OperatingMode.inactive;
         this.hash = hash;
         this.peers = peers;
         this.extraInfo = extraInfo;
@@ -82,6 +82,8 @@ class PeerBroadcastAgent implements Agent {
     }
 
     private async init() {
+
+        this.mode = OperatingMode.broadcasting;
 
         const networkAgent = this.getNetworkAgent();
 

@@ -11,7 +11,8 @@ class LinkupManager {
 
     static logger = new Logger(LinkupManager.name, LogLevel.INFO);
 
-    static defaultLinkupServer =  'wrtc+wss://mypeer.net:443';//'wrtc+ws://localhost:3002';
+    static defaultLinkupServer =  'wrtc+wss://mypeer.net:443';
+    //static defaultLinkupServer =  'wrtc+ws://localhost:8765';
 
     serverConnections : Map<string, LinkupServer>;
 

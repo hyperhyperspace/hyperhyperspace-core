@@ -2,8 +2,8 @@ import { LinkupManager, LinkupAddress } from 'net/linkup';
 import { describeProxy } from 'config';
 import { RNGImpl } from 'crypto/random';
 
-describeProxy('Single-host LinkupManager', () => {
-    test('Call starting', (done) => {
+describeProxy('[LNK] Single-host LinkupManager', () => {
+    test('[LNK01] Call starting', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
@@ -18,6 +18,8 @@ describeProxy('Single-host LinkupManager', () => {
         // one is going to listen for a message in a new call
         // two is going to send a message in a new call DUMMY_CALL_ID_TEST_A
 
+        let int:any = undefined;
+
         linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdMessage: any) => {
             
             expect(sender.linkupId).toEqual(address2.linkupId);
@@ -26,10 +28,13 @@ describeProxy('Single-host LinkupManager', () => {
             expect(recipient.serverURL).toEqual(address1.serverURL);
             expect(rcvdCallId).toEqual(callId);
             expect(rcvdMessage).toEqual(message);
+            if (int !== undefined) { clearInterval(int); }
+            linkupManager1.shutdown();
+            linkupManager2.shutdown();
             done();
         });
         
-        window.setTimeout(() => {
+        int = window.setInterval(() => {
             linkupManager2.sendMessageOnCall(address2, address1, callId, message);
         }, 100);
 
@@ -37,7 +42,7 @@ describeProxy('Single-host LinkupManager', () => {
 
     }, 20000);
 
-    test('Call answering', (done) => {
+    test('[LNK02] Call answering', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
@@ -54,6 +59,8 @@ describeProxy('Single-host LinkupManager', () => {
         // two is going to send a message in a new call DUMMY_CALL_ID_TEST_B
         // one is going to send a message back on call DUMMT_CALL_ID_TEST_B
 
+        let int:any = undefined;
+
         linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdMessage: any) => {
             expect(sender.linkupId).toEqual(address2.linkupId);
             expect(sender.serverURL).toEqual(address2.serverURL);
@@ -67,10 +74,13 @@ describeProxy('Single-host LinkupManager', () => {
 
         linkupManager2.listenForMessagesOnCall(address2, callId, (message: string) => {
             expect(message).toEqual(reply);
+            if (int !== undefined) { clearInterval(int); }
+            linkupManager1.shutdown();
+            linkupManager2.shutdown();
             done();
         });
         
-        window.setTimeout(() => {
+        int = window.setInterval(() => {
             linkupManager2.sendMessageOnCall(address2, address1, callId, message);
         }, 100);
 
@@ -78,7 +88,7 @@ describeProxy('Single-host LinkupManager', () => {
 
     }, 20000);
 
-    test('Raw messaging', (done) => {
+    test('[LNK03] Raw messaging', (done) => {
         let linkupManager1 = new LinkupManager();
         let linkupManager2 = new LinkupManager();
 
@@ -89,17 +99,22 @@ describeProxy('Single-host LinkupManager', () => {
 
         let message = 'MESSAGE_' + rnd;
 
+        let int: any = undefined;
+
         linkupManager1.listenForRawMessages(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdMessage: any) => {
             expect(sender.linkupId).toEqual(address2.linkupId);
             expect(sender.serverURL).toEqual(address2.serverURL);
             expect(recipient.linkupId).toEqual(address1.linkupId);
             expect(recipient.serverURL).toEqual(address1.serverURL);
             expect(rcvdMessage).toEqual(message);
+            if (int !== undefined) { clearInterval(int); }
+            linkupManager1.shutdown();
+            linkupManager2.shutdown();
             done();
         });
 
-        window.setTimeout(() => {
+        int = window.setInterval(() => {
             linkupManager2.sendRawMessage(address2, address1, message);
         }, 100);
-    });
+    }, 20000);
 });

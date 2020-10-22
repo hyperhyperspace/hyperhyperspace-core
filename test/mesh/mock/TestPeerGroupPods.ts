@@ -53,7 +53,7 @@ class TestPeerGroupPods {
 
             let peerSourceToUse: PeerSource = peerSource;
 
-            let params: any = { maxPeers: peerConnCount, minPeers: peerConnCount, tickInterval: 3 };
+            let params: any = { maxPeers: peerConnCount, minPeers: peerConnCount, tickInterval: 1.5, peerConnectionAttemptInterval: 1.5 };
 
             if (discovery === 'linkup-discovery') {
 
@@ -66,6 +66,7 @@ class TestPeerGroupPods {
                 const suffix = PeerBroadcastAgent.getSuffix(peerGroupId);
                 let discoveryAgent = new PeerDiscoveryAgent(
                     suffix, 
+                    peers[i].endpoint,
                     (ep: string) => peerSource.getPeerForEndpoint(ep),
                     {maxQueryFreq: 1}
                 );

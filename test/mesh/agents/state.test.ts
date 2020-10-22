@@ -14,37 +14,37 @@ import { Identity } from 'data/identity';
 import { TerminalOpsSyncAgent } from 'mesh/agents/state/TerminalOpsSyncAgent';
 import { describeProxy } from 'config';
 
-describeProxy('State sync', () => {
-    test('Gossip agent in small peer group (wrtc)', async (done) => {
+describeProxy('[SYN] State sync', () => {
+    test('[SYN01] Gossip agent in small peer group (wrtc)', async (done) => {
 
         await gossipInSmallPeerGroup(done, 'wrtc');
 
     }, 35000);
 
-    test('Gossip agent in small peer group (ws)', async (done) => {
+    test('[SYN02] Gossip agent in small peer group (ws)', async (done) => {
 
         await gossipInSmallPeerGroup(done, 'ws', 5200);
 
     }, 35000);
 
-    test('Gossip agent in small peer group (mix)', async (done) => {
+    test('[SYN03] Gossip agent in small peer group (mix)', async (done) => {
 
         await gossipInSmallPeerGroup(done, 'mix', 5210);
 
     }, 35000);
 
-    test('Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
+    test('[SYN04] Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'wrtc');
 
     }, 45000);
 
-    test('Terminal ops agent-based set sync in small peer group (ws)', async (done) => {
+    test('[SYN05] Terminal ops agent-based set sync in small peer group (ws)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'ws', 5300);
     }, 45000);
 
-    test('Terminal ops agent-based set sync in small peer group (mix)', async (done) => {
+    test('[SYN06] Terminal ops agent-based set sync in small peer group (mix)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'mix', 5310);
     }, 45000);
@@ -130,9 +130,10 @@ async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mi
             expect(witness[c].message).toEqual(results[c][1])
         }
 
-        //for (const pod of pods) {
-        //    pod.shutdown();
-        //}
+    }
+
+    for (const pod of pods) {
+        pod.shutdown();
     }
 
     done();
@@ -244,6 +245,10 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
 
     //const meshAgent = pods[0].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent
     //expect(meshAgent.getPeers().length).toEqual(size-1);
+
+    for (const pod of pods) {
+        pod.shutdown();
+    }
 
     expect(meshReady).toBeTruthy();
     expect(replicated).toBeTruthy();
