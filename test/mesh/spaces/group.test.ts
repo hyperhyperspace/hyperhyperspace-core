@@ -81,7 +81,7 @@ describeProxy('[SPA] Group shared spaces', () => {
         
         done();
         
-    }, 45000);
+    }, 300000);
 
 test('[SPA02] 2-node nested sync test', async (done) => {
 
@@ -169,7 +169,7 @@ test('[SPA02] 2-node nested sync test', async (done) => {
     }
 
     done();
-}, 45000);
+}, 300000);
 });
 
 
@@ -204,7 +204,7 @@ let generateSpacesForPeers = (spaceId: string, samplePeers: Array<SamplePeer>) =
 
     for (let i=0; i<samplePeers.length; i++) {
         let samplePeer = samplePeers[i];
-        let space = new SharedNamespace(spaceId, samplePeer.getPeer());
+        let space = new SharedNamespace(spaceId, samplePeer.getPeer(), {peerGroupAgentConfig: { tickInterval: 1.5, peerConnectionAttemptInterval: 15, peerConnectionTimeout: 14 }});
         let samplePeerSource = new SamplePeerSource(space.getStore(), allPeers);
         space.setPeerSource(samplePeerSource);
         spaces.push(space);

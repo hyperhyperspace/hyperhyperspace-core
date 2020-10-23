@@ -3,8 +3,8 @@ import { HashedObject } from 'data/model';
 import { TestIdentity } from './types/TestIdentity';
 import { describeProxy } from '../config';
 
-describeProxy('Identity', () => {
-    test( 'Basic identity', () => {
+describeProxy('[IDN] Identity', () => {
+    test( '[IDN01] Basic identity', () => {
 
         let keyPair = TestIdentity.getFistTestKeyPair();
 
@@ -24,7 +24,7 @@ describeProxy('Identity', () => {
 
     });
 
-    test( 'Identity keypair hash generation', () => {
+    test( '[IDN01] Identity keypair hash generation', () => {
         let keyPair = TestIdentity.getFistTestKeyPair();
 
         let id = TestIdentity.getFirstTestIdentity();

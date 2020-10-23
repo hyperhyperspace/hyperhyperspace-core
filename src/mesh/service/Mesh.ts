@@ -9,6 +9,7 @@ import { PeerInfo, PeerSource, PeerGroupAgent } from '../agents/peer';
 import { AgentPod } from './AgentPod';
 
 import { Store } from 'storage/store';
+import { PeerGroupAgentConfig } from 'mesh/agents/peer/PeerGroupAgent';
 
 type GossipId  = string;
 type PeerGroupId = string;
@@ -49,6 +50,9 @@ class Mesh {
     // given a root object, ALL the mut. objects that are being sync'd because of it.
     allDependencyClosures: Map<GossipId, MultiMap<Hash, Hash>>;
 
+    // configuration
+
+
     constructor() {
         this.pod = new AgentPod();
 
@@ -72,12 +76,12 @@ class Mesh {
         
     }
 
-    joinPeerGroup(pg: PeerGroupInfo) {
+    joinPeerGroup(pg: PeerGroupInfo, config?: PeerGroupAgentConfig) {
 
         let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(pg.id));
 
         if (agent === undefined) {
-            agent = new PeerGroupAgent(pg.id, pg.localPeer, pg.peerSource);
+            agent = new PeerGroupAgent(pg.id, pg.localPeer, pg.peerSource, config);
             this.pod.registerAgent(agent);
         }
 

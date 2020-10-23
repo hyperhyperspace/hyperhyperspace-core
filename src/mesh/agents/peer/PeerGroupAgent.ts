@@ -1048,4 +1048,5 @@ class PeerGroupAgent implements Agent {
 
 }
 
-export { PeerGroupAgent, PeerInfo, PeerMeshEventType, NewPeerEvent };
+type Config = Partial<Params>;
+export { PeerGroupAgent, PeerInfo, PeerMeshEventType, NewPeerEvent, Config as PeerGroupAgentConfig };

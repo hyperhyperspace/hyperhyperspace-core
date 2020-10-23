@@ -2,8 +2,8 @@ import { RSA, RSAImpl } from 'crypto/ciphers';
 import { ChaCha20, ChaCha20Impl } from 'crypto/ciphers';
 import { describeProxy } from 'config';
 
-describeProxy('Ciphers', () => {
-    test('chacha20 self test', () => {
+describeProxy('[ENC] Ciphers', () => {
+    test('[ENC01] chacha20 self test', () => {
         let chacha = new ChaCha20Impl() as ChaCha20;
         
         let message = 'hey dude, dont make it bad';
@@ -21,7 +21,7 @@ describeProxy('Ciphers', () => {
         expect(chacha.decryptHex(cipher, key, wrongNonce)).not.toEqual(message);
     });
 
-    test('chacha20 encrypt test', () => {
+    test('[ENC02] chacha20 encrypt test', () => {
         let chacha = new ChaCha20Impl() as ChaCha20;
         let key = "00000000000000000000000000000000" +
                   "00000000000000000000000000000000"; 
@@ -30,7 +30,7 @@ describeProxy('Ciphers', () => {
         expect(chacha.encryptHex(message, key, nonce)).toEqual("76b8e0ada0f13d90405d6ae55386bd28bdd219b8a08ded1aa836efcc8b770dc7da41597c5157488d7724e03fb8d84a376a43b8f41518a11cc387b669b2ee6586");
     });
 
-    test('RSA self test', () => {
+    test('[ENC03] RSA self test', () => {
 
         let privateKey = 
     "-----BEGIN RSA PRIVATE KEY-----\n" +
@@ -91,7 +91,7 @@ describeProxy('Ciphers', () => {
         expect(rsaPublic.verify(message, wrongSignature)).toEqual(false);
     });
 
-    test('RSA encrpyt test', () => {
+    test('[ENC04] RSA encrpyt test', () => {
 
         // UNFINISHED
 

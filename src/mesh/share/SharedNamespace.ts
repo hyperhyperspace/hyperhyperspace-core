@@ -4,9 +4,11 @@ import { MutableObject, Hash, HashedObject } from 'data/model';
 import { Store } from 'storage/store';
 import { IdbBackend } from 'storage/backends';
 import { Mesh, SyncMode } from 'mesh/service/Mesh';
+import { PeerGroupAgentConfig } from 'mesh/agents/peer/PeerGroupAgent';
 
 type Config = {
     syncDependencies?: boolean
+    peerGroupAgentConfig?: PeerGroupAgentConfig;
 }
 
 type Resources = {
@@ -21,6 +23,7 @@ class SharedNamespace {
     peerSource? : PeerSource;
 
     syncDependencies: boolean;
+    peerGroupAgentConfig: PeerGroupAgentConfig;
 
     store: Store;
 
@@ -56,6 +59,12 @@ class SharedNamespace {
             this.syncDependencies = true;
         }
 
+        if (config?.peerGroupAgentConfig !== undefined) {
+            this.peerGroupAgentConfig = config?.peerGroupAgentConfig;
+        } else {
+            this.peerGroupAgentConfig = { }; // empty config (defaults)
+        }
+
         this.objects = new Map();
         this.definedKeys = new Map();
         this.started = false;
@@ -67,7 +76,7 @@ class SharedNamespace {
             throw new Error("Cannot connect before setting a peerSource");
         }
 
-        this.mesh.joinPeerGroup({id: this.spaceId, localPeer: this.localPeer, peerSource: this.peerSource});
+        this.mesh.joinPeerGroup({id: this.spaceId, localPeer: this.localPeer, peerSource: this.peerSource}, this.peerGroupAgentConfig);
     }
 
     setPeerSource(peerSource: PeerSource) {

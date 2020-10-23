@@ -5,8 +5,8 @@ import { OverrideIds } from './types/OverrideIds';
 import { HashedMap } from 'data/model/HashedMap';
 import { describeProxy } from 'config';
 
-describeProxy('Data model', () => {
-    test( 'Basic types', () => {
+describeProxy('[MOD] Data model', () => {
+    test( '[MOD01] Basic types', () => {
         
         const original = ['hello', 1.0, false, 2.5, 'bye', true];
         const context = new Context();
@@ -18,7 +18,7 @@ describeProxy('Data model', () => {
         }
     });
 
-    test('Hashed sets', () => {
+    test('[MOD02] Hashed sets', () => {
         
         const set1 = new HashedSet();
         const set2 = new HashedSet();
@@ -39,7 +39,7 @@ describeProxy('Data model', () => {
         expect(set1.has('seven')).toBeFalsy();
     });
 
-    test('Hashed maps', () => {
+    test('[MOD03] Hashed maps', () => {
 
         const map1 = new HashedMap();
         const map2 = new HashedMap();
@@ -64,7 +64,7 @@ describeProxy('Data model', () => {
         expect(map2.equals(map3)).toBeTruthy();
     });
 
-    test('HashedObject subclasses', () => {
+    test('[MOD04] HashedObject subclasses', () => {
 
 
         let os = createHashedObjects();
@@ -80,7 +80,7 @@ describeProxy('Data model', () => {
         expect(a.equals(a2)).toBeFalsy();
     });
 
-    test('Id override', () => {
+    test('[MOD05] Id override', () => {
 
         let a = new OverrideIds('hello, world!', true);
         let b = new OverrideIds('hello, world!', true);

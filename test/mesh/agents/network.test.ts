@@ -8,21 +8,21 @@ import { describeProxy } from 'config';
 
 let linkupServer = LinkupManager.defaultLinkupServer;
 
-describeProxy('Basic networking', () => {
+describeProxy('[NET] Basic networking', () => {
 
-    test('2-node network test (wrtc)', async (done) => {
+    test('[NET01] 2-node network test (wrtc)', async (done) => {
 
         await twoNodeNetworkTest(linkupServer, linkupServer, done);
 
     }, 35000);
 
-    test('2-node network test (ws)', async (done) => {
+    test('[NET02] 2-node network test (ws)', async (done) => {
 
         await twoNodeNetworkTest('ws://localhost:10110', 'ws://localhost:10111', done);
 
     }, 35000);
 
-    test('2-node network test (mixed)', async (done) => {
+    test('[NET03] 2-node network test (mixed)', async (done) => {
 
         await twoNodeNetworkTest( 'ws://localhost:10112', linkupServer, done);
 

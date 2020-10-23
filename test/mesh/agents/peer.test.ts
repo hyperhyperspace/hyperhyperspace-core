@@ -9,49 +9,49 @@ describeProxy('[PGM] Peer group management', () => {
 
         await twoPeerGroupTest(done, 'wrtc', 'no-discovery');
         
-    }, 35000);
+    }, 300000);
 
     test('[PGM02] 2-peer group set up (ws)', async (done) => {
 
         await twoPeerGroupTest(done, 'ws', 'no-discovery', 5000);
 
-    }, 35000);
+    }, 300000);
 
     test('[PGM03] 2-peer group set up (mix)', async (done) => {
 
         await twoPeerGroupTest(done, 'mix', 'no-discovery', 5010);
 
-    }, 35000);
+    }, 300000);
 
     test('[PGM04] 2-peer group set up (wrtc) with peer discovery', async (done) => {
 
         await twoPeerGroupTest(done, 'wrtc', 'linkup-discovery');
 
-    }, 35000);
+    }, 300000);
 
     test('[PGM05] 4-peer group clique set up (wrtc)', async (done) => {
 
         await fourPeerCliqueGroupTest(done, 'wrtc', 'no-discovery');
 
-    }, 60000);
+    }, 300000);
 
     test('[PGM06] 4-peer group clique set up (ws)', async (done) => {
 
         await fourPeerCliqueGroupTest(done, 'ws', 'no-discovery', 5100);
 
-    }, 60000);
+    }, 300000);
 
     test('[PGM07] 4-peer group clique set up (mix)', async (done) => {
 
         await fourPeerCliqueGroupTest(done, 'mix', 'no-discovery', 5110);
 
-    }, 60000);
+    }, 300000);
 
     test('[PGM08] 4-peer group clique set up (wrtc) with peer discovery', async (done) => {
 
         await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery');
 
-    }, 60000);
+    }, 300000);
 });
 
 async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number) {
@@ -67,8 +67,8 @@ async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' =
     let checks = 0;
     let stats = control0.getStats();
     while (stats.peers < 1 /*|| stats.peers !== stats.connections*/) {
-        await new Promise(r => setTimeout(r, 50));
-        if (checks>400) {
+        await new Promise(r => setTimeout(r, 100));
+        if (checks>1500) {
             break;
         }
         checks++;
@@ -76,7 +76,7 @@ async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' =
     }
 
     informSituation(control0, 1);
-    
+
     expect(control0.getPeers().length).toEqual(1);
     /*expect(stats.connections).toEqual(stats.peers);*/
 
@@ -99,8 +99,8 @@ async function fourPeerCliqueGroupTest(done: () => void, network: 'wrtc'|'ws'|'m
     let checks = 0;
     let stats = control0.getStats();
     while (stats.peers < 3 || stats.peers !== stats.connections) {
-        await new Promise(r => setTimeout(r, 50));
-        if (checks>600) {
+        await new Promise(r => setTimeout(r, 100));
+        if (checks>2500) {
             
             break;
         }
@@ -127,7 +127,7 @@ function informSituation(control0: PeerGroupAgent, expectedPeers: number) {
     if (control0.getPeers().length !== expectedPeers) {
         let stats = control0.getStats();
 
-        let info = 'peers:       ' + stats.peers + '(expected ' + expectedPeers + ')\n' +
+        let info = 'peers:       ' + stats.peers + ' (expected ' + expectedPeers + ')\n' +
                    'connections: ' + stats.connections + '\n';
 
         for (const [status, count] of stats.connectionsPerStatus.entries()) {
@@ -136,7 +136,7 @@ function informSituation(control0: PeerGroupAgent, expectedPeers: number) {
 
         info = info + 'cumulative stats:\n' +
                         '    initiated  conns: ' + control0.stats.connectionInit + '\n' +
-                        '    accepted conns:   ' + control0.stats.connectionAccpt + '\n'
+                        '    accepted conns:   ' + control0.stats.connectionAccpt + '\n' +
                         '    timout conns:     ' + control0.stats.connectionAccpt + '\n';
 
         console.log(info);

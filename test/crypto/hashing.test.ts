@@ -2,8 +2,8 @@ import { SHA, SHAImpl } from 'crypto/hashing';
 import { RMD, RMDImpl } from 'crypto/hashing';
 import { describeProxy } from 'config';
 
-describeProxy('Hashing', () => {
-    test('SHA256 test', () => {
+describeProxy('[HSH] Hashing', () => {
+    test('[HSH01] SHA256 test', () => {
         let sha = new SHAImpl() as SHA;
         let message = 'say hi to the sha';
         let hash    = sha.sha256hex(message);
@@ -11,7 +11,7 @@ describeProxy('Hashing', () => {
         expect(hash).toEqual(correctHash);
     });
 
-    test('RMD160 test', () => {
+    test('[HSH02] RMD160 test', () => {
         let rmd = new RMDImpl() as RMD;
         let message = 'say hi to the sha';
         let hash    = rmd.rmd160hex(message);

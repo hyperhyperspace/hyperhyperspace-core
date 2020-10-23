@@ -7,63 +7,63 @@ import { SomethingMutable, SomeMutation } from '../data//types/SomethingMutable'
 import { describeProxy } from 'config';
 
 
-describeProxy('Storage', () => {
-    test('Indexeddb-based load / store cycle', async () => {
+describeProxy('[STR] Storage', () => {
+    test('[STR01] Indexeddb-based load / store cycle', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testLoadStoreCycle(store);
     });
 
-    test('Memory-based load / store cycle', async() => {
+    test('[STR02] Memory-based load / store cycle', async() => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testLoadStoreCycle(store);
     });
 
-    test('Indexeddb-based reference-based load hit', async () => {
+    test('[STR03] Indexeddb-based reference-based load hit', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testReferenceBasedLoadHit(store);
     });
 
-    test('Memory-based reference-based load hit', async () => {
+    test('[STR04] Memory-based reference-based load hit', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testReferenceBasedLoadHit(store);
     });
 
-    test('Indexeddb-based reference-based load miss', async () => {
+    test('[STR05] Indexeddb-based reference-based load miss', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testReferenceBasedLoadMiss(store);
     });
 
-    test('Memory-based reference-based load miss', async () => {
+    test('[STR06] Memory-based reference-based load miss', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testReferenceBasedLoadMiss(store);
     });
     
-    test('Indexeddb-based mutation op saving and loading', async () => {
+    test('[STR07] Indexeddb-based mutation op saving and loading', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testMutationOps(store);
     });
 
-    test('Memory-based mutation op saving and loading', async () => {
+    test('[STR08] Memory-based mutation op saving and loading', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testMutationOps(store);
     });
 
-    test('Indexeddb-based mutation op saving and auto-loading', async () => {
+    test('[STR10] Indexeddb-based mutation op saving and auto-loading', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testMutationOpAutoLoad(store);
     });
 
-    test('Memory-based mutation op saving and auto-loading', async () => {
+    test('[STR11] Memory-based mutation op saving and auto-loading', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testMutationOpAutoLoad(store);
     });
 
-    test('Indexeddb-based mutation op automatic prevOp generation', async () => {
+    test('[STR12] Indexeddb-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         testPrevOpGeneration(store);
     });
 
-    test('Memory-based mutation op automatic prevOp generation', async () => {
+    test('[STR13] Memory-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         testPrevOpGeneration(store);
     });

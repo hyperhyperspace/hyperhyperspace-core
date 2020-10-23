@@ -2,11 +2,11 @@ import { RNGImpl } from 'crypto/random';
 import { WordCode } from 'crypto/wordcoding';
 import { describeProxy } from 'config';
 
-describeProxy('Word-coding', () => {
-    test('Encode-deocde test: English', () => {
+describeProxy('[WCO] Word-coding', () => {
+    test('[WCO01] Encode-deocde test: English', () => {
         testWordCode(WordCode.english);
     });
-    test('Encode-decode test: Spanish', () => {
+    test('[WCO02] Encode-decode test: Spanish', () => {
         testWordCode(WordCode.spanish);
     })
 });

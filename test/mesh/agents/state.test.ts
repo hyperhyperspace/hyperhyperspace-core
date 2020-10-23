@@ -19,35 +19,35 @@ describeProxy('[SYN] State sync', () => {
 
         await gossipInSmallPeerGroup(done, 'wrtc');
 
-    }, 35000);
+    }, 300000);
 
     test('[SYN02] Gossip agent in small peer group (ws)', async (done) => {
 
         await gossipInSmallPeerGroup(done, 'ws', 5200);
 
-    }, 35000);
+    }, 300000);
 
     test('[SYN03] Gossip agent in small peer group (mix)', async (done) => {
 
         await gossipInSmallPeerGroup(done, 'mix', 5210);
 
-    }, 35000);
+    }, 300000);
 
     test('[SYN04] Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'wrtc');
 
-    }, 45000);
+    }, 300000);
 
     test('[SYN05] Terminal ops agent-based set sync in small peer group (ws)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'ws', 5300);
-    }, 45000);
+    }, 300000);
 
     test('[SYN06] Terminal ops agent-based set sync in small peer group (mix)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'mix', 5310);
-    }, 45000);
+    }, 300000);
 });
 
 async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
@@ -106,9 +106,9 @@ async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mi
 
         let finished = false;
         let checks = 0;
-        while (! finished && checks < 100) {
+        while (! finished && checks < 2500) {
             
-            await new Promise(r => { window.setTimeout( r, 50); });
+            await new Promise(r => { window.setTimeout( r, 100); });
 
             finished = true;
             for (let c=0; c<3 && finished; c++) {
@@ -206,8 +206,8 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
 
     let count = 0;
 
-    while (!meshReady && count < 400) {
-        await new Promise(r => setTimeout(r, 50));
+    while (!meshReady && count < 1000) {
+        await new Promise(r => setTimeout(r, 100));
         const meshAgent = pods[size-1].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent
         meshReady = meshAgent.getPeers().length === (size-1);
         //console.log(count + '. peers: ' + meshAgent.getPeers().length);
@@ -220,9 +220,9 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     if (meshReady) {
         count = 0;
 
-        while (!replicated && count < 400) {
+        while (!replicated && count < 1500) {
 
-            await new Promise(r => setTimeout(r, 50));
+            await new Promise(r => setTimeout(r, 100));
 
             const sr = await stores[size-1].load(s.hash()) as MutableSet<Identity> | undefined;
 
