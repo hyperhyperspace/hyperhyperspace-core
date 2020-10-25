@@ -16,16 +16,15 @@ import { PeerSource } from '../peer/PeerSource';
 class Module implements Agent {
 
     rootHash?: Hash;
-    accessSecret?: string;
     
 
-    private peerGroupSyncs: Map<string, PeerGroupSync>;
+    peerGroupSyncs: Map<string, PeerGroupSync>;
 
     constructor() {
         this.peerGroupSyncs = new Map();
     }
 
-    getInitialPeerGroup(hashFragment?: string, minPeers=1): PeerSource {
+    getInitialPeerGroup(_hashFragment?: string, _minPeers=1): PeerSource {
         throw new Error('implement this');
     }
 
@@ -33,33 +32,31 @@ class Module implements Agent {
 
     }
 
-    joinPeerGroup(peerGroupId: string, localPeer: PeerInfo, peerSource: PeerSource) {
+    joinPeerGroup(_peerGroupId: string, _localPeer: PeerInfo, _peerSource: PeerSource) {
 
     }
 
-    leavePeerGroup(peerGroupId: string) {
+    leavePeerGroup(_peerGroupId: string) {
 
     }
 
-    addSyncTarget(peerGroupId: string, target: HashedObject, mode: SyncMode) {
+    addSyncTarget(_peerGroupId: string, _target: HashedObject, _mode: SyncMode) {
 
     }
 
-    removeSyncTarget(peerGroupId: string, targetHash: Hash) {
+    removeSyncTarget(_peerGroupId: string, _targetHash: Hash) {
 
     }
-
-
 
     getAgentId(): string {
         throw new Error('Method not implemented.');
     }
 
-    ready(pod: AgentPod): void {
+    ready(_pod: AgentPod): void {
         throw new Error('Method not implemented.');
     }
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(_ev: Event): void {
         throw new Error('Method not implemented.');
     }
 

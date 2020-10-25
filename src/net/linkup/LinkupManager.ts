@@ -58,10 +58,10 @@ class LinkupManager {
         connection.sendMessage(sender, recipient, callId, data);
     }
 
-    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any) {
+    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any, sendLimit?: number) {
         let connection = this.getLinkupServer(recipient.serverURL);
 
-        connection.sendRawMessage(sender, recipient, data);
+        connection.sendRawMessage(sender, recipient, data, sendLimit);
     }
 
     listenForQueryResponses(queryId: string, callback: QueryCallback) {

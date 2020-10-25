@@ -15,7 +15,7 @@ interface LinkupServer {
     sendListeningAddressesQuery(queryId: string, addresses: Array<LinkupAddress>): void;
 
     listenForRawMessages(recipient: LinkupAddress, callback: RawMessageCallback): void;
-    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any): void;
+    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any, sendLimit?: number): void;
 
     close(): void;
 }

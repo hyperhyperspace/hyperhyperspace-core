@@ -614,7 +614,7 @@ class NetworkAgent implements Agent {
 
     }
 
-    sendLinkupMessage(sourceAddress: LinkupAddress, destinationAddress: LinkupAddress, agentId: AgentId, content: any) {
+    sendLinkupMessage(sourceAddress: LinkupAddress, destinationAddress: LinkupAddress, agentId: AgentId, content: any, sendLimit?: number) {
 
         let linkupMessage: LinkupMessage = {
             source: sourceAddress.url(),
@@ -623,7 +623,7 @@ class NetworkAgent implements Agent {
             content: content
         };
 
-        this.linkupManager.sendRawMessage(sourceAddress, destinationAddress, linkupMessage);
+        this.linkupManager.sendRawMessage(sourceAddress, destinationAddress, linkupMessage, sendLimit);
     }
 
     private connectionCloseCleanup(id: ConnectionId) {

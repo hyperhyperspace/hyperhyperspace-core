@@ -32,7 +32,8 @@ class PeerDiscoveryPeerSource implements PeerSource {
     }
 
     async getPeers(count: number): Promise<PeerInfo[]> {
-        this.agent.queryForPeers();
+        this.agent.queryForPeers(Math.round(count * 1.5));
+
         const peers = await this.agent.getPeers(count);
 
         PeerDiscoveryAgent.log.debug(() =>'Returning discovered endpoints at ' + this.agent.localEndpoint + ': ' + peers.map((pi: PeerInfo) => pi.endpoint));
@@ -99,7 +100,7 @@ class PeerDiscoveryAgent implements Agent {
         this.getNetworkAgent().listenForLinkupMessages(this.localEndpoint);
     }
 
-    queryForPeers() {
+    queryForPeers(count: number) {
 
         const currentTime = Date.now();
 
@@ -126,7 +127,8 @@ class PeerDiscoveryAgent implements Agent {
                     LinkupAddress.fromURL(this.localEndpoint),
                     new LinkupAddress(linkupServer, PeerBroadcastAgent.linkupIdForHashSuffix(this.hashSuffix)),
                     PeerBroadcastAgent.agentIdForHashSuffix(this.hashSuffix),
-                    request
+                    request,
+                    count
                 )
             }
 
@@ -148,14 +150,44 @@ class PeerDiscoveryAgent implements Agent {
 
         const now = Date.now();
 
-        for (const [endpoint, info] of this.currentPeers.entries()) {
-            if (now <= info.timestamp + this.params.peerLifetime * 1000) {
-                const pi = await this.parseEndpoint(endpoint);
-                if (pi !== undefined) { 
-                    result.push(pi); 
+        const toRemove: Endpoint[] = [];
+
+        let retries = 0;
+
+        const minPeers   = 3;
+        const minRetries = 4;
+        const maxRetries = 15;
+        const retryMillis = 100;
+        const waitingInterval = 3;
+
+        do {
+
+            if (retries > 0) {
+                await new Promise(r => setTimeout(r, retryMillis));
+            }
+
+            retries = retries + 1;
+
+            for (const [endpoint, info] of this.currentPeers.entries()) {
+                if (now <= info.timestamp + this.params.peerLifetime * 1000) {
+                    const pi = await this.parseEndpoint(endpoint);
+                    if (pi !== undefined) { 
+                        result.push(pi); 
+                    }
+                } else {
+                    toRemove.push(endpoint);
                 }
             }
-        }
+    
+            for (const endpoint of toRemove) {
+                this.currentPeers.delete(endpoint);
+            }
+
+        } while (((result.length === 0 && retries < maxRetries) || (result.length < Math.min(count, minPeers) && retries < minRetries)) &&
+                 this.lastQueryingTime !== undefined &&
+                 Date.now() < this.lastQueryingTime + waitingInterval * 1000);
+
+
 
         Shuffle.array(result);
         result = result.slice(0, count);

@@ -155,7 +155,7 @@ class SignallingServerConnection implements LinkupServer {
         this.enqueueAndSend(JSON.stringify(message));
     }
 
-    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any): void {
+    sendRawMessage(sender: LinkupAddress, recipient: LinkupAddress, data: any, sendLimit?: number): void {
         if (recipient.serverURL !== this.serverURL) {
             let e = new Error('Trying to send a linkup message to ' + 
                               recipient.serverURL + 
@@ -165,7 +165,7 @@ class SignallingServerConnection implements LinkupServer {
             throw e;
         }
 
-        var message = {
+        var message: any = {
                     'action'         :  'send',
                     'linkupId'       :  recipient.linkupId,
                     'raw'            :  'true',
@@ -173,6 +173,10 @@ class SignallingServerConnection implements LinkupServer {
                     'replyServerUrl' :  sender.serverURL,
                     'replyLinkupId'  :  sender.linkupId,
                   };
+
+        if (sendLimit !== undefined) {
+            message['limit'] = sendLimit;
+        }
         
         this.enqueueAndSend(JSON.stringify(message));
     }

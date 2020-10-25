@@ -145,7 +145,7 @@ class WebSocketListener implements LinkupServer {
         throw new Error("Listening for raw messages is not supported in WebSocket-listener based LinkupServers");
     }
     
-    sendRawMessage(_sender: LinkupAddress, _recipient: LinkupAddress, _data: any): void {
+    sendRawMessage(_sender: LinkupAddress, _recipient: LinkupAddress, _data: any, _sendLimit?: number): void {
         throw new Error("Sending raw messages is not supported in WebSocket-listener based LinkupServers");
     }
 
