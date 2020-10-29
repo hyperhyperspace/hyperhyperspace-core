@@ -288,7 +288,13 @@ class Mesh {
     private getDiscoveryAgentFor(hashSuffix: string): ObjectDiscoveryAgent {
         const agentId = ObjectDiscoveryAgent.agentIdForHexHashSuffix(hashSuffix);
 
-        let discoveryAgent = this.pod.getAgent(agentId) as ObjectDiscoveryAgent;
+        let discoveryAgent = this.pod.getAgent(agentId) as ObjectDiscoveryAgent | undefined;
+
+        if (discoveryAgent !== undefined && discoveryAgent.wasShutdown) {
+            this.pod.deregisterAgent(discoveryAgent);
+            discoveryAgent = undefined;
+        }
+
         if (discoveryAgent === undefined) {
             discoveryAgent = new ObjectDiscoveryAgent(hashSuffix);
             this.pod.registerAgent(discoveryAgent);

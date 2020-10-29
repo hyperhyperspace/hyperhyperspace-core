@@ -19,7 +19,7 @@ type ObjectBroadcastReply = {
 
 class ObjectBroadcastAgent implements Agent {
 
-    static log = new Logger(ObjectBroadcastAgent.name, LogLevel.TRACE);
+    static log = new Logger(ObjectBroadcastAgent.name, LogLevel.INFO);
 
     static defaultBroadcastedSuffixBits = 36;
 
@@ -112,8 +112,6 @@ class ObjectBroadcastAgent implements Agent {
 
         const MIN_BITS_TO_ANSWER = 36;
 
-        console.log(ev);
-
         if (ev.type === NetworkEventType.LinkupMessageReceived) {
             const msg = ev.content as LinkupMessage;
 
@@ -125,8 +123,6 @@ class ObjectBroadcastAgent implements Agent {
 
                 if (req.hashSuffix.length * 4 >= MIN_BITS_TO_ANSWER && this.hashSuffixMatch(req.hashSuffix)) {
                     
-                    ObjectBroadcastAgent.log.debug(() => 'Replying to query for suffix ' + req.hashSuffix + ' with hash ' + Hashing.toHex(this.literal.hash));
-
                     const networkAgent = this.getNetworkAgent();
                     const dstAddress = LinkupAddress.fromURL(msg.destination);
 

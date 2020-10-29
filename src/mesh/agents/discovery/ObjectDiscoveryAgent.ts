@@ -20,7 +20,7 @@ type ObjectDiscoveryReplyParams = {maxAge?: number, linkupServers?: string[], lo
 
 class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryReply> {
 
-    static log = new Logger(ObjectDiscoveryAgent.name, LogLevel.TRACE);
+    static log = new Logger(ObjectDiscoveryAgent.name, LogLevel.INFO);
 
     static agentIdForHexHashSuffix(suffix: string) {
         return 'object-discovery-for-' + suffix;
@@ -118,7 +118,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
                 this.getNetworkAgent().sendLinkupMessage(
                     LinkupAddress.fromURL(localEndpoint),
                     new LinkupAddress(linkupServer, ObjectBroadcastAgent.linkupIdForHexHashSuffix(broadcasted)),
-                    ObjectBroadcastAgent.agentIdForHash(this.hexHashSuffix, this.params.broadcastedSuffixBits),
+                    ObjectBroadcastAgent.agentIdForHexHashSuffix(this.hexHashSuffix, this.params.broadcastedSuffixBits),
                     request,
                     Math.ceil(count * 1.5)
                 );
@@ -159,6 +159,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
     }
 
     receiveLocalEvent(ev: Event): void {
+
         if (! this.wasShutdown && ev.type === NetworkEventType.LinkupMessageReceived) {
             const msg = ev.content as LinkupMessage;
 
@@ -166,12 +167,15 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
 
                 const reply = msg.content as ObjectBroadcastReply;
 
+                
+
                 let replyHash: Hash = '';
                 let object: HashedObject | undefined = undefined;
                 try {
                     object = HashedObject.fromLiteral(reply.literal);
                     replyHash = object.hash();
                 } catch (e) {
+                    ObjectDiscoveryAgent.log.warning('Error deliteralizing object discovery reply:' + e);
                     object = undefined;
                 }
 
@@ -188,6 +192,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
                     }
 
                     this.replies.push(item);
+
                     for (const itemCallback of this.itemSubscriptions) {
                         itemCallback(item);
                     }

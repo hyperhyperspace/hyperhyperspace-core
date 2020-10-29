@@ -150,6 +150,9 @@ class SubscribedAsyncStream<T> implements AsyncStream<T> {
             this.isAtEnd = true;
         };
 
+        this.provider.subscribeItem(this.itemCallback);
+        this.provider.subscribeEnd(this.endCallback);
+
     }
 
     next(timeoutMillis: number) : Promise<T> {

@@ -88,11 +88,6 @@ class WordCode {
                 throw new Error('Trying to decode wordcoded number but received a word that is not in the dictionary "' + this.dictName + '":' + word);
             }
 
-           if (position.toString(16).length > 3) {
-               console.log(position);
-               console.log(position.toString(16));
-           }
-
             result = result + position.toString(16).padStart(nibblesPerWord, '0');
         }
 
