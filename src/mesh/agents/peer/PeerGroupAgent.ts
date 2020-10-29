@@ -122,7 +122,7 @@ type Stats = {
 
 class PeerGroupAgent implements Agent {
 
-    static controlLog = new Logger(PeerGroupAgent.name, LogLevel.INFO);
+    static controlLog = new Logger(PeerGroupAgent.name, LogLevel.DEBUG);
 
     peerGroupId: string;
     localPeer: PeerInfo;

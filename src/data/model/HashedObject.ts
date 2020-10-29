@@ -173,7 +173,7 @@ abstract class HashedObject {
         return this._lastHash as Hash;
     }
 
-    hash(seed?: string) {
+    hash(seed?: string): Hash {
 
         let hash = this.customHash(seed);
 
@@ -254,10 +254,10 @@ abstract class HashedObject {
         return context.toLiteralContext();
     }
 
-    toLiteral() {
+    toLiteral() : Literal {
         let context = this.toContext();
 
-        return context.literals.get(context.rootHashes[0]);
+        return context.literals.get(context.rootHashes[0]) as Literal;
     }
 
     toContext(context?: Context) : Context {

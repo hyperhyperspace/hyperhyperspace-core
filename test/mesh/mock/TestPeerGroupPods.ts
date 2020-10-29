@@ -2,19 +2,16 @@ import { TestPeerSource } from './TestPeerSource';
 
 import { AgentPod } from 'mesh/service';
 
-import { NetworkAgent, SecureNetworkAgent } from 'mesh/agents/network';
 import { PeerInfo, PeerGroupAgent } from 'mesh/agents/peer';
-import { PeerBroadcastAgent, PeerDiscoveryAgent } from 'mesh/agents/peer';
+import { ObjectDiscoveryPeerSource } from 'mesh/agents/peer';
 
 import { PeerSource } from 'mesh/agents/peer';
 
 import { RNGImpl } from 'crypto/random';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { LinkupManager } from 'net/linkup';
-
-
-
-
+import { HashedLiteral } from 'data/model';
+import { Mesh } from 'mesh/service';
 
 
 class TestPeerGroupPods {
@@ -45,11 +42,8 @@ class TestPeerGroupPods {
         let pods = new Array<AgentPod>();
 
         for (let i=0; i<activePeers; i++) {
-            let pod = new AgentPod();
-            let networkAgent = new NetworkAgent();
-            pod.registerAgent(networkAgent);
-            let secureConn = new SecureNetworkAgent();
-            pod.registerAgent(secureConn);
+            let mesh = new Mesh();
+            let pod = mesh.pod;
 
             let peerSourceToUse: PeerSource = peerSource;
 
@@ -59,20 +53,12 @@ class TestPeerGroupPods {
 
                 params.tickInterval = 1; // speed up peer group management to make up for peer discovery
 
-                let broadcastAgent = new PeerBroadcastAgent(peerGroupId,
-                    [peers[i].endpoint]
-                );
-                pod.registerAgent(broadcastAgent);
-                
-                const suffix = PeerBroadcastAgent.getSuffix(peerGroupId);
-                let discoveryAgent = new PeerDiscoveryAgent(
-                    suffix, 
-                    peers[i].endpoint,
-                    (ep: string) => peerSource.getPeerForEndpoint(ep),
-                    {maxQueryFreq: 1, peerLifetime: 120}
-                );
-                pod.registerAgent(discoveryAgent);
-                peerSourceToUse = discoveryAgent.getPeerSource();
+                let object = new HashedLiteral(peerGroupId);
+
+
+                mesh.broadcastObject(object, [LinkupManager.defaultLinkupServer], [peers[i].endpoint]);
+
+                peerSourceToUse = new ObjectDiscoveryPeerSource(mesh, object, [LinkupManager.defaultLinkupServer], peers[i].endpoint, (ep: string) => peerSource.getPeerForEndpoint(ep));
             }
 
             let peerGroupAgent = new PeerGroupAgent(peerGroupId, peers[i], peerSourceToUse, params);

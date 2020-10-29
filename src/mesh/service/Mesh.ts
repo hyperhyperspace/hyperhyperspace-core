@@ -1,15 +1,70 @@
-import { MutableObject, HashedObject, Hash, MutationOp } from 'data/model';
-
-import { NetworkAgent, SecureNetworkAgent } from 'mesh/agents/network';
-import { StateGossipAgent, StateSyncAgent } from 'mesh/agents/state';
+import { MutableObject, HashedObject, Hash, MutationOp, Hashing } from 'data/model';
+import { Store } from 'storage/store';
 
 import { MultiMap } from 'util/multimap';
 
-import { PeerInfo, PeerSource, PeerGroupAgent } from '../agents/peer';
-import { AgentPod } from './AgentPod';
+import { Endpoint, NetworkAgent, SecureNetworkAgent } from '../agents/network';
+import { PeerInfo, PeerSource, PeerGroupAgent, PeerGroupAgentConfig } from '../agents/peer';
+import { StateGossipAgent, StateSyncAgent } from 'mesh/agents/state';
+import { ObjectBroadcastAgent, ObjectDiscoveryAgent, ObjectDiscoveryReply, ObjectDiscoveryReplyParams } from '../agents/discovery';
 
-import { Store } from 'storage/store';
-import { PeerGroupAgentConfig } from 'mesh/agents/peer/PeerGroupAgent';
+import { AgentPod } from './AgentPod';
+import { AsyncStream } from 'util/streams';
+
+
+
+
+/* Connect to the Hyper Hyper Space service mesh.
+ *
+ *
+ * Peers
+ * =====
+ *
+ * A Peer on the mesh has an endpoint and a cryptographic identifier.
+ * 
+ * Endpoints can be either plain websocket listeners of the form
+ *  - ws[s]://host/linkupId
+ * where the peer is listening directly, or of the form
+ *  - wrtc+ws[s]://host/linkupId
+ * in which case 'host' is a Linkup Server (see LinkupManager class, a small stateless
+ * support server that enables WebRTC connections and helps a bit with peer discovery),
+ * and linkupId is a string identifying this peer.
+ * 
+ * In both direct WebSocket and WebRTC connection enabled by a Linkup Server, the
+ * 'linkupId' part of the endpoint needs to allow establishing the cryptographic
+ * identity of the peer. This can be done by any means (e.g. using a hash of the keypair, 
+ * such hash obscured by symmetric encryption, a reference to some shared data both 
+ * peers have, whatever).
+ *
+ *  
+ * PeerGroups
+ * ==========
+ * Peers on the mesh organize in PeerGroups. See:
+ *  - Mesh.joinPeerGroup(), Mesh.leavePeerGroup()
+ * 
+ * When joining, you need to specify the local peer, and a way to find peers to connect
+ * to. This is done through the PeerSource interface, and can be a static list of peers
+ * (similar to a .torrent file), peers discovered on the fly with help from one or many
+ * Linkup Servers, or peers lifted from data that is being synchronized using the Mesh.
+ * 
+ * Once joined, PeerGroups can be used to synchronize HashedObjects and MutableObjects
+ * (as defined in data/model). See:
+ * 
+ *  - Mesh.syncObjectWithPeerGroup(), Mesh.stopSyncObjectWithPeerGroup()
+ *  - Mesh.syncManyObjectsWithPeerGroup(), Mesh.stopSyncManyObjectsWithPeerGroup()
+ * 
+ * 
+ * Discovery
+ * =========
+ * 
+ * Linkup Servers can be used as a basic discovery mechanism.
+ * 
+ *  - Mesh.broadcastObject(), Mesh.stopObjectBroadcast()
+ *  - Mesh.findObject(hash)
+ * 
+ */ 
+
+
 
 type GossipId  = string;
 type PeerGroupId = string;
@@ -76,6 +131,8 @@ class Mesh {
         
     }
 
+    // PeerGroups: join, leave
+
     joinPeerGroup(pg: PeerGroupInfo, config?: PeerGroupAgentConfig) {
 
         let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(pg.id));
@@ -110,6 +167,7 @@ class Mesh {
         }
     }
         
+    // Object synchronization
 
     syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string) {
         
@@ -171,6 +229,72 @@ class Mesh {
             this.stopSyncObjectWithPeerGroup(peerGroupId, hash, gossipId);
         }
 
+    }
+
+    // Object discovery
+
+    broadcastObject(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number) {
+
+        const agentId = ObjectBroadcastAgent.agentIdForHash(object.hash(), broadcastedSuffixBits);
+        let broadcastAgent = this.pod.getAgent(agentId) as ObjectBroadcastAgent;
+        if (broadcastAgent === undefined) {
+            broadcastAgent = new ObjectBroadcastAgent(object, broadcastedSuffixBits);
+            this.pod.registerAgent(broadcastAgent);
+        }
+
+        broadcastAgent.listenOn(linkupServers, replyEndpoints);
+
+    }
+
+    stopObjectBroadcast(hash: Hash, broadcastedSuffixBits?: number) {
+        const agentId = ObjectBroadcastAgent.agentIdForHash(hash, broadcastedSuffixBits);
+        let broadcastAgent = this.pod.getAgent(agentId);
+        broadcastAgent?.shutdown();
+    }
+
+    findObjectByHash(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
+        const suffix = Hashing.toHex(hash);
+        return this.findObjectByHashSuffix(suffix, linkupServers, replyEndpoint, count, maxAge, strictEndpoints);
+    }
+
+    findObjectByHashSuffix(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
+        
+        const discoveryAgent = this.getDiscoveryAgentFor(hashSuffix);
+
+        discoveryAgent.query(linkupServers, replyEndpoint, count);
+
+        let params: ObjectDiscoveryReplyParams = {};
+
+        params.maxAge = maxAge;
+
+        if (strictEndpoints) {
+            params.linkupServers = linkupServers;
+            params.localEndpoints = [replyEndpoint];
+        }
+
+        return discoveryAgent.getReplyStream(params);
+    }
+
+    findObjectByHashRetry(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {
+        const suffix = Hashing.toHex(hash);
+        this.findObjectByHashSuffixRetry(suffix, linkupServers, replyEndpoint, count);
+    }
+
+    findObjectByHashSuffixRetry(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {
+        const discoveryAgent = this.getDiscoveryAgentFor(hashSuffix);
+        discoveryAgent.query(linkupServers, replyEndpoint, count);
+    }
+
+    private getDiscoveryAgentFor(hashSuffix: string): ObjectDiscoveryAgent {
+        const agentId = ObjectDiscoveryAgent.agentIdForHexHashSuffix(hashSuffix);
+
+        let discoveryAgent = this.pod.getAgent(agentId) as ObjectDiscoveryAgent;
+        if (discoveryAgent === undefined) {
+            discoveryAgent = new ObjectDiscoveryAgent(hashSuffix);
+            this.pod.registerAgent(discoveryAgent);
+        }
+
+        return discoveryAgent;
     }
 
     private addRootSync(gossip: StateGossipAgent, obj: HashedObject, mode: SyncMode) {
