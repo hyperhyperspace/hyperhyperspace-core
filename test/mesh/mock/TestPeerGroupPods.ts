@@ -56,7 +56,7 @@ class TestPeerGroupPods {
                 let object = new HashedLiteral(peerGroupId);
 
 
-                mesh.broadcastObject(object, [LinkupManager.defaultLinkupServer], [peers[i].endpoint]);
+                mesh.startObjectBroadcast(object, [LinkupManager.defaultLinkupServer], [peers[i].endpoint]);
 
                 peerSourceToUse = new ObjectDiscoveryPeerSource(mesh, object, [LinkupManager.defaultLinkupServer], peers[i].endpoint, (ep: string) => peerSource.getPeerForEndpoint(ep));
             }

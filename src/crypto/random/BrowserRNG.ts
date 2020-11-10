@@ -20,7 +20,7 @@ class BrowserRNG implements RNG {
 
         result = result + this.randomHex8bitsWord().substring(2-length, 2);
 
-        return result;
+        return result.toUpperCase();
     }
     
     private randomHex8bitsWord() {

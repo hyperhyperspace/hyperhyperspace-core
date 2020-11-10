@@ -35,6 +35,7 @@ class ObjectDiscoveryPeerSource implements PeerSource {
 
     async getPeers(count: number): Promise<PeerInfo[]> {
         
+        let unique = new Set<Endpoint>();
         let found: PeerInfo[] = []
         let now = Date.now();
         let limit = now + this.timeoutMillis;
@@ -46,8 +47,9 @@ class ObjectDiscoveryPeerSource implements PeerSource {
 
             while (reply !== undefined && found.length < count) {
                 const peerInfo = await this.parseEndpoint(reply.source);
-                if (peerInfo !== undefined) {
+                if (peerInfo !== undefined && !unique.has(peerInfo.endpoint)) {
                     found.push(peerInfo);
+                    unique.add(peerInfo.endpoint);
                 }  
             } 
 
@@ -61,8 +63,9 @@ class ObjectDiscoveryPeerSource implements PeerSource {
             try {
                 const reply = await this.replyStream.next(limit - now)
                 const peerInfo = await this.parseEndpoint(reply.source);
-                if (peerInfo !== undefined) {
+                if (peerInfo !== undefined && !unique.has(peerInfo.endpoint)) {
                     found.push(peerInfo);
+                    unique.add(peerInfo.endpoint);
                 }
             } catch(reason) {
                 if (reason === 'timeout') {
@@ -71,6 +74,7 @@ class ObjectDiscoveryPeerSource implements PeerSource {
                     this.replyStream = this.tryObjectDiscovery(count - found.length);
                     break;
                 } else {
+                    console.log(reason);
                     // something odd happened TODO: log this
                     break;
                 }

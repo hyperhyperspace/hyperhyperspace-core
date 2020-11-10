@@ -59,8 +59,9 @@ import { AsyncStream } from 'util/streams';
  * 
  * Linkup Servers can be used as a basic discovery mechanism.
  * 
- *  - Mesh.broadcastObject(), Mesh.stopObjectBroadcast()
- *  - Mesh.findObject(hash)
+ *  - Mesh.startObjectBroadcast(), Mesh.stopObjectBroadcast()
+ *  - Mesh.findObjectByHash(), Mesh.findObjectByHashRetry()
+ *  - Mesh.findObjectByHashSuffix(), Mesh.findObjectByHashSuffixRetry()
  * 
  */ 
 
@@ -233,7 +234,7 @@ class Mesh {
 
     // Object discovery
 
-    broadcastObject(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number) {
+    startObjectBroadcast(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number) {
 
         const agentId = ObjectBroadcastAgent.agentIdForHash(object.hash(), broadcastedSuffixBits);
         let broadcastAgent = this.pod.getAgent(agentId) as ObjectBroadcastAgent;

@@ -18,6 +18,12 @@ class Strings {
       
     }
 
+    static hexToBase64(hex: string) {
+        return btoa((hex.match(/\w{2}/g) as string[]).map(function(a) {
+            return String.fromCharCode(parseInt(a, 16));
+        }).join(""));
+    }
+
     // Slow but simple chunker to use on small strings:
     // RSA-encoded symmetric keys, etc.
 

@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "npx microbundle-crl --tsconfig tsconfig.build.json &&  npx tsc --project tsconfig.build.json --declaration --outDir ./decl",
-    "build-test": "npx tsc --project tsconfig.json",
+    "build-test": "npx microbundle-crl --tsconfig tsconfig.json --output dist-test",
     "clean": "rm -rf ./decl/* ./dist/* ./dist-test/*",
     "winclean": "if exist decl (rmdir decl /s /q) && mkdir decl && if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-test (rmdir dist-test /s /q) && mkdir dist-test",
     "test": "npx jest"
@@ -44,6 +44,7 @@
     "modulePaths": [
       "<rootDir>/test",
       "<rootDir>/src",
+      "<rootDir>/examples",
       "<rootDir>/node_modules/**"
     ],
     "roots": [

@@ -30,6 +30,11 @@ class Hashing {
     static toHex(hash: Hash) {
         return Strings.base64toHex(hash);
     }
+
+    static fromHex(hex: string) {
+        return Strings.hexToBase64(hex);
+    }
+
  }
 
 export { Hashing, Hash };

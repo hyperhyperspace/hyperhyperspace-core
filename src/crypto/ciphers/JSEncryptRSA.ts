@@ -1,12 +1,25 @@
-import { JSEncrypt } from 'jsencrypt';
+//import { JSEncrypt } from 'jsencrypt';
 import { RSA } from './RSA';
 import { SHA, SHAImpl } from '../hashing';
+
+// dummy objects for JSEncrypt
+
+if ((global as any).navigator === undefined) {
+    (global as any).navigator = {appName: 'nodejs'};
+}
+
+if ((global as any).window === undefined) {
+    (global as any).window = {};
+}
+
+
+const JSEncrypt = require('jsencrypt').JSEncrypt;
 
 class JSEncryptRSA implements RSA {
 
     static PKCS8 = 'pkcs8';
 
-    private crypto? : JSEncrypt;
+    private crypto? : typeof JSEncrypt;
     private sha : SHA;
 
     constructor(sha?: SHA) {

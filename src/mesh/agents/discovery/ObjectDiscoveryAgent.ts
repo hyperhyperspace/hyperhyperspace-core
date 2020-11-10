@@ -6,7 +6,7 @@ import { Agent } from '../../service/Agent';
 import { Endpoint, LinkupMessage, NetworkAgent, NetworkEventType } from '../network/NetworkAgent';
 import { ObjectBroadcastAgent, ObjectBroadcastRequest, ObjectBroadcastReply } from './ObjectBroadcastAgent';
 
-import { AsyncStream, SubscribedAsyncStream, AsyncStreamSource, FilteredAsyncStreamSource } from 'util/streams';
+import { AsyncStream, BufferedAsyncStream, AsyncStreamSource, FilteredAsyncStreamSource } from 'util/streams';
 
 type Params = {
     broadcastedSuffixBits : number,
@@ -145,7 +145,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
                 let now = Date.now();
                 let accept = true;
                 
-                accept = accept && (maxAge === undefined || elem.timestamp >= now - maxAge);
+                accept = accept && (maxAge === undefined || elem.timestamp >= now - maxAge * 1000);
                 accept = accept && (linkupServers === undefined || linkupServers.indexOf(LinkupAddress.fromURL(elem.source).serverURL) >= 0);
                 accept = accept && (localEndpoints === undefined || localEndpoints.indexOf(elem.destination) >= 0);
                 
@@ -155,7 +155,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
             source = new FilteredAsyncStreamSource<ObjectDiscoveryReply>(source, filter);
         }
 
-        return new SubscribedAsyncStream(this);;
+        return new BufferedAsyncStream(this);;
     }
 
     receiveLocalEvent(ev: Event): void {
@@ -172,18 +172,18 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
                 let replyHash: Hash = '';
                 let object: HashedObject | undefined = undefined;
                 try {
-                    object = HashedObject.fromLiteral(reply.literal);
+                    object = HashedObject.fromLiteralContext(reply.literalContext);
                     replyHash = object.hash();
                 } catch (e) {
                     ObjectDiscoveryAgent.log.warning('Error deliteralizing object discovery reply:' + e);
                     object = undefined;
                 }
 
-                if (object !== undefined && replyHash === reply.literal.hash && 
+                if (object !== undefined && replyHash === reply.literalContext.rootHashes[0] && 
                     this.hexHashSuffix === Hashing.toHex(replyHash).slice(-this.hexHashSuffix.length) &&
                     this.localEndpoints.has(msg.destination)) {
 
-                    ObjectDiscoveryAgent.log.trace('Received object with hash ' + replyHash + ' from ' + msg.source);
+                    ObjectDiscoveryAgent.log.trace(() => 'Received object with hash ' + replyHash + ' from ' + msg.source + ' at ' + msg.destination);
 
                     let item = {source: msg.source, destination: msg.destination, hash: replyHash, object: object, timestamp: Date.now()}; 
 
@@ -196,8 +196,8 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
                     for (const itemCallback of this.itemSubscriptions) {
                         itemCallback(item);
                     }
-
-                    
+                } else {
+                    ObjectDiscoveryAgent.log.debug('Error validating object discovery reply');
                 }
 
             }
@@ -219,7 +219,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
         return this.replies.slice();
     }
 
-    subscribeItem(cb: (elem: ObjectDiscoveryReply) => void): void {
+    subscribeNewItem(cb: (elem: ObjectDiscoveryReply) => void): void {
         this.itemSubscriptions.add(cb);
     }
     
@@ -227,7 +227,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
         this.endSubscriptions.add(cb);
     }
     
-    unsubscribeItem(cb: (elem: ObjectDiscoveryReply) => void): void {
+    unsubscribeNewItem(cb: (elem: ObjectDiscoveryReply) => void): void {
         this.itemSubscriptions.delete(cb);
     }
     

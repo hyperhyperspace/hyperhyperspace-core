@@ -69,6 +69,7 @@
     "skipLibCheck": true,                     /* Skip type checking of declaration files. */
     "forceConsistentCasingInFileNames": true  /* Disallow inconsistently-cased references to the same file. */
   },
+  "files": [ "examples/chat/index.ts" ],
   //"files": [ "src/index.ts" ],
   "include": [ "./types/*", "./src/**/*", "./test/**/*", "./examples/**/*" ]
   /* "./target/node/*",  */

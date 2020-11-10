@@ -11,6 +11,10 @@ class WordCode {
     static english = new WordCode(englishDictName, englishWords);
     static spanish = new WordCode(spanishDictName, spanishWords, spanishNormalizer);
 
+    static lang = new Map<String, WordCode>([['es', WordCode.spanish], ['en', WordCode.english]]);
+    
+    static all  = [WordCode.english, WordCode.spanish];
+
     dictName : string;
     words    : string[];
 
@@ -91,7 +95,7 @@ class WordCode {
             result = result + position.toString(16).padStart(nibblesPerWord, '0');
         }
 
-        return result;
+        return result.toUpperCase();
     }
     
 }
