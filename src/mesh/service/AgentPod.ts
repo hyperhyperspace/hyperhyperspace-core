@@ -94,7 +94,7 @@ class AgentPod {
 
     broadcastEvent(ev: Event) {
 
-        AgentPod.logger.trace('Network sending event ' + ev.type + ' with content ' + JSON.stringify(ev.content));
+        AgentPod.logger.trace('EventPod broadcasting event ' + ev.type + ' with content ' + JSON.stringify(ev.content));
 
         for (const agent of this.agents.values()) {
             agent.receiveLocalEvent(ev);
