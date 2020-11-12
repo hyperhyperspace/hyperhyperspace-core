@@ -28,6 +28,7 @@ function initResources(): Resources {
 }
 
 async function createIdentity(resources: Resources, name: string): Promise<Identity> {
+    console.log();
     console.log('Generating RSA key for ' + name + '...');
     let key = RSAKeyPair.generate(1024);
     console.log('Done.');
@@ -49,7 +50,7 @@ async function createChatRoomSpace(resources: Resources, id: Identity, topic?: s
 
     let space = Space.fromEntryPoint(chatRoom, resources, endpoint);
 
-    //space.startBroadcast();
+    space.startBroadcast();
     let room = await space.getEntryPoint();
 
     await resources.store.save(room);
@@ -57,7 +58,11 @@ async function createChatRoomSpace(resources: Resources, id: Identity, topic?: s
     room.setResources(resources);
     room.startSync();
 
-    console.log('Created chat room, wordcode is "' + (await space.getWordCoding()).join(' ') + '".');
+    console.log();
+    console.log('Created chat room, wordcode is:');
+    console.log();
+    console.log((await space.getWordCoding()).join(' '));
+    console.log();
 
     return space;
 }
@@ -67,11 +72,13 @@ async function joinChatRoomSpace(resources: Resources, id: Identity, wordcode: s
     let endpoint = (await IdentityPeer.fromIdentity(id).asPeer()).endpoint;
     let space = Space.fromWordCode(wordcode, resources, endpoint);
 
+    console.log();
     console.log('Trying to join chat with word code "' + wordcode.join(' ') + '"...');
     await space.entryPoint;
     console.log('Done.');
+    console.log();
 
-    //space.startBroadcast();
+    space.startBroadcast();
     let room = await space.getEntryPoint();
 
     await resources.store.save(room);
@@ -92,6 +99,7 @@ async function main() {
         output: process.stdout
     });
 
+    console.log();
     let name = await new Promise((resolve: (name: string) => void/*, reject: (reason: any) => void*/) => {
         rl.question('Enter your name: ', (name: string) => {
             resolve(name);
@@ -102,9 +110,10 @@ async function main() {
 
     console.log()
     console.log('Press enter to create a chat room, or input the 3 code words to join an existing one.');
+    console.log();
 
     let command = await new Promise((resolve: (text: string) => void/*, reject: (reason: any) => void*/) => {
-        rl.question('', (command: string) => {
+        rl.question('>', (command: string) => {
             resolve(command);
         });
     });
@@ -134,6 +143,7 @@ async function main() {
     });
 
     console.log('Type and press return to send a message!')
+    console.log();
 
     while (true) {
         let text = await new Promise((resolve: (text: string) => void/*, reject: (reason: any) => void*/) => {
