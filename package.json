@@ -16,6 +16,7 @@
     "build-test": "npx microbundle-crl --tsconfig tsconfig.json --output dist-test",
     "build-chat": "npx tsc --module CommonJs --project tsconfig.json --outDir ./dist-chat",
     "chat": "NODE_PATH=\"dist-chat/src:dist-chat/examples/chat\" node ./dist-chat/examples/chat/index.js",
+    "winchat": "./scripts/chat.bat",
     "clean": "rm -rf ./decl/* ./dist/* ./dist-test/* ./dist-chat/*",
     "winclean": "if exist decl (rmdir decl /s /q) && mkdir decl && if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-test (rmdir dist-test /s /q) && mkdir dist-test && if exist dist-chat (rmdir dist-chat /s /q) && mkdir dist-chat",
     "test": "npx jest"
