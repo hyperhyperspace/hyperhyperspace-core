@@ -49,7 +49,7 @@ async function createChatRoomSpace(resources: Resources, id: Identity, topic?: s
 
     let space = Space.fromEntryPoint(chatRoom, resources, endpoint);
 
-    space.startBroadcast();
+    //space.startBroadcast();
     let room = await space.getEntryPoint();
 
     await resources.store.save(room);
@@ -71,7 +71,7 @@ async function joinChatRoomSpace(resources: Resources, id: Identity, wordcode: s
     await space.entryPoint;
     console.log('Done.');
 
-    space.startBroadcast();
+    //space.startBroadcast();
     let room = await space.getEntryPoint();
 
     await resources.store.save(room);
@@ -93,38 +93,38 @@ async function main() {
     });
 
     let name = await new Promise((resolve: (name: string) => void/*, reject: (reason: any) => void*/) => {
-        rl.question('Enter your name to start chat: ', (name: string) => {
+        rl.question('Enter your name: ', (name: string) => {
             resolve(name);
         });
     });
 
     let id = await createIdentity(resources, name);
 
+    console.log()
+    console.log('Press enter to create a chat room, or input the 3 code words to join an existing one.');
 
-    let command = process.argv[2];
+    let command = await new Promise((resolve: (text: string) => void/*, reject: (reason: any) => void*/) => {
+        rl.question('', (command: string) => {
+            resolve(command);
+        });
+    });
 
     let space: Space;
-    if (command === '--create') {
+    if (command.trim() === '') {
 
-        let topic:string|undefined = undefined;
+        space = await createChatRoomSpace(resources, id, '');
 
-        if (process.argv.length>3) {
-            topic = process.argv[3];
-        }
+    } else {
 
-        space = await createChatRoomSpace(resources, id, topic);
+        let wordcode: string[] = command.split(' ');
 
-    } else if (command === '--join') {
-
-        let wordcode: string[] = [];
-
-        for(let i=0; i<3; i++) {
-            wordcode.push(process.argv[3+i]);
+        if (wordcode.length !== 3) {
+            console.log('expected 3 words, like: pineapple greatness flurry');
+            console.log('cannot join chat, exiting.');
+            process.exit();
         }
 
         space = await joinChatRoomSpace(resources, id, wordcode);
-    } else {
-        throw new Error('Unknown command: ' + command + '.');
     }
 
     let room = await space.getEntryPoint() as ChatRoom;

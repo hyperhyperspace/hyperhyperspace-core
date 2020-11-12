@@ -1,7 +1,7 @@
 # The Hyper Hyper Space core library  
 
 
-> An offline-first shared data library for creating p2p apps in the browser.  
+> An offline-first shared data library for creating p2p apps that work in the browser (and now also nodejs).  
 
 
 ## Intro
@@ -44,6 +44,19 @@ Peer groups use simple randomized algorithms to choose how peers interconnect to
 Apps will configure groups of peers, and the HHS mesh provides primitives for effortlessly synchronizing objects within each peer group (this boils down to syncrhonizing their sets of CRDT operations for each shared object).
 
 
+## Spaces
+
+A [space](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/spaces/Space.ts) is a data unit that can be shared and discovered easily. It has root object that can be used to bootstrap and synchronize the space.
+
+## Example: chat
+
+[Here](https://github.com/hyperhyperspace/hyperhyperspace-core/tree/master/examples/chat) you can see an example of a small console-based chat application built on HHS.
+
+To run the example, do
+
+yarn build-chat
+yarn chat
+
 ## Project status
 
 There is a demo of a simple fully in-browser p2p chat app running [here](https://hyperhyper.space). However, the library has been fully rewritten since that demo was created.
@@ -53,9 +66,3 @@ Re-wiring the demo to use the current version of the library is currently WIP. C
 ## Using outside the browser
 
 If you need to use this library directly in NodeJs, outside of a web browser, you need to import [@hyper-hyper-space/node-env](https://www.npmjs.com/package/@hyper-hyper-space/node-env).
-
-## Libraries
-
- - [Account](https://github.com/hyperhyperspace/hyperhyperspace-account): This library allows your app to creates a personal cloud using all your devices, based on your HHS identity, and syncrhonizing information across them using the HHS store. It also allows you to add other HHS identities to a personal `Contacts` list, and slectively share information with them through mingling your and one of your contacts' devices (forming a shared cloud just for you two).
-
- __More libraries to come.__
