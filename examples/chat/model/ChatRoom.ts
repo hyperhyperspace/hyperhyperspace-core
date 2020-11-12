@@ -60,8 +60,9 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
 
     say(author: Identity, text: string) {
         let message = new Message(author, text);
-        this.messages?.add(message);
-        this.getStore().save(this.messages as HashedObject);
+        this.messages?.add(message).then( () => {
+            this.getStore().save(this.messages as HashedObject);
+        })        
         //this.messages?.saveQueuedOps();
     }
 

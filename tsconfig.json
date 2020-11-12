@@ -71,6 +71,7 @@
   },
   "files": [ "examples/chat/index.ts" ],
   //"files": [ "src/index.ts" ],
+  //"include": [ "./types/*" ]
   "include": [ "./types/*", "./src/**/*", "./test/**/*", "./examples/**/*" ]
   /* "./target/node/*",  */
 }

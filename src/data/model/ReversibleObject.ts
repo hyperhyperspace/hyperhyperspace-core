@@ -17,11 +17,11 @@ abstract class ReversibleObject extends MutableObject {
         super(acceptedOpClasses.concat([UndoOp.className]));
     }
 
-    protected async apply(op: MutationOp) : Promise<void> {
+    protected async apply(op: MutationOp, isNew: boolean) : Promise<void> {
         if (op instanceof UndoOp) {
             await this.reverseMutation(op);
         } else {
-            await this.mutate(op);
+            await this.mutate(op, isNew);
         }
     }
 

@@ -98,7 +98,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                                              //     that has just been received,
                                              //     which incmplete ops depend on it.
 
-    opShippingInterval: number;
+    opShippingInterval: any;
 
     controlLog     = TerminalOpsSyncAgent.controlLog;
     peerMessageLog = TerminalOpsSyncAgent.peerMessageLog;
@@ -137,7 +137,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         this.incompleteOps = new Map();
         this.opsForMissingObj = new MultiMap();
 
-        this.opShippingInterval = window.setInterval(() => {
+        this.opShippingInterval = setInterval(() => {
             let now = Date.now();
             
             // check sending / receiving timeouts & remove stale entries
@@ -320,7 +320,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     shutdown() {
         this.unwatchStoreForOps();
         if (this.opShippingInterval !== undefined) {
-            window.clearInterval(this.opShippingInterval);
+            clearInterval(this.opShippingInterval);
         } 
     }
 

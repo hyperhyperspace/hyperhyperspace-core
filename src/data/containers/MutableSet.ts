@@ -210,6 +210,8 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     _elements: Map<ElmtHash, T>;
     _currentAddOpRefs: Map<ElmtHash, HashedSet<HashReference<T>>>;
 
+    _unsavedAppliedOps: Set<Hash>;
+
     _addElementCallback?    : (element: T) => void;
     _deleteElementCallback? : (element: T) => void;
 
@@ -222,6 +224,8 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
         this._elements = new Map();
         this._currentAddOpRefs = new Map();
+
+        this._unsavedAppliedOps = new Set();
 
     }
 
@@ -275,7 +279,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         return this._elements.values();
     }
 
-    async mutate(op: MutationOp): Promise<void> {
+    async mutate(op: MutationOp, isNew: boolean): Promise<void> {
 
         if (op instanceof MutableSetAddOp ) {
             const addOp = op as MutableSetAddOp<T>;
@@ -297,13 +301,29 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
             this._elements.set(hash, addOp.element as T)
 
-            if (this._addElementCallback !== undefined) {
-                try {
-                    this._addElementCallback(addOp.element as T);
-                } catch (e) {
-                    this.logger.warning(() => ('Error calling MutableSet element addition callback on op ' + addOp.hash()));
+            let call = false;
+            if (isNew) {
+                this._unsavedAppliedOps.add(op.hash());
+                call = true;
+            } else {
+                const opHash = addOp.hash();
+                if (!this._unsavedAppliedOps.has(opHash)) {
+                    call = true;
+                } else {
+                    this._unsavedAppliedOps.delete(opHash);
                 }
             }
+
+            if (call) {
+                if (this._addElementCallback !== undefined) {
+                    try {
+                        this._addElementCallback(addOp.element as T);
+                    } catch (e) {
+                        this.logger.warning(() => ('Error calling MutableSet element addition callback on op ' + addOp.hash()));
+                    }
+                }
+            }
+
 
         } else if (op instanceof MutableSetDeleteOp) {
             const deleteOp = op as MutableSetDeleteOp<T>;

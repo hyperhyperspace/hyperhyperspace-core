@@ -132,6 +132,10 @@ class Space {
         })
     }
 
+    getResources() {
+        return this.resources;
+    }
+
 }
 
 export { Space };

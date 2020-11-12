@@ -15,6 +15,7 @@ type LoadStrategy = 'none'|'full'|'lazy';
 
 abstract class MutableObject extends HashedObject {
 
+    static controlLog = new Logger(MutableObject.name, LogLevel.INFO)
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     readonly _acceptedMutationOpClasses : Array<string>;
@@ -41,7 +42,7 @@ abstract class MutableObject extends HashedObject {
         };
     }
 
-    abstract async mutate(op: MutationOp): Promise<void>;
+    abstract async mutate(op: MutationOp, isNew: boolean): Promise<void>;
 
     watchForChanges(auto: boolean): boolean {
         if (auto) {
@@ -105,7 +106,7 @@ abstract class MutableObject extends HashedObject {
 
             for (const obj of results.objects) {
                 const op = obj as MutationOp;
-                await this.apply(op);
+                await this.apply(op, false);
             }
 
             results = await this.getStore()
@@ -149,7 +150,7 @@ abstract class MutableObject extends HashedObject {
             }
 
             if (lastOp === undefined && this.shouldAcceptMutationOp(op)) {
-                this.apply(op);
+                this.apply(op, false);
             }
         }
 
@@ -161,7 +162,7 @@ abstract class MutableObject extends HashedObject {
 
         op = await this.getStore().load(hash) as MutationOp;
         
-        await this.apply(op);
+        await this.apply(op, false);
     }
 
     async applyNewOp(op: MutationOp) : Promise<void> {
@@ -234,7 +235,7 @@ abstract class MutableObject extends HashedObject {
                 MutableObject.prevOpsComputationLog.debug(() => 'op ' + op.hash() + ' generated prev ops: ' + Array.from(terminalOpRefs).map((ref:HashReference<MutationOp>) => ref.hash))
             }            
 
-            await this.apply(op);
+            await this.apply(op, true);
 
             for (let opHash of terminalOps) {
                 this._prevOpsForUnsavedOps.add(opHash);
@@ -244,8 +245,8 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    protected async apply(op: MutationOp) : Promise<void> {
-        await this.mutate(op);
+    protected async apply(op: MutationOp, isNew: boolean) : Promise<void> {
+        await this.mutate(op, isNew);
     }
 
 
@@ -268,6 +269,7 @@ abstract class MutableObject extends HashedObject {
                     await store.save(op);
                 } catch (e) {
                     this._unsavedOps.unshift(op);
+                    MutableObject.controlLog.debug(() => 'Error trying to save op for ' + this.hash() + ' (class: ' + this.getClassName() + ').');
                     throw e;
                 }
                 

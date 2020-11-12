@@ -222,7 +222,7 @@ class PeerGroupAgent implements Agent {
         }
 
         this.queryForOnlinePeers();
-        this.tickTimerRef = window.setInterval(this.tick, this.params.tickInterval * 1000);
+        this.tickTimerRef = setInterval(this.tick, this.params.tickInterval * 1000);
 
     }
 
@@ -469,7 +469,7 @@ class PeerGroupAgent implements Agent {
 
     shutdown() {
         if (this.tickTimerRef !== undefined) {
-            window.clearInterval(this.tickTimerRef);
+            clearInterval(this.tickTimerRef);
             this.tickTimerRef = undefined;
         }
     }

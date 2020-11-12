@@ -6,6 +6,7 @@ import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity/Identity';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Resources } from 'data/model/Context';
+import { Logger, LogLevel } from 'util/logging';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
@@ -14,6 +15,8 @@ import { Resources } from 'data/model/Context';
 type LoadParams = BackendSearchParams;
 
 class Store {
+
+    static operationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     private backend : Backend;
 
@@ -51,13 +54,18 @@ class Store {
         let missing = await this.findMissingReferencesWithContext(hash, context);
 
         if (missing.size > 0) {
-            throw new Error('Cannot save object ' + hash + ' because the following references are missing: ' + Array.from(missing) + '.');
+            Store.operationLog.debug(() => 'Cannot save ' + hash + ' because the following references are missing: ' + Array.from(missing).join(', ') + '.');
+            throw new Error('Cannot save object ' + hash + ' because the following references are missing: ' + Array.from(missing).join(', ') + '.');
         }
 
+        Store.operationLog.debug(() => 'Saving object with hash ' + hash + ' .');
         await this.saveWithContext(hash, context);
 
         if (object instanceof MutableObject) {
-            await object.saveQueuedOps(); // see (* note 1) above
+            let queuedOps = await object.saveQueuedOps(); // see (* note 1) above
+            if (queuedOps) {
+                Store.operationLog.debug(() => 'Saved queued ops for object with hash ' + hash + ' .');
+            }
         }
 
     }

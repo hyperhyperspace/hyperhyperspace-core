@@ -419,7 +419,7 @@ class NetworkAgent implements Agent {
     shutdown() {
         this.linkupManager.shutdown();
         if (this.intervalRef !== undefined) {
-            window.clearInterval(this.intervalRef);
+            clearInterval(this.intervalRef);
             this.intervalRef = undefined;
         }  
         for (const conn of this.connections.values()) {
@@ -651,7 +651,7 @@ class NetworkAgent implements Agent {
 
     ready(pod: AgentPod): void {
         this.pod = pod;
-        this.intervalRef = window.setInterval(this.tick, TickInterval * 1000);
+        this.intervalRef = setInterval(this.tick, TickInterval * 1000);
     }
 
     receiveLocalEvent(ev: Event): void {

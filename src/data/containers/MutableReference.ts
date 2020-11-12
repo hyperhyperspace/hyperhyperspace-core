@@ -30,7 +30,7 @@ class MutableReference<T> extends MutableObject {
         await this.applyNewOp(op);
     }
 
-    async mutate(op: MutationOp): Promise<void> {
+    async mutate(op: MutationOp, _isNew: boolean): Promise<void> {
         let refUpdateOp = op as RefUpdateOp<T>;
 
         if (refUpdateOp.getTarget().equals(this)) {

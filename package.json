@@ -1,6 +1,6 @@
 {
   "name": "@hyper-hyper-space/core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "author": "Santiago Bazerque",
   "license": "MIT",
   "source": "src/index.ts",
@@ -14,12 +14,14 @@
   "scripts": {
     "build": "npx microbundle-crl --tsconfig tsconfig.build.json &&  npx tsc --project tsconfig.build.json --declaration --outDir ./decl",
     "build-test": "npx microbundle-crl --tsconfig tsconfig.json --output dist-test",
-    "clean": "rm -rf ./decl/* ./dist/* ./dist-test/*",
-    "winclean": "if exist decl (rmdir decl /s /q) && mkdir decl && if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-test (rmdir dist-test /s /q) && mkdir dist-test",
+    "build-chat": "npx tsc --module CommonJs --project tsconfig.json --outDir ./dist-chat",
+    "run-chat": "node ./dist-chat/examples/chat/index.js",
+    "clean": "rm -rf ./decl/* ./dist/* ./dist-test/* ./dist-chat/*",
+    "winclean": "if exist decl (rmdir decl /s /q) && mkdir decl && if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-test (rmdir dist-test /s /q) && mkdir dist-test && if exist dist-chat (rmdir dist-chat /s /q) && mkdir dist-chat",
     "test": "npx jest"
   },
   "devDependencies": {
-    "@hyper-hyper-space/node-env": "^0.6.0",
+    "@hyper-hyper-space/node-env": "^0.7.0",
     "@types/jest": "^26.0.0",
     "@types/ws": "^7.2.6",
     "dts-generator": "^3.0.0",
