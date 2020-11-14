@@ -193,9 +193,13 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
 
                     this.replies.push(item);
 
+                    ObjectDiscoveryAgent.log.trace(() => 'About to fire ' + this.itemSubscriptions.size + ' callbacks.');
+
+
                     for (const itemCallback of this.itemSubscriptions) {
                         itemCallback(item);
                     }
+                    
                 } else {
                     ObjectDiscoveryAgent.log.debug('Error validating object discovery reply');
                 }

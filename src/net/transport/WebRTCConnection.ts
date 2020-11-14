@@ -182,6 +182,8 @@ class WebRTCConnection implements Connection {
     send(message: any) {
         WebRTCConnection.logger.trace(this.localAddress?.linkupId + ' sending msg to ' + this.remoteAddress?.linkupId + ' through channel ' + this.channelName + ' on call ' + this.callId);
         this.channel?.send(message);
+        WebRTCConnection.logger.trace('Done sending msg');
+        
     }
 
     private init(ICEServers? : any) {

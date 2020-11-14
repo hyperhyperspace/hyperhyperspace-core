@@ -13,6 +13,7 @@ class LinkupManager {
 
     static defaultLinkupServer =  'wrtc+wss://mypeer.net:443';
     //static defaultLinkupServer =  'wrtc+ws://localhost:8765';
+    //static defaultLinkupServer = 'wrtc+ws://192.168.0.105:8765';
 
     serverConnections : Map<string, LinkupServer>;
 

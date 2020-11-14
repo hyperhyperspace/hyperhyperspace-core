@@ -43,14 +43,16 @@ class ObjectDiscoveryPeerSource implements PeerSource {
         if (this.replyStream === undefined) {
             this.replyStream = this.tryObjectDiscovery(count);;
         } else {
-            const reply = this.replyStream.nextIfAvailable();
+            let reply = this.replyStream.nextIfAvailable();
 
             while (reply !== undefined && found.length < count) {
                 const peerInfo = await this.parseEndpoint(reply.source);
                 if (peerInfo !== undefined && !unique.has(peerInfo.endpoint)) {
                     found.push(peerInfo);
                     unique.add(peerInfo.endpoint);
-                }  
+                }
+
+                reply = this.replyStream.nextIfAvailable();
             } 
 
             if (found.length < count) {
