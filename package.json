@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@hyper-hyper-space/node-env": "^0.8.0",
+    "@subspace/vdf": "^0.1.0",
     "@types/jest": "^26.0.0",
     "@types/ws": "^7.2.6",
     "dts-generator": "^3.0.0",

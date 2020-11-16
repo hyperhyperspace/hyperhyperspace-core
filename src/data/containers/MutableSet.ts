@@ -199,7 +199,7 @@ MutableSetDeleteOp.registerClass(MutableSetDeleteOp.className, MutableSetDeleteO
 
 class MutableSet<T extends HashedObject> extends MutableObject {
 
-    static className = 'hss/MutableSet';
+    static className = 'hss/v0/MutableSet';
     static opClasses = [MutableSetAddOp.className, MutableSetDeleteOp.className];
     static logger    = new Logger(MutableSet.className, LogLevel.INFO);
 

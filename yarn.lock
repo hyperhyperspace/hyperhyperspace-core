@@ -2103,6 +2103,13 @@
   dependencies:
     "@sinonjs/commons" "^1.7.0"
 
+"@subspace/vdf@^0.1.0":
+  version "0.1.0"
+  resolved "https://registry.yarnpkg.com/@subspace/vdf/-/vdf-0.1.0.tgz#f341dc742e84df7eac9bf9653a08ddfea2b615c1"
+  integrity sha512-iKYdYOcAtALmxxgreWqnHphT7m8HIyBsAYLrPSRvOJM9hTY+Rfg+EsLiqXLgHoIXyy980dQhoE4yIwu8xXDmvg==
+  dependencies:
+    "@types/node" "^11.13.4"
+
 "@svgr/babel-plugin-add-jsx-attribute@^5.4.0":
   version "5.4.0"
   resolved "https://registry.yarnpkg.com/@svgr/babel-plugin-add-jsx-attribute/-/babel-plugin-add-jsx-attribute-5.4.0.tgz#81ef61947bb268eb9d50523446f9c638fb355906"
@@ -2300,6 +2307,11 @@
   version "14.0.13"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-14.0.13.tgz#ee1128e881b874c371374c1f72201893616417c9"
   integrity sha512-rouEWBImiRaSJsVA+ITTFM6ZxibuAlTuNOCyxVbwreu6k6+ujs7DfnU9o+PShFhET78pMBl3eH+AGSI5eOTkPA==
+
+"@types/node@^11.13.4":
+  version "11.15.35"
+  resolved "https://registry.yarnpkg.com/@types/node/-/node-11.15.35.tgz#282b97494e4967649d776c3cc91da5f861a03c40"
+  integrity sha512-kmxE30w+R//Vh/+dlVS5DPPyzPtWtrMrJ9+io7jvkPtWv3X43ERA4HTcFEn/R7dtHO3HCMU1y3WKf3NDLYhQEQ==
 
 "@types/normalize-package-data@^2.4.0":
   version "2.4.0"
