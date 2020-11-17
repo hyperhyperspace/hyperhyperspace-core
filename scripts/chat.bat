@@ -1,4 +1,7 @@
 @ECHO OFF
-setx NODE_PATH "dist-chat/src;dist-chat/examples/chat" > $null
+setx NODE_PATH "dist-examples/src;dist-examples/examples/chat" > $null
 @ECHO ON
-node ./dist-chat/examples/chat/index.js
+
+echo ${NODE_PATH}
+
+node ./dist-examples/examples/chat/index.js

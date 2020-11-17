@@ -94,6 +94,9 @@ class BeaconValueOp extends MutationOp {
 
         const steps = (this.getTarget() as Beacon).steps as number;
 
+
+        //TODO: make sure there is no upper/lowercase ambiguity in the vdfResult!
+
         if (!BeaconValueOp.vdfVerifier.verify(steps, challenge, this.vdfResult, 2048, true)) {
             return false;
         }

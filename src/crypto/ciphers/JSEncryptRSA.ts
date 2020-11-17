@@ -4,16 +4,32 @@ import { SHA, SHAImpl } from '../hashing';
 
 // dummy objects for JSEncrypt
 
+let fixNavigator = false;
+
 if ((global as any).navigator === undefined) {
     (global as any).navigator = {appName: 'nodejs'};
+    fixNavigator = true;
 }
+
+let fixWindow = false;
 
 if ((global as any).window === undefined) {
     (global as any).window = {};
+    fixWindow = true;
 }
 
 
 const JSEncrypt = require('jsencrypt').JSEncrypt;
+
+
+if (fixNavigator) {
+    (global as any).navigator = undefined;
+}
+
+if (fixWindow) {
+    (global as any).window = undefined;
+}
+
 
 class JSEncryptRSA implements RSA {
 
