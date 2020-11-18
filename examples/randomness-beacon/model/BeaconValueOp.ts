@@ -114,7 +114,7 @@ class BeaconValueOp extends MutationOp {
         const challengeBuffer = Buffer.from(challenge, 'hex');
         const resultBuffer = Buffer.from(this.vdfResult, 'hex');
 
-        if (!BeaconValueOp.vdfVerifier.verify(steps, challengeBuffer, resultBuffer, 2048, true)) {
+        if (!BeaconValueOp.vdfVerifier.verify(steps, challengeBuffer, resultBuffer, 2048, false)) {
             BeaconValueOp.log.trace('VDF verification failed.');
             return false;
         }

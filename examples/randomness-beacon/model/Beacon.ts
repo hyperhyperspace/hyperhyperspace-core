@@ -66,18 +66,10 @@ class Beacon extends MutableObject implements SpaceEntryPoint {
             Beacon.log.debug(() => 'Racing for challenge (' + this.steps + ' steps): "' + this.currentChallenge() + '".');
 
             this._computation = new Worker('./dist-examples/examples/randomness-beacon/model/worker.js');
-            console.log('is death immediate?')
-            this._computation.on('online', () => {console.log('worker is online')});
             this._computation.on('error', (err: Error) => { console.log('ERR');console.log(err)});
-            this._computation.on('exit', (exitCode: number) => {
-                console.log('worker exited with ' + exitCode);
-            })
-            console.log('created worker')
             this._computation.on('message', async (msg: {challenge: string, result: string}) => {
                 
                 Beacon.log.debug(() => 'Solved challenge "' + msg.challenge + '" with: "' + msg.result + '".');
-
-                
 
                 if (msg.challenge === this.currentChallenge()) {
                     let op = new BeaconValueOp(this, this.currentSeq(), msg.result);
@@ -92,25 +84,23 @@ class Beacon extends MutableObject implements SpaceEntryPoint {
                     await this.getStore().save(this);
                     
                 } else {
-                    console.log('mismatched challenge');
+                    Beacon.log.debug('Mismatched challenge - could be normal.');
                 }
             });
             this._computation.postMessage({steps: this.steps, challenge: this.currentChallenge()});
-            console.log('posted message to worker')
             
         } else {
-            console.log('race was called but a computation is running');
+            Beacon.log.debug('Race was called but a computation is running.');
         }
     }
 
     stopRace() {
-        console.log('stopRace()');
+        Beacon.log.debug('Going to stop current VDF computation.');
         if (this._computation !== undefined) {
             if (this._computationTermination === undefined) {
-                console.log('need to stop')
                 this._computationTermination = this._computation.terminate().then(
                     (ret: number) => {
-                        console.log('stopped');
+                        Beacon.log.trace('Stopped VDF computation');
                         this._computation = undefined;
                         this._computationTermination = undefined;
                         return ret;
@@ -174,15 +164,14 @@ class Beacon extends MutableObject implements SpaceEntryPoint {
 
                 if (this._autoCompute) {
                     if (this._computation === undefined) {
-                        console.log('computation was finished');
                         this.race();
                     } else {
-                        console.log('chaining');
                         this.stopRace();
-                        this._computationTermination?.then(() => { console.log('finished now!');this.race(); });
+                        this._computationTermination?.then(() => { this.race(); });
                     }
-                    
                 }
+
+                Beacon.log.debug('Challenge now is "' + this.currentChallenge() + '".');
             
             }
 
