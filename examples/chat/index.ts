@@ -108,7 +108,7 @@ async function main() {
 
     let id = await createIdentity(resources, name);
 
-    console.log()
+    console.log();
     console.log('Press enter to create a chat room, or input the 3 code words to join an existing one.');
     console.log();
 
