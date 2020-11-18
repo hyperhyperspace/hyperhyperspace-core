@@ -18,7 +18,7 @@ class VDF {
 
         const t = Date.now();
 
-        VDF.log.debug('VDF sekf verification: ' + vdfInstance.verify(steps, Buffer.from(challenge, 'hex'), result, 2048, true));
+        VDF.log.debug('VDF sekf verification: ' + vdfInstance.verify(steps, Buffer.from(challenge, 'hex'), result, 2048, false));
 
         const elapsed = Date.now() - t;
 
