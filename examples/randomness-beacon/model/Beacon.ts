@@ -171,7 +171,7 @@ class Beacon extends MutableObject implements SpaceEntryPoint {
                     }
                 }
 
-                Beacon.log.debug('Challenge now is "' + this.currentChallenge() + '".');
+                Beacon.log.debug('Challenge now is "' + this.currentChallenge() + '" for beacon position ' + this.currentSeq() + '.');
             
             }
 
