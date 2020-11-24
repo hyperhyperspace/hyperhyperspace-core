@@ -5,7 +5,7 @@ const createVdf = require('@subspace/vdf').default;
 
 class VDF {
 
-    static BITS = 1024;
+    static BITS = 256;
 
     static log = new Logger(VDF.name, LogLevel.TRACE)
 
