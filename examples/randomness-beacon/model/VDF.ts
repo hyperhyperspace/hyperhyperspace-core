@@ -11,19 +11,23 @@ class VDF {
 
     static async compute(challenge: string, steps: number): Promise<string> {
 
+        
+
         VDF.log.debug('Creating VDF instance...');
         const vdfInstance = await createVdf();
         VDF.log.debug('Computing VDF...');
+        const tGen = Date.now();
         const result = vdfInstance.generate(steps, Buffer.from(challenge, 'hex'), VDF.BITS, true);
-        VDF.log.debug('Done computing VDF.')
+        const elapsedGen = Date.now() - tGen;
+        VDF.log.debug('Done computing VDF, took ' + elapsedGen + ' millis');
 
-        const t = Date.now();
+        const tVerif = Date.now();
 
         VDF.log.debug('VDF self verification: ' + vdfInstance.verify(steps, Buffer.from(challenge, 'hex'), result, VDF.BITS, true));
 
-        const elapsed = Date.now() - t;
+        const elapsedVerif = Date.now() - tVerif;
 
-        VDF.log.debug('verification took ' + elapsed + ' millis');
+        VDF.log.debug('verification took ' + elapsedVerif + ' millis');
 
         return Buffer.from(result).toString('hex');
     }
