@@ -22,7 +22,7 @@ import { BeaconValueOp } from './model/BeaconValueOp';
 import * as readline from 'readline';
 
 
-const STEPS = 66;
+const STEPS = 10000;
 
 function initResources(): Resources {
     return { store: new Store(new MemoryBackend(new RNGImpl().randomHexString(128))), mesh: new Mesh(), config: {}, aliasing: new Map()};

@@ -3,6 +3,7 @@ import { Hashing, Hash, HashedObject, MutationOp } from 'data/model';
 import { Logger, LogLevel } from 'util/logging';
 
 import { Beacon } from './Beacon';
+import { VDF } from './VDF';
 
 const createVdf = require('@subspace/vdf').default;
 (global as any).document = { }; // yikes!
@@ -114,7 +115,7 @@ class BeaconValueOp extends MutationOp {
         const challengeBuffer = Buffer.from(challenge, 'hex');
         const resultBuffer = Buffer.from(this.vdfResult, 'hex');
 
-        if (!BeaconValueOp.vdfVerifier.verify(steps, challengeBuffer, resultBuffer, 2048, false)) {
+        if (!BeaconValueOp.vdfVerifier.verify(steps, challengeBuffer, resultBuffer, VDF.BITS, true)) {
             BeaconValueOp.log.trace('VDF verification failed.');
             return false;
         }

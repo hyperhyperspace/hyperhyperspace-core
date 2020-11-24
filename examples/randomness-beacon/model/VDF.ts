@@ -5,6 +5,8 @@ const createVdf = require('@subspace/vdf').default;
 
 class VDF {
 
+    static BITS = 1024;
+
     static log = new Logger(VDF.name, LogLevel.TRACE)
 
     static async compute(challenge: string, steps: number): Promise<string> {
@@ -12,13 +14,13 @@ class VDF {
         VDF.log.debug('Computing VDF...');
 
         const vdfInstance = await createVdf();
-        const result = vdfInstance.generate(steps, Buffer.from(challenge, 'hex'), 2048, false);
+        const result = vdfInstance.generate(steps, Buffer.from(challenge, 'hex'), VDF.BITS, true);
 
         VDF.log.debug('Done computing VDF.')
 
         const t = Date.now();
 
-        VDF.log.debug('VDF sekf verification: ' + vdfInstance.verify(steps, Buffer.from(challenge, 'hex'), result, 2048, false));
+        VDF.log.debug('VDF self verification: ' + vdfInstance.verify(steps, Buffer.from(challenge, 'hex'), result, VDF.BITS, true));
 
         const elapsed = Date.now() - t;
 
