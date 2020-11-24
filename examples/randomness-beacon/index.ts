@@ -23,7 +23,7 @@ import * as readline from 'readline';
 import { VDF } from './model/VDF';
 
 
-const STEPS = 10000;
+const STEPS = 300000;
 
 function initResources(): Resources {
     return { store: new Store(new MemoryBackend(new RNGImpl().randomHexString(128))), mesh: new Mesh(), config: {}, aliasing: new Map()};
