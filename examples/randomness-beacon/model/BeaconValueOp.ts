@@ -120,6 +120,8 @@ class BeaconValueOp extends MutationOp {
             return false;
         }
 
+        BeaconValueOp.log.trace('Successfully received proof for sequence number ' + this.seq + '.');
+
         return true;
 
     }
