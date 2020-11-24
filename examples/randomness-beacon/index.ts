@@ -20,6 +20,7 @@ import { Beacon } from './model/Beacon';
 import { BeaconValueOp } from './model/BeaconValueOp';
 
 import * as readline from 'readline';
+import { VDF } from './model/VDF';
 
 
 const STEPS = 10000;
@@ -108,7 +109,17 @@ async function main() {
     });
 
     let space: Space;
-    if (command.trim() === '') {
+    if (command.trim() === 'selftest') { 
+
+        console.log('starting self test...');
+        console.log();
+        await VDF.compute(new RNGImpl().randomHexString(160), 10000);
+        console.log();
+        console.log('self test done');
+
+        return;
+
+    } else if (command.trim() === '') {
 
         space = await createBeaconSpace(resources);
 

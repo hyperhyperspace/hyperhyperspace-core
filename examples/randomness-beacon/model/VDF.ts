@@ -11,11 +11,10 @@ class VDF {
 
     static async compute(challenge: string, steps: number): Promise<string> {
 
-        VDF.log.debug('Computing VDF...');
-
+        VDF.log.debug('Creating VDF instance...');
         const vdfInstance = await createVdf();
+        VDF.log.debug('Computing VDF...');
         const result = vdfInstance.generate(steps, Buffer.from(challenge, 'hex'), VDF.BITS, true);
-
         VDF.log.debug('Done computing VDF.')
 
         const t = Date.now();
