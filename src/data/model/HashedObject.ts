@@ -436,22 +436,22 @@ abstract class HashedObject {
     }
 
 
-    static fromLiteralContext(literalContext: LiteralContext, hash?: Hash) : HashedObject {
+    static fromLiteralContext(literalContext: LiteralContext, hash?: Hash, validate=false) : HashedObject {
 
         let context = new Context();
         context.fromLiteralContext(literalContext);
 
-        return HashedObject.fromContext(context, hash);
+        return HashedObject.fromContext(context, hash, validate);
     }
 
     
-    static fromLiteral(literal: Literal) : HashedObject {
+    static fromLiteral(literal: Literal, validate=false) : HashedObject {
 
         let context = new Context();
         context.rootHashes.push(literal.hash);
         context.literals.set(literal.hash, literal);
 
-        return HashedObject.fromContext(context);
+        return HashedObject.fromContext(context, undefined, validate);
 
     }
 
