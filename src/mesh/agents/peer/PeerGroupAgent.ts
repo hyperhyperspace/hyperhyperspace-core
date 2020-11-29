@@ -240,6 +240,11 @@ class PeerGroupAgent implements Agent {
         return unique;
     }
 
+    validateConnectedPeer(ep: Endpoint) : boolean {
+        let connId = this.findWorkingConnectionId(ep);
+        return connId !== undefined;
+    }
+
     // Peer messaging functions, to be used by other local agents:
 
     sendToAllPeers(agentId: AgentId, content: any): number {
@@ -882,7 +887,7 @@ class PeerGroupAgent implements Agent {
         this.getNetworkAgent().sendMessage(connId, this.getAgentId(), message);
     }
 
-    // handle of peer message reception
+    // handle peer message reception
 
     private onPeerMessage(connId: ConnectionId, sender: Hash, recipient: Hash, peerGroupId: string, agentId: AgentId, message: any) {
         let pc = this.connections.get(connId);
