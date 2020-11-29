@@ -174,12 +174,20 @@ class StateGossipAgent extends PeeringAgentBase {
             
             let secMsgEv = ev as SecureMessageReceivedEvent;
 
-            // TODO: validate if the secure message comes from who it should,
-            //       uses the right credentials, etc
-
             let gossipMsg = secMsgEv.content.payload as GossipMessage;
 
-            this.receiveGossip(secMsgEv.content.sender, gossipMsg);
+            // Check if the sender of the message is in the peer group this agent
+            //  is using for gossiping.
+
+            if (this.getPeerControl().validateConnectedPeer(secMsgEv.content.sender) &&
+                this.getPeerControl().getLocalPeer().endpoint === secMsgEv.content.recipient) {
+
+                    this.receiveGossip(secMsgEv.content.sender, gossipMsg);
+            } else {
+                StateGossipAgent.peerMessageLog.debug('Received message with wrong origin / destination (could be a just disconnected legitimate peer) from ' + secMsgEv.content.sender + '.');
+            }
+
+            
         } else if (ev.type === GossipEventTypes.AgentStateUpdate) {
             
             let updateEv = ev as AgentStateUpdateEvent;
