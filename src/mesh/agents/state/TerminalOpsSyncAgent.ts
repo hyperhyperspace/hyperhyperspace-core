@@ -298,6 +298,9 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 this.receiveRemoteState(source, state.hash(), state);
             } else if (msg.type === TerminalOpsSyncAgentMessageType.SendObjs) {
                 // TODO: you need to check signatures here also, so FIXME
+                //       (signatures will be checked when importing object, but it would be wise
+                //       to check if each dependency has valid signatures even before the object
+                //       is complete)
                 const sendOpsMsg = msg as SendObjsMessage;
                 this.receiveObjects(source, sendOpsMsg.sentObjects, sendOpsMsg.omittedDeps, sendOpsMsg.ownershipProofSecret);
             }
