@@ -28,7 +28,7 @@ class BeaconValueOp extends MutationOp {
 
         if (seq !== undefined && vdfResult !== undefined) {
             this.seq = seq;
-            this.vdfResult = vdfResult;
+            this.vdfResult = vdfResult.toUpperCase();
         }
     }
 
@@ -109,8 +109,10 @@ class BeaconValueOp extends MutationOp {
 
         const steps = (this.getTarget() as Beacon).steps as number;
 
-
-        //TODO: make sure there is no upper/lowercase ambiguity in the vdfResult!
+        if (this.vdfResult.toUpperCase() !== this.vdfResult) {
+            BeaconValueOp.log.trace('VDF result is not uppercase');
+            return false;
+        }
 
         const challengeBuffer = Buffer.from(challenge, 'hex');
         const resultBuffer = Buffer.from(this.vdfResult, 'hex');
