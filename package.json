@@ -19,6 +19,8 @@
     "example-chat-win": "./scripts/chat.bat",
     "example-beacon": "NODE_PATH=\"dist-examples/src:dist-examples/examples/chat\" node ./dist-examples/examples/randomness-beacon/index.js",
     "example-beacon-win": "./scripts/beacon.bat",
+    "run-tero": "NODE_PATH=\"dist-examples/src:dist-examples/examples/social\" node ./dist-examples/examples/social/index.js",
+    "run-tero-win": "./scripts/tero.bat",
     "clean": "rm -rf ./decl/* ./dist/* ./dist-test/* ./dist-examples/*",
     "winclean": "if exist decl (rmdir decl /s /q) && mkdir decl && if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-test (rmdir dist-test /s /q) && mkdir dist-test && if exist dist-examples (rmdir dist-examples /s /q) && mkdir dist-examples",
     "test": "npx jest"
