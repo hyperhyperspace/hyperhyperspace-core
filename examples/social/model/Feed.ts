@@ -41,24 +41,22 @@ class Feed extends HashedObject implements SpaceEntryPoint {
     }
 
     validate(_references: Map<string, HashedObject>): boolean {
+        let author = this.getAuthor();
         return  this.getId() !== undefined &&
-                // TODO: CHECKS
+                author !== undefined &&
+                this.getId() === '-feed-'+this.getAuthor()?.hash() &&
                 this.checkDerivedField('bio') &&
-                this.checkDerivedField('posts');
+                author.equals(this.bio?.getAuthor()) &&
+                this.checkDerivedField('posts') &&
+                author.equals(this.posts?.getAuthor());
     }
 
-    join(id: Identity) {
-        this.followers?.add(id);
-        this.getStore().save(this.followers as HashedObject);
-        //this.participants?.saveQueuedOps();
+    setBio(bio: string) {
+        this.bio?.setValue(new HashedLiteral(bio));
+        this.getStore().save(this.bio as HashedObject);
     }
 
-    leave(id: Identity) {
-        this.followers?.delete(id);
-        this.followers?.saveQueuedOps();
-    }
-
-    say(author: Identity, text: string) {
+    publish(author: Identity, text: string) {
         let message = new Message(author, text);
         this.posts?.add(message).then( () => {
             this.getStore().save(this.posts as HashedObject);
@@ -66,15 +64,7 @@ class Feed extends HashedObject implements SpaceEntryPoint {
         //this.messages?.saveQueuedOps();
     }
 
-    getParticipants() : MutableSet<Identity> {
-        if (this.followers === undefined) {
-            throw new Error('The chat room has not been initialized, participants are unavailable.');
-        }
-
-        return this.followers;
-    }
-
-    getMessages() : MutableSet<Message> {
+    getPosts() : MutableSet<Message> {
         if (this.posts === undefined) {
             throw new Error('The chat room has not been initialized, messages are unavailable.');
         }
@@ -117,7 +107,6 @@ class Feed extends HashedObject implements SpaceEntryPoint {
         this._mesh.joinPeerGroup(this._peerGroup);
         this._mesh.syncObjectWithPeerGroup(this._peerGroup.id, this);
 
-        this.followers?.loadAndWatchForChanges();
         this.posts?.loadAndWatchForChanges();
     }
     
@@ -141,4 +130,4 @@ class Feed extends HashedObject implements SpaceEntryPoint {
 
 HashedObject.registerClass(Feed.className, Feed);
 
-export { Feed as ChatRoom };
+export { Feed };

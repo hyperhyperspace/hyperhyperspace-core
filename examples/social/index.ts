@@ -18,7 +18,7 @@ import { MemoryBackend } from 'storage/backends';
 import { Mesh } from 'mesh/service';
 import { IdentityPeer } from 'mesh/agents/peer';
 
-import { ChatRoom } from './model/ChatRoom';
+import { Feed } from './model/Feed';
 import { Message } from './model/Message';
 
 import * as readline from 'readline';
@@ -43,12 +43,12 @@ async function createIdentity(resources: Resources, name: string): Promise<Ident
     return id;
 }
 
-async function createChatRoomSpace(resources: Resources, id: Identity, topic?: string): Promise<Space> {
+async function createFeedSpace(resources: Resources, id: Identity): Promise<Space> {
 
-    let chatRoom = new ChatRoom(topic);
+    let feed = new Feed(id);
     let endpoint = (await IdentityPeer.fromIdentity(id).asPeer()).endpoint;
 
-    let space = Space.fromEntryPoint(chatRoom, resources, endpoint);
+    let space = Space.fromEntryPoint(feed, resources, endpoint);
 
     space.startBroadcast();
     let room = await space.getEntryPoint();
@@ -59,7 +59,7 @@ async function createChatRoomSpace(resources: Resources, id: Identity, topic?: s
     room.startSync();
 
     console.log();
-    console.log('Created chat room, wordcode is:');
+    console.log('Created your publisher feed, wordcode is:');
     console.log();
     console.log((await space.getWordCoding()).join(' '));
     console.log();
@@ -67,13 +67,13 @@ async function createChatRoomSpace(resources: Resources, id: Identity, topic?: s
     return space;
 }
 
-async function joinChatRoomSpace(resources: Resources, id: Identity, wordcode: string[]): Promise<Space> {
+async function joinFeedSpace(resources: Resources, id: Identity, wordcode: string[]): Promise<Space> {
     
     let endpoint = (await IdentityPeer.fromIdentity(id).asPeer()).endpoint;
     let space = Space.fromWordCode(wordcode, resources, endpoint);
 
     console.log();
-    console.log('Trying to join chat with word code "' + wordcode.join(' ') + '"...');
+    console.log('Trying to follow feed with word code "' + wordcode.join(' ') + '"...');
     await space.entryPoint;
     console.log('Done.');
     console.log();
@@ -109,7 +109,7 @@ async function main() {
     let id = await createIdentity(resources, name);
 
     console.log();
-    console.log('Press enter to create a chat room, or input the 3 code words to join an existing one.');
+    console.log('Press enter to create your publisher feed, or input the 3 code words to follow an existing one.');
     console.log();
 
     let command = await new Promise((resolve: (text: string) => void/*, reject: (reason: any) => void*/) => {
@@ -121,7 +121,7 @@ async function main() {
     let space: Space;
     if (command.trim() === '') {
 
-        space = await createChatRoomSpace(resources, id, '');
+        space = await createFeedSpace(resources, id, '');
 
     } else {
 
@@ -133,10 +133,10 @@ async function main() {
             process.exit();
         }
 
-        space = await joinChatRoomSpace(resources, id, wordcode);
+        space = await joinFeedSpace(resources, id, wordcode);
     }
 
-    let room = await space.getEntryPoint() as ChatRoom;
+    let room = await space.getEntryPoint() as Feed;
 
     room.messages?.onAddition((m: Message) => {
         console.log(m.getAuthor()?.info?.name + ': ' + m.text);
