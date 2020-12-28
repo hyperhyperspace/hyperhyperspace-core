@@ -51,12 +51,12 @@ async function createFeedSpace(resources: Resources, id: Identity): Promise<Spac
     let space = Space.fromEntryPoint(feed, resources, endpoint);
 
     space.startBroadcast();
-    let room = await space.getEntryPoint();
+    await space.getEntryPoint();
 
-    await resources.store.save(room);
+    await resources.store.save(feed);
 
-    room.setResources(resources);
-    room.startSync();
+    feed.setResources(resources);
+    feed.startSync();
 
     console.log();
     console.log('Created your publisher feed, wordcode is:');
@@ -121,7 +121,7 @@ async function main() {
     let space: Space;
     if (command.trim() === '') {
 
-        space = await createFeedSpace(resources, id, '');
+        space = await createFeedSpace(resources, id);
 
     } else {
 
@@ -129,20 +129,20 @@ async function main() {
 
         if (wordcode.length !== 3) {
             console.log('expected 3 words, like: pineapple greatness flurry');
-            console.log('cannot join chat, exiting.');
+            console.log('cannot follow feed, exiting.');
             process.exit();
         }
 
         space = await joinFeedSpace(resources, id, wordcode);
     }
 
-    let room = await space.getEntryPoint() as Feed;
+    let feed = await space.getEntryPoint() as Feed;
 
-    room.messages?.onAddition((m: Message) => {
+    feed.posts?.onAddition((m: Message) => {
         console.log(m.getAuthor()?.info?.name + ': ' + m.text);
     });
 
-    console.log('Type and press return to send a message!')
+    console.log('Type and press return to post a publication!')
     console.log();
 
     while (true) {
@@ -152,7 +152,7 @@ async function main() {
             });
         });
     
-        room.say(id, text);
+        feed.publish(id, text);
     }
 
     
