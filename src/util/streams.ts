@@ -227,7 +227,7 @@ class BufferedAsyncStream<T> implements AsyncStream<T> {
 
     provider: AsyncStreamSource<T>;
     buffer: T[];
-    pending: {resolve: (value?: T) => void, reject: (reason: any) => void}[];
+    pending: {resolve: (value: T) => void, reject: (reason: any) => void}[];
 
     itemCallback: (elem: T) => void;
     endCallback: () => void;
@@ -269,7 +269,7 @@ class BufferedAsyncStream<T> implements AsyncStream<T> {
         if (this.buffer.length > 0) {
             return Promise.resolve(this.buffer.shift() as T);
         } else {
-            let p = new Promise((resolve: (value?: T) => void, reject: (reason: 'timeout'|'end') => void) => {
+            let p = new Promise((resolve: (value: T) => void, reject: (reason: 'timeout'|'end') => void) => {
                 
                 this.pending.push({resolve: resolve, reject: reject});
                 

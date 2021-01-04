@@ -83,7 +83,7 @@ class Space {
     }
 
     private processDiscoveryReply(discoveryStream: AsyncStream<ObjectDiscoveryReply>): Promise<HashedObject & SpaceEntryPoint> {
-        return new Promise((resolve: (value?: (HashedObject & SpaceEntryPoint)) => void, reject: (reason: 'timeout'|'end') => void) => {
+        return new Promise((resolve: (value: (HashedObject & SpaceEntryPoint)) => void, reject: (reason: 'timeout'|'end') => void) => {
 
             discoveryStream.next(30000).then((reply: ObjectDiscoveryReply) => {
                 resolve(reply.object as (HashedObject & SpaceEntryPoint));

@@ -42,7 +42,7 @@ abstract class MutableObject extends HashedObject {
         };
     }
 
-    abstract async mutate(op: MutationOp, isNew: boolean): Promise<void>;
+    abstract mutate(op: MutationOp, isNew: boolean): Promise<void>;
 
     watchForChanges(auto: boolean): boolean {
         if (auto) {

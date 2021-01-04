@@ -26,13 +26,13 @@
   "devDependencies": {
     "@hyper-hyper-space/node-env": "^0.8.0",
     "@subspace/vdf": "^0.1.0",
-    "@types/jest": "^26.0.0",
+    "@types/jest": "^26.0.19",
     "@types/ws": "^7.2.6",
     "dts-generator": "^3.0.0",
-    "jest": "^26.4.2",
+    "jest": "^26.6.3",
     "microbundle-crl": "^0.13.11",
-    "ts-jest": "^26.1.0",
-    "typescript": "^3.9.6"
+    "ts-jest": "^26.4.4",
+    "typescript": "^4.1.2"
   },
   "dependencies": {
     "@types/node": "^14.0.13",
@@ -58,7 +58,7 @@
     ],
     "globals": {
       "ts-jest": {
-        "tsConfig": "tsconfig.json"
+        "tsconfig": "tsconfig.json"
       }
     }
   }

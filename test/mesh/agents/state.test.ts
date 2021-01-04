@@ -76,7 +76,7 @@ async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mi
     let seq1:Array<[number, string]> = [[10, 'a'], [10, 'b'], [3, 'three']]
     let seq2:Array<[number, string]> = [[11, 'eleven'], [10, 'ten'], [9, 'nine']];
 
-    await new Promise(r => { window.setTimeout(() => { r() }, 1000);  });
+    await new Promise<void>(r => { window.setTimeout(() => { r() }, 1000);  });
 
     let seqs = [seq0, seq1, seq2];
     let witness: Array<LinearStateAgent> = [];
