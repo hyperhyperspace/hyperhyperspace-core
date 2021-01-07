@@ -1,16 +1,11 @@
 import { HashedObject, HashedLiteral } from 'data/model';
 import { MutableSet, MutableReference } from 'data/containers';
 import { Identity } from 'data/identity';
+import { SpaceEntryPoint } from 'spaces/SpaceEntryPoint';
+import { PeerNode } from 'mesh/service';
+import { Store } from 'storage/store';
 
 import { Message } from './Message';
-
-import { SpaceEntryPoint } from 'spaces/SpaceEntryPoint';
-import { Mesh } from 'mesh/service';
-import { LinkupManager } from 'net/linkup';
-import { ObjectDiscoveryPeerSource } from 'mesh/agents/peer';
-import { PeerGroupInfo } from 'mesh/service';
-import { IdentityPeer } from 'mesh/agents/peer';
-
 
 class ChatRoom extends HashedObject implements SpaceEntryPoint {
 
@@ -20,8 +15,9 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
     participants?: MutableSet<Identity>;
     messages?: MutableSet<Message>;
 
-    _mesh?: Mesh;
-    _peerGroup?: PeerGroupInfo;
+    _node?: PeerNode;
+//    _mesh?: Mesh;
+//    _peerGroup?: PeerGroupInfo;
 
     constructor(topic?: string) {
         super();
@@ -84,12 +80,9 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
 
     async startSync(): Promise<void> {
 
-        let resources = this.getResources();
 
-        if (resources === undefined) {
-            throw new Error('Cannot start sync: resources not configured.');
-        }
 
+        /*
         this._mesh = resources.mesh;
 
         if (this._mesh === undefined) {
@@ -101,7 +94,7 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
 
 
 
-        const localIdentity = resources.config.id as Identity;
+        
         const localPeer     = await new IdentityPeer(linkupServers[0] as string, localIdentity.hash(), localIdentity).asPeer();
 
         this._mesh.startObjectBroadcast(this, linkupServers, [localPeer.endpoint]);
@@ -116,6 +109,28 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
 
         this._mesh.joinPeerGroup(this._peerGroup);
         this._mesh.syncObjectWithPeerGroup(this._peerGroup.id, this);
+        */
+
+        let resources = this.getResources();
+
+        if (resources === undefined) {
+            throw new Error('Cannot start sync: resources not configured.');
+        }
+
+        if (resources.config?.id === undefined) {
+            throw new Error('Cannot start sync: local identity has not been defined.');
+        }
+
+        if (resources.store === undefined) {
+            throw new Error('Cannot start sync: a local store has not been configured.')
+        }
+
+        const localIdentity = resources.config.id as Identity;
+        const localStore    = resources.store as Store;
+        this._node = new PeerNode(localIdentity, localStore, resources.mesh, resources.config.linkupServer);
+        
+        this._node.broadcast(this);
+        this._node.sync(this);
 
         this.participants?.loadAndWatchForChanges();
         this.messages?.loadAndWatchForChanges();
@@ -123,14 +138,8 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
     
     async stopSync(): Promise<void> {
 
-        const peerGroupId = this._peerGroup?.id as string;
-        
-        this._mesh?.stopSyncObjectWithPeerGroup(peerGroupId, this.hash());
-        this._mesh?.stopObjectBroadcast(this.hash());
-        this._mesh?.leavePeerGroup(peerGroupId);
-
-        this._mesh = undefined;
-        this._peerGroup = undefined;
+        this._node?.stopBroadcast(this);
+        this._node?.stopSync(this);
     }
 
     getClassName(): string {

@@ -145,6 +145,20 @@ class Mesh {
 
     }
 
+    // FIXME: that would fail if the same peer group is used with
+    //        more than one gossip ids.
+    isPeerGroupInUse(peerGroupId: string, gossipId?: string) {
+
+        if (gossipId === undefined) {
+            gossipId = peerGroupId;
+        }
+
+        let roots = this.rootObjects.get(gossipId);
+
+        return (roots !== undefined && roots.size > 0);
+
+    }
+
     leavePeerGroup(peerGroupId: string) {
 
         const gossipIds = this.gossipIdsPerPeerGroup.get(peerGroupId);
