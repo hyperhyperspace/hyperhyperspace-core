@@ -16,8 +16,6 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
     messages?: MutableSet<Message>;
 
     _node?: PeerNode;
-//    _mesh?: Mesh;
-//    _peerGroup?: PeerGroupInfo;
 
     constructor(topic?: string) {
         super();
@@ -79,37 +77,6 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
     }
 
     async startSync(): Promise<void> {
-
-
-
-        /*
-        this._mesh = resources.mesh;
-
-        if (this._mesh === undefined) {
-            throw new Error('Cannot start sync: mesh is missing from configured resources.');
-        }
-
-        let linkupServers = resources.config.linkupServers === undefined?
-                            [LinkupManager.defaultLinkupServer] : resources.config.linkupServer as string[];
-
-
-
-        
-        const localPeer     = await new IdentityPeer(linkupServers[0] as string, localIdentity.hash(), localIdentity).asPeer();
-
-        this._mesh.startObjectBroadcast(this, linkupServers, [localPeer.endpoint]);
-
-        let peerSource = new ObjectDiscoveryPeerSource(this._mesh, this, linkupServers, localPeer.endpoint, IdentityPeer.getEndpointParser(resources.store));
-
-        this._peerGroup = {
-            id: 'sync-for-' + this.hash(),
-            localPeer: localPeer,
-            peerSource: peerSource
-        }
-
-        this._mesh.joinPeerGroup(this._peerGroup);
-        this._mesh.syncObjectWithPeerGroup(this._peerGroup.id, this);
-        */
 
         let resources = this.getResources();
 
