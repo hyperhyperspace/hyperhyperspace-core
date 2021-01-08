@@ -16,7 +16,6 @@ import { RNGImpl } from 'crypto/random';
 
 import { MemoryBackend } from 'storage/backends';
 import { Mesh } from 'mesh/service';
-import { IdentityPeer } from 'mesh/agents/peer';
 
 import { ChatRoom } from './model/ChatRoom';
 import { Message } from './model/Message';
@@ -43,12 +42,11 @@ async function createIdentity(resources: Resources, name: string): Promise<Ident
     return id;
 }
 
-async function createChatRoomSpace(resources: Resources, id: Identity, topic?: string): Promise<Space> {
+async function createChatRoomSpace(resources: Resources, topic?: string): Promise<Space> {
 
     let chatRoom = new ChatRoom(topic);
-    let endpoint = (await IdentityPeer.fromIdentity(id).asPeer()).endpoint;
 
-    let space = Space.fromEntryPoint(chatRoom, resources, endpoint);
+    let space = Space.fromEntryPoint(chatRoom, resources);
 
     space.startBroadcast();
     let room = await space.getEntryPoint();
@@ -67,10 +65,9 @@ async function createChatRoomSpace(resources: Resources, id: Identity, topic?: s
     return space;
 }
 
-async function joinChatRoomSpace(resources: Resources, id: Identity, wordcode: string[]): Promise<Space> {
+async function joinChatRoomSpace(resources: Resources, wordcode: string[]): Promise<Space> {
     
-    let endpoint = (await IdentityPeer.fromIdentity(id).asPeer()).endpoint;
-    let space = Space.fromWordCode(wordcode, resources, endpoint);
+    let space = Space.fromWordCode(wordcode, resources);
 
     console.log();
     console.log('Trying to join chat with word code "' + wordcode.join(' ') + '"...');
@@ -121,7 +118,7 @@ async function main() {
     let space: Space;
     if (command.trim() === '') {
 
-        space = await createChatRoomSpace(resources, id, '');
+        space = await createChatRoomSpace(resources, '');
 
     } else {
 
@@ -133,7 +130,7 @@ async function main() {
             process.exit();
         }
 
-        space = await joinChatRoomSpace(resources, id, wordcode);
+        space = await joinChatRoomSpace(resources, wordcode);
     }
 
     let room = await space.getEntryPoint() as ChatRoom;

@@ -3,7 +3,6 @@ import { MutableSet, MutableReference } from 'data/containers';
 import { Identity } from 'data/identity';
 import { SpaceEntryPoint } from 'spaces/SpaceEntryPoint';
 import { PeerNode } from 'mesh/service';
-import { Store } from 'storage/store';
 
 import { Message } from './Message';
 
@@ -84,17 +83,7 @@ class ChatRoom extends HashedObject implements SpaceEntryPoint {
             throw new Error('Cannot start sync: resources not configured.');
         }
 
-        if (resources.config?.id === undefined) {
-            throw new Error('Cannot start sync: local identity has not been defined.');
-        }
-
-        if (resources.store === undefined) {
-            throw new Error('Cannot start sync: a local store has not been configured.')
-        }
-
-        const localIdentity = resources.config.id as Identity;
-        const localStore    = resources.store as Store;
-        this._node = new PeerNode(localIdentity, localStore, resources.mesh, resources.config.linkupServer);
+        this._node = new PeerNode(resources);
         
         this._node.broadcast(this);
         this._node.sync(this);

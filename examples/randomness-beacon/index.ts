@@ -14,7 +14,6 @@ import { Store } from 'storage/store';
 import { MemoryBackend } from 'storage/backends';
 
 import { Mesh } from 'mesh/service';
-import { IdentityPeer } from 'mesh/agents/peer';
 
 import { Beacon } from './model/Beacon';
 import { BeaconValueOp } from './model/BeaconValueOp';
@@ -40,9 +39,7 @@ async function createBeaconSpace(resources: Resources, steps=STEPS): Promise<Spa
 
     resources.config.id = localIdentity;
 
-    let endpoint = (await IdentityPeer.fromIdentity(localIdentity).asPeer()).endpoint;
-
-    let space = Space.fromEntryPoint(beacon, resources, endpoint);
+    let space = Space.fromEntryPoint(beacon, resources);
     space.startBroadcast();
 
     await resources.store.save(beacon);
@@ -66,9 +63,7 @@ async function joinBeaconSpace(resources: Resources, wordcode: string[]): Promis
     console.log();
     console.log('Generated keys.')
 
-    
-    let endpoint = (await IdentityPeer.fromIdentity(localIdentity).asPeer()).endpoint;
-    let space = Space.fromWordCode(wordcode, resources, endpoint);
+    let space = Space.fromWordCode(wordcode, resources);
 
     console.log();
     console.log('Trying to join randomness beacon with word code "' + wordcode.join(' ') + '"...');

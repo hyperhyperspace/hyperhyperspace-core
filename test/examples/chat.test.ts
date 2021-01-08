@@ -9,7 +9,6 @@ import { RNGImpl } from 'crypto/random';
 import { Mesh } from 'mesh/service';
 import { Space } from 'spaces/Space';
 import { Resources } from 'data/model';
-import { IdentityPeer } from 'mesh/agents/peer';
 
 describeProxy('[CHT] Chat example', () => {
     test( '[CHT01] Basic chat', async (done) => {
@@ -91,7 +90,7 @@ describeProxy('[CHT] Chat example', () => {
 
         chatRoom1.setResources({store: store1, mesh: mesh1, config: {id: id1}, aliasing: new Map()});
         
-        let space1 = Space.fromEntryPoint(chatRoom1, chatRoom1.getResources() as Resources, (await IdentityPeer.fromIdentity(id1).asPeer()).endpoint)
+        let space1 = Space.fromEntryPoint(chatRoom1, chatRoom1.getResources() as Resources);
         space1.startBroadcast();
         
         let wordCode = await space1.getWordCoding();
@@ -101,8 +100,7 @@ describeProxy('[CHT] Chat example', () => {
 
         let space2 = Space.fromWordCode(
             wordCode, 
-            {store: store2, mesh: mesh2, config: {id: id2}, aliasing: new Map()},
-            (await IdentityPeer.fromIdentity(id2).asPeer()).endpoint);
+            {store: store2, mesh: mesh2, config: {id: id2}, aliasing: new Map()});
 
         //console.log('receiver is ' + (await IdentityPeer.fromIdentity(id2).asPeer()).endpoint);
 
