@@ -1,0 +1,11 @@
+src/
+test/
+dist-test/
+dist-examples/
+node_modules
+package-lock.json
+notes.txt
+.rts2_cache_cjs/
+.rts2_cache_esm/
+coverage/
+yarn-error.log
