@@ -8,14 +8,7 @@ import '@hyper-hyper-space/node-env';
 import { Identity } from 'data/identity';
 import { RSAKeyPair } from 'data/identity';
 
-import { Space } from 'spaces/Space';
-import { Resources } from 'data/model';
-import { Store } from 'storage/store';
-//import { IdbBackend } from 'storage/backends';
-import { RNGImpl } from 'crypto/random';
-
-import { MemoryBackend } from 'storage/backends';
-import { Mesh } from 'mesh/service';
+import { Space, Resources } from 'spaces/spaces';
 
 import { ChatRoom } from './model/ChatRoom';
 import { Message } from './model/Message';
@@ -23,7 +16,7 @@ import { Message } from './model/Message';
 import * as readline from 'readline';
 
 function initResources(): Resources {
-    return { store: new Store(new MemoryBackend(new RNGImpl().randomHexString(128))), mesh: new Mesh(), config: {}, aliasing: new Map()};
+    return new Resources();
 }
 
 async function createIdentity(resources: Resources, name: string): Promise<Identity> {

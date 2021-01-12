@@ -279,7 +279,9 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         return this._elements.values();
     }
 
-    async mutate(op: MutationOp, isNew: boolean): Promise<void> {
+    async mutate(op: MutationOp, isNew: boolean): Promise<boolean> {
+
+        let mutated = false;
 
         if (op instanceof MutableSetAddOp ) {
             const addOp = op as MutableSetAddOp<T>;
@@ -301,20 +303,19 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
             this._elements.set(hash, addOp.element as T)
 
-            let call = false;
             if (isNew) {
                 this._unsavedAppliedOps.add(op.hash());
-                call = true;
+                mutated = true;
             } else {
                 const opHash = addOp.hash();
                 if (!this._unsavedAppliedOps.has(opHash)) {
-                    call = true;
+                    mutated = true;
                 } else {
                     this._unsavedAppliedOps.delete(opHash);
                 }
             }
 
-            if (call) {
+            if (mutated) {
                 if (this._addElementCallback !== undefined) {
                     try {
                         this._addElementCallback(addOp.element as T);
@@ -344,6 +345,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
                 }
 
                 if (current.size() === 0) {
+                    mutated = true;
                     const deleted = this._elements.get(hash) as T;
                     this._elements.delete(hash);
                     this._currentAddOpRefs.delete(hash);
@@ -361,6 +363,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
             throw new Error("Method not implemented.");
         }
 
+        return mutated;
     }
 
     onAddition(callback: (elem: T) => void) {

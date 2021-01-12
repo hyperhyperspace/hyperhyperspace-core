@@ -27,6 +27,9 @@ abstract class MutableObject extends HashedObject {
 
     _opCallback : (hash: Hash) => Promise<void>;
 
+    // If anyone using this mutable object needs to be notified whenever it changes,
+    // an external mutation callback should be registered below.
+    _externalMutationCallbacks : Set<(mut: MutationOp) => void>;
 
     constructor(acceptedOpClasses : Array<string>, load: LoadStrategy = 'full') {
         super();
@@ -40,9 +43,19 @@ abstract class MutableObject extends HashedObject {
         this._opCallback = async (hash: Hash) => {
             await this.applyOpFromStore(hash);
         };
+
+        this._externalMutationCallbacks = new Set();
     }
 
-    abstract mutate(op: MutationOp, isNew: boolean): Promise<void>;
+    abstract mutate(op: MutationOp, isNew: boolean): Promise<boolean>;
+
+    addMutationCallback(cb: (mut: MutationOp) => void) {
+        this._externalMutationCallbacks.add(cb);
+    }
+
+    deleteMutationCallback(cb: (mut: MutationOp) => void) {
+        this._externalMutationCallbacks.delete(cb);
+    }
 
     watchForChanges(auto: boolean): boolean {
         if (auto) {
@@ -246,7 +259,13 @@ abstract class MutableObject extends HashedObject {
     }
 
     protected async apply(op: MutationOp, isNew: boolean) : Promise<void> {
-        await this.mutate(op, isNew);
+        const mutated = await this.mutate(op, isNew);
+
+        if (mutated) {
+            for (const cb of this._externalMutationCallbacks) {
+                cb(op);
+            }
+        }
     }
 
 

@@ -22,7 +22,6 @@ export * from './mesh/agents/state';
 export * from './mesh/service';
 export * from './mesh/share';
 
-export * from './spaces/SpaceEntryPoint';
-export * from './spaces/Space';
+export * from './spaces/spaces';
 
 export * from './util/shuffling';

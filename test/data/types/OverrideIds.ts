@@ -21,7 +21,7 @@ class HasId extends MutableObject {
         
     }
 
-    async mutate(_op: MutationOp) : Promise<void> {
+    async mutate(_op: MutationOp) : Promise<boolean> {
         throw new Error();
     }
 

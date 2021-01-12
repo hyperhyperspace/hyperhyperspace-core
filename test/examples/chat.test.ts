@@ -7,8 +7,7 @@ import { Store} from 'storage/store';
 import { IdbBackend } from 'storage/backends';
 import { RNGImpl } from 'crypto/random';
 import { Mesh } from 'mesh/service';
-import { Space } from 'spaces/Space';
-import { Resources } from 'data/model';
+import { Space, Resources } from 'spaces/spaces';
 
 describeProxy('[CHT] Chat example', () => {
     test( '[CHT01] Basic chat', async (done) => {
@@ -37,10 +36,14 @@ describeProxy('[CHT] Chat example', () => {
         let mesh1 = new Mesh();
         let mesh2 = new Mesh();
 
-        chatRoom1.setResources({store: store1, mesh: mesh1, config: {id: id1}, aliasing: new Map()});
+        const res1 = new Resources({store: store1, mesh: mesh1, config: {id: id1}})
+
+        chatRoom1.setResources(res1);
         chatRoom1.startSync();
 
-        chatRoom2.setResources({store: store2, mesh: mesh2, config: {id: id2}, aliasing: new Map()});
+        const res2 = new Resources({store: store2, mesh: mesh2, config: {id: id2}})
+
+        chatRoom2.setResources(res2);
         chatRoom2.startSync();
 
         chatRoom1.join(id1);
@@ -88,7 +91,12 @@ describeProxy('[CHT] Chat example', () => {
         let mesh1 = new Mesh();
         let mesh2 = new Mesh();
 
-        chatRoom1.setResources({store: store1, mesh: mesh1, config: {id: id1}, aliasing: new Map()});
+        const res1 = new Resources({store: store1, mesh: mesh1, config: {id: id1}})
+        const res2 = new Resources({store: store2, mesh: mesh2, config: {id: id2}})
+
+
+
+        chatRoom1.setResources(res1);
         
         let space1 = Space.fromEntryPoint(chatRoom1, chatRoom1.getResources() as Resources);
         space1.startBroadcast();
@@ -100,7 +108,7 @@ describeProxy('[CHT] Chat example', () => {
 
         let space2 = Space.fromWordCode(
             wordCode, 
-            {store: store2, mesh: mesh2, config: {id: id2}, aliasing: new Map()});
+            res2);
 
         //console.log('receiver is ' + (await IdentityPeer.fromIdentity(id2).asPeer()).endpoint);
 
@@ -113,7 +121,7 @@ describeProxy('[CHT] Chat example', () => {
 
         chatRoom1.startSync();
 
-        chatRoom2.setResources({store: store2, mesh: mesh2, config: {id: id2}, aliasing: new Map()});
+        chatRoom2.setResources(res2);
         chatRoom2.startSync();
         
         chatRoom1.join(id1);

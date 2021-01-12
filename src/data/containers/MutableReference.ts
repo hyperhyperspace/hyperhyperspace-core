@@ -30,9 +30,10 @@ class MutableReference<T> extends MutableObject {
         await this.applyNewOp(op);
     }
 
-    async mutate(op: MutationOp, _isNew: boolean): Promise<void> {
+    async mutate(op: MutationOp, _isNew: boolean): Promise<boolean> {
         let refUpdateOp = op as RefUpdateOp<T>;
 
+        let mutated = false;
         if (refUpdateOp.getTarget().equals(this)) {
             if (this._sequence === undefined || 
                 this._sequence < refUpdateOp.getSequence() ||
@@ -42,8 +43,12 @@ class MutableReference<T> extends MutableObject {
                  this._sequence = refUpdateOp.getSequence();
                  this._timestamp = refUpdateOp.getTimestamp();
                  this._value = refUpdateOp.getValue();                    
+
+                 mutated = true;
             }
         }
+
+        return mutated;
     }
     
     getClassName(): string {

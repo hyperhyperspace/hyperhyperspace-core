@@ -1,12 +1,9 @@
-import { RNGImpl } from 'crypto/random';
 import { WordCode } from 'crypto/wordcoding';
-import { Hash, HashedObject, Hashing, Resources } from 'data/model';
+import { Hash, HashedObject, Hashing } from 'data/model';
 import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
-import { Endpoint } from 'mesh/agents/network';
-import { IdentityPeer, PeerInfo } from 'mesh/agents/peer';
-import { LinkupAddress, LinkupManager } from 'net/linkup';
 import { AsyncStream } from 'util/streams';
 import { SpaceEntryPoint } from './SpaceEntryPoint';
+import { Resources } from './Resources';
 
 type SpaceInit = {entryPoint?: HashedObject & SpaceEntryPoint, hash?: Hash, wordCode?: string[], wordCodeLang?: string };
 
@@ -26,8 +23,8 @@ class Space {
 
 
     entryPoint: Promise<HashedObject & SpaceEntryPoint>;
-    linkupServers: string[];
-    discoveryEndpoint: Promise<Endpoint>;
+    //linkupServers: string[];
+    //discoveryEndpoint: Promise<Endpoint>;
     resources: Resources;
 
     discovery?: AsyncStream<ObjectDiscoveryReply>;
@@ -35,18 +32,91 @@ class Space {
     constructor(init: SpaceInit, resources: Resources) {
 
         this.resources = resources;
-        this.linkupServers = resources.config.linkupServerss || [LinkupManager.defaultLinkupServer];
 
-        if (resources.config.discoveryEndpoint !== undefined) {
+        if (init.entryPoint !== undefined) {
+            this.entryPoint = Promise.resolve(init.entryPoint);
+        } else if (init.hash !== undefined) {
+
+            this.entryPoint = this.resources.store.load(init.hash).then((obj: HashedObject | undefined) => {
+                if (obj !== undefined) {
+                    return obj as HashedObject & SpaceEntryPoint;
+                } else {
+                    if (resources.config.peersForDiscovery === undefined) {
+                        throw new Error('Trying to open space for missing object ' + init.hash + ', but config.peersForDiscovery is undefined.');
+                    }
+
+                    const linkupServers = resources.config.linkupServers;
+                    const discoveryEndpoint = resources.config.peersForDiscovery[0].endpoint;
+            
+                    const discovery = 
+                        this.resources.mesh.findObjectByHash(init.hash as Hash, linkupServers, discoveryEndpoint);
+
+                    return this.processDiscoveryReply(discovery);
+                }
+            });
+        } else if (init.wordCode !== undefined) {
+
+            let wordCoders: WordCode[];
+
+            if (init.wordCodeLang !== undefined) {
+                if (WordCode.lang.has(init.wordCodeLang)) {
+                    wordCoders = [WordCode.lang.get(init.wordCodeLang) as WordCode];
+                } else {
+                    throw new Error('Unknown language "' + init.wordCodeLang + '" received for decoding wordCode ' + init.wordCode.join('-') + '.');
+                }
+                
+            } else {
+                wordCoders = WordCode.all;
+            }
+
+            let suffix: string|undefined;
+            let lastError: Error|undefined;
+
+            for (const wordCoder of wordCoders) {
+                try {
+                    suffix = wordCoder.decode(init.wordCode);
+                    break;
+                } catch (e) {
+                    lastError = e;
+                }
+            }
+
+            if (suffix === undefined) {
+                throw new Error('Could not decode wordCode ' + init.wordCode.join(' ') + ', last error: ' + lastError);
+            }
+
+            if (resources.config.peersForDiscovery === undefined) {
+                throw new Error('Trying to open space for missing object ' + init.hash + ', but config.peersForDiscovery is undefined.');
+            }
+
+            const linkupServers = resources.config.linkupServers;
+            const discoveryEndpoint = resources.config.peersForDiscovery[0].endpoint;
+
+
+            const discovery =
+                this.resources.mesh.findObjectByHashSuffix(suffix, linkupServers, discoveryEndpoint);
+
+            this.entryPoint = this.processDiscoveryReply(discovery);
+        } else {
+            throw new Error('Created new space, but no initialization was provided (entry object nor hash no word code).');
+        }
+
+
+        /*
+        this.linkupServers = resources.config?.linkupServers || [LinkupManager.defaultLinkupServer];
+
+        if (resources.config?.discoveryEndpoint !== undefined) {
             this.discoveryEndpoint = Promise.resolve(resources.config.discoveryEndpoint);
-        } else if (resources.config.id !== undefined) {
+        } else if (resources.config?.id !== undefined) {
             const id = resources.config.id;
             this.discoveryEndpoint = IdentityPeer.fromIdentity(id).asPeer().then((p: PeerInfo) => p.endpoint);
         } else {
             this.discoveryEndpoint = Promise.resolve( new LinkupAddress(this.linkupServers[0], new RNGImpl().randomHexString(128)).url());
         }
-
+        */
         
+        
+        /*
         this.entryPoint = this.discoveryEndpoint.then((discoveryEndpoint: Endpoint) => {
 
             let entryPoint;
@@ -97,6 +167,7 @@ class Space {
 
             return entryPoint;
         });
+        */
     }
 
     private processDiscoveryReply(discoveryStream: AsyncStream<ObjectDiscoveryReply>): Promise<HashedObject & SpaceEntryPoint> {
@@ -136,10 +207,16 @@ class Space {
     }
 
     startBroadcast() {
-        this.discoveryEndpoint.then((discoveryEndpoint: Endpoint) => {
-            this.entryPoint.then((ep: HashedObject & SpaceEntryPoint) => {
-                this.resources.mesh.startObjectBroadcast(ep, this.linkupServers, [discoveryEndpoint]);
-            });
+
+        if (this.resources.config.peersForDiscovery === undefined) {
+            throw new Error('Trying to start space broadcast but config.peersForDiscovery is undefined.');
+        }
+
+        const linkupServers = this.resources.config.linkupServers;
+        const discoveryEndpoint = this.resources.config.peersForDiscovery[0].endpoint;
+
+        this.entryPoint.then((ep: HashedObject & SpaceEntryPoint) => {
+            this.resources.mesh.startObjectBroadcast(ep, linkupServers, [discoveryEndpoint]);
         });
     }
 
@@ -155,4 +232,4 @@ class Space {
 
 }
 
-export { Space };
+export { Space, SpaceInit };

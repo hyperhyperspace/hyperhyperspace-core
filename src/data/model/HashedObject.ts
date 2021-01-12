@@ -10,10 +10,13 @@ import { HashedSet } from './HashedSet';
 import { HashReference } from './HashReference';
 import { HashedMap } from './HashedMap';
 
-import { Context, LiteralContext, Resources } from './Context';
+import { Context, LiteralContext } from './Context';
+
+import { Mesh } from 'mesh/service';
+import { Resources } from 'spaces/spaces';
 
 import { __spreadArrays } from 'tslib';
-import { Mesh } from 'mesh/service';
+
 
 type Literal           = { hash: Hash, value: any, author?: Hash, signature?: string, dependencies: Array<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
@@ -49,7 +52,7 @@ abstract class HashedObject {
     private _lastHash?        : Hash;
     private _lastSignature?   : string;
 
-    private _resources? : Partial<Resources>;
+    private _resources? : Resources;
 
     constructor() {
         this._signOnLiteraliz = false;
@@ -235,11 +238,11 @@ abstract class HashedObject {
         return Hashing.forValue('#' + this.getId() + '.' + fieldName);
     }
 
-    setResources(resources: Partial<Resources>) : void {
+    setResources(resources: Resources) : void {
         this._resources = resources;
     }
 
-    getResources() : Partial<Resources> | undefined {
+    getResources() : Resources | undefined {
         return this._resources;
     }
 

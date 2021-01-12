@@ -128,9 +128,9 @@ class Beacon extends MutableObject implements SpaceEntryPoint {
     }
 
 
-    async mutate(op: MutationOp, isNew: boolean): Promise<void> {
+    async mutate(op: MutationOp, _isNew: boolean): Promise<boolean> {
        
-        isNew;
+        let mutated = false;
 
         if (op instanceof BeaconValueOp) {
 
@@ -172,12 +172,12 @@ class Beacon extends MutableObject implements SpaceEntryPoint {
                 }
 
                 Beacon.log.debug('Challenge now is "' + this.currentChallenge() + '" for beacon position ' + this.currentSeq() + '.');
-            
+                mutated = true;
             }
 
-            
-        } 
+        }
 
+        return mutated;
     }
 
     getClassName(): string {
@@ -209,7 +209,7 @@ class Beacon extends MutableObject implements SpaceEntryPoint {
         }
 
         let linkupServers = resources.config.linkupServers === undefined?
-                            [LinkupManager.defaultLinkupServer] : resources.config.linkupServer as string[];
+                            [LinkupManager.defaultLinkupServer] : resources.config.linkupServers;
 
 
         let localIdentity = resources.config.id as Identity;

@@ -1,54 +1,29 @@
-import { Identity } from 'data/identity';
-import { HashedObject, Resources } from 'data/model';
-import { IdentityPeer, ObjectDiscoveryPeerSource, PeerInfo } from 'mesh/agents/peer';
-import { LinkupManager } from 'net/linkup';
-import { Store } from 'storage/store';
-import { PeerGroupInfo, Mesh, SyncMode } from './Mesh';
+
+import { HashedObject } from 'data/model';
+import { ObjectDiscoveryPeerSource, PeerInfo } from 'mesh/agents/peer';
+import { Resources } from 'spaces/spaces';
+import { PeerGroupInfo, SyncMode } from './Mesh';
 
 
 class PeerNode {
 
-    localIdentity: Identity;
-    linkupServer: string;
+    resources: Resources;
 
-    peerInfoPromise: Promise<PeerInfo>;
-
-    store: Store;
-    mesh: Mesh;
-
-    
-
-    constructor(resources: Partial<Resources>) {
-
-        if (resources.config?.id === undefined) {
-            throw new Error('Cannot start sync: local identity has not been defined.');
-        }
-
-        if (resources.store === undefined) {
-            throw new Error('Cannot start sync: a local store has not been configured.')
-        }
-
-        this.localIdentity = resources.config.id as Identity;
-        this.store = resources.store as Store;
-
-
-        this.linkupServer = resources.config.linkupServers !== undefined && resources.config.linkupServers.length > 0?
-                                resources.config.linkupServers[0] :
-                                LinkupManager.defaultLinkupServer; 
-
-        this.peerInfoPromise = (new IdentityPeer(this.linkupServer, this.localIdentity.hash(), this.localIdentity)).asPeer();
-
-        this.mesh = resources.mesh !== undefined? 
-                        resources.mesh : new Mesh();
-
+    constructor(resources: Resources) {
+        this.resources = resources;
     }
 
-    async broadcast(obj: HashedObject, linkupServers=[this.linkupServer], localEndpoints?: Array<string>): Promise<void> {
+    async broadcast(obj: HashedObject, linkupServers?: Array<string>, localEndpoints?: Array<string>): Promise<void> {
+
+        if (linkupServers === undefined) {
+            linkupServers = this.resources.config.linkupServers;
+        }
 
         if (localEndpoints === undefined) {
-            localEndpoints = [(await this.peerInfoPromise).endpoint];
+            localEndpoints = this.resources.getPeersForDiscovery().map((pi:PeerInfo) => pi.endpoint);
         }
-        this.mesh.startObjectBroadcast(obj, linkupServers, localEndpoints);
+
+        this.resources.mesh.startObjectBroadcast(obj, linkupServers, localEndpoints);
     }
 
     async sync(obj: HashedObject, mode:SyncMode = SyncMode.full, peerGroup?: PeerGroupInfo, gossipId?: string): Promise<void> {
@@ -57,29 +32,29 @@ class PeerNode {
             peerGroup = await this.discoveryPeerGroupInfo(obj);
         }
 
-        this.mesh.joinPeerGroup(peerGroup);
-        this.mesh.syncObjectWithPeerGroup(peerGroup.id, obj, mode, gossipId);
+        this.resources.mesh.joinPeerGroup(peerGroup);
+        this.resources.mesh.syncObjectWithPeerGroup(peerGroup.id, obj, mode, gossipId);
     }
 
     async stopSync(obj: HashedObject, peerGroupId?: string, gossipId?: string) : Promise<void> {
         if (peerGroupId === undefined) {
             peerGroupId = PeerNode.discoveryPeerGroupInfoId(obj);
         }
-        this.mesh.stopSyncObjectWithPeerGroup(peerGroupId, obj.hash(), gossipId);        
+        this.resources.mesh.stopSyncObjectWithPeerGroup(peerGroupId, obj.hash(), gossipId);        
 
-        if (!this.mesh.isPeerGroupInUse(peerGroupId, gossipId)) {
-            this.mesh.leavePeerGroup(peerGroupId);
+        if (!this.resources.mesh.isPeerGroupInUse(peerGroupId, gossipId)) {
+            this.resources.mesh.leavePeerGroup(peerGroupId);
         }
 
     }
 
     async stopBroadcast(obj: HashedObject) {
-        this.mesh.stopObjectBroadcast(obj.hash());
+        this.resources.mesh.stopObjectBroadcast(obj.hash());
     }
 
     private async discoveryPeerGroupInfo(obj: HashedObject) : Promise<PeerGroupInfo> {
-        let localPeer = await this.peerInfoPromise;
-        let peerSource = new ObjectDiscoveryPeerSource(this.mesh, obj, [this.linkupServer], localPeer.endpoint, IdentityPeer.getEndpointParser(this.store));
+        let localPeer = this.resources.getPeersForDiscovery()[0];
+        let peerSource = new ObjectDiscoveryPeerSource(this.resources.mesh, obj, this.resources.config.linkupServers, localPeer.endpoint, this.resources.getEndointParserForDiscovery());
 
         return {
             id: PeerNode.discoveryPeerGroupInfoId(obj),
@@ -87,10 +62,6 @@ class PeerNode {
             peerSource: peerSource
         };
 
-    }
-
-    async getPeerInfo(): Promise<PeerInfo> {
-        return this.peerInfoPromise;
     }
 
     private static discoveryPeerGroupInfoId(obj: HashedObject) {

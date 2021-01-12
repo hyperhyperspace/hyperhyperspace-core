@@ -27,8 +27,9 @@ class SomethingMutable extends MutableObject {
         return true;
     }
 
-    async mutate(_op: MutationOp): Promise<void> {
+    async mutate(_op: MutationOp): Promise<boolean> {
         this._operations.set(_op.hash(), _op);
+        return true;
     }
 
     getOperations() : Set<MutationOp>{

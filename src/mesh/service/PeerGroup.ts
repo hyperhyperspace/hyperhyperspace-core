@@ -1,8 +1,8 @@
-import { Resources } from 'data/model';
-
 import { PeerSource } from '../agents/peer/PeerSource';
 import { PeerInfo } from '../agents/peer/PeerGroupAgent';
 import { PeerGroupInfo } from './Mesh';
+
+import { Resources } from 'spaces/spaces';
 
 
 

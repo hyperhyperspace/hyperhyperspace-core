@@ -1,12 +1,9 @@
 
 import { HashedObject, Literal } from './HashedObject';
 import { Hash, Hashing } from './Hashing';
-import { Store } from 'storage/store';
-import { Mesh } from 'mesh/service';
+import { Resources } from 'spaces/spaces';
 
 type LiteralContext = { rootHashes: Array<Hash>, literals: any };
-
-type Resources = { store: Store, mesh: Mesh, config: any, aliasing: Map<Hash, HashedObject> };
 
 class Context {
 
@@ -14,7 +11,7 @@ class Context {
     objects  : Map<Hash, HashedObject>;
     literals : Map<Hash, Literal>;
     //aliased?: Map<Hash, HashedObject>;
-    resources?: Partial<Resources>;
+    resources?: Resources;
 
     constructor() {
         this.rootHashes = [];
@@ -53,24 +50,22 @@ class Context {
             }
         }
 
-        if (other?.resources?.aliasing !== undefined) {
-            
-            if (this.resources === undefined) {
-                this.resources = {};
-            }
+        if (this.resources === undefined) {
+            this.resources = other.resources;
+        } else {
+            if (other.resources?.aliasing !== undefined) {
 
-            if (this.resources.aliasing === undefined) {
-                this.resources.aliasing = new Map();
-            }
+                if (this.resources?.aliasing === undefined) {
+                    this.resources.aliasing = new Map();
+                }
 
-            for (const [hash, aliased] of other.resources.aliasing.entries()) {
-                if (!this.resources.aliasing.has(hash)) {
-                    this.resources.aliasing.set(hash, aliased);
+                for (const [hash, aliased] of other.resources.aliasing.entries()) {
+                    if (!this.resources.aliasing.has(hash)) {
+                        this.resources.aliasing.set(hash, aliased);
+                    }
                 }
             }
         }
-
-        
     }
 
     // if a dependency is in more than one subobject, it will pick one of the shortest dep chains.
@@ -133,4 +128,4 @@ class Context {
     }
 }
 
-export { Context, LiteralContext, Resources }
+export { Context, LiteralContext }

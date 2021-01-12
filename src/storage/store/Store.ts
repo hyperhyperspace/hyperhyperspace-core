@@ -5,8 +5,9 @@ import { Hash } from 'data/model/Hashing';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity/Identity';
 import { RSAKeyPair } from 'data/identity/RSAKeyPair';
-import { Resources } from 'data/model/Context';
 import { Logger, LogLevel } from 'util/logging';
+
+import { Resources } from 'spaces/spaces';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
@@ -24,7 +25,7 @@ class Store {
     private referencesCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
     private classReferencesCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
 
-    private resources?: Partial<Resources>;
+    private resources?: Resources;
 
     constructor(backend : Backend) {
         this.backend = backend;
@@ -39,7 +40,7 @@ class Store {
     //       (* note 1)        this object's dependencies. You need to call save explicitly
     //                         on the mutable object whose operations you want saved.
 
-    setResources(resources: Partial<Resources>) {
+    setResources(resources: Resources) {
         this.resources = resources;
     }
 

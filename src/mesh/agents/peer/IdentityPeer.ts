@@ -26,7 +26,10 @@ class IdentityPeer implements Peer {
     }
 
     async asPeer(): Promise<PeerInfo> {
+        return this.asPeerIfReady();
+    }
 
+    asPeerIfReady(): PeerInfo {
         if (this.linkupServer === undefined || this.identityHash === undefined) {
             throw new Error('Missing peer information.');
         }

@@ -1,6 +1,8 @@
-import { Resources, Hash, HashedObject } from 'data/model';
+import { Hash, HashedObject } from 'data/model';
 import { PeerGroup } from './PeerGroup';
 import { SyncMode, Mesh } from './Mesh';
+
+import { Resources } from 'spaces/spaces';
 
 
 class PeerGroupSync {

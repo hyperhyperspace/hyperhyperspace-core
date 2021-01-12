@@ -7,13 +7,7 @@ import { RNGImpl } from 'crypto/random';
 
 
 
-import { Space } from 'spaces/Space';
-import { Resources } from 'data/model';
-
-import { Store } from 'storage/store';
-import { MemoryBackend } from 'storage/backends';
-
-import { Mesh } from 'mesh/service';
+import { Space, Resources } from 'spaces/spaces';
 
 import { Beacon } from './model/Beacon';
 import { BeaconValueOp } from './model/BeaconValueOp';
@@ -25,7 +19,7 @@ import { VDF } from './model/VDF';
 const STEPS = 300000;
 
 function initResources(): Resources {
-    return { store: new Store(new MemoryBackend(new RNGImpl().randomHexString(128))), mesh: new Mesh(), config: {}, aliasing: new Map()};
+    return new Resources();
 }
 
 async function createBeaconSpace(resources: Resources, steps=STEPS): Promise<Space> {
