@@ -1,4 +1,2 @@
-export { NetworkAgent, ConnectionId, Endpoint, NetworkEventType,
-    ConnectionStatusChangeEvent, ConnectionStatus, 
-    RemoteAddressListeningEvent, MessageReceivedEvent } from './network/NetworkAgent';
-export { SecureNetworkAgent } from './network/SecureNetworkAgent';
+export * from './network/NetworkAgent';
+export * from './network/SecureNetworkAgent';

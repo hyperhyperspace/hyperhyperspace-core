@@ -16,6 +16,7 @@ export * from './crypto/wordcoding';
 
 export * from './net/linkup';
 export * from './net/transport';
+export * from './mesh/agents/discovery';
 export * from './mesh/agents/network';
 export * from './mesh/agents/peer';
 export * from './mesh/agents/state';
