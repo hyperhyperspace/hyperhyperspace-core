@@ -1,9 +1,3 @@
-
-
-
-//$Env:NODE_PATH="dist-chat/src;dist-chat/examples/chat"
-
-
 import '@hyper-hyper-space/node-env';
 import { Identity } from 'data/identity';
 import { RSAKeyPair } from 'data/identity';
@@ -131,6 +125,9 @@ async function main() {
     room.messages?.onAddition((m: Message) => {
         console.log(m.getAuthor()?.info?.name + ': ' + m.text);
     });
+
+    room.participants?.loadAndWatchForChanges();
+    room.messages?.loadAndWatchForChanges();
 
     console.log('Type and press return to send a message!')
     console.log();

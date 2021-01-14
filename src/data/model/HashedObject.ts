@@ -36,12 +36,20 @@ const BITS_FOR_ID = 128;
  and which objects should be preloaded when loading operations that mutate
  this object and its subobjects. */
 
+
 abstract class HashedObject {
 
+    
     static knownClasses = new Map<string, new () => HashedObject>();
+
     static registerClass(name: string, clazz: new () => HashedObject) {
-        this.knownClasses.set(name, clazz);
+        HashedObject.knownClasses.set(name, clazz);
     }
+
+    static lookupClass(name: string): (new () => HashedObject) | undefined {
+        return HashedObject.knownClasses.get(name);
+    }
+
 
     private id?     : string;
     private author? : Identity;
@@ -511,12 +519,12 @@ abstract class HashedObject {
             throw new Error("Missing 'hashed_object' type signature while attempting to deliteralize " + literal.hash);
         }
         
-        let constr = HashedObject.knownClasses.get(value['_class']);
+        let constr = HashedObject.lookupClass(value['_class']);
 
         if (constr === undefined) {
             throw new Error("A local implementation of class '" + value['_class'] + "' is necessary to deliteralize " + literal.hash);
         } else {
-            hashedObject = new constr();
+            hashedObject = new constr() as HashedObject;
         }
 
         for (const [fieldName, fieldValue] of Object.entries(value['_fields'])) {
@@ -691,7 +699,7 @@ abstract class HashedObject {
                     something = tab;
                     let contents;
                     if (value['_type'] === 'hashed_object') {
-                        let constr = HashedObject.knownClasses.get(value['_class']);
+                        let constr = HashedObject.lookupClass(value['_class']);
                         if (constr === undefined) {
                             something = something + 'HashedObject: ';
                         } else {

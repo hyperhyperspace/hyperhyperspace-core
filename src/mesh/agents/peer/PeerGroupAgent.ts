@@ -194,7 +194,7 @@ class PeerGroupAgent implements Agent {
     }
 
     ready(pod: AgentPod): void {
-        this.controlLog.debug('Started PeerControlAgent on ' + this.localPeer.endpoint + ' for id ' + this.localPeer.identityHash);
+        this.controlLog.debug('Started PeerControlAgent on local ' + this.localPeer.endpoint + ' (id=' + this.localPeer.identityHash + ') for peerGroupId ' + this.peerGroupId);
         this.pod = pod;
         this.init();
     }
@@ -351,8 +351,10 @@ class PeerGroupAgent implements Agent {
     }
 
     private async queryForOnlinePeers() {
-        if (this.connectionsPerEndpoint.size < this.params.minPeers) {
 
+        PeerGroupAgent.controlLog.trace("Consdidering querying for peers on " + this.peerGroupId);
+
+        if (this.connectionsPerEndpoint.size < this.params.minPeers) {
             let candidates = await this.peerSource.getPeers(this.params.minPeers * 5);
             let endpoints = new Array<Endpoint>();
             let fallbackEndpoints = new Array<Endpoint>();
@@ -415,6 +417,8 @@ class PeerGroupAgent implements Agent {
             }
 
             
+        } else {
+            PeerGroupAgent.controlLog.trace("Skipping querying for peers on " + this.peerGroupId);
         }
     }
 

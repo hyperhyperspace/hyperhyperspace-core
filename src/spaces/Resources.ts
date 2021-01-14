@@ -65,6 +65,7 @@ class Resources {
             } else {
                 let key = RSAKeyPair.generate(1024);
                 localId = Identity.fromKeyPair({name: 'auto-generated id ' + + new RNGImpl().randomHexString(64)}, key);
+                this.config.id = localId;
             }
 
             this.config.peersForDiscovery = [(new IdentityPeer(this.config.linkupServers[0], localId.hash(), localId)).asPeerIfReady()];

@@ -1,4 +1,7 @@
+setlocal
 @ECHO OFF
-setx NODE_PATH "dist-examples/src;dist-examples/examples/randomness-beacon" > NUL
+set NODE_PATH=dist-examples/src;dist-examples/examples/chat
 @ECHO ON
+
 node ./dist-examples/examples/randomness-beacon/index.js
+endlocal

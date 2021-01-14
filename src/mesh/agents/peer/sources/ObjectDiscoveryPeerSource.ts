@@ -61,10 +61,12 @@ class ObjectDiscoveryPeerSource implements PeerSource {
         }
 
         while (found.length < count && now < limit) {
-            
+            now = Date.now();
+
             try {
                 const reply = await this.replyStream.next(limit - now)
                 const peerInfo = await this.parseEndpoint(reply.source);
+                
                 if (peerInfo !== undefined && !unique.has(peerInfo.endpoint)) {
                     found.push(peerInfo);
                     unique.add(peerInfo.endpoint);

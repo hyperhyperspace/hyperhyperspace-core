@@ -23,7 +23,7 @@ class ImmutableReference<T extends MutableObject> extends HashedObject {
         }
 
         const ref = references.get(this.value.hash);
-        const knownClass = HashedObject.knownClasses.get(this.value.className);
+        const knownClass = HashedObject.lookupClass(this.value.className);
 
         if (ref === undefined || knownClass === undefined) {
             return false;

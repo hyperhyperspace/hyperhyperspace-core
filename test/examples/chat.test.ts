@@ -46,6 +46,10 @@ describeProxy('[CHT] Chat example', () => {
         chatRoom2.setResources(res2);
         chatRoom2.startSync();
 
+        await chatRoom1.messages?.loadAndWatchForChanges();
+        await chatRoom1.participants?.loadAndWatchForChanges();
+
+
         chatRoom1.join(id1);
         chatRoom2.join(id2);
 
@@ -123,7 +127,10 @@ describeProxy('[CHT] Chat example', () => {
 
         chatRoom2.setResources(res2);
         chatRoom2.startSync();
-        
+
+        await chatRoom1.messages?.loadAndWatchForChanges();
+        await chatRoom1.participants?.loadAndWatchForChanges();
+
         chatRoom1.join(id1);
         chatRoom2.join(id2);
 
@@ -131,6 +138,8 @@ describeProxy('[CHT] Chat example', () => {
         chatRoom2.say(id2, 'hello from id2');
 
         let checks = 0;
+
+        
 
         while (chatRoom1.getMessages().size() < 2) {
             await new Promise(r => setTimeout(r, 100));
