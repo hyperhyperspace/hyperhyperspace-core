@@ -1,5 +1,5 @@
 import { RSA, RSAImpl } from 'crypto/ciphers';
-import { HashedObject } from 'data/model/HashedObject';
+import { HashedObject } from '../model/HashedObject';
 import { RSAPublicKey } from './RSAPublicKey';
 import { Hashing } from 'data/model/Hashing';
 

@@ -64,7 +64,7 @@ class Resources {
                 localId = init.config.id;
             } else {
                 let key = RSAKeyPair.generate(1024);
-                localId = Identity.fromKeyPair({name: 'auto-generated id ' + + new RNGImpl().randomHexString(64)}, key);
+                localId = Identity.fromKeyPair({name: 'auto-generated id ' + new RNGImpl().randomHexString(64)}, key);
                 this.config.id = localId;
             }
 

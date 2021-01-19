@@ -121,14 +121,13 @@ class Store {
         //       having to call this.load(hash).
 
         let loaded = await this.load(hash);
-
-        let object = context.objects.get(hash) as HashedObject;
         
-        object.setStore(this);
-        object.setLastHash(hash);
-
         if (loaded === undefined) {        
 
+            let object = context.objects.get(hash) as HashedObject;
+        
+            object.setStore(this);
+            object.setLastHash(hash);
             let literal = context.literals.get(hash);
 
             if (literal === undefined) {
@@ -145,6 +144,12 @@ class Store {
 
             // after the backend has stored the object, fire callbacks:
             await this.fireCallbacks(literal);
+
+        } else {
+            for (const [hash, obj] of context.objects.entries()) {
+                obj.setStore(this);
+                obj.setLastHash(hash);
+            }
         }
 
     }

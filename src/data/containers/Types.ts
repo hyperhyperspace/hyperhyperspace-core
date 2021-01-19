@@ -39,7 +39,7 @@ abstract class Types {
         return satisfies;
     }
     
-    static hasType(value: any, typ: string) {
+    static hasType(value: any, typ: string): boolean {
         if (typ === 'string') {
             return (typeof value) === 'string';
         } else if (typ === 'number') {
