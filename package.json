@@ -12,8 +12,9 @@
     "url": "https://github.com/hyperhyperspace/hyperhyperspace-core.git"
   },
   "scripts": {
-    "build": "ttsc",
+    "build": "npx ttsc",
     "clean": "rm -rf ./dist/*",
+    "winclean": "if exist dist (rmdir dist /s /q) && mkdir dist",
     "test": "npx jest"
   },
   "devDependencies": {
