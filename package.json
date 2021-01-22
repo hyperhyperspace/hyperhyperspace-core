@@ -6,36 +6,29 @@
   "source": "src/index.ts",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
-  "types": "decl/index.d.ts",
+  "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/hyperhyperspace/hyperhyperspace-core.git"
   },
   "scripts": {
-    "build": "npx microbundle-crl --tsconfig tsconfig.build.json &&  npx tsc --project tsconfig.build.json --declaration --outDir ./decl",
-    "build-test": "npx microbundle-crl --tsconfig tsconfig.json --output dist-test",
-    "build-examples": "npx tsc --module CommonJs --project tsconfig.json --outDir ./dist-examples",
-    "example-chat": "NODE_PATH=\"dist-examples/src:dist-examples/examples/chat\" node ./dist-examples/examples/chat/index.js",
-    "example-chat-win": "./scripts/chat.bat",
-    "example-beacon": "NODE_PATH=\"dist-examples/src:dist-examples/examples/chat\" node ./dist-examples/examples/randomness-beacon/index.js",
-    "example-beacon-win": "./scripts/beacon.bat",
-    "clean": "rm -rf ./decl/* ./dist/* ./dist-test/* ./dist-examples/*",
-    "winclean": "if exist decl (rmdir decl /s /q) && mkdir decl && if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-test (rmdir dist-test /s /q) && mkdir dist-test && if exist dist-examples (rmdir dist-examples /s /q) && mkdir dist-examples",
+    "build": "ttsc",
+    "clean": "rm -rf ./dist/*",
     "test": "npx jest"
   },
   "devDependencies": {
     "@hyper-hyper-space/node-env": "^0.8.0",
     "@subspace/vdf": "^0.1.0",
     "@types/jest": "^26.0.19",
+    "@types/node": "^14.0.13",
     "@types/ws": "^7.2.6",
-    "dts-generator": "^3.0.0",
+    "@zerollup/ts-transform-paths": "^1.7.18",
     "jest": "^26.6.3",
-    "microbundle-crl": "^0.13.11",
     "ts-jest": "^26.4.4",
+    "ttypescript": "^1.5.12",
     "typescript": "^4.1.2"
   },
   "dependencies": {
-    "@types/node": "^14.0.13",
     "chacha-js": "^2.1.1",
     "get-random-values": "^1.2.0",
     "idb": "^5.0.4",
@@ -58,7 +51,7 @@
     ],
     "globals": {
       "ts-jest": {
-        "tsconfig": "tsconfig.json"
+        "tsconfig": "tsconfig.test.json"
       }
     }
   }
