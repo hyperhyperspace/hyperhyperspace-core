@@ -12,7 +12,7 @@
     "url": "https://github.com/hyperhyperspace/hyperhyperspace-core.git"
   },
   "scripts": {
-    "build": "npx ttsc",
+    "build": "npx ttsc --project tsconfig.build.json",
     "clean": "rm -rf ./dist/*",
     "winclean": "if exist dist (rmdir dist /s /q) && mkdir dist",
     "test": "npx jest"
@@ -52,7 +52,7 @@
     ],
     "globals": {
       "ts-jest": {
-        "tsconfig": "tsconfig.test.json"
+        "tsconfig": "tsconfig.json"
       }
     }
   }

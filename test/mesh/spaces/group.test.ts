@@ -7,13 +7,11 @@ import { SamplePeerSource } from '../types/SamplePeerSource';
 import { MutableSet } from 'data/containers';
 import { Logger, LogLevel } from 'util/logging';
 import { PeerGroupAgent } from 'mesh/agents/peer';
-import { NetworkAgent } from 'mesh/agents/network';
 import { describeProxy } from 'config';
 
 describeProxy('[SPA] Group shared spaces', () => {
 
-    connectSpaceWithLogger;
-
+    
     test('[SPA01] 3-node sync test', async (done) => {
 
         const size = 3;
@@ -211,35 +209,4 @@ let generateSpacesForPeers = (spaceId: string, samplePeers: Array<SamplePeer>) =
     }
 
     return spaces;
-}
-
-let connectSpaceWithLogger = (space: SharedNamespace, logger: Logger) => {
-
-    {
-        let network = space.mesh.network as NetworkAgent;
-        network;
-        network.logger = logger;
-        network.connLogger = logger;
-        network.messageLogger = logger;
-
-    }
-
-    /*{
-        let gossip = space.gossip as StateGossipAgent;
-        gossip;
-        gossip.controlLog     = logger;
-        gossip.peerMessageLog = logger;
-    }
-
-    {
-        let peerMesh = space.peerMesh as PeerMeshAgent;
-        peerMesh;
-        peerMesh.controlLog = logger;
-    }*/
-
-    space.connect();
-
- 
-
-
 }
