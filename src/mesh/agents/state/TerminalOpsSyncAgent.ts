@@ -17,6 +17,87 @@ import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
 
+/*
+
+*Introduction*
+
+The TerminalOpsSyncAgent's purpose is to synchronize the state of a MutableObject by keeping track
+of its "terminal ops". A MutableObject represents the initial state of the object, which is then
+updated by creating MutationOp instances that point to it through their "target" field.
+
+The agent will be instantiated to sync a particular MutableObject present in the local store, and
+will perform state reconcilaition with any connected peers that either advertise new states
+through gossiping or request MutationOps in response to its own state advertisements.
+
+The TerminalOpsSyncAgent only deals with actual state sync. The gossiping of new states is done
+by other agents (typically the StateGossipAgent, which batches together the states of all the
+objects that a peer wants to sync with a particular PeerGroup). The local TerminalOpsSyncAgent and 
+StateGossipAgent communicate trough the local broadcasting mechanism of the AgentPod they share.
+
+
+*State by terminal ops*
+
+The TerminalOpsSyncAgent uses the "prevOps" field in the MutationOp object to discard all the ops
+that have any following ops -that is another op that points to them through its "prevOps" field- 
+and use the set of remaining "terminal ops" as a way to represent the state of the MutableObject 
+being synchronized. This set of terminal ops can be obtained easily and quickly from the store 
+itself.
+
+*State broadcasting*
+
+After discovering that the state of the object has changed, the agent will broadcast a message to
+the local agent pod informing of the update. Any gossiping agents active in the pod will pick up
+the update and inform any connected peers. Conversely, if any gossip agent picks up any state update
+from a connected peer, it will also broadcast a message on the local agent pod. The 
+TermninalOpsSyncAgent will check the received state and start synchronizing with such a peer if
+necessary.
+
+*State sync*
+
+After determining (via gossip results broadcaste on the local pod by a gossiping agent) that it
+needs to perform state sync, the TerminalOpsSyncAgent exchanges a series of messages with the
+TerminalOpsSyncAgent on the peer that has advertised a new state. Since the state is just the
+set of "terminal ops" on the other end, the agent will just ask for any of this "terminal ops"
+that are missing on the local store. Since an op can only be persisted to the store once all
+its prevOps have been already persisted, the agent may need to make several calls until it can
+reconcile the local state with the remote one, following the trail of prevOps until all the
+dependencies of the terminalOps have been fetched. There are 4 types of messages used in this
+task:
+
+The SendStateMessage is sent in reply to a RequestStateMessage, and it will send the set of
+terminalOps in full (gossiping usually would send just a hash of the terminalOp set).
+
+The SendOpsMessage is sent in reply to the RequestObjsMessage, and will send the literalized
+version of the objects and their dependencies.
+
+*Security measures, optimizations*
+
+When sending state (in the form of literalized objects) the agent may omit some dependencies
+of the objects being sent, expecting the receiving peer to already have them in its store
+(e.g., the identities and public keys that are referenced again and again by the ops being
+applied to the target object). And of course, there may be more prevOps that the other end
+discovers as a result of the received objects, and that it also needs to request.
+
+There are two security measures in place to prevent object exfiltration:
+
+Rule 1. Every requested object needs to be referenced (probably indirectly) from an op that has the
+object being synchronized as its target.
+Rule 2. Every an object A that is sent, and has a reference B that is optimized away from the sent
+message, must provide also a proof that the sender has B locally in its store.
+
+The purpose of Rule 1 is preventing an adversary from requesting arbitrary objects that have no
+relation to the object being synchronized.
+
+The purpose of Rule 2 is a bit more subtle: an adversary may construct a legitimate MutationOp that
+he then applies to the object being syncronized in such a way that the op references some object
+that he wants to steal from another peer (perhaps an object
+unrelated to the one being synchronized). So even if the attacker knows the hash of the object that
+he wants to steal, and is able to construct a MutationOp that will be accepted by the type of the
+mutations that the mutable object accepts, he will not be able to provide the proof of ownership
+that is required for sending incomplete operations.
+
+
+*/
 
 enum TerminalOpsSyncAgentMessageType {
     RequestState     = 'request-state',
