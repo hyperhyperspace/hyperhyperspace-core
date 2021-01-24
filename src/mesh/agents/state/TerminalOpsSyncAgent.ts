@@ -361,7 +361,9 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         
         if (msg.targetObjHash !== this.objHash) {
 
-            //TODO: report bad peer?
+            // TODO: report bad peer go peer group?
+
+            this.peerMessageLog.warning('Received wrong targetObjHash, expected ' + this.objHash + ' but got ' + msg.targetObjHash + ' from ' + source);
 
             return;
         }
