@@ -767,16 +767,6 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         movement.set(endpoint, {dependencyChain: dependencyChain, secret: secret, timeout: Date.now() + timeout * 1000});
     }
-
-
-/*    private removeOpToSend(hash: Hash) {
-        this.outgoingObjects.delete(hash);
-    }
-
-    private removeOpToReceive(hash: Hash) {
-        this.incomingObjects.delete(hash);
-    } */
-
     
 }
 
