@@ -284,7 +284,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             }
             
 
-        }, 1000);
+        }, 5000);
 
     }
 
