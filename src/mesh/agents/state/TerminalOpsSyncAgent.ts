@@ -142,7 +142,7 @@ type TerminalOpsSyncAgentParams = {
     incompleteOpTimeout: number
 };
 
-type ObjectMovements = Map<Hash, Map<Endpoint, {secret: string, timeout: number, dependencyChain: Array<Hash>}>>;
+type ObjectMovements = Map<Hash, Map<Endpoint, {timeout: number, secret: string, dependencyChain: Array<Hash>}>>;
 type ObjectRequest   = { hash: string, dependencyChain: Array<string> };
 type OwnershipProof  = { hash: Hash, ownershipProofHash: Hash };
  
@@ -231,16 +231,18 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
                 for (const [hash, destinations] of objs.entries()) {
 
-                    let outdatedEndpoints: Array<Hash> = []
+                    let outdatedEndpoints: Array<Hash> = [];
     
                     for (const [endpoint, params] of destinations.entries()) {
+
                         if (now > params.timeout) {
-                            outdatedEndpoints.push(endpoint);
-                        }
+                            outdatedEndpoints.push(endpoint);    
+                        }                        
                     }
     
                     for (const ep of outdatedEndpoints) {
                         destinations.delete(ep);
+                        this.controlLog.warning('fetching of object with hash ' + hash + ' from ' + ep + ' has timed out')
                     }
     
                     if (destinations.size === 0) {
@@ -450,18 +452,29 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         let secret = new RNGImpl().randomHexString(128);
 
+        let newReqs: Array<ObjectRequest> = [];
+
         for (const req of reqs) {
-            this.expectIncomingObject(destination, req.hash, req.dependencyChain, secret);
+
+            const pendingReqs = this.incomingObjects.get(req.hash)?.size || 0;
+
+            if ( pendingReqs < 2) {
+                if (this.expectIncomingObject(destination, req.hash, req.dependencyChain, secret)) {
+                    newReqs.push(req);
+                }
+            }
         }
 
-        let msg: RequestObjsMessage = {
-            type: TerminalOpsSyncAgentMessageType.RequestObjs,
-            targetObjHash: this.objHash,
-            requestedObjects: reqs,
-            ownershipProofSecret: secret
-        };
-
-        this.sendSyncMessageToPeer(destination, msg);
+        if (newReqs.length > 0) {
+            let msg: RequestObjsMessage = {
+                type: TerminalOpsSyncAgentMessageType.RequestObjs,
+                targetObjHash: this.objHash,
+                requestedObjects: newReqs,
+                ownershipProofSecret: secret
+            };
+    
+            this.sendSyncMessageToPeer(destination, msg);    
+        }
     }
 
     sendState(ep: Endpoint) {
@@ -483,6 +496,9 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         for (const req of missing) {
             this.scheduleOutgoingObject(destination, req.hash, req.dependencyChain, secret);
+
+            // note: if the object was already scheduled the above function will return false and
+            //       do nothing, but that is OK.
         }
         
     }
@@ -588,14 +604,18 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         let destinations = this.outgoingObjects.get(hash);
 
         if (destinations !== undefined) {
-            for (const [endpoint, details] of destinations.entries()) {
-                this.tryToSendObjects(endpoint, [{hash: hash, dependencyChain: details.dependencyChain}], details.secret);
+            for (const [endpoint, params] of destinations.entries()) {
+                this.tryToSendObjects(endpoint, [{hash: hash, dependencyChain: params.dependencyChain}], params.secret);
             }
         }
+
+        this.controlLog.trace('ops depending on completed object: ' + this.opsForMissingObj.get(hash)?.size);
 
         for (const opHash of this.opsForMissingObj.get(hash)) {
 
             const incompleteOp = this.incompleteOps.get(opHash) as IncompleteOp;
+
+            // incompleteOp is undefined! FIXME
 
             incompleteOp.context.objects.set(hash, obj);
             incompleteOp.missingObjects.delete(hash);
@@ -603,19 +623,30 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             if (incompleteOp.missingObjects.size === 0) {
 
                 try {
-                    this.processReceivedObject(opHash, context);
+                    this.processReceivedObject(opHash, incompleteOp.context);
                 // TODO: catch error, log, report bad peer?
                 } catch(e) { 
                     this.controlLog.warning('could not process received object with hash ' + hash + ', error is: ' + e);
                 } finally {
                     this.incompleteOps.delete(opHash);
-                    
+                    this.opsForMissingObj.delete(hash, opHash);
                 }
             }
         }
 
         // just in case this op was received partailly before:
-        this.incompleteOps.delete(hash);
+
+        const incompleteOp = this.incompleteOps.get(hash);
+
+        if (incompleteOp !== undefined) {
+
+            for (const reqHash of incompleteOp.missingObjects.keys()) {
+                this.opsForMissingObj.delete(reqHash, hash);
+            }
+
+            this.incompleteOps.delete(hash);
+        }
+        
     }
 
     private async receiveObjects(source: Endpoint, literalContext: LiteralContext, omittedDeps: Array<OwnershipProof>, secret?: string) {
@@ -642,6 +673,8 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                     try {
                         let toRequest = Array<ObjectRequest>();
                         
+                        // add omitted dependencies, if their ownership proofs are correct
+
                         for (let [depHash, depChain] of context.findMissingDeps(hash).entries()) {
                             let dep = await this.store.load(depHash);
                             if (dep === undefined || dep.hash(secret) !== ownershipProofForHash.get(depHash)) {
@@ -674,12 +707,15 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                     } catch (e) {
                         TerminalOpsSyncAgent.controlLog.warning(e);
                     }
+
                     this.incomingObjects.delete(hash);
                 } else {
                     
                     // TODO: report missing or incorrect incoming object entry
                     if (incoming === undefined) {
-                        this.controlLog.warning('missing incoming object entry for hash ' + hash + ' in object sent by ' + source);
+                        if (await this.store.load(hash) === undefined) {
+                            this.controlLog.warning('missing incoming object entry for hash ' + hash + ' in object sent by ' + source);
+                        }
                     } else {
                         this.controlLog.warning('incoming object secret mismatch, expected: ' + secret + ', received: ' + incoming.secret);
                     }
@@ -695,17 +731,24 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     private async processIncompleteOp(source: Endpoint, hash: Hash, context: Context, toRequest: Array<ObjectRequest>) {
 
-        let incompleteOp = this.incompleteOps.get(source);
+        let incompleteOp = this.incompleteOps.get(hash);
         let missingObjects = new Map<Hash, ObjectRequest>( toRequest.map((req: ObjectRequest) => [req.hash, req]) );
 
         if (incompleteOp === undefined) {
+
             incompleteOp = {
                 source: source,
                 context: context,
                 missingObjects: missingObjects,
                 timeout: Date.now() + this.params.incompleteOpTimeout * 1000
             };
+            
             this.incompleteOps.set(hash, incompleteOp);
+
+            for (const objReq of toRequest) {
+                this.opsForMissingObj.add(objReq.hash, hash);
+            }
+
         } else {
 
             const initialMissingCount = incompleteOp.missingObjects.size;
@@ -726,6 +769,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 try {
                     this.processReceivedObject(hash, context);
                 } finally {
+
                     this.incompleteOps.delete(hash);
                 }
             } else if (incompleteOp.missingObjects.size < initialMissingCount) {
@@ -750,15 +794,15 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                this.acceptedMutationOpClasses.indexOf(op.value._class) >= 0;
     }
 
-    private expectIncomingObject(source: Endpoint, objHash: Hash, dependencyChain: Array<Hash>, secret: string) {
-        this.insertObjectMovement(this.incomingObjects, source, objHash, dependencyChain, secret, this.params.receiveTimeout);
+    private expectIncomingObject(source: Endpoint, objHash: Hash, dependencyChain: Array<Hash>, secret: string): boolean {
+        return this.insertObjectMovement(this.incomingObjects, source, objHash, dependencyChain, secret, this.params.receiveTimeout);
     }
 
-    private scheduleOutgoingObject(destination: Endpoint, objHash: Hash, dependencyChain: Array<Hash>, secret: string) {
-        this.insertObjectMovement(this.outgoingObjects, destination, objHash, dependencyChain, secret, this.params.sendTimeout);
+    private scheduleOutgoingObject(destination: Endpoint, objHash: Hash, dependencyChain: Array<Hash>, secret: string): boolean {
+        return this.insertObjectMovement(this.outgoingObjects, destination, objHash, dependencyChain, secret, this.params.sendTimeout);
     }
 
-    private insertObjectMovement(allMovements: ObjectMovements, endpoint: Endpoint, objHash: Hash, dependencyChain: Array<Hash>, secret: string, timeout: number) {
+    private insertObjectMovement(allMovements: ObjectMovements, endpoint: Endpoint, objHash: Hash, dependencyChain: Array<Hash>, secret: string, timeout: number): boolean {
 
         let movement = allMovements.get(objHash);
 
@@ -767,7 +811,13 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             allMovements.set(objHash, movement);
         }
 
-        movement.set(endpoint, {dependencyChain: dependencyChain, secret: secret, timeout: Date.now() + timeout * 1000});
+        if (movement.has(endpoint)) {
+            return false;
+        } else {
+            movement.set(endpoint, {dependencyChain: dependencyChain, secret: secret, timeout: Date.now() + timeout * 1000});
+            return true;
+        }
+
     }
     
 }
