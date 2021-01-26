@@ -6,7 +6,7 @@ import { Agent } from '../../service/Agent';
 import { Endpoint, LinkupMessage, NetworkAgent, NetworkEventType } from '../network/NetworkAgent';
 import { ObjectBroadcastAgent, ObjectBroadcastRequest, ObjectBroadcastReply } from './ObjectBroadcastAgent';
 
-import { AsyncStream, BufferedAsyncStream, AsyncStreamSource, FilteredAsyncStreamSource } from 'util/streams';
+import { AsyncStream, BufferedAsyncStream, BufferingAsyncStreamSource, AsyncStreamSource, FilteredAsyncStreamSource } from 'util/streams';
 
 type Params = {
     broadcastedSuffixBits : number,
@@ -18,7 +18,7 @@ type ObjectDiscoveryReply = { source: Endpoint, destination: Endpoint, hash: Has
 
 type ObjectDiscoveryReplyParams = {maxAge?: number, linkupServers?: string[], localEndpoints?: Endpoint[]};
 
-class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryReply> {
+class ObjectDiscoveryAgent implements Agent {
 
     static log = new Logger(ObjectDiscoveryAgent.name, LogLevel.INFO);
 
@@ -35,11 +35,10 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
     params: Params;
 
     localEndpoints: Set<Endpoint>;
-    replies: ObjectDiscoveryReply[];
     lastQueryingTimePerServer: Map<string, number>;
 
-    itemSubscriptions: Set<(elem: ObjectDiscoveryReply) => void>;
-    endSubscriptions: Set<() => void>;
+    streamSource: BufferingAsyncStreamSource<ObjectDiscoveryReply>;
+
 
     wasShutdown = false;
 
@@ -58,11 +57,9 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
         };
 
         this.localEndpoints = new Set();
-        this.replies = [];
         this.lastQueryingTimePerServer = new Map();
 
-        this.itemSubscriptions = new Set();
-        this.endSubscriptions = new Set();
+        this.streamSource = new BufferingAsyncStreamSource(this.params.maxStoredReplies);
     }
 
     getAgentId(): string {
@@ -130,7 +127,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
 
     getReplyStream(filterParams?: ObjectDiscoveryReplyParams) : AsyncStream<ObjectDiscoveryReply> {
 
-        let source: AsyncStreamSource<ObjectDiscoveryReply> = this; 
+        let source: AsyncStreamSource<ObjectDiscoveryReply> = this.streamSource; 
 
         const maxAge         = filterParams?.maxAge;
         const linkupServers  = filterParams?.linkupServers;
@@ -155,7 +152,7 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
             source = new FilteredAsyncStreamSource<ObjectDiscoveryReply>(source, filter);
         }
 
-        return new BufferedAsyncStream(this);;
+        return new BufferedAsyncStream(source);;
     }
 
     receiveLocalEvent(ev: Event): void {
@@ -186,19 +183,8 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
                     ObjectDiscoveryAgent.log.trace(() => 'Received object with hash ' + replyHash + ' from ' + msg.source + ' at ' + msg.destination);
 
                     let item = {source: msg.source, destination: msg.destination, hash: replyHash, object: object, timestamp: Date.now()}; 
-
-                    if (this.replies.length === this.params.maxStoredReplies) {
-                        this.replies.shift();
-                    }
-
-                    this.replies.push(item);
-
-                    ObjectDiscoveryAgent.log.trace(() => 'About to fire ' + this.itemSubscriptions.size + ' callbacks.');
-
-
-                    for (const itemCallback of this.itemSubscriptions) {
-                        itemCallback(item);
-                    }
+                    
+                    this.streamSource.ingest(item);
                     
                 } else {
                     ObjectDiscoveryAgent.log.debug('Error validating object discovery reply');
@@ -214,30 +200,9 @@ class ObjectDiscoveryAgent implements Agent, AsyncStreamSource<ObjectDiscoveryRe
         // TODO: stop listening on linkup endpoints
 
         this.wasShutdown = true;
-        for (const endCallback of this.endSubscriptions) {
-            endCallback();
-        }
+        this.streamSource.end();
     }
 
-    current(): ObjectDiscoveryReply[] {
-        return this.replies.slice();
-    }
-
-    subscribeNewItem(cb: (elem: ObjectDiscoveryReply) => void): void {
-        this.itemSubscriptions.add(cb);
-    }
-    
-    subscribeEnd(cb: () => void): void {
-        this.endSubscriptions.add(cb);
-    }
-    
-    unsubscribeNewItem(cb: (elem: ObjectDiscoveryReply) => void): void {
-        this.itemSubscriptions.delete(cb);
-    }
-    
-    unsubscribeEnd(cb: () => void): void {
-        this.endSubscriptions.delete(cb);
-    }
 
 
     private getNetworkAgent() {

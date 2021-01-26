@@ -1,112 +1,26 @@
 
 /*
-interface Stream<T> {
-    next(): Promise<T>;
-    atEnd(): boolean;
-}
+    What we want to achieve is to have a stream that can be consumed multiple times
+    at the same time, asynchronically, by several clients that may join it over a 
+    lapse of time.
 
-interface StreamSource<T> {
+    The AsyncStreamSource ingests the source of the stream and keeps some or all of
+    the contents that it has received, so AsyncStream clients may get some or all of 
+    the history from before their creation.
 
-    subscribeNewItem(cb: (elem: T) => void): void;
-    subscribeEnd(cb: () => void): void;
+    AsyncStreams can then be used to traverse the stream concurrently, with each one
+    keeping track of how far in the stream its reader is.
 
-    unsubscribeNewItem(cb: (elem: T) => void): void;
-    unsubscribeEnd(cb: () => void): void;
-}
-
-class SourceBasedStream<T> implements Stream<T> {
-
-    provider: StreamSource<T>;
-    pending: {resolve: (value?: T) => void, reject: (reason: any) => void}[];
-
-    itemCallback: (elem: T) => void;
-    endCallback: () => void;
-
-    isAtEnd = false;
-    isClosed = false;
-
-    constructor(provider: AsyncStreamSource<T>) {
-        this.provider = provider;
-        this.pending = [];
-
-        this.itemCallback = (elem: T) => {
-            
-            if (this.pending.length > 0) {
-                this.pending.shift()?.resolve(elem);
-            }
-
-        };
-
-        this.endCallback = () => {
-            let toReject = this.pending;
-            this.pending = [];
-            for (const p of toReject) {
-                p.reject('end');
-            }
-            this.isAtEnd = true;
-        };
-
-        this.provider.subscribeNewItem(this.itemCallback);
-        this.provider.subscribeEnd(this.endCallback);
-
-    }
-
-    next() : Promise<T> {
-
-        if (this.buffer.length > 0) {
-            return Promise.resolve(this.buffer.shift() as T);
-        } else {
-            let p = new Promise((resolve: (value?: T) => void, reject: (reason: 'timeout'|'end') => void) => {
-                
-                this.pending.push({resolve: resolve, reject: reject});
-                
-                setTimeout(() => {
-                    let idx = -1;
-    
-                    for (let i=0; i<this.pending.length; i++) {
-                        if (this.pending[i].resolve === resolve) {
-                            idx = i;
-                        }
-                    }
-    
-                    if (idx >= 0) {
-                        this.pending.splice(idx, 1);
-                    }
-    
-                    reject('timeout');
-    
-                }, timeoutMillis);
-               
-            });
-    
-            return p;
-        }
-    }
-
-    nextIfAvailable() : T | undefined {
-        if (this.buffer.length > 0) {
-            return this.buffer.shift();
-        } else {
-            return undefined;
-        }
-    }
-
-    countAvailableItems(): number {
-        return this.buffer.length;
-    }
-
-    close() {
-        this.provider.unsubscribeNewItem(this.itemCallback);
-        this.provider.unsubscribeEnd(this.endCallback);
-        this.isClosed = true;
-    }
-
-    atEnd() : boolean {
-        return this.isClosed || (this.isAtEnd && this.buffer.length === 0);
-    }
-}
 */
 
+
+
+/*
+    AsyncStream: a stream that allows both synchronous (through nextIfAvailable and 
+                 countAvailableItems) and asynchronows (using next() that returns a
+                 Promise) consuming.
+
+*/
 
 interface AsyncStream<T> {
 
@@ -131,6 +45,14 @@ interface AsyncStream<T> {
     atEnd(): boolean;
 }
 
+/*
+
+    A source for an AsyncStream. It has a method to retrieve the current stream contents
+    (that the implementation may choose to buffer with some limits, rolling, etc) and
+    callbacks for notification on new items and reaching the end of the stream.
+
+*/
+
 interface AsyncStreamSource<T> {
 
     current(): T[];
@@ -140,6 +62,71 @@ interface AsyncStreamSource<T> {
 
     unsubscribeNewItem(cb: (elem: T) => void): void;
     unsubscribeEnd(cb: () => void): void;
+}
+
+/*
+    Default implementation f an AsyncStreamSource, buffering items
+    so clients who create AsyncStreams later can see the full stream.
+*/
+
+class BufferingAsyncStreamSource<T> implements AsyncStreamSource<T> {
+
+    maxBufferSize?: number;
+    buffer: Array<T>;
+
+    itemSubscriptions: Set<(item: T) => void>;
+    endSubscriptions: Set<() => void>;
+
+    constructor(maxBufferSize?: number) {
+        this.maxBufferSize = maxBufferSize;
+
+        this.buffer = [];
+        this.itemSubscriptions = new Set();
+        this.endSubscriptions = new Set();
+        
+    }
+
+    ingest(item: T) {
+
+        if (this.maxBufferSize !== undefined &&
+            this.maxBufferSize === this.buffer.length) {
+            this.buffer.shift();
+        }
+
+        this.buffer.push(item);
+
+        for (const itemCallback of this.itemSubscriptions) {
+            itemCallback(item);
+        }
+
+    };
+
+    end() {
+        for (const endCallback of this.endSubscriptions) {
+            endCallback();
+        }
+    };
+
+    current(): T[] {
+        return this.buffer.slice();
+    }
+
+    subscribeNewItem(cb: (elem: T) => void): void {
+        this.itemSubscriptions.add(cb);
+    }
+    
+    subscribeEnd(cb: () => void): void {
+        this.endSubscriptions.add(cb);
+    }
+    
+    unsubscribeNewItem(cb: (elem: T) => void): void {
+        this.itemSubscriptions.delete(cb);
+    }
+    
+    unsubscribeEnd(cb: () => void): void {
+        this.endSubscriptions.delete(cb);
+    }
+    
 }
 
 class FilteredAsyncStreamSource<T> implements AsyncStreamSource<T> {
@@ -320,7 +307,7 @@ class BufferedAsyncStream<T> implements AsyncStream<T> {
     }
 }
 
-export { AsyncStream, BufferedAsyncStream, AsyncStreamSource, FilteredAsyncStreamSource }
+export { AsyncStream, BufferedAsyncStream, AsyncStreamSource, BufferingAsyncStreamSource, FilteredAsyncStreamSource }
 
 // in case we want to make this support async iteration, this
 
