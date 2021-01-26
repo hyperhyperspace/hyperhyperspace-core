@@ -1,7 +1,6 @@
 src/
 test/
-dist-test/
-dist-examples/
+dist-dev/
 node_modules
 package-lock.json
 notes.txt
