@@ -1,9 +1,11 @@
 import { PeerGroupAgentConfig } from '../agents/peer';
 import { Mesh, PeerGroupInfo, SyncMode } from '../service/Mesh';
-import { Context, HashedLiteral, HashedObject } from 'data/model';
+import { Context, HashedObject } from 'data/model';
 import { Hash } from 'data/model';
 import { Endpoint } from 'mesh/agents/network';
 import { RNGImpl } from 'crypto/random';
+import { AsyncStream } from 'util/streams';
+import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 
 type MeshCommand = JoinPeerGroup | CheckPeerGroupUsageCommand | LeavePeerGroup |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
@@ -174,17 +176,26 @@ class MeshServer {
             } catch (e) {
                 result.error = e;
             }
-        } else if (command.type === 'find-object-by-hash') {
-            const find = command as FindObjectByHash;
+        } else if (command.type === 'find-object-by-hash' ||
+                   command.type === 'find-object-by-hash-suffix') {
+            const find = command as FindObjectByHash | FindObjectByHashSuffix;
 
             try {
                 if (!find.retry) {
 
                     const streamId = new RNGImpl().randomHexString(64);
+                    let replyStream: AsyncStream<ObjectDiscoveryReply>;
 
-                    const replyStream = this.mesh.findObjectByHash(
-                                            find.hash, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
-                                        );
+                    if (command.type === 'find-object-by-hash') {
+                        replyStream = this.mesh.findObjectByHash(
+                            (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
+                        );
+                    } else {
+                        this.mesh.findObjectByHashSuffix(
+                            (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
+                        );
+                    }
+                    
 
                     const tt = setTimeout(async () => {
 
@@ -221,24 +232,15 @@ class MeshServer {
 
 
                 } else {
-                    this.mesh.findObjectByHashRetry(find.hash, find.linkupServers, find.replyEndpoint, find.count);
-                }
-                
-            } catch (e) {
-                result.error = e;
-            }
-        }  else if (command.type === 'find-object-by-hash-suffix') {
-            const find = command as FindObjectByHashSuffix;
-
-            try {
-                if (!find.retry) {
-                    /*const replyStream = */this.mesh.findObjectByHashSuffix(
-                                            find.hashSuffix, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
-                                        );
-
-
-                } else {
-                    this.mesh.findObjectByHashSuffixRetry(find.hashSuffix, find.linkupServers, find.replyEndpoint, find.count);
+                    if (command.type === 'find-object-by-hash') {
+                        this.mesh.findObjectByHashRetry(
+                            (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count
+                        );
+                    } else {
+                        this.mesh.findObjectByHashSuffixRetry(
+                            (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count
+                        );
+                    }
                 }
                 
             } catch (e) {
