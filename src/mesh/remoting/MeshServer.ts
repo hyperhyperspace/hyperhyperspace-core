@@ -3,11 +3,10 @@ import { Mesh, PeerGroupInfo, SyncMode } from '../service/Mesh';
 import { Context, HashedObject } from 'data/model';
 import { Hash } from 'data/model';
 import { Endpoint } from 'mesh/agents/network';
-import { RNGImpl } from 'crypto/random';
 import { AsyncStream } from 'util/streams';
 import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 
-type MeshCommand = JoinPeerGroup | CheckPeerGroupUsageCommand | LeavePeerGroup |
+type MeshCommand = JoinPeerGroup | CheckPeerGroupUsage | LeavePeerGroup |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
                    StartObjectBroadcast | StopObjectBroadcast |
                    FindObjectByHash | FindObjectByHashSuffix;
@@ -18,7 +17,7 @@ type JoinPeerGroup = {
     config?: PeerGroupAgentConfig;
 };
 
-type CheckPeerGroupUsageCommand = {
+type CheckPeerGroupUsage = {
     type: 'check-peer-group-usage';
     peerGroupId: string;
     gossipId?: string;
@@ -49,7 +48,7 @@ type StartObjectBroadcast = {
     objContext: Context;
     linkupServers: Array<string>;
     replyEndpoints: Array<Endpoint>;
-    brpadcastedSuffixBits?: number;
+    broadcastedSuffixBits?: number;
 }
 
 type StopObjectBroadcast = {
@@ -67,6 +66,7 @@ type FindObjectByHash = {
     maxAge?: number;
     strictEndpoints?: boolean;
     retry: boolean;
+    streamId?: string; // used when retry is false
 }
 
 type FindObjectByHashSuffix = {
@@ -78,9 +78,8 @@ type FindObjectByHashSuffix = {
     maxAge?: number;
     strictEndpoints?: boolean;
     retry: boolean;
+    streamId?: string; // used when retry is false
 }
-
-type CommandResult = { error?: string; streamedResponseId?: string };
 
 type LiteralObjectDiscoveryReply = {
     type: 'object-discovery-reply'
@@ -109,28 +108,22 @@ class MeshServer {
         this.streamedReplyCb = streamedReplyCb;
     }
 
-    execute(command: MeshCommand) : CommandResult {
+    execute(command: MeshCommand) : void {
 
         //let error: string | undefined;
 
-        let result: CommandResult = {};
-
         if (command.type === 'join-peer-group') {
             const join = command as JoinPeerGroup;
+            this.mesh.joinPeerGroup(join.peerGroupInfo, join.config);
+        } else if (command.type === 'check-peer-group-usage') {
+            const check = command as CheckPeerGroupUsage;
+            this.mesh.isPeerGroupInUse(check.peerGroupId, check.gossipId);
+            
+            // TODO: send reply somehow :*(
 
-            try {
-                this.mesh.joinPeerGroup(join.peerGroupInfo, join.config);
-            } catch (e) {
-                result.error = e;
-            }
         } else if (command.type === 'leave-peer-group') {
             const leave = command as LeavePeerGroup;
-
-            try {
-                this.mesh.leavePeerGroup(leave.peerGroupId);
-            } catch (e) {
-                result.error = e;
-            }
+            this.mesh.leavePeerGroup(leave.peerGroupId);
         } else if (command.type === 'sync-objects-with-peer-group') {
             const syncObjs = command as SyncObjectsWithPeerGroup;
 
@@ -140,117 +133,100 @@ class MeshServer {
                 objs.push(HashedObject.fromContext(syncObjs.objContext, hash));
             }
             
-            try {
-                this.mesh.syncManyObjectsWithPeerGroup(
-                    syncObjs.peerGroupId, objs.values(), syncObjs.mode, syncObjs.gossipId
-                );
-            } catch (e) {
-                result.error = e;
-            }
+            this.mesh.syncManyObjectsWithPeerGroup(
+                syncObjs.peerGroupId, objs.values(), syncObjs.mode, syncObjs.gossipId
+            );
         } else if (command.type === 'stop-sync-objects-with-peer-group') {
             const stopSyncObjs = command as StopSyncObjectsWithPeerGroup;
 
-            try {
-                this.mesh.stopSyncManyObjectsWithPeerGroup(
-                    stopSyncObjs.peerGroupId, stopSyncObjs.hashes.values(), stopSyncObjs.gossipId
-                );
-            } catch (e) {
-                result.error = e;
-            }
+            this.mesh.stopSyncManyObjectsWithPeerGroup(
+                stopSyncObjs.peerGroupId, stopSyncObjs.hashes.values(), stopSyncObjs.gossipId
+            );
         } else if (command.type === 'start-object-broadcast') {
             const startBcast = command as StartObjectBroadcast;
 
             let obj = HashedObject.fromContext(startBcast.objContext);
 
-            try {
-                this.mesh.startObjectBroadcast(obj, startBcast.linkupServers, startBcast.replyEndpoints, startBcast.brpadcastedSuffixBits
+            this.mesh.startObjectBroadcast(
+                obj, startBcast.linkupServers, startBcast.replyEndpoints, startBcast.broadcastedSuffixBits
             );
-            } catch (e) {
-                result.error = e;
-            }
+
         } else if (command.type === 'stop-object-broadcast') {
             const stopBcast = command as StopObjectBroadcast;
-
-            try {
-                this.mesh.stopObjectBroadcast(stopBcast.hash, stopBcast.broadcastedSuffixBits);
-            } catch (e) {
-                result.error = e;
-            }
+            this.mesh.stopObjectBroadcast(stopBcast.hash, stopBcast.broadcastedSuffixBits);
         } else if (command.type === 'find-object-by-hash' ||
                    command.type === 'find-object-by-hash-suffix') {
             const find = command as FindObjectByHash | FindObjectByHashSuffix;
 
-            try {
-                if (!find.retry) {
+            if (!find.retry) {
 
-                    const streamId = new RNGImpl().randomHexString(64);
-                    let replyStream: AsyncStream<ObjectDiscoveryReply>;
+                const streamId = command.streamId;
+                let replyStream: AsyncStream<ObjectDiscoveryReply>;
 
-                    if (command.type === 'find-object-by-hash') {
-                        replyStream = this.mesh.findObjectByHash(
-                            (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
-                        );
-                    } else {
-                        this.mesh.findObjectByHashSuffix(
-                            (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
-                        );
-                    }
-                    
-
-                    const tt = setTimeout(async () => {
-
-                        try {
-                            while (!replyStream.atEnd()) {
-                                const discov = await replyStream.next();
-
-                                let reply: LiteralObjectDiscoveryReply = {
-                                    type: 'object-discovery-reply',
-                                    streamId: streamId,
-                                    source: discov.source, 
-                                    destination: discov.destination,
-                                    hash: discov.hash, 
-                                    objContext: discov.object.toContext(), 
-                                    timestamp: discov.timestamp
-                                };
-
-                                this.streamedReplyCb(reply)
-
-                            }
-
-
-                        } finally {
-                            let replyEnd: DiscoveryEndReply = {
-                                type: 'object-discovery-end',
-                                streamId: streamId
-                            }
-
-                            this.streamedReplyCb(replyEnd);
-                            clearTimeout(tt);
-                        }
-
-                    }, 0);
-
-
+                if (command.type === 'find-object-by-hash') {
+                    replyStream = this.mesh.findObjectByHash(
+                        (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
+                    );
                 } else {
-                    if (command.type === 'find-object-by-hash') {
-                        this.mesh.findObjectByHashRetry(
-                            (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count
-                        );
-                    } else {
-                        this.mesh.findObjectByHashSuffixRetry(
-                            (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count
-                        );
-                    }
+                    this.mesh.findObjectByHashSuffix(
+                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
+                    );
                 }
                 
-            } catch (e) {
-                result.error = e;
+
+                const tt = setTimeout(async () => {
+
+                    try {
+                        while (!replyStream.atEnd()) {
+                            const discov = await replyStream.next();
+
+                            let reply: LiteralObjectDiscoveryReply = {
+                                type: 'object-discovery-reply',
+                                streamId: streamId as string,
+                                source: discov.source, 
+                                destination: discov.destination,
+                                hash: discov.hash, 
+                                objContext: discov.object.toContext(), 
+                                timestamp: discov.timestamp
+                            };
+
+                            this.streamedReplyCb(reply)
+
+                        }
+
+
+                    } finally {
+                        let replyEnd: DiscoveryEndReply = {
+                            type: 'object-discovery-end',
+                            streamId: streamId as string
+                        }
+
+                        this.streamedReplyCb(replyEnd);
+                        clearTimeout(tt);
+                    }
+
+                }, 0);
+
+
+            } else {
+                if (command.type === 'find-object-by-hash') {
+                    this.mesh.findObjectByHashRetry(
+                        (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count
+                    );
+                } else {
+                    this.mesh.findObjectByHashSuffixRetry(
+                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count
+                    );
+                }
             }
         }
-
-        return result;
     }
 
 }
 
-export { MeshServer };
+export { MeshServer, MeshCommand,
+         JoinPeerGroup, CheckPeerGroupUsage, LeavePeerGroup,
+         SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
+         StartObjectBroadcast, StopObjectBroadcast,
+         FindObjectByHash, FindObjectByHashSuffix,
+         CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply };
