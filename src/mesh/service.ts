@@ -1,6 +1,6 @@
 export { Mesh, PeerGroupInfo, SyncMode } from './service/Mesh';
-export { MeshServer, MeshCommand, CommandStreamedReply} from './remoting/MeshServer';
-export { MeshClient } from './remoting/MeshClient';
+export { MeshServer, MeshCommand, CommandStreamedReply} from './service/remoting/MeshServer';
+export { MeshClient } from './service/remoting/MeshClient';
 export { AgentPod, Event, AgentSetChangeEvent, AgentSetChange } from './service/AgentPod';
 export { Agent } from './service/Agent';
 export { PeerGroup } from './service/PeerGroup';
