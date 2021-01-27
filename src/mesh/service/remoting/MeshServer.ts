@@ -1,5 +1,5 @@
-import { PeerGroupAgentConfig } from '../agents/peer';
-import { Mesh, PeerGroupInfo, SyncMode } from '../service/Mesh';
+import { PeerGroupAgentConfig } from '../../agents/peer';
+import { Mesh, PeerGroupInfo, SyncMode } from '../../service/Mesh';
 import { Context, HashedObject } from 'data/model';
 import { Hash } from 'data/model';
 import { Endpoint } from 'mesh/agents/network';

@@ -1,6 +1,6 @@
 import { TestPeerSource } from './TestPeerSource';
 
-import { AgentPod } from 'mesh/service';
+import { AgentPod, MeshClient } from 'mesh/service';
 
 import { PeerInfo, PeerGroupAgent } from 'mesh/agents/peer';
 import { ObjectDiscoveryPeerSource } from 'mesh/agents/peer';
@@ -9,14 +9,15 @@ import { PeerSource } from 'mesh/agents/peer';
 
 import { RNGImpl } from 'crypto/random';
 import { Identity, RSAKeyPair } from 'data/identity';
-import { LinkupManager } from 'net/linkup';
+import { LinkupManager } from 'net/linkup';
 import { HashedLiteral } from 'data/model';
-import { Mesh } from 'mesh/service';
+import { Mesh } from 'mesh/service';
+import { RemotingMesh } from './RemotingMesh';
 
 
 class TestPeerGroupPods {
     
-    static generate(peerGroupId: string, activePeers: number, totalPeers: number, peerConnCount: number, network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number): Array<AgentPod> {
+    static generate(peerGroupId: string, activePeers: number, totalPeers: number, peerConnCount: number, network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number, useRemoting=false): Array<AgentPod> {
 
         let peers = new Array<PeerInfo>();
 
@@ -42,8 +43,23 @@ class TestPeerGroupPods {
         let pods = new Array<AgentPod>();
 
         for (let i=0; i<activePeers; i++) {
-            let mesh = new Mesh();
-            let pod = mesh.pod;
+
+            let remoting: RemotingMesh | undefined;
+            let meshClient: Mesh | MeshClient;
+            let mesh: Mesh;
+            
+
+            if (useRemoting) {
+                remoting = new RemotingMesh();
+                meshClient = remoting.client;
+                mesh = remoting.mesh;
+            } else {
+                remoting = undefined;
+                meshClient = new Mesh();
+                mesh = meshClient;
+            }
+
+            let pod: AgentPod = mesh.pod;
 
             let peerSourceToUse: PeerSource = peerSource;
 
@@ -56,7 +72,7 @@ class TestPeerGroupPods {
                 let object = new HashedLiteral(peerGroupId);
 
 
-                mesh.startObjectBroadcast(object, [LinkupManager.defaultLinkupServer], [peers[i].endpoint]);
+                meshClient.startObjectBroadcast(object, [LinkupManager.defaultLinkupServer], [peers[i].endpoint]);
 
                 peerSourceToUse = new ObjectDiscoveryPeerSource(mesh, object, [LinkupManager.defaultLinkupServer], peers[i].endpoint, (ep: string) => peerSource.getPeerForEndpoint(ep));
             }

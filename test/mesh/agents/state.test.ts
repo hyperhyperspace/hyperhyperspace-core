@@ -48,6 +48,12 @@ describeProxy('[SYN] State sync', () => {
 
         await syncInSmallPeerGroup(done, 'mix', 5310);
     }, 300000);
+
+    test('[SYN07] Terminal ops agent-based set sync in small peer group (wrtc) w/remoting', async (done) => {
+
+        await syncInSmallPeerGroup(done, 'wrtc', undefined, true);
+
+    }, 300000);
 });
 
 async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
@@ -140,13 +146,13 @@ async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mi
 
 }
 
-async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
+async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number, useRemoting?: boolean) {
 
     const size = 3;
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort);
+    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
 
     let stores : Array<Store> = [];
     
