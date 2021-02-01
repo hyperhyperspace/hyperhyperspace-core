@@ -3,13 +3,14 @@ import { Store } from 'storage/store';
 
 import { MultiMap } from 'util/multimap';
 
-import { Endpoint, NetworkAgent, SecureNetworkAgent } from '../agents/network';
+import { Endpoint, NetworkAgent, NetworkAgentProxyConfig, SecureNetworkAgent } from '../agents/network';
 import { PeerInfo, PeerSource, PeerGroupAgent, PeerGroupAgentConfig } from '../agents/peer';
 import { StateGossipAgent, StateSyncAgent } from 'mesh/agents/state';
 import { ObjectBroadcastAgent, ObjectDiscoveryAgent, ObjectDiscoveryReply, ObjectDiscoveryReplyParams } from '../agents/discovery';
 
 import { AgentPod } from './AgentPod';
 import { AsyncStream } from 'util/streams';
+import { LinkupManager } from 'net/linkup';
 
 
 
@@ -109,10 +110,10 @@ class Mesh {
     // configuration
 
 
-    constructor() {
+    constructor(networkProxy?: NetworkAgentProxyConfig) {
         this.pod = new AgentPod();
 
-        this.network = new NetworkAgent();
+        this.network = new NetworkAgent(new LinkupManager(), networkProxy);
         this.pod.registerAgent(this.network);
         this.secured = new SecureNetworkAgent();
         this.pod.registerAgent(this.secured);

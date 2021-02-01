@@ -1,6 +1,6 @@
 import { TestPeerSource } from './TestPeerSource';
 
-import { AgentPod, MeshClient } from 'mesh/service';
+import { AgentPod, MeshProxy } from 'mesh/service';
 
 import { PeerInfo, PeerGroupAgent } from 'mesh/agents/peer';
 import { ObjectDiscoveryPeerSource } from 'mesh/agents/peer';
@@ -45,7 +45,7 @@ class TestPeerGroupPods {
         for (let i=0; i<activePeers; i++) {
 
             let remoting: RemotingMesh | undefined;
-            let meshClient: Mesh | MeshClient;
+            let meshClient: Mesh | MeshProxy;
             let mesh: Mesh;
             
 

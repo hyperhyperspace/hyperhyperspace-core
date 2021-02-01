@@ -5,23 +5,36 @@ import { MeshCommand,
     SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
     StartObjectBroadcast, StopObjectBroadcast,
     FindObjectByHash, FindObjectByHashSuffix, 
-    CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply} from './MeshServer';
+    CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply} from './MeshProxyHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject } from 'data/model';
 import { AsyncStream, BufferedAsyncStream, BufferingAsyncStreamSource } from 'util/streams';
 import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 import { Endpoint } from 'mesh/agents/network';
+import { LinkupManager, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
+import { WebRTCConnectionEvent, WebRTCConnectionProxyHost } from 'net/transport';
 
-class MeshClient {
+class MeshProxy {
 
     commandForwardingFn: (cmd: MeshCommand) => void;
     discoveryStreamSources: Map<string, BufferingAsyncStreamSource<ObjectDiscoveryReply>>;
     commandStreamedReplyIngestFn: (reply: CommandStreamedReply) => void;
 
-    constructor(commandForwardingFn: (cmd: MeshCommand) => void) {
-        this.commandForwardingFn = commandForwardingFn;
+    linkup?: LinkupManagerProxy;
+    webRTCConnProxyHost?: WebRTCConnectionProxyHost;
+
+    constructor(meshCommandFwdFn: (cmd: MeshCommand) => void, linkupcommandFwdFn?: (cmd: LinkupManagerCommand) => void, webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void) {
+        this.commandForwardingFn = meshCommandFwdFn;
         this.discoveryStreamSources = new Map();
+
+        if (linkupcommandFwdFn !== undefined) {
+            this.linkup = new LinkupManagerProxy(linkupcommandFwdFn);
+        }
+
+        if (webRTCConnEventIngestFn !== undefined) {
+            this.webRTCConnProxyHost = new WebRTCConnectionProxyHost(webRTCConnEventIngestFn, this.linkup as any as LinkupManager); // ugly
+        }
 
         this.commandStreamedReplyIngestFn = (reply: CommandStreamedReply) => {
             if (reply.type === 'object-discovery-reply') {
@@ -225,4 +238,4 @@ class MeshClient {
 
 }
 
-export { MeshClient };
+export { MeshProxy };

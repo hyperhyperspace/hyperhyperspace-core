@@ -8,6 +8,8 @@ import { WebRTCConnection } from 'net/transport/WebRTCConnection';
 import { RNGImpl } from 'crypto/random';
 import { SignallingServerConnection } from 'net/linkup/SignallingServerConnection';
 import { WebSocketConnection } from 'net/transport/WebSocketConnection';
+import { LinkupManagerProxyHost, LinkupManagerEvent } from 'net/linkup';
+import { WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxy } from 'net/transport';
 
 type Endpoint = string;
 
@@ -80,12 +82,20 @@ type ConnectionInfo = {
     requestedBy: Set<AgentId>
 }
 
+// proxy here refers to object proxy, i.e. have a bridged WebRTCConnection that bridges 
+// LinkupManager back to the one here (necessary in the browser because Web Workers can't
+// create WebRTC connections).
+
+type NetworkAgentProxyConfig = {
+    linkupEventIngestFn?: (ev: LinkupManagerEvent) => void, 
+    webRTCCommandFn?: (cmd: WebRTCConnectionCommand) => void
+};
+
 // all the following in seconds
 
 const TickInterval = 5;
 
 const ConnectionEstablishmentTimeout = 10;
-
 
 class NetworkAgent implements Agent {
 
@@ -102,6 +112,8 @@ class NetworkAgent implements Agent {
     pod?: AgentPod;
 
     linkupManager : LinkupManager;
+
+    proxyConfig?: NetworkAgentProxyConfig;
 
     listening    : Set<Endpoint>;
     linkupMessageListening : Set <Endpoint>;
@@ -122,19 +134,23 @@ class NetworkAgent implements Agent {
 
     intervalRef : any;
 
+    linkupManagerHost?: LinkupManagerProxyHost;
+    webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void;
+    connProxies?: Map<string, WebRTCConnectionProxy>;
 
 
     getAgentId(): string {
         return NetworkAgent.AgentId; 
     }
 
-    constructor(linkupManager = new LinkupManager()) {
+    constructor(linkupManager = new LinkupManager(), proxyConfig?: NetworkAgentProxyConfig) {
 
         this.logger        = NetworkAgent.logger;
         this.connLogger    = NetworkAgent.connLogger;
         this.messageLogger = NetworkAgent.messageLogger;
 
         this.linkupManager = linkupManager;
+        this.proxyConfig = proxyConfig;
 
         this.listening    = new Set();
         this.linkupMessageListening = new Set();
@@ -308,9 +324,54 @@ class NetworkAgent implements Agent {
             }
         };
 
+        if (proxyConfig?.linkupEventIngestFn !== undefined) {
+            this.linkupManagerHost = new LinkupManagerProxyHost(proxyConfig.linkupEventIngestFn, this.linkupManager);
+        }
+
+        if (proxyConfig?.webRTCCommandFn !== undefined) {
+            this.connProxies = new Map();
+            this.webRTCConnEventIngestFn = (ev: WebRTCConnectionEvent) => {
+                const proxy = this.connProxies?.get(ev.connId);
+
+                proxy?.connectionEventIngestFn(ev);
+
+                if (ev.type === 'connection-status-change' && ev.status === 'closed') {
+                    this.connProxies?.delete(ev.connId);
+                }
+            };
+
+        }
+
+
+        /*
+        this.worker = globalThis.process?.versions?.node === undefined && globalThis.document === undefined;
+
+        if (this.worker) {
+
+            const eventCallback = (ev: LinkupManagerEvent) => {
+                (globalThis as any as ServiceWorker).postMessage(ev);
+            }
+
+            this.linkupManagerHost = new LinkupManagerProxyHost(eventCallback, this.linkupManager);
         
+            const sendToWebRTCProxyHost = (cmd: WebRTCConnectionCommand) => {
+                globalThis.postMessage(cmd);
+            };
+
+        }
+        */
 
     }
+
+    /*
+    public linkupManagerHostCommand(cmd: LinkupManagerCommand) {
+        this.linkupManagerHost?.execute(cmd);
+    }
+
+    public createWebRTCConnectionProxy() {
+        globalThis.postMessage
+    }
+    */
 
     private acceptReceivedConnectionMessages(connId: ConnectionId, message?: any) {
 
@@ -337,7 +398,15 @@ class NetworkAgent implements Agent {
 
                     if (SignallingServerConnection.isWebRTCBased(connInfo.remoteEndpoint)) {
                         if (SignallingServerConnection.isWebRTCBased(connInfo.localEndpoint)) {
-                            conn = new WebRTCConnection(this.linkupManager, receiver, sender, connId, this.connectionReadyCallback);
+
+                            if (this.proxyConfig?.webRTCCommandFn === undefined) {
+                                conn = new WebRTCConnection(this.linkupManager, receiver, sender, connId, this.connectionReadyCallback);
+                            } else {
+                                const connProxy = new WebRTCConnectionProxy(receiver, sender, connId, this.connectionReadyCallback, this.proxyConfig?.webRTCCommandFn);
+                                this.connProxies?.set(connId, connProxy);
+                                conn = connProxy;
+                            }
+                            
                         } else {
                             conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback);    
                         }
@@ -672,4 +741,4 @@ class NetworkAgent implements Agent {
     }
 }
 
-export { NetworkAgent, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent, LinkupMessageReceivedEvent, LinkupMessage, Endpoint }
+export { NetworkAgent, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent, LinkupMessageReceivedEvent, LinkupMessage, Endpoint, NetworkAgentProxyConfig }

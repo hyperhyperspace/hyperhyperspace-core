@@ -98,7 +98,34 @@ type DiscoveryEndReply = {
 
 type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply;
 
-class MeshServer {
+class MeshProxyHost {
+
+    static isMeshCommand(msg: any): MeshCommand | undefined {
+
+        const type = msg?.type;
+
+        if (type === 'join-peer-group' ||
+            type === 'check-peer-group-usage' ||
+            type === 'leave-peer-group' ||
+            type === 'sync-objects-with-peer-group' ||
+            type === 'stop-sync-objects-with-peer-group' ||
+            type === 'start-object-broadcast' ||
+            type === 'stop-object-broadcast' ||
+            type === 'find-object-by-hash' ||
+            type === 'find-object-by-hash-suffix' ||
+            type === 'object-discovery-reply' ||
+            type === 'object-discovery-end') {
+
+            return msg as MeshCommand;
+        }
+         else {
+
+            return undefined;
+        
+        }
+
+    }
+
 
     mesh: Mesh;
     streamedReplyCb: (resp: CommandStreamedReply) => void;
@@ -224,7 +251,7 @@ class MeshServer {
 
 }
 
-export { MeshServer, MeshCommand,
+export { MeshProxyHost, MeshCommand,
          JoinPeerGroup, CheckPeerGroupUsage, LeavePeerGroup,
          SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
          StartObjectBroadcast, StopObjectBroadcast,

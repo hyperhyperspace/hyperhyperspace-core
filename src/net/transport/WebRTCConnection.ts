@@ -35,11 +35,11 @@ class WebRTCConnection implements Connection {
 
     onmessage : (ev: MessageEvent) => void;
     onready : () => void;
-    channelStatusChangeCallback : () => void;
+    channelStatusChangeCallback : ((status: string, conn: Connection) => void) | undefined;
 
     private handleSignallingMessage : (message: any) => void;
 
-    constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void) {
+    constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void, channelStatusChangeCallback?: (status: string, conn: Connection) => void) {
 
         this.linkupManager = linkupManager;
         this.localAddress  = local;
@@ -57,7 +57,7 @@ class WebRTCConnection implements Connection {
         this.onmessage = (ev) => {
             WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' received message from ' + this.remoteAddress?.linkupId + ' on call ' + this.callId);
             WebRTCConnection.logger.trace('message is ' + ev.data);
-            if (this.messageCallback != null) {
+            if (this.messageCallback != undefined) {
                 this.messageCallback(ev.data, this);
             } else {
                 this.incomingMessages.push(ev);
@@ -69,14 +69,7 @@ class WebRTCConnection implements Connection {
             this.readyCallback(this);
         };
 
-        this.channelStatusChangeCallback = () => {
-            if (this.channel === undefined) {
-                WebRTCConnection.logger.debug('channel status callback was called, but channel is null');
-            } else {
-                WebRTCConnection.logger.debug('channel status is ' + this.channel.readyState);
-            }
-        
-        }
+        this.channelStatusChangeCallback = channelStatusChangeCallback;
 
         this.handleSignallingMessage = (message) => {
 
@@ -120,7 +113,7 @@ class WebRTCConnection implements Connection {
     setMessageCallback(messageCallback: (message: any, conn: Connection) => void) {
         this.messageCallback = messageCallback;
 
-        if (messageCallback != null) {
+        if (messageCallback != undefined) {
             while (this.incomingMessages.length > 0) {
                 var ev = this.incomingMessages.shift();
                 messageCallback(ev.data, this);
@@ -286,6 +279,10 @@ class WebRTCConnection implements Connection {
             if (this.channel?.readyState === 'open') {
                 this.onready();
             };
+
+            if (this.channelStatusChangeCallback !== undefined) {
+                this.channelStatusChangeCallback(this.channel?.readyState || 'unknown', this);
+            }
         }
 
         if (this.channel !== undefined) {
