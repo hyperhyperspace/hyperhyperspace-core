@@ -24,12 +24,12 @@ class MeshProxy {
     linkup?: LinkupManagerProxy;
     webRTCConnProxyHost?: WebRTCConnectionProxyHost;
 
-    constructor(meshCommandFwdFn: (cmd: MeshCommand) => void, linkupcommandFwdFn?: (cmd: LinkupManagerCommand) => void, webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void) {
+    constructor(meshCommandFwdFn: (cmd: MeshCommand) => void, linkupCommandFwdFn?: (cmd: LinkupManagerCommand) => void, webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void) {
         this.commandForwardingFn = meshCommandFwdFn;
         this.discoveryStreamSources = new Map();
 
-        if (linkupcommandFwdFn !== undefined) {
-            this.linkup = new LinkupManagerProxy(linkupcommandFwdFn);
+        if (linkupCommandFwdFn !== undefined) {
+            this.linkup = new LinkupManagerProxy(linkupCommandFwdFn);
         }
 
         if (webRTCConnEventIngestFn !== undefined) {

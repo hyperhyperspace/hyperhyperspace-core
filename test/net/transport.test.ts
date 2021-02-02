@@ -1,6 +1,6 @@
 
-import { WebRTCConnection, WebSocketConnection } from 'net/transport';
-import { LinkupManager, LinkupAddress } from 'net/linkup';
+import { WebRTCConnection, WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxy, WebRTCConnectionProxyHost, WebSocketConnection } from 'net/transport';
+import { LinkupManager, LinkupAddress, LinkupManagerEvent, LinkupManagerProxyHost, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
 import { describeProxy } from 'config';
 import { Connection } from 'net/transport/Connection';
 import { RNGImpl } from 'crypto/random';
@@ -229,6 +229,105 @@ describeProxy('[TRA] Transports', () => {
 
     }, 15000);
 
+    test('[TRA05] WebRTC send / answer w/proxies', (done) => {
 
+            let eventCallback = (ev: LinkupManagerEvent) =>  {
+                linkupManager1.linkupManagerEventIngestFn(ev);
+            }
+
+            let linkupManager1Host = new LinkupManagerProxyHost(eventCallback);
+
+            let commandForwardingFn = (cmd: LinkupManagerCommand) => {
+                linkupManager1Host.execute(cmd);
+            }
+
+        let linkupManager1 = new LinkupManagerProxy(commandForwardingFn);
+        let eventCallback2 = (ev: LinkupManagerEvent) =>  {
+            linkupManager2.linkupManagerEventIngestFn(ev);
+        }
+
+        let linkupManager2Host = new LinkupManagerProxyHost(eventCallback2);
+
+        let commandForwardingFn2 = (cmd: LinkupManagerCommand) => {
+            linkupManager2Host.execute(cmd);
+        }
+
+        let linkupManager2 = new LinkupManagerProxy(commandForwardingFn2);
+
+        //let linkupServer2 = LinkupManager.defaultLinkupServer;
+        let linkupServer1 = LinkupManager.defaultLinkupServer;
+
+        const rnd = new RNGImpl().randomHexString(64);
+
+        let address1 = new LinkupAddress(linkupServer1, 'addressOne_F_' + rnd);
+        let address2 = new LinkupAddress(linkupServer1, 'addressTwo_F_' + rnd);
+
+        let theCallId = 'DUMMY_CALL_ID_TEST_F_' + rnd;
+        let channelName = "test_data_channel";
+
+        let conn2: WebRTCConnection|undefined = undefined;
+
+        linkupManager2.listenForMessagesNewCall(address2, (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => {
+            receiver;
+
+            let webRTCEventCallback2 = (ev: WebRTCConnectionEvent) => {
+                conn2.connectionEventIngestFn(ev);
+            }
+
+            let connHost2 = new WebRTCConnectionProxyHost(webRTCEventCallback2, linkupManager2 as any as LinkupManager);
+
+            let webRTCcommandForwardingFn2 = (cmd: WebRTCConnectionCommand) => {
+                connHost2.execute(cmd);
+            }
+    
+            let conn2 = new WebRTCConnectionProxy(address2, sender, callId, (conn: Connection) => {
+                expect(sender.linkupId).toEqual(address1.linkupId);
+                expect(conn.getConnectionId()).toEqual(theCallId);
+            }, webRTCcommandForwardingFn2)
+
+
+
+            /*conn2 = new WebRTCConnection(linkupManager2, address2, sender, callId, (conn: Connection) => {
+                expect(sender.linkupId).toEqual(address1.linkupId);
+                expect(conn.getConnectionId()).toEqual(theCallId);
+            });*/
+            conn2.setMessageCallback((message: any, _conn: Connection) => {
+                expect(message).toEqual("hola");
+                conn2?.send("chau");
+            });
+            conn2.answer(message);
+        });
+
+        let webRTCEventCallback1 = (ev: WebRTCConnectionEvent) => {
+            conn1.connectionEventIngestFn(ev);
+        }
+
+        let connHost1 = new WebRTCConnectionProxyHost(webRTCEventCallback1, linkupManager1 as any as LinkupManager);
+
+
+        let webRTCcommandForwardingFn1 = (cmd: WebRTCConnectionCommand) => {
+            connHost1.execute(cmd);
+        }
+
+        let conn1 = new WebRTCConnectionProxy(address1, address2, theCallId, (conn: Connection) => {
+            conn.send("hola");
+        }, webRTCcommandForwardingFn1)
+
+        
+        /*let _conn1 = new WebRTCConnection(linkupManager1 as any as LinkupManager, address1, address2, theCallId, (conn: Connection) => {
+            conn.send("hola");
+        });*/
+
+        conn1.setMessageCallback((message: any) => {
+            expect(message).toEqual("chau");
+            conn1.close();
+            conn2?.close();
+            linkupManager1Host.linkup.shutdown();
+            linkupManager2Host.linkup.shutdown();
+            done();
+        });
+
+        conn1.open(channelName);
+    }, 15000);
 
 });

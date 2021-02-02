@@ -1,4 +1,4 @@
-import { WebRTCConnectionCommand, CreateConnection, InformCallbackSet, CloseConnection, SendMessage } from './WebRTCConnectionProxyHost';
+import { WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage } from './WebRTCConnectionProxyHost';
 import { WebRTCConnectionEvent, ConnectionStatusChange, MessageReceived } from './WebRTCConnectionProxyHost';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { Connection } from '../Connection';
@@ -94,12 +94,12 @@ class WebRTCConnectionProxy implements Connection {
         this.messageCallback = messageCallback;
 
         if (messageCallback !== undefined) {
-            const msg: InformCallbackSet = {
+            const cmd: InformCallbackSet = {
                 type: 'message-callback-set',
                 connId: this.callId
             }
 
-            this.commandForwardingFn(msg);
+            this.commandForwardingFn(cmd);
         }
     }
 
@@ -112,6 +112,37 @@ class WebRTCConnectionProxy implements Connection {
     channelIsOperational(): boolean {
         return this.cachedChannelStatus === 'open';
     }
+
+    open(channelName='mesh-network-channel') {
+        const cmd: OpenConnection = {
+            type: 'open-connection',
+            connId: this.callId,
+            channelName: channelName
+        };
+
+        this.commandForwardingFn(cmd);
+    }
+
+    answer(message: any) {
+        const cmd: AnswerConnection = {
+            type: 'answer-connection',
+            connId: this.callId,
+            message: message
+        };
+
+        this.commandForwardingFn(cmd);
+    }
+
+    receiveSignallingMessage(message: any) {
+        const cmd: ReceiveSignalling = {
+            type: 'receive-signalling',
+            connId: this.callId,
+            message: message
+        };
+
+        this.commandForwardingFn(cmd);
+    }
+
 
     close(): void {
         this.closed = true;

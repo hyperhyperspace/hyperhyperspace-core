@@ -416,12 +416,12 @@ class NetworkAgent implements Agent {
                     
                 }
 
-                if (conn instanceof WebRTCConnection || conn instanceof WebSocketConnection) {
+                if (conn instanceof WebRTCConnection || conn instanceof WebRTCConnectionProxy || conn instanceof WebSocketConnection) {
                     conn.setMessageCallback(this.messageCallback);
                     conn.answer(message);
                 }
             } else {
-                if (conn instanceof WebRTCConnection) {
+                if (conn instanceof WebRTCConnection || conn instanceof WebRTCConnectionProxy) {
                     conn.receiveSignallingMessage(message);
                 } else if (conn instanceof WebSocketConnection) {
                     conn.answer(message);
@@ -521,11 +521,18 @@ class NetworkAgent implements Agent {
             });
 
 
-        let conn: WebRTCConnection | WebSocketConnection;
+        let conn: WebRTCConnection | WebRTCConnectionProxy | WebSocketConnection;
 
         if (SignallingServerConnection.isWebRTCBased(remoteAddress.url())) {
             if (SignallingServerConnection.isWebRTCBased(localAddress.url())) {
-                conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
+                if (this.proxyConfig?.webRTCCommandFn === undefined) {
+                    conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
+                } else {
+                    //console.log('created conn proxy for connId ' + connId);
+                    const connProxy = new WebRTCConnectionProxy(localAddress, remoteAddress, callId, this.connectionReadyCallback, this.proxyConfig?.webRTCCommandFn);
+                    this.connProxies?.set(callId, connProxy);
+                    conn = connProxy;
+                }    
             } else {
                 conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback, this.linkupManager);
             }

@@ -96,7 +96,7 @@ class LinkupManagerProxyHost {
 
     constructor(eventCallback: (ev: LinkupManagerEvent) => void, linkup?: LinkupManager) {
 
-        this.linkup = linkup || new LinkupManager;
+        this.linkup = linkup || new LinkupManager();
 
         this.eventCallback = eventCallback;
 
