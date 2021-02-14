@@ -83,7 +83,30 @@ type MessageOnCallEvent = {
     message: any
 }
 
-class LinkupManagerProxyHost {
+class LinkupManagerHost {
+
+    static isCommand(msg: any): boolean {
+
+        const type = msg?.type;
+
+        return (type === 'listen-for-messages-new-call' || 
+                type === 'listen-for-messages-on-call' ||
+                type === 'listen-for-raw-messages' ||
+                type === 'send-message-on-call' ||
+                type === 'send-raw-message' ||
+                type === 'listen-for-query-responses' ||
+                type === 'query-for-listening-addresses');
+
+    }
+
+    static isEvent(msg: any): boolean {
+        const type = msg?.type;
+
+        return (type === 'new-call-message' ||
+                type === 'raw-message-event' ||
+                type === 'listening-addresses-query-response' ||
+                type === 'message-on-call')
+    }
 
     linkup: LinkupManager;
 
@@ -206,7 +229,7 @@ class LinkupManagerProxyHost {
 
 }
 
-export { LinkupManagerProxyHost};
+export { LinkupManagerHost };
 export { LinkupManagerCommand, ListenForMessagesNewCall, ListenForMessagesOnCall,
          ListenForRawMessages, SendMessageOnCall, SendRawMessage, 
          ListenForQueryResponses, QueryForListeningAddresses };

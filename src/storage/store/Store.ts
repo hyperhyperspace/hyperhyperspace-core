@@ -19,6 +19,24 @@ class Store {
 
     static operationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
+    static backendLoaders: Map<string, (dbName: string) => Backend> = new Map();
+
+    static registerBackend(name: string, loader: (dbName: string) => Backend) {
+        Store.backendLoaders.set(name, loader);
+    }
+
+    static load(backendName:string, dbName: string) : (Store | undefined) {
+
+        const loader = Store.backendLoaders.get(backendName);
+
+        if (loader === undefined) {
+            return undefined;
+        } else {
+            return new Store(loader(dbName));
+        }
+
+    }
+
     private backend : Backend;
 
     private classCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
@@ -434,6 +452,14 @@ class Store {
     removeClassReferencesWatch(referringClassName: string, referringPath: string, referencedHash: Hash, callback: (match: Hash) => Promise<void>) : boolean {
         const key = Store.keyForClassReference(referringClassName, referringPath, referencedHash);
         return this.classReferencesCallbacks.delete(key, callback);
+    }
+
+    getName() {
+        return this.backend.getName();
+    }
+
+    getBackendName() {
+        return this.backend.getBackendName();
     }
 
     private static keyForClass(className: string) {

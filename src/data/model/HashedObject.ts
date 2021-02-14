@@ -153,7 +153,7 @@ abstract class HashedObject {
     getStore() : Store {
 
         if (!this.hasStore()) {
-            throw new Error('Attempted to get store from object resources, but one is not present.');
+            throw new Error('Attempted to get store from object resources, but one is not present in instance of ' + this._lastHash);
         }
 
         return this._resources?.store as Store;

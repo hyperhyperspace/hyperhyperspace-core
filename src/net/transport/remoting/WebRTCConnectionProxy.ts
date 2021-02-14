@@ -1,5 +1,5 @@
-import { WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage } from './WebRTCConnectionProxyHost';
-import { WebRTCConnectionEvent, ConnectionStatusChange, MessageReceived } from './WebRTCConnectionProxyHost';
+import { WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage } from './WebRTCConnectionsHost';
+import { WebRTCConnectionEvent, ConnectionStatusChange, MessageReceived } from './WebRTCConnectionsHost';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { Connection } from '../Connection';
 /* functions that actually used:

@@ -1,11 +1,12 @@
-import { PeerGroupAgentConfig } from 'mesh/agents/peer';
+import { PeerGroupAgentConfig, PeerInfo, PeerSource } from 'mesh/agents/peer';
 import { PeerGroupInfo, SyncMode } from 'mesh/service/Mesh';
 import { MeshCommand,
     JoinPeerGroup, LeavePeerGroup,
     SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
     StartObjectBroadcast, StopObjectBroadcast,
     FindObjectByHash, FindObjectByHashSuffix, 
-    CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply} from './MeshProxyHost';
+    CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply,
+    PeerSourceRequest } from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject } from 'data/model';
@@ -13,7 +14,7 @@ import { AsyncStream, BufferedAsyncStream, BufferingAsyncStreamSource } from 'ut
 import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 import { Endpoint } from 'mesh/agents/network';
 import { LinkupManager, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
-import { WebRTCConnectionEvent, WebRTCConnectionProxyHost } from 'net/transport';
+import { WebRTCConnectionEvent, WebRTCConnectionsHost } from 'net/transport';
 
 class MeshProxy {
 
@@ -22,7 +23,10 @@ class MeshProxy {
     commandStreamedReplyIngestFn: (reply: CommandStreamedReply) => void;
 
     linkup?: LinkupManagerProxy;
-    webRTCConnProxyHost?: WebRTCConnectionProxyHost;
+    webRTCConnsHost?: WebRTCConnectionsHost;
+
+    peerSources: Map<string, PeerSource>;
+    peerSourceRequestIngestFn: (req: PeerSourceRequest) => void;
 
     constructor(meshCommandFwdFn: (cmd: MeshCommand) => void, linkupCommandFwdFn?: (cmd: LinkupManagerCommand) => void, webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void) {
         this.commandForwardingFn = meshCommandFwdFn;
@@ -33,7 +37,7 @@ class MeshProxy {
         }
 
         if (webRTCConnEventIngestFn !== undefined) {
-            this.webRTCConnProxyHost = new WebRTCConnectionProxyHost(webRTCConnEventIngestFn, this.linkup as any as LinkupManager); // ugly
+            this.webRTCConnsHost = new WebRTCConnectionsHost(webRTCConnEventIngestFn, this.linkup as any as LinkupManager); // ugly
         }
 
         this.commandStreamedReplyIngestFn = (reply: CommandStreamedReply) => {
@@ -44,7 +48,7 @@ class MeshProxy {
                     source: literalReply.source,
                     destination: literalReply.destination,
                     hash: literalReply.hash,
-                    object: HashedObject.fromContext(literalReply.objContext),
+                    object: HashedObject.fromLiteralContext(literalReply.objContext),
                     timestamp: literalReply.timestamp
                 }
 
@@ -56,6 +60,54 @@ class MeshProxy {
             }
         }
 
+        this.peerSources = new Map();
+        this.peerSourceRequestIngestFn = (req: PeerSourceRequest) => {
+            if (req.type === 'get-peers') {
+                const source = this.peerSources.get(req.peerGroupId);
+
+                if (source !== undefined) {
+                    source.getPeers(req.count).then(
+                        (value: PeerInfo[]) => {
+                            this.commandForwardingFn({
+                                type: 'forward-get-peers-reply',
+                                requestId: req.requestId,
+                                peers: value,
+                                error: false
+                        });
+                        },
+                        (_reason: any) => {
+                            this.commandForwardingFn({
+                                type: 'forward-get-peers-reply',
+                                requestId: req.requestId,
+                                peers: [],
+                                error: true
+                            });
+                        });
+                }
+            } else if (req.type === 'get-peer-for-endpoint') {
+                const source = this.peerSources.get(req.peerGroupId);
+
+                if (source !== undefined) {
+                    source.getPeerForEndpoint(req.endpoint).then(
+                        (value: PeerInfo|undefined) => {
+                            this.commandForwardingFn({
+                                type: 'forward-get-peer-for-endpoint-reply',
+                                requestId: req.requestId,
+                                peerInfo: value,
+                                error: false
+                        });
+                        },
+                        (_reason: any) => {
+                            this.commandForwardingFn({
+                                type: 'forward-get-peer-for-endpoint-reply',
+                                requestId: req.requestId,
+                                peerInfo: undefined,
+                                error: true
+                            });
+                        })
+                }
+            }
+        };
     }
 
     getCommandStreamedReplyIngestFn() {
@@ -63,9 +115,18 @@ class MeshProxy {
     }
 
     joinPeerGroup(pg: PeerGroupInfo, config?: PeerGroupAgentConfig) {
+
+        if (!this.peerSources.has(pg.id)) {
+            this.peerSources.set(pg.id, pg.peerSource);
+        }
+
         const cmd: JoinPeerGroup = {
             type: 'join-peer-group',
-            peerGroupInfo: pg,
+            peerGroupId: pg.id,
+            localPeerEndpoint: pg.localPeer.endpoint,
+            localPeerIdentityHash: pg.localPeer.identityHash,
+            localPeerIdentity: pg.localPeer.identity === undefined? undefined : pg.localPeer.identity.toLiteralContext(),
+            localPeerIdentityKeyPair: pg.localPeer.identity?._keyPair === undefined? undefined: pg.localPeer.identity._keyPair.toLiteralContext(),
             config: config
         };
 
@@ -86,10 +147,23 @@ class MeshProxy {
     }
 
     syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string) {
+        
+        const ctx = obj.toContext();
+
+        let stores: any = {};
+
+        for (const [hash, o] of ctx.objects.entries()) {
+            const store = o.getStore();
+            if (store !== undefined) {
+                stores[hash] = {backendName: store.getBackendName(), dbName: store.getName()};
+            }
+        }
+        
         const cmd: SyncObjectsWithPeerGroup = {
             type:'sync-objects-with-peer-group',
             peerGroupId: peerGroupId,
-            objContext: obj.toContext(),
+            objContext: obj.toLiteralContext(),
+            stores: stores,
             mode: mode,
             gossipId: gossipId
         };
@@ -105,10 +179,20 @@ class MeshProxy {
             objContext.merge(obj.toContext());
         }
 
+        let stores: any = {};
+
+        for (const [hash, o] of objContext.objects.entries()) {
+            const store = o.getStore();
+            if (store !== undefined) {
+                stores[hash] = {backendName: store.getBackendName(), dbName: store.getName()};
+            }
+        }
+
         const cmd: SyncObjectsWithPeerGroup = {
             type: 'sync-objects-with-peer-group',
             peerGroupId: peerGroupId,
-            objContext: objContext,
+            objContext: objContext.toLiteralContext(),
+            stores: stores,
             mode: mode,
             gossipId: gossipId
         };
@@ -141,7 +225,7 @@ class MeshProxy {
     startObjectBroadcast(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number) {
         const cmd: StartObjectBroadcast = {
             type: 'start-object-broadcast',
-            objContext: object.toContext(),
+            objContext: object.toLiteralContext(),
             linkupServers: linkupServers,
             replyEndpoints: replyEndpoints,
             broadcastedSuffixBits: broadcastedSuffixBits

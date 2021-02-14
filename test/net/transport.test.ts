@@ -1,6 +1,6 @@
 
-import { WebRTCConnection, WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxy, WebRTCConnectionProxyHost, WebSocketConnection } from 'net/transport';
-import { LinkupManager, LinkupAddress, LinkupManagerEvent, LinkupManagerProxyHost, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
+import { WebRTCConnection, WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxy, WebRTCConnectionsHost, WebSocketConnection } from 'net/transport';
+import { LinkupManager, LinkupAddress, LinkupManagerEvent, LinkupManagerHost, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
 import { describeProxy } from 'config';
 import { Connection } from 'net/transport/Connection';
 import { RNGImpl } from 'crypto/random';
@@ -235,7 +235,7 @@ describeProxy('[TRA] Transports', () => {
                 linkupManager1.linkupManagerEventIngestFn(ev);
             }
 
-            let linkupManager1Host = new LinkupManagerProxyHost(eventCallback);
+            let linkupManager1Host = new LinkupManagerHost(eventCallback);
 
             let commandForwardingFn = (cmd: LinkupManagerCommand) => {
                 linkupManager1Host.execute(cmd);
@@ -246,7 +246,7 @@ describeProxy('[TRA] Transports', () => {
             linkupManager2.linkupManagerEventIngestFn(ev);
         }
 
-        let linkupManager2Host = new LinkupManagerProxyHost(eventCallback2);
+        let linkupManager2Host = new LinkupManagerHost(eventCallback2);
 
         let commandForwardingFn2 = (cmd: LinkupManagerCommand) => {
             linkupManager2Host.execute(cmd);
@@ -274,7 +274,7 @@ describeProxy('[TRA] Transports', () => {
                 conn2.connectionEventIngestFn(ev);
             }
 
-            let connHost2 = new WebRTCConnectionProxyHost(webRTCEventCallback2, linkupManager2 as any as LinkupManager);
+            let connHost2 = new WebRTCConnectionsHost(webRTCEventCallback2, linkupManager2 as any as LinkupManager);
 
             let webRTCcommandForwardingFn2 = (cmd: WebRTCConnectionCommand) => {
                 connHost2.execute(cmd);
@@ -302,7 +302,7 @@ describeProxy('[TRA] Transports', () => {
             conn1.connectionEventIngestFn(ev);
         }
 
-        let connHost1 = new WebRTCConnectionProxyHost(webRTCEventCallback1, linkupManager1 as any as LinkupManager);
+        let connHost1 = new WebRTCConnectionsHost(webRTCEventCallback1, linkupManager1 as any as LinkupManager);
 
 
         let webRTCcommandForwardingFn1 = (cmd: WebRTCConnectionCommand) => {

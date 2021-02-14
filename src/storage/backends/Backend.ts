@@ -8,6 +8,7 @@ type BackendSearchResults = {items : Array<Literal>, start?: string, end?: strin
 
 interface Backend {
 
+    getBackendName() : string;
     getName() : string;
 
     store(literal : Literal) : Promise<void>;

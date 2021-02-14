@@ -6,6 +6,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { Literal, Hash } from 'data/model';
 
 import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
+import { Store } from 'storage/store/Store';
 
 type IdbStorageFormat = {
     literal   : Literal,
@@ -23,6 +24,7 @@ type IdbTerminalOpsFormat = {
 class IdbBackend implements Backend {
 
     static terminalOpsStorageLog = new Logger(IdbBackend.name, LogLevel.INFO);
+    static backendName = 'idb';
 
 
     static readonly META_STORE = 'meta_store';
@@ -63,6 +65,10 @@ class IdbBackend implements Backend {
               // …
             }
         });
+    }
+
+    getBackendName() {
+        return IdbBackend.backendName;
     }
 
     getName() {
@@ -270,5 +276,7 @@ class IdbBackend implements Backend {
         return value + '_' + sequence.toString(16).padStart(16, '0');
     }
 }
+
+Store.registerBackend(IdbBackend.backendName, (dbName: string) => new IdbBackend(dbName));
 
 export { IdbBackend };

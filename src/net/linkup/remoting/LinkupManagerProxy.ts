@@ -5,10 +5,10 @@ import { LinkupAddress } from '../LinkupAddress';
 import { QueryCallback } from '../LinkupManager';
 import { MessageCallback, NewCallMessageCallback, RawMessageCallback } from '../LinkupServer';
 import { LinkupManagerCommand, ListenForMessagesNewCall, ListenForMessagesOnCall, 
-         ListenForRawMessages, SendMessageOnCall, SendRawMessage } from './LinkupManagerProxyHost';
-import { ListenForQueryResponses, QueryForListeningAddresses } from './LinkupManagerProxyHost'; 
+         ListenForRawMessages, SendMessageOnCall, SendRawMessage } from './LinkupManagerHost';
+import { ListenForQueryResponses, QueryForListeningAddresses } from './LinkupManagerHost'; 
 import { LinkupManagerEvent, NewCallMessageEvent, RawMessageEvent, 
-         ListeningAddressesQueryEvent, MessageOnCallEvent } from './LinkupManagerProxyHost';
+         ListeningAddressesQueryEvent, MessageOnCallEvent } from './LinkupManagerHost';
 
 class LinkupManagerProxy {
 
@@ -136,7 +136,7 @@ class LinkupManagerProxy {
             sender: sender.url(),
             recipient: recipient.url(),
             callId: callId, 
-            data: data
+            data: JSON.parse(JSON.stringify(data))
         };
         
         this.commandForwardingFn(cmd);

@@ -203,7 +203,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     static opClasses = [MutableSetAddOp.className, MutableSetDeleteOp.className];
     static logger    = new Logger(MutableSet.className, LogLevel.INFO);
 
-    logger: Logger;
+    _logger: Logger;
 
     typeConstraints?: Array<string>;
 
@@ -218,7 +218,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     constructor() {
         super(MutableSet.opClasses);
 
-        this.logger = MutableSet.logger;
+        this._logger = MutableSet.logger;
 
         this.setRandomId();
 
@@ -320,7 +320,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
                     try {
                         this._addElementCallback(addOp.element as T);
                     } catch (e) {
-                        this.logger.warning(() => ('Error calling MutableSet element addition callback on op ' + addOp.hash()));
+                        this._logger.warning(() => ('Error calling MutableSet element addition callback on op ' + addOp.hash()));
                     }
                 }
             }
@@ -353,7 +353,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
                         try {
                             this._deleteElementCallback(deleted);
                         } catch (e) {
-                            this.logger.warning(() => ('Error calling MutableSet element deletion callback on op ' + deleteOp.hash()));
+                            this._logger.warning(() => ('Error calling MutableSet element deletion callback on op ' + deleteOp.hash()));
                         }
                     }
                 }

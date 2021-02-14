@@ -1,4 +1,4 @@
-import { LinkupManager, LinkupAddress, LinkupManagerProxyHost, LinkupManagerProxy, LinkupManagerEvent, LinkupManagerCommand } from 'net/linkup';
+import { LinkupManager, LinkupAddress, LinkupManagerHost, LinkupManagerProxy, LinkupManagerEvent, LinkupManagerCommand } from 'net/linkup';
 import { describeProxy } from 'config';
 import { RNGImpl } from 'crypto/random';
 
@@ -126,7 +126,7 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
                 linkupManager1.linkupManagerEventIngestFn(ev);
             }
 
-            let linkupManager1Host = new LinkupManagerProxyHost(eventCallback);
+            let linkupManager1Host = new LinkupManagerHost(eventCallback);
 
             let commandForwardingFn = (cmd: LinkupManagerCommand) => {
                 linkupManager1Host.execute(cmd);
@@ -175,7 +175,7 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
                 linkupManager1.linkupManagerEventIngestFn(ev);
             }
 
-            let linkupManager1Host = new LinkupManagerProxyHost(eventCallback1);
+            let linkupManager1Host = new LinkupManagerHost(eventCallback1);
 
             let commandForwardingFn1 = (cmd: LinkupManagerCommand) => {
                 linkupManager1Host.execute(cmd);
@@ -187,7 +187,7 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
                 linkupManager2.linkupManagerEventIngestFn(ev);
             }
 
-            let linkupManager2Host = new LinkupManagerProxyHost(eventCallback2);
+            let linkupManager2Host = new LinkupManagerHost(eventCallback2);
 
             let commandForwardingFn2 = (cmd: LinkupManagerCommand) => {
                 linkupManager2Host.execute(cmd);

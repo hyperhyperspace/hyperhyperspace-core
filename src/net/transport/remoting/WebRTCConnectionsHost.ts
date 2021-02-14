@@ -67,7 +67,27 @@ type MessageReceived = {
 }
 
 
-class WebRTCConnectionProxyHost {
+class WebRTCConnectionsHost {
+
+    static isEvent(msg: any) {
+        const type = msg?.type;
+
+        return (type === 'connection-ready' || 
+                type === 'connection-status-change' || 
+                type === 'message-received')
+    }
+
+    static isCommand(msg: any): boolean {
+        const type = msg?.type;
+
+        return (type === 'create-connection' || 
+                type === 'message-callback-set' ||
+                type === 'open-connection' ||
+                type === 'answer-connection' ||
+                type === 'receive-signalling' ||
+                type === 'close-connection' ||
+                type === 'send-message');
+    }
 
     connections: Map<string, WebRTCConnection>;
     linkup: LinkupManager;
@@ -160,4 +180,4 @@ class WebRTCConnectionProxyHost {
 
 }
 
-export { WebRTCConnectionProxyHost, WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage, WebRTCConnectionEvent, MessageReceived, ConnectionReady, ConnectionStatusChange };
+export { WebRTCConnectionsHost, WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage, WebRTCConnectionEvent, MessageReceived, ConnectionReady, ConnectionStatusChange };

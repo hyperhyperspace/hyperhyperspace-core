@@ -1,6 +1,7 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from './Backend';
 import { Literal, Hash } from 'data/model';
 import { MultiMap } from 'util/multimap';
+import { Store } from 'storage/store/Store';
 
 type MemStorageFormat = {
     literal: Literal,
@@ -9,6 +10,8 @@ type MemStorageFormat = {
 }
 
 class MemoryBackend implements Backend {
+
+    static backendName = 'memory';
 
     name: string;
 
@@ -34,6 +37,10 @@ class MemoryBackend implements Backend {
         this.sortedReferencingClassIndex = new Map();
         this.terminalOps = new MultiMap();
         this.lastOps = new Map();
+    }
+
+    getBackendName() {
+        return MemoryBackend.backendName;
     }
 
     getName(): string {
@@ -175,5 +182,7 @@ class MemoryBackend implements Backend {
 
     }
 } 
+
+Store.registerBackend(MemoryBackend.backendName, (dbName: string) => new MemoryBackend(dbName));
 
 export { MemoryBackend };

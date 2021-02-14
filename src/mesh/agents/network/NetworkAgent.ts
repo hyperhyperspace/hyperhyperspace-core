@@ -8,7 +8,7 @@ import { WebRTCConnection } from 'net/transport/WebRTCConnection';
 import { RNGImpl } from 'crypto/random';
 import { SignallingServerConnection } from 'net/linkup/SignallingServerConnection';
 import { WebSocketConnection } from 'net/transport/WebSocketConnection';
-import { LinkupManagerProxyHost, LinkupManagerEvent } from 'net/linkup';
+import { LinkupManagerHost, LinkupManagerEvent } from 'net/linkup';
 import { WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxy } from 'net/transport';
 
 type Endpoint = string;
@@ -134,7 +134,7 @@ class NetworkAgent implements Agent {
 
     intervalRef : any;
 
-    linkupManagerHost?: LinkupManagerProxyHost;
+    linkupManagerHost?: LinkupManagerHost;
     webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void;
     connProxies?: Map<string, WebRTCConnectionProxy>;
 
@@ -325,7 +325,7 @@ class NetworkAgent implements Agent {
         };
 
         if (proxyConfig?.linkupEventIngestFn !== undefined) {
-            this.linkupManagerHost = new LinkupManagerProxyHost(proxyConfig.linkupEventIngestFn, this.linkupManager);
+            this.linkupManagerHost = new LinkupManagerHost(proxyConfig.linkupEventIngestFn, this.linkupManager);
         }
 
         if (proxyConfig?.webRTCCommandFn !== undefined) {

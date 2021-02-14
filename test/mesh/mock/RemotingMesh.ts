@@ -1,15 +1,14 @@
-import { Mesh, MeshProxy, MeshCommand, MeshProxyHost } from 'mesh/service';
-import { WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxyHost } from 'net/transport';
-import { LinkupManagerCommand, LinkupManagerEvent } from '../../../src';
+import { Mesh, MeshProxy, MeshCommand, MeshHost } from 'mesh/service';
+import { WebRTCConnectionCommand, WebRTCConnectionEvent } from 'net/transport';
+import { LinkupManagerCommand, LinkupManagerEvent } from 'net/linkup';
 
 
 class RemotingMesh {
 
     mesh: Mesh;
-    server: MeshProxyHost;
-    client: MeshProxy;
+    server: MeshHost;
 
-    connections: Map<string, WebRTCConnectionProxyHost>;
+    client: MeshProxy;
 
     linkupCommandFwdFn?: (cmd: LinkupManagerCommand) => void;
     linkupEventIngestFn?: (ev: LinkupManagerEvent) => void;
@@ -31,7 +30,7 @@ class RemotingMesh {
         }
 
         this.webRTCCommandFn = (cmd: WebRTCConnectionCommand) => {
-            setTimeout(() => { this.client.webRTCConnProxyHost?.execute(cmd); }, 0);
+            setTimeout(() => { this.client.webRTCConnsHost?.execute(cmd); }, 0);
         }
 
         this.webRTCConnEventIngestFn = (ev: WebRTCConnectionEvent) => {
@@ -51,9 +50,7 @@ class RemotingMesh {
             this.linkupCommandFwdFn,
             this.webRTCConnEventIngestFn
         );
-        this.server = new MeshProxyHost(this.mesh, this.client.commandStreamedReplyIngestFn);
-
-        this.connections = new Map();
+        this.server = new MeshHost(this.mesh, this.client.commandStreamedReplyIngestFn);
     }
     
 }
