@@ -38,6 +38,9 @@ class MemoryBackend implements Backend {
         this.terminalOps = new MultiMap();
         this.lastOps = new Map();
     }
+    async processExternalStore(literal: Literal): Promise<void> {
+        await this.store(literal);
+    }
 
     getBackendName() {
         return MemoryBackend.backendName;

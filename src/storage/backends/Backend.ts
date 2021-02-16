@@ -19,6 +19,8 @@ interface Backend {
     searchByClass(className: string, params? : BackendSearchParams) : Promise<BackendSearchResults>;
     searchByReference(referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
     searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
+
+    processExternalStore(literal: Literal): Promise<void>;
 }
 
 export { Backend, BackendSearchParams, BackendSearchResults };

@@ -67,6 +67,9 @@ class IdbBackend implements Backend {
         });
 
     }
+    async processExternalStore(literal: Literal): Promise<void> {
+        literal;
+    }
 
     getBackendName() {
         return IdbBackend.backendName;

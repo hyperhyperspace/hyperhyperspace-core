@@ -56,7 +56,10 @@ class Store {
         this.instanceId = new RNGImpl().randomHexString(128);
 
         this.backend = backend;
-        const callback = (literal: Literal) => this.fireCallbacks(literal);
+        const callback = async (literal: Literal) => { 
+            await this.backend.processExternalStore(literal);
+            await this.fireCallbacks(literal);
+        };
         this.triggerDispatcher = triggerDispatcher !== undefined? 
                                     triggerDispatcher : 
                                     new DefaultTriggerDispatcher(
