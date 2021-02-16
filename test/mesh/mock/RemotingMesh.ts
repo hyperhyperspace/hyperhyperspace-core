@@ -50,7 +50,7 @@ class RemotingMesh {
             this.linkupCommandFwdFn,
             this.webRTCConnEventIngestFn
         );
-        this.server = new MeshHost(this.mesh, this.client.commandStreamedReplyIngestFn);
+        this.server = new MeshHost(this.mesh, this.client.commandStreamedReplyIngestFn, this.client.peerSourceRequestIngestFn);
     }
     
 }
