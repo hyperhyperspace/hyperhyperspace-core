@@ -56,14 +56,14 @@ class Store {
         this.instanceId = new RNGImpl().randomHexString(128);
 
         this.backend = backend;
+        const callback = (literal: Literal) => this.fireCallbacks(literal);
         this.triggerDispatcher = triggerDispatcher !== undefined? 
                                     triggerDispatcher : 
                                     new DefaultTriggerDispatcher(
+                                            callback,
                                             backend.getBackendName(),
                                             backend.getName(),
                                             this.instanceId);
-
-        this.triggerDispatcher.setCallback((literal: Literal) => this.fireCallbacks(literal));
 
         this.classCallbacks = new MultiMap();
         this.referencesCallbacks = new MultiMap();
