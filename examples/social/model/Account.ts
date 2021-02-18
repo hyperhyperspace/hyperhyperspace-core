@@ -97,7 +97,7 @@ class Account extends HashedObject implements SpaceEntryPoint {
         }
 
         let linkupServers = resources.config.linkupServers === undefined?
-                            [LinkupManager.defaultLinkupServer] : resources.config.linkupServer as string[];
+                            [LinkupManager.defaultLinkupServer] : resources.config.linkupServers as string[];
 
 
 

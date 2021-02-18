@@ -9,14 +9,7 @@ import { Identity } from 'data/identity';
 import { RSAKeyPair } from 'data/identity';
 
 import { Space } from 'spaces/Space';
-import { Resources } from 'data/model';
-import { Store } from 'storage/store';
-//import { IdbBackend } from 'storage/backends';
-import { RNGImpl } from 'crypto/random';
-
-import { MemoryBackend } from 'storage/backends';
-import { Mesh } from 'mesh/service';
-import { IdentityPeer } from 'mesh/agents/peer';
+import { Resources } from 'spaces/spaces';
 
 import { Feed } from './model/Feed';
 import { Message } from './model/Message';
@@ -24,7 +17,7 @@ import { Message } from './model/Message';
 import * as readline from 'readline';
 
 function initResources(): Resources {
-    return { store: new Store(new MemoryBackend(new RNGImpl().randomHexString(128))), mesh: new Mesh(), config: {}, aliasing: new Map()};
+    return new Resources();// { store: new Store(new MemoryBackend(new RNGImpl().randomHexString(128))), mesh: new Mesh(), config: {}, aliasing: new Map()};
 }
 
 async function createIdentity(resources: Resources, name: string): Promise<Identity> {
@@ -46,9 +39,8 @@ async function createIdentity(resources: Resources, name: string): Promise<Ident
 async function createFeedSpace(resources: Resources, id: Identity): Promise<Space> {
 
     let feed = new Feed(id);
-    let endpoint = (await IdentityPeer.fromIdentity(id).asPeer()).endpoint;
 
-    let space = Space.fromEntryPoint(feed, resources, endpoint);
+    let space = Space.fromEntryPoint(feed, resources);
 
     space.startBroadcast();
     await space.getEntryPoint();
@@ -67,10 +59,9 @@ async function createFeedSpace(resources: Resources, id: Identity): Promise<Spac
     return space;
 }
 
-async function joinFeedSpace(resources: Resources, id: Identity, wordcode: string[]): Promise<Space> {
+async function joinFeedSpace(resources: Resources, wordcode: string[]): Promise<Space> {
     
-    let endpoint = (await IdentityPeer.fromIdentity(id).asPeer()).endpoint;
-    let space = Space.fromWordCode(wordcode, resources, endpoint);
+    let space = Space.fromWordCode(wordcode, resources);
 
     console.log();
     console.log('Trying to follow feed with word code "' + wordcode.join(' ') + '"...');
@@ -133,7 +124,7 @@ async function main() {
             process.exit();
         }
 
-        space = await joinFeedSpace(resources, id, wordcode);
+        space = await joinFeedSpace(resources, wordcode);
     }
 
     let feed = await space.getEntryPoint() as Feed;
