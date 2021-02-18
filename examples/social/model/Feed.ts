@@ -5,11 +5,7 @@ import { Identity } from 'data/identity';
 import { Message } from './Message';
 
 import { SpaceEntryPoint } from 'spaces/SpaceEntryPoint';
-import { Mesh } from 'mesh/service';
-import { LinkupManager } from 'net/linkup';
-import { ObjectDiscoveryPeerSource } from 'mesh/agents/peer';
-import { PeerGroupInfo } from 'mesh/service';
-import { IdentityPeer } from 'mesh/agents/peer';
+import { PeerNode } from 'mesh/service';
 
 
 class Feed extends HashedObject implements SpaceEntryPoint {
@@ -19,8 +15,7 @@ class Feed extends HashedObject implements SpaceEntryPoint {
     bio?: MutableReference<HashedLiteral>
     posts?: MutableSet<Message>;
 
-    _mesh?: Mesh;
-    _peerGroup?: PeerGroupInfo;
+    _node?: PeerNode;
 
     constructor(author?: Identity) {
         super();
@@ -74,52 +69,35 @@ class Feed extends HashedObject implements SpaceEntryPoint {
 
     async startSync(): Promise<void> {
 
+
         let resources = this.getResources();
 
         if (resources === undefined) {
             throw new Error('Cannot start sync: resources not configured.');
         }
 
-        this._mesh = resources.mesh;
-
-        if (this._mesh === undefined) {
-            throw new Error('Cannot start sync: mesh is missing from configured resources.');
+        if (resources.config?.id === undefined) {
+            throw new Error('Cannot start sync: local identity has not been defined.');
         }
 
-        let linkupServers = resources.config.linkupServers === undefined?
-                            [LinkupManager.defaultLinkupServer] : resources.config.linkupServer as string[];
-
-
-
-        const localIdentity = resources.config.id as Identity;
-        const localPeer     = await new IdentityPeer(linkupServers[0] as string, localIdentity.hash(), localIdentity).asPeer();
-
-        this._mesh.startObjectBroadcast(this, linkupServers, [localPeer.endpoint]);
-
-        let peerSource = new ObjectDiscoveryPeerSource(this._mesh, this, linkupServers, localPeer.endpoint, IdentityPeer.getEndpointParser(resources.store));
-
-        this._peerGroup = {
-            id: 'sync-for-' + this.hash(),
-            localPeer: localPeer,
-            peerSource: peerSource
+        if (resources.store === undefined) {
+            throw new Error('Cannot start sync: a local store has not been configured.')
         }
 
-        this._mesh.joinPeerGroup(this._peerGroup);
-        this._mesh.syncObjectWithPeerGroup(this._peerGroup.id, this);
+        this._node = new PeerNode(resources);
+        
+        this._node.broadcast(this);
+        this._node.sync(this);
+
+
 
         this.posts?.loadAndWatchForChanges();
     }
     
     async stopSync(): Promise<void> {
 
-        const peerGroupId = this._peerGroup?.id as string;
-        
-        this._mesh?.stopSyncObjectWithPeerGroup(peerGroupId, this.hash());
-        this._mesh?.stopObjectBroadcast(this.hash());
-        this._mesh?.leavePeerGroup(peerGroupId);
-
-        this._mesh = undefined;
-        this._peerGroup = undefined;
+        this._node?.stopBroadcast(this);
+        this._node?.stopSync(this);
     }
 
     getClassName(): string {

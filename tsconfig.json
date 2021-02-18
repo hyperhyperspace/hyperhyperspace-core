@@ -71,5 +71,5 @@
       { "transform": "@zerollup/ts-transform-paths" }
     ],
   },
-  "include": [ "./types/**/*", "./src/**/*", "./test/**/*" ]
+  "include": [ "./types/**/*", "./src/**/*", "./test/**/*", "./examples/social/**/*" ]
 }
