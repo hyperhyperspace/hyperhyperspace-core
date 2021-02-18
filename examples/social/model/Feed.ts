@@ -69,7 +69,6 @@ class Feed extends HashedObject implements SpaceEntryPoint {
 
     async startSync(): Promise<void> {
 
-
         let resources = this.getResources();
 
         if (resources === undefined) {
@@ -88,6 +87,7 @@ class Feed extends HashedObject implements SpaceEntryPoint {
         
         this._node.broadcast(this);
         this._node.sync(this);
+
 
 
 

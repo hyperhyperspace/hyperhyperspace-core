@@ -101,6 +101,7 @@ class Account extends HashedObject implements SpaceEntryPoint {
 
 
 
+
         const localIdentity = resources.config.id as Identity;
         const localPeer     = await new IdentityPeer(linkupServers[0] as string, localIdentity.hash(), localIdentity).asPeer();
 
