@@ -44,14 +44,8 @@ class IdbBackend implements Backend {
     static async fireCallbacks(dbName: string, literal: Literal) {
         for (const backend of IdbBackend.getRegisteredInstances(dbName)) {
             if (backend.objectStoreCallback !== undefined) {
-                console.log('firing callbacks for instance ' + backend + ' of ' + dbName);
-                console.log(backend);
                 await backend.objectStoreCallback(literal);
             }
-        }
-
-        if (IdbBackend.getRegisteredInstances(dbName).size === 0) {
-            console.log('no instances of ' + dbName +' found');
         }
     }
 
