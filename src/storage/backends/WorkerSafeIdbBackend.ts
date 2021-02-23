@@ -18,22 +18,13 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
             
             WorkerSafeIdbBackend.broadcastId = new RNGImpl().randomHexString(128);
             WorkerSafeIdbBackend.broadcastChannel = new BroadcastChannel(WorkerSafeIdbBackend.channelName);
-            console.log('initializing for ' + WorkerSafeIdbBackend.broadcastId);
+            
             WorkerSafeIdbBackend.broadcastChannel.onmessage = (ev: MessageEvent<any>) => {
                 
-                console.log('got data');
-                console.log(ev.data);
                 if (ev.data.broadcastId !== undefined &&
                     ev.data.broadcastId !== WorkerSafeIdbBackend.broadcastId) {
-
-                    console.log('firing callbacks for ' + ev.data.literal.hash + ' in ' + WorkerSafeIdbBackend.broadcastId);
-                    try {
-                        IdbBackend.fireCallbacks(ev.data.dbName, ev.data.literal);
-                    } catch (e) {
-                        console.log('ERROR');
-                        console.log(e);
-                    }
                     
+                    IdbBackend.fireCallbacks(ev.data.dbName, ev.data.literal);
                 
                 }
             };
@@ -42,8 +33,6 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
 
     constructor(name: string) {
         super(name);
-
-        console.log('constructing for ' + name);
 
         WorkerSafeIdbBackend.init();
     }
@@ -54,8 +43,6 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
 
     async store(literal: Literal): Promise<void> {
         await super.store(literal);
-
-        console.log('super name is ' + this.name);
 
         WorkerSafeIdbBackend.broadcastChannel.postMessage({
             broadcastId: WorkerSafeIdbBackend.broadcastId,
