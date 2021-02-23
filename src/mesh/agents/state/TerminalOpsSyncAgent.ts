@@ -328,15 +328,21 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 let badOps = false;
 
                 for (const opHash of (peerTerminalOpsState.terminalOps as HashedSet<Hash>).values()) {
-                    let o = await this.store.load(opHash);
+                    
+                    const alreadyFetching = this.incompleteOps.has(opHash);
 
-                    if (o === undefined) {
-                        opsToFetch.push(opHash);
-                    } else {
-                        const op = o as MutationOp;
+                    if (!alreadyFetching) {
 
-                        if (!this.shouldAcceptMutationOp(op)) {
-                            badOps = true;
+                        const o = await this.store.load(opHash);
+
+                        if (o === undefined) {
+                            opsToFetch.push(opHash);
+                        } else {
+                            const op = o as MutationOp;
+
+                            if (!this.shouldAcceptMutationOp(op)) {
+                                badOps = true;
+                            }
                         }
                     }
                 }
@@ -459,13 +465,28 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         for (const req of reqs) {
 
+            this.controlLog.trace('Pending reqs for ' + req.hash + ': ' + this.incomingObjects.get(req.hash)?.size);
+
+            // if we have already requested this object from this very same peer, do not ask for it again
+            const alreadyRequested = this.incomingObjects.get(req.hash)?.get(destination) !== undefined;
+
+            // if we already have two pending requests, do not ask for it again
             const pendingReqs = this.incomingObjects.get(req.hash)?.size || 0;
 
-            if ( pendingReqs < 2) {
+            if (!alreadyRequested && pendingReqs < 2) {
                 if (this.expectIncomingObject(destination, req.hash, req.dependencyChain, secret)) {
                     newReqs.push(req);
+                    this.controlLog.trace('This req was not being expected, WILL request');
+                } else {
+                    this.controlLog.trace('This req was already being expected, WILL NOT request');
                 }
+            } else {
+                // TODO: we should record that we have another possible source for this object, in case the
+                //       pending requests fail and we need to ask for it again. Once the object is effectively
+                //       received, those alternatives are no longer necessary and should be discarded.
             }
+
+
         }
 
         if (newReqs.length > 0) {
@@ -682,7 +703,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                             let dep = await this.store.load(depHash);
                             if (dep === undefined || dep.hash(secret) !== ownershipProofForHash.get(depHash)) {
                                 if (dep !== undefined) {
-                                    this.controlLog.trace('missing valid ownership proof for ' + hash);
+                                    this.controlLog.warning('missing valid ownership proof for ' + hash);
                                     // TODO: log / report invalid ownership proof
                                 }
                                 toRequest.push({hash: depHash, dependencyChain: depChain});
@@ -696,7 +717,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                             this.processReceivedObject(hash, context);
                         } else {
                             
-                            // If this claims to be an op that should be prcesed later, record an incomplete op
+                            // If this claims to be an op that should be procesed later, record an incomplete op
                             if (this.shouldAcceptMutationOpLiteral(context.literals.get(hash) as Literal)) {
                                 this.controlLog.trace('received object with hash ' + hash + ' is incomplete, about to process');
                                 this.processIncompleteOp(source, hash, context, toRequest);
