@@ -21,12 +21,15 @@ import { MultiMap } from 'util/multimap';
 
 *Introduction*
 
+A MutableObject represents the initial state of the object, which is then updated by creating 
+MutationOp instances that point to it through their "target" field, and to the MutationOps that
+were created just before in the "prevOps" field.
+
 The TerminalOpsSyncAgent's purpose is to synchronize the state of a MutableObject by keeping track
-of its "terminal ops". A MutableObject represents the initial state of the object, which is then
-updated by creating MutationOp instances that point to it through their "target" field.
+of its "terminal ops", i.e. the very last ops that were created, and that have no successor ops yet. 
 
 The agent will be instantiated to sync a particular MutableObject present in the local store, and
-will perform state reconcilaition with any connected peers that either advertise new states
+will perform state reconciliation with any connected peers that either advertise new states
 through gossiping or request MutationOps in response to its own state advertisements.
 
 The TerminalOpsSyncAgent only deals with actual state sync. The gossiping of new states is done
@@ -82,8 +85,8 @@ There are two security measures in place to prevent object exfiltration:
 
 Rule 1. Every requested object needs to be referenced (probably indirectly) from an op that has the
 object being synchronized as its target.
-Rule 2. Every an object A that is sent, and has a reference B that is optimized away from the sent
-message, must provide also a proof that the sender has B locally in its store.
+Rule 2. Every an object A that is sent and has a reference B that is optimized away from the sent
+message must provide a proof that the sender has B locally in its store.
 
 The purpose of Rule 1 is preventing an adversary from requesting arbitrary objects that have no
 relation to the object being synchronized.
