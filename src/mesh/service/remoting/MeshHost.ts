@@ -266,11 +266,6 @@ class MeshHost {
                     console.log('missing store info for ' + hash);
                 }
             }
-
-
-            
-
-
             
             this.mesh.syncManyObjectsWithPeerGroup(
                 syncObjs.peerGroupId, objs.values(), syncObjs.mode, syncObjs.gossipId
@@ -361,8 +356,6 @@ class MeshHost {
             }
         } else if (command.type === 'forward-get-peers-reply') {
 
-            console.log('GET PEERS REPLY');
-
             const reply = command as ForwardGetPeersReply;
 
             let ex = this.pendingPeersRequests.get(reply.requestId);
@@ -375,8 +368,6 @@ class MeshHost {
                 }
             }
         } else if (command.type === 'forward-get-peer-for-endpoint-reply') {
-
-            console.log('GET PEER FOR ENDPOINT REPLY');
 
             const reply = command as ForwardGetPeerForEndpointReply;
 

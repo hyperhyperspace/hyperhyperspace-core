@@ -7,6 +7,7 @@ import { Literal, Hash } from 'data/model';
 
 import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
 import { Store } from 'storage/store/Store';
+import { MultiMap } from 'util/multimap';
 
 type IdbStorageFormat = {
     literal   : Literal,
@@ -26,6 +27,34 @@ class IdbBackend implements Backend {
     static terminalOpsStorageLog = new Logger(IdbBackend.name, LogLevel.INFO);
     static backendName = 'idb';
 
+    static registered: MultiMap<string, IdbBackend> = new MultiMap();
+
+    static register(backend: IdbBackend) {
+        IdbBackend.registered.add(backend.name, backend);
+    }
+
+    static deregister(backend: IdbBackend) {
+        IdbBackend.registered.delete(backend.name, backend);
+    }
+
+    static getRegisteredInstances(name: string): Set<IdbBackend> {
+        return IdbBackend.registered.get(name);
+    }
+
+    static async fireCallbacks(dbName: string, literal: Literal) {
+        for (const backend of IdbBackend.getRegisteredInstances(dbName)) {
+            if (backend.objectStoreCallback !== undefined) {
+                console.log('firing callbacks for instance ' + backend + ' of ' + dbName);
+                console.log(backend);
+                await backend.objectStoreCallback(literal);
+            }
+        }
+
+        if (IdbBackend.getRegisteredInstances(dbName).size === 0) {
+            console.log('no instances of ' + dbName +' found');
+        }
+    }
+
 
     static readonly META_STORE = 'meta_store';
     static readonly OBJ_STORE  = 'object_store';
@@ -39,6 +68,8 @@ class IdbBackend implements Backend {
 
     name: string;
     idbPromise: Promise<IDBPDatabase>;
+
+    objectStoreCallback?: (literal: Literal) => Promise<void>
 
     constructor(name: string) {
         this.name = name;
@@ -66,7 +97,14 @@ class IdbBackend implements Backend {
             }
         });
 
+        IdbBackend.register(this);
+
     }
+
+    setStoredObjectCallback(objectStoreCallback: (literal: Literal) => Promise<void>): void {
+        this.objectStoreCallback = objectStoreCallback;
+    }
+
     async processExternalStore(literal: Literal): Promise<void> {
         literal;
     }
@@ -115,8 +153,6 @@ class IdbBackend implements Backend {
             let referencingClass = dep.className + '.' + dep.path + '#' + dep.hash;
             IdbBackend.assignIdxValue(storable, IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY, referencingClass, {sequence: true, multi: true});
         }
-
-
 
         if (isOp) {
             
@@ -168,9 +204,8 @@ class IdbBackend implements Backend {
         await tx.objectStore(IdbBackend.META_STORE).put(seqInfo);
         await tx.objectStore(IdbBackend.OBJ_STORE).put(storable);
 
+        await IdbBackend.fireCallbacks(this.name, literal);
     }
-        
-    
     
     async load(hash: Hash): Promise<Literal | undefined> {
 
@@ -199,6 +234,10 @@ class IdbBackend implements Backend {
     async searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: BackendSearchParams): Promise<BackendSearchResults> {
         return this.searchByIndex(IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY + '_idx', 
                                   referringClassName + '.' + referringPath + '#' + referencedHash, params);
+    }
+
+    close() {
+        IdbBackend.deregister(this);
     }
 
     private async searchByIndex(index: string, value: string, params?: BackendSearchParams) : Promise<BackendSearchResults> {

@@ -8,9 +8,6 @@ import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Logger, LogLevel } from 'util/logging';
 
 import { Resources } from 'spaces/spaces';
-import { TriggerDispatcher } from 'storage/triggers/TriggerDispatcher';
-import { DefaultTriggerDispatcher } from 'storage/triggers/DefaultTriggerDispatcher';
-import { RNGImpl } from 'crypto/random';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
@@ -40,10 +37,7 @@ class Store {
 
     }
 
-    private instanceId: string;
-
     private backend : Backend;
-    private triggerDispatcher: TriggerDispatcher;
 
     private classCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
     private referencesCallbacks : MultiMap<string, (match: Hash) => Promise<void>>;
@@ -51,22 +45,13 @@ class Store {
 
     private resources?: Resources;
 
-    constructor(backend : Backend, triggerDispatcher?: TriggerDispatcher) {
-
-        this.instanceId = new RNGImpl().randomHexString(128);
+    constructor(backend : Backend) {
 
         this.backend = backend;
-        const callback = async (literal: Literal) => { 
-            await this.backend.processExternalStore(literal);
+
+        this.backend.setStoredObjectCallback(async (literal: Literal) => {
             await this.fireCallbacks(literal);
-        };
-        this.triggerDispatcher = triggerDispatcher !== undefined? 
-                                    triggerDispatcher : 
-                                    new DefaultTriggerDispatcher(
-                                            callback,
-                                            backend.getBackendName(),
-                                            backend.getName(),
-                                            this.instanceId);
+        });
 
         this.classCallbacks = new MultiMap();
         this.referencesCallbacks = new MultiMap();
@@ -179,13 +164,6 @@ class Store {
             }
 
             await this.backend.store(literal);
-
-            // after the backend has stored the object, fire callbacks:
-            await this.fireCallbacks(literal);
-
-            // dispatch the stored object to any other instances of the store
-            // thaty may be open:
-            this.triggerDispatcher.dispatch(literal);
 
         } else {
             for (const [hash, obj] of context.objects.entries()) {
