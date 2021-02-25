@@ -63,6 +63,8 @@ class WebRTCConnectionProxy implements Connection {
                     // that the messageCallback was installed.
                     if (this.messageCallback !== undefined) {
                         this.messageCallback(msg.data, this);
+                    } else {
+                        console.log('WARNING: lost message due to missing callback in WebRTCConnectionProxy for ' + msg.connId);
                     }
                     
                 }

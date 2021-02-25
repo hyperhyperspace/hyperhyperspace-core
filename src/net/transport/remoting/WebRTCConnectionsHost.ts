@@ -139,21 +139,24 @@ class WebRTCConnectionsHost {
     execute(cmd: WebRTCConnectionCommand) {
 
         if (cmd.type === 'create-connection') { 
-
+            
             const create = cmd as CreateConnection;
             
             const local = LinkupAddress.fromURL(create.localEndpoint);
             const remote = LinkupAddress.fromURL(create.remoteEndpoint);
             const callId = create.connId;
 
-            const conn = new WebRTCConnection(this.linkup, local, remote, callId, this.connectionReadyCallback, this.connectionStatusChangeCallback);
-            this.connections.set(callId, conn);
+            if (!this.connections.has(callId)) {
+                const conn = new WebRTCConnection(this.linkup, local, remote, callId, this.connectionReadyCallback, this.connectionStatusChangeCallback);
+                this.connections.set(callId, conn);                    
+            }
+
 
         } else if (cmd.type === 'message-callback-set') {
 
             this.connections.get(cmd.connId)?.setMessageCallback(this.messageCallback);
         
-        } else if (cmd.type === 'open-connection') { 
+        } else if (cmd.type === 'open-connection') {
 
             this.connections.get(cmd.connId)?.open(cmd.channelName)
 
@@ -171,6 +174,10 @@ class WebRTCConnectionsHost {
             this.connections.delete(cmd.connId);
 
         } else if (cmd.type === 'send-message') {
+
+            if (!this.connections.has(cmd.connId)) {
+                console.log('WARNING: trying to send message on ' + cmd.connId + ', but there is no such connection.');
+            }
 
             this.connections.get(cmd.connId)?.send(cmd.contents);
 

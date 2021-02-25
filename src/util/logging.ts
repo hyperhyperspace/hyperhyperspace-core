@@ -22,13 +22,13 @@ class Logger {
     this.level = level;
   }
 
-  trace(msg: string | Object | (() => string))            { this.log(msg, LogLevel.TRACE); }
-  debug(msg: string | Object | (() => string))            { this.log(msg, LogLevel.DEBUG); }
-  info(msg: string | Object | (() => string))             { this.log(msg, LogLevel.INFO); }
-  warning(msg: string | Object  | (() => string))         { this.log(msg, LogLevel.WARNING); }
-  error(msg: string | Error | Object  | (() => string))   { this.log(msg, LogLevel.ERROR); }
+  trace(msg: string | Object | (() => string), obj?: any)            { this.log(msg, LogLevel.TRACE, obj); }
+  debug(msg: string | Object | (() => string), obj?: any)            { this.log(msg, LogLevel.DEBUG, obj); }
+  info(msg: string | Object | (() => string), obj?: any)             { this.log(msg, LogLevel.INFO, obj); }
+  warning(msg: string | Object  | (() => string), obj?: any)         { this.log(msg, LogLevel.WARNING, obj); }
+  error(msg: string | Error | Object  | (() => string), obj?: any)   { this.log(msg, LogLevel.ERROR, obj); }
 
-  log(msg: string | Object | (() => string), level: LogLevel) {
+  log(msg: string | Object | (() => string), level: LogLevel, obj?: any) {
     if (level >= this.level) {
       let className = 'Not within class';
       if (this.className) className = this.className;
@@ -39,6 +39,9 @@ class Logger {
       }
 
       console.log('[' + className + ' ' + d.getHours() + ':' + d.getMinutes() + ' ' + d.getSeconds() + '.' + d.getMilliseconds().toString().padStart(3, '0') + ']: ' + msg);
+      if (obj !== undefined) {
+        console.log(obj);
+      }
     } else if (this.chained !== undefined) {
       // in case another logger in the chain has a more verbose log level.
       this.chained.log(msg, level);

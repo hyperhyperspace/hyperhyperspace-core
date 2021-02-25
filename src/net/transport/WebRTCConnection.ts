@@ -16,6 +16,7 @@ const ICE_CANDIDATE = 'ICE_CANDIDATE';
 class WebRTCConnection implements Connection {
 
     static logger = new Logger(WebRTCConnection.name, LogLevel.INFO);
+    static iceLogger = new Logger(WebRTCConnection.name, LogLevel.INFO)
 
     readonly linkupManager : LinkupManager;
     readonly localAddress  : LinkupAddress;
@@ -55,6 +56,7 @@ class WebRTCConnection implements Connection {
         this.incomingMessages = [];
 
         this.onmessage = (ev) => {
+
             WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' received message from ' + this.remoteAddress?.linkupId + ' on call ' + this.callId);
             WebRTCConnection.logger.trace('message is ' + ev.data);
             if (this.messageCallback != undefined) {
@@ -83,6 +85,8 @@ class WebRTCConnection implements Connection {
                     this.handleReceiveConnectionDescription(data['callId'], data['channelName'], data['description']);
                 break;
                 case ICE_CANDIDATE:
+                    WebRTCConnection.iceLogger.debug('received ICE candidate:');
+                    WebRTCConnection.iceLogger.debug(data['candidate']);
                     this.handleReceiveIceCandidate(data['candidate']);
                 break;
             }
@@ -133,7 +137,12 @@ class WebRTCConnection implements Connection {
 
         this.channel =
                 this.connection?.createDataChannel(channelName);
-            this.setUpChannel();
+        
+        if (this.connection === undefined) {
+            WebRTCConnection.logger.error('Failed to create data channel, connection is undefined');
+        }
+        
+        this.setUpChannel();
 
         this.connection?.createOffer().then(
             (description) => {
@@ -173,8 +182,12 @@ class WebRTCConnection implements Connection {
     }
 
     send(message: any) {
-        WebRTCConnection.logger.trace(this.localAddress?.linkupId + ' sending msg to ' + this.remoteAddress?.linkupId + ' through channel ' + this.channelName + ' on call ' + this.callId);
+
+        WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' sending msg to ' + this.remoteAddress?.linkupId + ' through channel ' + this.channelName + ' on call ' + this.callId);
         this.channel?.send(message);
+        if (this.channel === undefined) {
+            WebRTCConnection.logger.warning('Attemting to send over missing channel in connection ' + this.callId + ' at ' + Date.now());
+        }
         WebRTCConnection.logger.trace('Done sending msg');
         
     }
@@ -186,6 +199,8 @@ class WebRTCConnection implements Connection {
         this.gatheredICE    = false;
 
         this.connection.onicecandidate = (ev) => {
+            WebRTCConnection.iceLogger.debug('onicecandidate was called with:');
+            WebRTCConnection.iceLogger.debug(JSON.stringify(ev.candidate));
             if (ev.candidate == null) {
                 this.gatheredICE = true;
                 WebRTCConnection.logger.debug(this.callId + ' is done gathering ICE candiadtes');
@@ -210,6 +225,8 @@ class WebRTCConnection implements Connection {
     }
 
     private signalIceCandidate(candidate: RTCIceCandidate) {
+        WebRTCConnection.iceLogger.debug('sending ice:');
+        WebRTCConnection.iceLogger.debug(candidate);
         this.signalSomething(ICE_CANDIDATE,
                               {'callId':          this.callId,
                                'channelName': this.channelName,
@@ -256,7 +273,13 @@ class WebRTCConnection implements Connection {
             this.setUpLinkupListener()
             this.connection?.createAnswer().then(
                 (description: RTCSessionDescriptionInit) => {
-                    this.connection?.setLocalDescription(description);
+                    try {
+                        this.connection?.setLocalDescription(description);
+                    } catch (e) {
+                        WebRTCConnection.logger.warning('Failed to set local description, error:', e);
+                        WebRTCConnection.logger.warning('Description object was:', description);
+                    }
+                    
                     this.signalConnectionDescription(description);
                 },
                 (error) => {

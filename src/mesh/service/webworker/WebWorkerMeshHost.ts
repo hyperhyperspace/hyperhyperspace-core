@@ -89,12 +89,21 @@ class WebWorkerMeshHost {
         
         this.host = new MeshHost(this.mesh, this.commandStreamedReplyIngestFn, this.peerSourceRequestIngestFn);
         
+        this.worker.onerror = (ev: ErrorEvent) => {
+            console.log('ERROR RECEIVING PROXYIED MESSAGE FROM MAIN THREAD:');
+            console.log(ev);
+        };
+
         this.worker.onmessage = (msg :{ data : any }) => {
         
             const data = msg?.data;
         
             WebWorkerMeshHost.logger.debug('Received from main: ' + data?.type);
             WebWorkerMeshHost.logger.debug(msg);
+
+            if (data.type === 'mesh-worker-ready-query') {
+                this.worker.postMessage({type: 'mesh-worker-ready'});
+            }
 
             if (MeshHost.isCommand(data)) {
                 WebWorkerMeshHost.logger.debug('Executing mesh command');
@@ -115,6 +124,8 @@ class WebWorkerMeshHost {
             }
         
         };
+
+        this.worker.postMessage({type: 'mesh-worker-ready'});
     }
 }
 

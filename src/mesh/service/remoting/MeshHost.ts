@@ -258,12 +258,9 @@ class MeshHost {
 
                     if (db !== undefined) {
                         obj.setStore(db);
-                        console.log('set store ' + dbName + ' for ' + hash);
                     } else {
-                        console.log('missing store');
+                        console.log('WARNING: missing store for ' + hash);
                     }
-                } else {
-                    console.log('missing store info for ' + hash);
                 }
             }
             
@@ -380,9 +377,6 @@ class MeshHost {
                     ex.resolve(reply.peerInfo);
                 }
             }
-        } else {
-            console.log('UNKNOWN:')
-            console.log(command);
         }
     }
 

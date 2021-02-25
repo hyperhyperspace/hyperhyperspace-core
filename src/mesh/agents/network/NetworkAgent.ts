@@ -161,7 +161,7 @@ class NetworkAgent implements Agent {
 
         this.messageCallback = (data: any, conn: Connection) => {
 
-            this.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getConnectionId())?.localEndpoint + ' received message: ' + data);
+            this.messageLogger.debug(() => 'Endpoint ' + this.connectionInfo.get(conn.getConnectionId())?.localEndpoint + ' received message from ' + this.connectionInfo.get(conn.getConnectionId())?.remoteEndpoint + ':\n' + data);
 
             const connectionId = conn.getConnectionId(); 
             const connInfo = this.connectionInfo.get(connectionId);
@@ -211,7 +211,7 @@ class NetworkAgent implements Agent {
                         }
                     };
 
-                    NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', status now is ' + connInfo.status + ' in ' + connInfo.localEndpoint);
+                    NetworkAgent.connLogger.trace(() => 'Broadcasting connection readiness for ' + connectionId + ', status now is ' + connInfo.status + ' in ' + connInfo.localEndpoint);
 
                     this.pod?.broadcastEvent(ev);
                 }
@@ -333,6 +333,10 @@ class NetworkAgent implements Agent {
             this.webRTCConnEventIngestFn = (ev: WebRTCConnectionEvent) => {
                 const proxy = this.connProxies?.get(ev.connId);
 
+                if (proxy === undefined) {
+                    this.logger.warning('Receivd connection event for ' + ev.connId + ', but there is no registered proxy.');
+                }
+
                 proxy?.connectionEventIngestFn(ev);
 
                 if (ev.type === 'connection-status-change' && ev.status === 'closed') {
@@ -392,7 +396,7 @@ class NetworkAgent implements Agent {
             if (conn === undefined) {
                 let connInfo = this.connectionInfo.get(connId) as ConnectionInfo;
     
-                if (conn === undefined) {
+                if (connInfo !== undefined) {
                     const receiver = LinkupAddress.fromURL(connInfo.localEndpoint);
                     const sender   = LinkupAddress.fromURL(connInfo.remoteEndpoint);
 
@@ -426,6 +430,10 @@ class NetworkAgent implements Agent {
                 } else if (conn instanceof WebSocketConnection) {
                     conn.answer(message);
                 }
+            }
+
+            if (conn !== undefined) {
+                this.connections.set(connId, conn);
             }
         }
     }
@@ -528,7 +536,6 @@ class NetworkAgent implements Agent {
                 if (this.proxyConfig?.webRTCCommandFn === undefined) {
                     conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
                 } else {
-                    //console.log('created conn proxy for connId ' + connId);
                     const connProxy = new WebRTCConnectionProxy(localAddress, remoteAddress, callId, this.connectionReadyCallback, this.proxyConfig?.webRTCCommandFn);
                     this.connProxies?.set(callId, connProxy);
                     conn = connProxy;
@@ -670,6 +677,8 @@ class NetworkAgent implements Agent {
     // Meant to be used in peer authentication & set up.
 
     sendMessage(connId: ConnectionId, agentId: AgentId, content: any) {
+
+        this.messageLogger.trace(() => 'Endpoint ' + this.connectionInfo.get(connId)?.localEndpoint + ' is sending message to ' + this.connectionInfo.get(connId)?.remoteEndpoint + ':\n' + JSON.stringify(content));
 
         const conn = this.connections.get(connId);
         const connInfo = this.connectionInfo.get(connId);

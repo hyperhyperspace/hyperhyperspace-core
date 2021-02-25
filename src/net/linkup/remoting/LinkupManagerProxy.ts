@@ -42,7 +42,7 @@ class LinkupManagerProxy {
                     try {
                         cb(sender, recipient, newCall.callId, newCall.message);
                     } catch (e) {
-                        console.log('Error in callback invocation within LinkupManagerProxy: ' + e);
+                        console.log('Error in callback invocation within LinkupManagerProxy: ', e);
                     }
                     
                 }
@@ -57,7 +57,7 @@ class LinkupManagerProxy {
                     try {
                         cb(sender, recipient, raw.message);
                     } catch (e) {
-                        console.log('Error in callback invocation within LinkupManagerProxy: ' + e);
+                        console.log('Error in callback invocation within LinkupManagerProxy: ', e);
                     }
                 }
 
@@ -71,7 +71,7 @@ class LinkupManagerProxy {
                     try {
                         cb(response.queryId, listening);
                     } catch (e) {
-                        console.log('Error in callback invocation within LinkupManagerProxy: ' + e);
+                        console.log('Error in callback invocation within LinkupManagerProxy: ', e);
                     }
                 }
 
@@ -84,7 +84,7 @@ class LinkupManagerProxy {
                     try {
                         cb(msg.message);
                     } catch (e) {
-                        console.log('Error in callback invocation within LinkupManagerProxy: ' + e);
+                        console.log('Error in callback invocation within LinkupManagerProxy: ', e);
                     }
                 }
             }
