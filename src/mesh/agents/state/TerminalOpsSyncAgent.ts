@@ -207,7 +207,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         this.opCallback = async (opHash: Hash) => {
 
-            this.opTransferLog.debug('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.peerGroupAgent.getLocalPeer().endpoint);
+            this.opTransferLog.trace('Op ' + opHash + ' found for object ' + this.objHash + ' in peer ' + this.peerGroupAgent.getLocalPeer().endpoint);
 
             let op = await this.store.load(opHash) as MutationOp;
             if (this.shouldAcceptMutationOp(op)) {
@@ -286,7 +286,10 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
             for (const hash of timeoutedIncompleteOps) {
                 this.incompleteOps.delete(hash);
+                console.log('timeouted incomlete op: ' + hash);
             }
+
+            //FIXME: issue retry for tiemouted incomplete op
             
 
         }, 5000);
@@ -351,6 +354,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                     // report bad peer
                 } else if (opsToFetch.length > 0) {
                     this.sendRequestObjsMessage(sender, opsToFetch.map( (hash: Hash) => ({hash: hash, dependencyChain: []}) ));
+                    //console.log('requesting ops from received sate: ' + opsToFetch);
                 }
 
                 return opsToFetch.length > 0 && !badOps;
@@ -497,7 +501,8 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 ownershipProofSecret: secret
             };
     
-            this.sendSyncMessageToPeer(destination, msg);    
+            this.sendSyncMessageToPeer(destination, msg);
+            //console.log('sending objs req for: ' + newReqs.map((req: ObjectRequest) => req.hash) + ' to ' + destination);
         }
     }
 
@@ -620,6 +625,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         if (this.shouldAcceptMutationOp(obj as MutationOp)) {
             this.controlLog.trace(() => 'saving object with hash ' + hash + ' in ' + this.peerGroupAgent.localPeer.endpoint);
+            this.opTransferLog.debug('Op is complete, saving ' + hash + ' of type ' + obj.getClassName());
             await this.store.save(obj);
         } else {
             this.controlLog.warning(() => 'NOT saving object with hash ' + hash + ' in ' + this.peerGroupAgent.localPeer.endpoint + ', it has the wrong type for a mutation op.');
@@ -639,8 +645,6 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
             const incompleteOp = this.incompleteOps.get(opHash) as IncompleteOp;
 
-            // incompleteOp is undefined! FIXME
-
             incompleteOp.context.objects.set(hash, obj);
             incompleteOp.missingObjects.delete(hash);
 
@@ -659,6 +663,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         }
 
         // just in case this op was received partailly before:
+        // FIXME: don't do if there was an error above!
 
         const incompleteOp = this.incompleteOps.get(hash);
 
@@ -726,6 +731,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                             }
 
                             this.sendRequestObjsMessage(source, toRequest);
+                            //console.log('requesting objects from missing deps: ' + toRequest.map((req: ObjectRequest) => req.hash));
                         }
 
                     } catch (e) {
@@ -760,6 +766,8 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         if (incompleteOp === undefined) {
 
+            this.opTransferLog.debug('Received new incomplete op ' + hash + ', missing objects: ' + toRequest.map((req: ObjectRequest) => req.hash));
+
             incompleteOp = {
                 source: source,
                 context: context,
@@ -793,11 +801,17 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 try {
                     this.processReceivedObject(hash, context);
                 } finally {
-
+                    // FIXME: if someone sends a broken dependency object, this would remove the
+                    //        op from the incompleteOp map!
                     this.incompleteOps.delete(hash);
                 }
             } else if (incompleteOp.missingObjects.size < initialMissingCount) {
+
+                this.opTransferLog.debug('Received duplicated incomplete op ' + hash + ', completed ' + (initialMissingCount - incompleteOp.missingObjects.size) + 'deps, ' + incompleteOp.missingObjects.size + ' remain to be fetched');
+
                 incompleteOp.timeout = Date.now() + this.params.incompleteOpTimeout * 1000;
+            } else {
+                this.opTransferLog.debug('Received duplicated incomplete op ' + hash + ', no missing dependencies were present');
             }
         }
 
