@@ -16,6 +16,7 @@ import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
+import { LiteralUtils } from 'data/model/Literals';
 
 /*
 
@@ -828,7 +829,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }
 
     private shouldAcceptMutationOpLiteral(op: Literal): boolean {
-        return this.objHash === op.value._fields['target']._hash &&
+        return this.objHash === LiteralUtils.getFields(op)['target']._hash &&
                this.acceptedMutationOpClasses.indexOf(op.value._class) >= 0;
     }
 

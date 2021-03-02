@@ -22,7 +22,7 @@ class RemotingMesh {
     constructor() {
 
         this.linkupCommandFwdFn = (cmd: LinkupManagerCommand) => {
-            setTimeout(() => { this.server.mesh.network.linkupManagerHost?.execute(cmd); }, 0);
+            /*setTimeout(() => { */ this.server.mesh.network.linkupManagerHost?.execute(cmd);/* }, 0)*/;
         }
 
         this.linkupEventIngestFn = (ev: LinkupManagerEvent) => {
@@ -30,7 +30,7 @@ class RemotingMesh {
         }
 
         this.webRTCCommandFn = (cmd: WebRTCConnectionCommand) => {
-            setTimeout(() => { this.client.webRTCConnsHost?.execute(cmd); }, 0);
+            /*setTimeout(() => { */this.client.webRTCConnsHost?.execute(cmd);/* }, 0)*/;
         }
 
         this.webRTCConnEventIngestFn = (ev: WebRTCConnectionEvent) => {
@@ -46,7 +46,7 @@ class RemotingMesh {
 
         this.mesh = new Mesh(proxyConfig);
         this.client = new MeshProxy(
-            (cmd: MeshCommand) => { setTimeout(() => { this.server.execute(cmd) }, 0);},
+            (cmd: MeshCommand) => { /*setTimeout(() => { */this.server.execute(cmd) /*}, 0)*/;},
             this.linkupCommandFwdFn,
             this.webRTCConnEventIngestFn
         );

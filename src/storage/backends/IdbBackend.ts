@@ -8,6 +8,7 @@ import { Literal, Hash } from 'data/model';
 import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
 import { Store } from 'storage/store/Store';
 import { MultiMap } from 'util/multimap';
+import { LiteralUtils } from 'data/model/Literals';
 
 type IdbStorageFormat = {
     literal   : Literal,
@@ -150,13 +151,13 @@ class IdbBackend implements Backend {
 
         if (isOp) {
             
-            const mutableHash = storable.literal.value._fields['target']['_hash'];
+            const mutableHash = LiteralUtils.getFields(storable.literal)['target']['_hash'];
 
             // FIXME: we could expose a static method in HashedSet to get the element array in the 
             //        literalized representation, and maybe another static method in HashedReference
             //        to get the hashed from the literalized ref?
 
-            const prevOpHashes =  storable.literal.value._fields['prevOps']['_elements']
+            const prevOpHashes =  LiteralUtils.getFields(storable.literal)['prevOps']['_elements']
                                     .map((elmtValue: {_hash: Hash}) => elmtValue['_hash']) as Array<Hash>;
 
             IdbBackend.terminalOpsStorageLog.debug('updating stored last ops for ' + mutableHash + 

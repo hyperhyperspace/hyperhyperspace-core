@@ -1,4 +1,4 @@
-import { Literal } from 'data/model/HashedObject';
+import { Literal } from 'data/model/Literals';
 import { Hash } from 'data/model/Hashing';
 
 type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, limit?: number};

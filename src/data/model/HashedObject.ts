@@ -15,18 +15,11 @@ import { Context, LiteralContext } from './Context';
 import { Mesh } from 'mesh/service';
 import { Resources } from 'spaces/spaces';
 
-import { __spreadArrays } from 'tslib';
+import { Literal, Dependency } from './Literals';
 
-
-type Literal           = { hash: Hash, value: any, author?: Hash, signature?: string, dependencies: Array<Dependency> }
-type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
-
-//type ObjectContext    = { rootHashes: Array<Hash>, objects: Map<Hash, HashedObject> };
-//type LiteralContext   = { rootHashes: Array<Hash>, literals: Map<Hash, Literal> };
-//type Context = { rootHashes: Array<Hash>, objects: Map<Hash, HashedObject>, literals: Map<Hash, Literal>, aliased?: Map<Hash, HashedObject> };  //ObjectContext & Partial<AliasingContext>;
+//import { __spreadArrays } from 'tslib';
 
 const BITS_FOR_ID = 128;
-
 
 /* HashedObject: Base class for objects than need to be storable in the
                  Hyper Hyper Space global content-addressed database.
@@ -35,7 +28,6 @@ const BITS_FOR_ID = 128;
  whether it needs an id (randomized or derived from a parent object's id)
  and which objects should be preloaded when loading operations that mutate
  this object and its subobjects. */
-
 
 abstract class HashedObject {
 
@@ -740,4 +732,4 @@ abstract class HashedObject {
 
 }
 
-export { HashedObject, Literal, Dependency };
+export { HashedObject };

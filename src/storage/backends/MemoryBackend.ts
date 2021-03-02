@@ -2,6 +2,7 @@ import { Backend, BackendSearchParams, BackendSearchResults } from './Backend';
 import { Literal, Hash } from 'data/model';
 import { MultiMap } from 'util/multimap';
 import { Store } from 'storage/store/Store';
+import { LiteralUtils } from 'data/model/Literals';
 
 type MemStorageFormat = {
     literal: Literal,
@@ -132,10 +133,10 @@ class MemoryBackend implements Backend {
         const isOp = literal.value['_flags'].indexOf('op') >= 0;
 
         if (isOp) {
-            const mutableHash = storable.literal.value._fields['target']['_hash'];
+            const mutableHash = LiteralUtils.getFields(storable.literal)['target']['_hash'];
 
         
-            const prevOpHashes =  storable.literal.value._fields['prevOps']['_elements']
+            const prevOpHashes =  LiteralUtils.getFields(storable.literal)['prevOps']['_elements']
                                     .map((elmtValue: {_hash: Hash}) => elmtValue['_hash']) as Array<Hash>;
             
 
