@@ -170,7 +170,7 @@ abstract class HashedObject {
     getLastHash() {
         
         if (this._lastHash === undefined) {
-            throw new Error('Attempted to get stored hash within an unstored object.');
+            this.hash();
         }
 
         return this._lastHash as Hash;
