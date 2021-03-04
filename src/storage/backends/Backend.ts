@@ -6,7 +6,7 @@ type BackendSearchResults = {items : Array<Literal>, start?: string, end?: strin
 
 //type MutableObjectInfo = { hash: Hash, nextOpSeqNumber: number, terminalOps: Array<Hash> };
 
-type StoredLiteral = { literal: Literal, extra: {opDepth?: number, prevOpCount?: number}};
+type StoredLiteral = { literal: Literal, extra: {opHeight?: number, prevOpCount?: number}};
 
 interface Backend {
 

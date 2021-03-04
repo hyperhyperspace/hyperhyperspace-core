@@ -10,7 +10,7 @@ type MemStorageFormat = {
     timestamp: string,
     sequence: number,
 
-    opDepth?     : number,
+    opHeight?     : number,
     prevOpCount? : number
 }
 
@@ -143,7 +143,7 @@ class MemoryBackend implements Backend {
 
             const prevOpHashes = HashedSet.elementsFromLiteral(LiteralUtils.getFields(storable.literal)['prevOps']).map(HashReference.hashFromLiteral);
 
-            let opDepth = 0;
+            let opHeight = 0;
             let prevOpCount = 0;
 
             for (const prevOpHash of prevOpHashes) {
@@ -154,8 +154,8 @@ class MemoryBackend implements Backend {
                     throw new Error('PrevOp ' + prevOpHash + ' is missing from memory-based store ' + this.name + ' for op ' + literal.hash);
                 }
 
-                if (stored.extra.opDepth !== undefined && stored.extra.opDepth + 1 > opDepth) {
-                    opDepth = stored.extra.opDepth + 1;
+                if (stored.extra.opHeight !== undefined && stored.extra.opHeight + 1 > opHeight) {
+                    opHeight = stored.extra.opHeight + 1;
                 }
 
                 if (stored.extra.prevOpCount !== undefined) {
@@ -163,7 +163,7 @@ class MemoryBackend implements Backend {
                 }
             }
 
-            storable.opDepth = opDepth;
+            storable.opHeight = opHeight;
             storable.prevOpCount = prevOpCount;
 
             for (const prevOpHash of prevOpHashes) {
@@ -191,8 +191,8 @@ class MemoryBackend implements Backend {
             
             let extra: any = {};
 
-            if (loaded.opDepth !== undefined) {
-                extra.opDepth = loaded.opDepth;
+            if (loaded.opHeight !== undefined) {
+                extra.opHeight = loaded.opHeight;
             }
 
             if (loaded.prevOpCount !== undefined) {

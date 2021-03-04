@@ -16,7 +16,7 @@ type IdbStorageFormat = {
     timestamp : string,
     sequence  : number,
 
-    opDepth?     : number,
+    opHeight?     : number,
     prevOpCount? : number
 }
 
@@ -159,27 +159,29 @@ class IdbBackend implements Backend {
 
             const prevOpHashes = HashedSet.elementsFromLiteral(LiteralUtils.getFields(storable.literal)['prevOps']).map(HashReference.hashFromLiteral);
 
-            let opDepth = 0;
+            let opHeight = 0;
             let prevOpCount = 0;
 
             for (const prevOpHash of prevOpHashes) {
-                const stored = await this.load(prevOpHash);
 
-                if (stored === undefined) {
+
+                const loaded = await tx.objectStore(IdbBackend.OBJ_STORE).get(prevOpHash);
+
+                if (loaded === undefined) {
                     IdbBackend.log.error('PrevOp ' + prevOpHash + ' is missing from IDB store ' + this.name + ' for op ' + literal.hash);
                     throw new Error('PrevOp ' + prevOpHash + ' is missing from IDB store ' + this.name + ' for op ' + literal.hash);
                 }
 
-                if (stored.extra.opDepth !== undefined && stored.extra.opDepth + 1 > opDepth) {
-                    opDepth = stored.extra.opDepth + 1;
+                if (loaded.opHeight !== undefined && loaded.opHeight + 1 > opHeight) {
+                    opHeight = loaded.opHeight + 1;
                 }
 
-                if (stored.extra.prevOpCount !== undefined) {
-                    prevOpCount = prevOpCount + stored.extra.prevOpCount;
+                if (loaded.prevOpCount !== undefined) {
+                    prevOpCount = prevOpCount + loaded.prevOpCount;
                 }
             }
 
-            storable.opDepth = opDepth;
+            storable.opHeight = opHeight;
             storable.prevOpCount = prevOpCount;
 
             IdbBackend.terminalOpsStorageLog.debug('updating stored last ops for ' + mutableHash + 
@@ -234,8 +236,8 @@ class IdbBackend implements Backend {
 
             let extra: any = {};
 
-            if (loaded.opDepth !== undefined) {
-                extra.opDepth = loaded.opDepth;
+            if (loaded.opHeight !== undefined) {
+                extra.opHeight = loaded.opHeight;
             }
 
             if (loaded.prevOpCount !== undefined) {
