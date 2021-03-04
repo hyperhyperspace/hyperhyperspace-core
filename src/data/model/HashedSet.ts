@@ -102,6 +102,14 @@ class HashedSet<T> {
         return this.hashedElements.size;
     }
 
+
+    // NOTE ABOUT VALIDATION.
+    
+    // There is no validation step for deliteralize, but if the object came from an unstrusted source,
+    // it will be re-hashed after reconstruction to check if the advertised hash was correct.
+    // Hence if the hashes in the array were not sorted as they should, they will be when the object
+    // is re-hashed, the hashes will not match and the object will be discarded.
+
     static deliteralize(value: any, context: Context, validate=false) : HashedSet<any> {
         
         if (value['_type'] !== 'hashed_set') {
