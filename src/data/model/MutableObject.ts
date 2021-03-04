@@ -181,7 +181,7 @@ abstract class MutableObject extends HashedObject {
 
             op.setTarget(this);
 
-            let prevOps = op.getPrevOps();
+            let prevOps = op.getPrevOpsIfPresent();
 
             let terminalOpHashes = new Set<Hash>();
 
@@ -286,7 +286,7 @@ abstract class MutableObject extends HashedObject {
                     throw e;
                 }
                 
-                let prevOps = op.getPrevOps();
+                let prevOps = op.getPrevOpsIfPresent();
                 if (prevOps !== undefined) {
                     for (const prevOp of prevOps) {
                         this._prevOpsForUnsavedOps.delete(prevOp.hash);
