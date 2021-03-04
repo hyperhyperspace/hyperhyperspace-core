@@ -22,6 +22,14 @@ class HashReference<_T extends HashedObject> {
     static deliteralize(literal: { _type: 'hashed_object_reference', _hash: Hash, _class: string }) {
         return new HashReference<HashedObject>(literal._hash, literal._class);
     }
+
+    static hashFromLiteral(literal: { _hash: Hash }) {
+        return literal._hash;
+    }
+
+    static classNameFromLiteral(literal: { _class: string }) {
+        return literal._class;
+    }
 }
 
 export { HashReference }

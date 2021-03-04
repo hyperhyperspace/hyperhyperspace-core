@@ -3,9 +3,9 @@ import { openDB, IDBPDatabase } from 'idb';
 
 import { Logger, LogLevel } from 'util/logging';
 
-import { Literal, Hash } from 'data/model';
+import { Literal, Hash, HashedSet, HashReference } from 'data/model';
 
-import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
+import { Backend, BackendSearchParams, BackendSearchResults, StoredLiteral } from './Backend'; 
 import { Store } from 'storage/store/Store';
 import { MultiMap } from 'util/multimap';
 import { LiteralUtils } from 'data/model/Literals';
@@ -14,7 +14,10 @@ type IdbStorageFormat = {
     literal   : Literal,
     indexes   : any,
     timestamp : string,
-    sequence  : number
+    sequence  : number,
+
+    opDepth?     : number,
+    prevOpCount? : number
 }
 
 type IdbTerminalOpsFormat = {
@@ -25,6 +28,7 @@ type IdbTerminalOpsFormat = {
 
 class IdbBackend implements Backend {
 
+    static log = new Logger(IdbBackend.name, LogLevel.INFO);
     static terminalOpsStorageLog = new Logger(IdbBackend.name, LogLevel.INFO);
     static backendName = 'idb';
 
@@ -153,12 +157,30 @@ class IdbBackend implements Backend {
             
             const mutableHash = LiteralUtils.getFields(storable.literal)['target']['_hash'];
 
-            // FIXME: we could expose a static method in HashedSet to get the element array in the 
-            //        literalized representation, and maybe another static method in HashedReference
-            //        to get the hashed from the literalized ref?
+            const prevOpHashes = HashedSet.elementsFromLiteral(LiteralUtils.getFields(storable.literal)['prevOps']).map(HashReference.hashFromLiteral);
 
-            const prevOpHashes =  LiteralUtils.getFields(storable.literal)['prevOps']['_elements']
-                                    .map((elmtValue: {_hash: Hash}) => elmtValue['_hash']) as Array<Hash>;
+            let opDepth = 0;
+            let prevOpCount = 0;
+
+            for (const prevOpHash of prevOpHashes) {
+                const stored = await this.load(prevOpHash);
+
+                if (stored === undefined) {
+                    IdbBackend.log.error('PrevOp ' + prevOpHash + ' is missing from IDB store ' + this.name + ' for op ' + literal.hash);
+                    throw new Error('PrevOp ' + prevOpHash + ' is missing from IDB store ' + this.name + ' for op ' + literal.hash);
+                }
+
+                if (stored.extra.opDepth !== undefined && stored.extra.opDepth + 1 > opDepth) {
+                    opDepth = stored.extra.opDepth + 1;
+                }
+
+                if (stored.extra.prevOpCount !== undefined) {
+                    prevOpCount = prevOpCount + stored.extra.prevOpCount;
+                }
+            }
+
+            storable.opDepth = opDepth;
+            storable.prevOpCount = prevOpCount;
 
             IdbBackend.terminalOpsStorageLog.debug('updating stored last ops for ' + mutableHash + 
                                                    ' on arrival of ' + storable.literal.hash + 
@@ -202,13 +224,28 @@ class IdbBackend implements Backend {
         await IdbBackend.fireCallbacks(this.name, literal);
     }
     
-    async load(hash: Hash): Promise<Literal | undefined> {
+    async load(hash: Hash): Promise<StoredLiteral | undefined> {
 
         let idb = await this.idbPromise;
 
-        return idb.get(IdbBackend.OBJ_STORE, hash)
-                  .then((storable: IdbStorageFormat | undefined) => 
-                     (storable?.literal)) as Promise<Literal | undefined>;
+        const loaded = await (idb.get(IdbBackend.OBJ_STORE, hash) as Promise<IdbStorageFormat|undefined>);
+
+        if (loaded !== undefined) {
+
+            let extra: any = {};
+
+            if (loaded.opDepth !== undefined) {
+                extra.opDepth = loaded.opDepth;
+            }
+
+            if (loaded.prevOpCount !== undefined) {
+                extra.prevOpCount = loaded.prevOpCount;
+            }
+
+            return {literal: loaded.literal, extra: extra };
+        } else {
+            return undefined;
+        }
     }
 
     async loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined> {

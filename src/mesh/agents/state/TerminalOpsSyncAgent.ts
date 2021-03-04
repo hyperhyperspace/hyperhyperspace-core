@@ -551,7 +551,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
             // follow depedency path, until we reach the op
             for (const depHash of req.dependencyChain) {
-                let depLiteral = await this.store.loadLiteral(depHash);
+                let depLiteral = (await this.store.loadLiteral(depHash))?.literal;
 
                 if (depLiteral === undefined) {
                     missing = true;

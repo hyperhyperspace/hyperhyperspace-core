@@ -1,13 +1,17 @@
-import { Backend, BackendSearchParams, BackendSearchResults } from './Backend';
-import { Literal, Hash } from 'data/model';
+import { Backend, BackendSearchParams, BackendSearchResults, StoredLiteral } from './Backend';
+import { Literal, Hash, HashReference, HashedSet } from 'data/model';
 import { MultiMap } from 'util/multimap';
 import { Store } from 'storage/store/Store';
 import { LiteralUtils } from 'data/model/Literals';
+import { Logger, LogLevel } from 'util/logging';
 
 type MemStorageFormat = {
     literal: Literal,
     timestamp: string,
-    sequence: number
+    sequence: number,
+
+    opDepth?     : number,
+    prevOpCount? : number
 }
 
 type MemoryRepr = {
@@ -23,6 +27,8 @@ type MemoryRepr = {
 }
 
 class MemoryBackend implements Backend {
+
+    static log = new Logger(MemoryBackend.name, LogLevel.INFO);
 
     static instances: Map<string, MemoryBackend> = new Map();
 
@@ -135,10 +141,30 @@ class MemoryBackend implements Backend {
         if (isOp) {
             const mutableHash = LiteralUtils.getFields(storable.literal)['target']['_hash'];
 
-        
-            const prevOpHashes =  LiteralUtils.getFields(storable.literal)['prevOps']['_elements']
-                                    .map((elmtValue: {_hash: Hash}) => elmtValue['_hash']) as Array<Hash>;
-            
+            const prevOpHashes = HashedSet.elementsFromLiteral(LiteralUtils.getFields(storable.literal)['prevOps']).map(HashReference.hashFromLiteral);
+
+            let opDepth = 0;
+            let prevOpCount = 0;
+
+            for (const prevOpHash of prevOpHashes) {
+                const stored = await this.load(prevOpHash);
+
+                if (stored === undefined) {
+                    MemoryBackend.log.error('PrevOp ' + prevOpHash + ' is missing from memory-basd store ' + this.name + ' for op ' + literal.hash);
+                    throw new Error('PrevOp ' + prevOpHash + ' is missing from memory-based store ' + this.name + ' for op ' + literal.hash);
+                }
+
+                if (stored.extra.opDepth !== undefined && stored.extra.opDepth + 1 > opDepth) {
+                    opDepth = stored.extra.opDepth + 1;
+                }
+
+                if (stored.extra.prevOpCount !== undefined) {
+                    prevOpCount = prevOpCount + stored.extra.prevOpCount;
+                }
+            }
+
+            storable.opDepth = opDepth;
+            storable.prevOpCount = prevOpCount;
 
             for (const prevOpHash of prevOpHashes) {
                 this.repr.terminalOps.delete(mutableHash, prevOpHash);
@@ -157,8 +183,26 @@ class MemoryBackend implements Backend {
         }
     }
 
-    async load(hash: string): Promise<Literal | undefined> {
-        return this.repr.objects.get(hash)?.literal;
+    async load(hash: string): Promise<StoredLiteral | undefined> {
+         const loaded = this.repr.objects.get(hash);
+
+         if (loaded !== undefined) {
+
+            
+            let extra: any = {};
+
+            if (loaded.opDepth !== undefined) {
+                extra.opDepth = loaded.opDepth;
+            }
+
+            if (loaded.prevOpCount !== undefined) {
+                extra.prevOpCount = loaded.prevOpCount;
+            }
+
+            return {literal: loaded.literal, extra: extra };
+         } else {
+             return undefined;
+         }
     }
 
     async loadTerminalOpsForMutable(hash: string): Promise<{ lastOp: string; terminalOps: string[]; } | undefined> {

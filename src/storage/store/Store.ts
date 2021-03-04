@@ -1,4 +1,4 @@
-import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
+import { Backend, BackendSearchParams, BackendSearchResults, StoredLiteral } from '../backends/Backend'; 
 import { HashedObject, MutableObject, Literal, Context, HashReference } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
@@ -248,7 +248,7 @@ class Store {
     }
     */
 
-    async loadLiteral(hash: Hash) {
+    async loadLiteral(hash: Hash): Promise<StoredLiteral | undefined> {
         return this.backend.load(hash);
     }
     
@@ -281,7 +281,7 @@ class Store {
 
             let literal = context.literals.get(hash);
             if (literal === undefined) {
-                literal = await this.backend.load(hash);// loadLiteral(hash);
+                literal = (await this.backend.load(hash))?.literal;// loadLiteral(hash);
 
                 if (literal === undefined) {
                     return undefined;
@@ -299,7 +299,7 @@ class Store {
                         // NO NEED to this.loadLiteralWithContext(depLiteral as Literal, context)
                         // because all transitive deps are in object deps.
 
-                        let depLiteral = await this.backend.load(dependency.hash);// loadLiteral(dependency.hash);                            
+                        let depLiteral = (await this.backend.load(dependency.hash))?.literal;// loadLiteral(dependency.hash);                            
                         context.literals.set(dependency.hash, depLiteral as Literal);
                     }
                 }

@@ -6,13 +6,15 @@ type BackendSearchResults = {items : Array<Literal>, start?: string, end?: strin
 
 //type MutableObjectInfo = { hash: Hash, nextOpSeqNumber: number, terminalOps: Array<Hash> };
 
+type StoredLiteral = { literal: Literal, extra: {opDepth?: number, prevOpCount?: number}};
+
 interface Backend {
 
     getBackendName() : string;
     getName() : string;
 
     store(literal : Literal) : Promise<void>;
-    load(hash: Hash) : Promise<Literal | undefined>;
+    load(hash: Hash) : Promise<StoredLiteral | undefined>;
 
     loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined>;
 
@@ -27,4 +29,4 @@ interface Backend {
     //processExternalStore(literal: Literal): Promise<void>;
 }
 
-export { Backend, BackendSearchParams, BackendSearchResults };
+export { Backend, StoredLiteral, BackendSearchParams, BackendSearchResults };

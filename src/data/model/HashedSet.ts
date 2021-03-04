@@ -117,6 +117,11 @@ class HashedSet<T> {
         return hset;
     }
 
+    static elementsFromLiteral(literal: {_elements: any[]}): any[] {
+        return literal['_elements'];
+        //return literal['_elements'].map((elmtValue: {_hash: Hash}) => elmtValue['_hash']);
+    }
+
 }
 
 export { HashedSet };

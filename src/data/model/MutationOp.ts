@@ -10,6 +10,9 @@ abstract class MutationOp extends HashedObject {
     target?  : MutableObject;
     prevOps? : HashedSet<HashReference<MutationOp>>;
 
+    _depth? : number;
+    _prevCount?: number;
+
     constructor(target?: MutableObject) {
         super();
         this.target  = target;
