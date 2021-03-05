@@ -4,6 +4,7 @@ import { MultiMap } from 'util/multimap';
 import { Store } from 'storage/store/Store';
 import { LiteralUtils } from 'data/model/Literals';
 import { Logger, LogLevel } from 'util/logging';
+import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
 type MemStorageFormat = {
     literal: Literal,
@@ -11,7 +12,8 @@ type MemStorageFormat = {
     sequence: number,
 
     opHeight?     : number,
-    prevOpCount? : number
+    prevOpCount? : number,
+    causalHistoryHash?: Hash
 }
 
 type MemoryRepr = {
@@ -145,6 +147,7 @@ class MemoryBackend implements Backend {
 
             let opHeight = 0;
             let prevOpCount = 0;
+            const prevOpCausalHistoryHashes = new Map<Hash, Hash>();
 
             for (const prevOpHash of prevOpHashes) {
                 const stored = await this.load(prevOpHash);
@@ -161,10 +164,15 @@ class MemoryBackend implements Backend {
                 if (stored.extra.prevOpCount !== undefined) {
                     prevOpCount = prevOpCount + stored.extra.prevOpCount;
                 }
+
+                if (stored.extra.causalHistoryHash !== undefined) {
+                    prevOpCausalHistoryHashes.set(prevOpHash, stored.extra.causalHistoryHash);
+                }
             }
 
             storable.opHeight = opHeight;
             storable.prevOpCount = prevOpCount;
+            storable.causalHistoryHash = OpCausalHistory.computeCausalHistoryHash(prevOpCausalHistoryHashes);
 
             for (const prevOpHash of prevOpHashes) {
                 this.repr.terminalOps.delete(mutableHash, prevOpHash);
@@ -197,6 +205,10 @@ class MemoryBackend implements Backend {
 
             if (loaded.prevOpCount !== undefined) {
                 extra.prevOpCount = loaded.prevOpCount;
+            }
+
+            if (loaded.causalHistoryHash !== undefined) {
+                extra.causalHistoryHash = loaded.causalHistoryHash;
             }
 
             return {literal: loaded.literal, extra: extra };

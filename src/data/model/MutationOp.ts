@@ -4,6 +4,7 @@ import { MutableObject } from './MutableObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
+import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
 abstract class MutationOp extends HashedObject {
 
@@ -12,6 +13,7 @@ abstract class MutationOp extends HashedObject {
 
     _depth? : number;
     _prevCount?: number;
+    _causalHistoryHash?: Hash;
 
     constructor(target?: MutableObject) {
         super();
@@ -24,20 +26,22 @@ abstract class MutationOp extends HashedObject {
             return false;
         }
 
-        if (this.prevOps !== undefined) {
-            for (const prevOpRef of this.prevOps.values()) {
-                let prevOp = references.get(prevOpRef.hash);
-
-                if (prevOp === undefined) {
-                    return false;
-                } else if (! (prevOp instanceof MutationOp)) {
-                    return false
-                } else if (! ((prevOp as MutationOp).target as MutableObject).equals(this.target)) { 
-                    return false;
-                }
-            }
+        if (this.prevOps === undefined) {
+            return false;
         }
 
+        for (const prevOpRef of this.prevOps.values()) {
+            let prevOp = references.get(prevOpRef.hash);
+
+            if (prevOp === undefined) {
+                return false;
+            } else if (! (prevOp instanceof MutationOp)) {
+                return false
+            } else if (! ((prevOp as MutationOp).target as MutableObject).equals(this.target)) { 
+                return false;
+            }
+        }
+        
         return true;
 
     }
@@ -50,12 +54,21 @@ abstract class MutationOp extends HashedObject {
         this.target = target;
     }
 
-    getPrevOps() : IterableIterator<HashReference<MutationOp>> | undefined {
-        return this.prevOps?.values();
+    getPrevOps() : IterableIterator<HashReference<MutationOp>> {
+        return (this.prevOps as HashedSet<HashReference<MutationOp>>).values();
     }
 
-    setPrevOps(prevOps: IterableIterator<HashReference<MutationOp>>) {
-        this.prevOps = new HashedSet(prevOps);
+    getPrevOpsIfPresent() : IterableIterator<HashReference<MutationOp>> | undefined {
+        if (this.prevOps === undefined) {
+            return undefined;
+        } else {
+            return (this.prevOps as HashedSet<HashReference<MutationOp>>).values();
+        }
+        
+    }
+
+    setPrevOps(prevOps: IterableIterator<MutationOp>) {
+        this.prevOps = new HashedSet(Array.from(prevOps).map((op: MutationOp) => op.createReference()).values());
     }
 
     literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
@@ -68,6 +81,14 @@ abstract class MutationOp extends HashedObject {
 
         return super.literalizeInContext(context, path, flags);
 
+    }
+
+    hasCausalHistory(): boolean {
+        return this._causalHistoryHash !== undefined;
+    }
+
+    getCausalHistory(): OpCausalHistory {
+        return new OpCausalHistory(this);
     }
 
 }

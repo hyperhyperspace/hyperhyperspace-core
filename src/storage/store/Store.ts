@@ -219,35 +219,6 @@ class Store {
 
     }
 
-    /*async pack(object: HashedObject) {
-        let packed = await this.packLiteral(object.toLiteral());
-
-        return packed;
-    }*/
-
-    /*
-    private async packLiteral(literal: Literal, context: Context) {
-        let packed = {} as PackedLiteral;
-
-        packed.hash  = literal.hash;
-        packed.value = literal.value;
-        
-        if (literal.author !== undefined) {
-            packed.author = literal.author;
-            let author = context.objects.get(literal.author) as Identity;
-            let keyHash = author.getKeyPairHash();
-            let key     = await (this.load(keyHash) as Promise<RSAKeyPair>);
-            packed.signature = key.sign(packed.hash);
-        }
-
-        packed.dependencies = Array.from(literal.dependencies);
-        
-        packed.flags = literal.value['_flags'];
-        
-        return packed;
-    }
-    */
-
     async loadLiteral(hash: Hash): Promise<StoredLiteral | undefined> {
         return this.backend.load(hash);
     }

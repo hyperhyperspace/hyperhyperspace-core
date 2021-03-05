@@ -9,6 +9,7 @@ import { Backend, BackendSearchParams, BackendSearchResults, StoredLiteral } fro
 import { Store } from 'storage/store/Store';
 import { MultiMap } from 'util/multimap';
 import { LiteralUtils } from 'data/model/Literals';
+import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
 type IdbStorageFormat = {
     literal   : Literal,
@@ -17,7 +18,8 @@ type IdbStorageFormat = {
     sequence  : number,
 
     opHeight?     : number,
-    prevOpCount? : number
+    prevOpCount? : number,
+    causalHistoryHash?: Hash
 }
 
 type IdbTerminalOpsFormat = {
@@ -161,6 +163,7 @@ class IdbBackend implements Backend {
 
             let opHeight = 0;
             let prevOpCount = 0;
+            const prevOpCausalHistoryHashes = new Map<Hash, Hash>();
 
             for (const prevOpHash of prevOpHashes) {
 
@@ -179,10 +182,15 @@ class IdbBackend implements Backend {
                 if (loaded.prevOpCount !== undefined) {
                     prevOpCount = prevOpCount + loaded.prevOpCount;
                 }
+
+                if (loaded.causalHistoryHash !== undefined) {
+                    prevOpCausalHistoryHashes.set(prevOpHash, loaded.causalHistoryHash);
+                }
             }
 
             storable.opHeight = opHeight;
             storable.prevOpCount = prevOpCount;
+            storable.causalHistoryHash = OpCausalHistory.computeCausalHistoryHash(prevOpCausalHistoryHashes);
 
             IdbBackend.terminalOpsStorageLog.debug('updating stored last ops for ' + mutableHash + 
                                                    ' on arrival of ' + storable.literal.hash + 
@@ -242,6 +250,10 @@ class IdbBackend implements Backend {
 
             if (loaded.prevOpCount !== undefined) {
                 extra.prevOpCount = loaded.prevOpCount;
+            }
+
+            if (loaded.causalHistoryHash !== undefined) {
+                extra.causalHistoryHash = loaded.causalHistoryHash;
             }
 
             return {literal: loaded.literal, extra: extra };
