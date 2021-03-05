@@ -9,7 +9,7 @@ type OpCausalHistoryLiteral = {
 };
 
 class OpCausalHistory {
-    opHash: Hash;
+    hash: Hash;
     causalHistoryHash: Hash;
 
     prevOpHashes: Set<Hash>;
@@ -18,10 +18,10 @@ class OpCausalHistory {
         if (opOrLiteral instanceof MutationOp) {
             const op = opOrLiteral as MutationOp;
 
-            this.opHash = op.hash();
+            this.hash = op.hash();
 
             if (op._causalHistoryHash === undefined) {
-                throw new Error('Trying to get OpCausalHistory from op ' + this.opHash + ', but it has not been completed yet. Persist the op to a store first.');
+                throw new Error('Trying to get OpCausalHistory from op ' + this.hash + ', but it has not been completed yet. Persist the op to a store first.');
             }
 
             this.causalHistoryHash = op._causalHistoryHash;
@@ -32,7 +32,7 @@ class OpCausalHistory {
 
             const literal = opOrLiteral as OpCausalHistoryLiteral;
 
-            this.opHash = literal.opHash;
+            this.hash = literal.opHash;
             this.causalHistoryHash = literal.causalHistoryHash;
             this.prevOpHashes = new Set(literal.prevOpHashes);
 
@@ -60,7 +60,7 @@ class OpCausalHistory {
 
             if (! ( typeof(prevOpCausalHistory) === 'string' || 
                     (prevOpCausalHistory instanceof OpCausalHistory && 
-                        prevOpCausalHistory.opHash === prevOpHash &&
+                        prevOpCausalHistory.hash === prevOpHash &&
                         prevOpCausalHistory.causalHistoryHash !== undefined)
                   )
                 ) {
