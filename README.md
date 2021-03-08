@@ -3,7 +3,7 @@
 
 > An offline-first shared data library for creating p2p apps that work in the browser (and now also nodejs).  
 
-## TLDR
+## TLDR
 
 This library helps you create distributed data structures, mostly for p2p applications. It works like an object store, where objects have to follow some conventions to enable secure remote sync. You can see an example [here](https://github.com/hyperhyperspace/examples/blob/master/src/chat/model/ChatRoom.ts).
 
