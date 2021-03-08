@@ -18,7 +18,7 @@ Apps will most of the time work on the local store as if it were universal (i.e.
 
 Since data stored within an HHS store can be modified by 3rd parties over the network, the store needs to be able to validate any updates it receives independently of the application. This imposes a few requirements on how data is represented.
 
-You can learn more in the Data Model section below, or jump to a few examples in [this repo](https://github.com/hyperhyperspace/examples).
+You can learn more in the [Data Model](#data-model) section below, or jump to a few examples in [this repo](https://github.com/hyperhyperspace/examples).
 
 ## Objectives
 
