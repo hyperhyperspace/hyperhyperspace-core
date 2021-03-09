@@ -172,7 +172,7 @@ class MemoryBackend implements Backend {
 
             storable.opHeight = opHeight;
             storable.prevOpCount = prevOpCount;
-            storable.causalHistoryHash = OpCausalHistory.computeCausalHistoryHash(prevOpCausalHistoryHashes);
+            storable.causalHistoryHash = OpCausalHistory.computeCausalHistoryHash(literal.hash, prevOpCausalHistoryHashes);
 
             for (const prevOpHash of prevOpHashes) {
                 this.repr.terminalOps.delete(mutableHash, prevOpHash);

@@ -190,7 +190,7 @@ class IdbBackend implements Backend {
 
             storable.opHeight = opHeight;
             storable.prevOpCount = prevOpCount;
-            storable.causalHistoryHash = OpCausalHistory.computeCausalHistoryHash(prevOpCausalHistoryHashes);
+            storable.causalHistoryHash = OpCausalHistory.computeCausalHistoryHash(literal.hash, prevOpCausalHistoryHashes);
 
             IdbBackend.terminalOpsStorageLog.debug('updating stored last ops for ' + mutableHash + 
                                                    ' on arrival of ' + storable.literal.hash + 

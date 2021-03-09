@@ -40,10 +40,10 @@ class OpCausalHistory {
     }
 
     verify(prevOpCausalHistories: Map<Hash, OpCausalHistory | Hash>): boolean {
-        return this.causalHistoryHash === OpCausalHistory.computeCausalHistoryHash(prevOpCausalHistories);
+        return this.causalHistoryHash === OpCausalHistory.computeCausalHistoryHash(this.hash, prevOpCausalHistories);
     }
 
-    static computeCausalHistoryHash(prevOpCausalHistories: Map<Hash, Hash|OpCausalHistory>): Hash {
+    static computeCausalHistoryHash(opHash: Hash, prevOpCausalHistories: Map<Hash, Hash|OpCausalHistory>): Hash {
 
         const sortedPrevOpHashes = Array.from(prevOpCausalHistories.keys());
         sortedPrevOpHashes.sort();
@@ -77,7 +77,7 @@ class OpCausalHistory {
 
         }
 
-        return Hashing.forValue(causalHistoryHashes);
+        return Hashing.forValue({hash: opHash, history: causalHistoryHashes});
 
     }
 }
