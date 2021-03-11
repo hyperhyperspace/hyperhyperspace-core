@@ -1,6 +1,6 @@
 import { MultiMap } from 'util/multimap';
 import { Hash } from '../model/Hashing';
-import { OpCausalHistory } from './OpCausalHistory';
+import { OpCausalHistory, OpCausalHistoryLiteral } from './OpCausalHistory';
 
 
 
@@ -96,6 +96,65 @@ class CausalHistoryFragment {
                 }
             }
         }
+
+    }
+
+    isValid(startingOpHistories: Map<Hash, Hash|OpCausalHistory>): boolean {
+
+        const verified = new Set<Hash>();
+        const checking = new Set<Hash>();
+
+        for (const hash of this.terminalOps) {
+            checking.add(hash);
+        }
+
+        while (checking.size > 0) {
+
+            const currentOpHash = checking.values().next().value as Hash;
+
+            checking.delete(currentOpHash);
+
+            const currentOp = this.contents.get(currentOpHash) as OpCausalHistory;
+
+            const prevOpHistories = new Map<Hash, Hash|OpCausalHistory>();
+
+            for (const prevOpHash of currentOp.prevOpHashes) {
+
+                if (prevOpHash === currentOpHash) {
+                    return false;
+                }
+
+                if (verified.has(prevOpHash)) {
+                    return false; // cycle detected. bail out.
+                }
+
+                const start = startingOpHistories.get(prevOpHash);
+                if (start !== undefined) {
+                    prevOpHistories.set(prevOpHash, start);
+                } else {
+                    const op = this.contents.get(prevOpHash);
+
+                    if (op === undefined) {
+                        return false;
+                    }
+
+                    prevOpHistories.set(prevOpHash, op);
+
+                    if (!verified.has(prevOpHash)) {
+                        checking.add(prevOpHash);
+                    }
+                }
+            }
+
+            if (currentOp.verify(prevOpHistories)) {
+                verified.add(currentOpHash)
+                checking.delete(currentOpHash);
+            } else {
+                return false;
+            }
+        }
+
+        return true;
 
     }
 
