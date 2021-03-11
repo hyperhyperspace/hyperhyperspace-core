@@ -42,20 +42,20 @@ class CausalHistoryFragment {
         this.nextOps = new MultiMap();
     }
 
-    add(op: OpCausalHistory) {
+    add(opHistory: OpCausalHistory) {
 
-        if (this.isNew(op.hash)) {
+        if (this.isNew(opHistory.opHash)) {
             
-            this.contents.set(op.hash, op);
+            this.contents.set(opHistory.opHash, opHistory);
 
             // Adjust startingOps and terminalOps (see lemma above)
-            if (this.startingOps.has(op.hash)) {
-                this.startingOps.delete(op.hash);
+            if (this.startingOps.has(opHistory.opHash)) {
+                this.startingOps.delete(opHistory.opHash);
             } else {
-                this.terminalOps.add(op.hash);
+                this.terminalOps.add(opHistory.opHash);
             }
             
-            for (const prevOpHash of op.prevOpHashes) {
+            for (const prevOpHash of opHistory.prevOpHashes) {
 
                 // Adjust startingOps and terminalOps with info about this new prev op
                 if (this.isNew(prevOpHash)) {
@@ -70,22 +70,22 @@ class CausalHistoryFragment {
                 }
 
                 // Add reverse mapping to nextOps
-                this.nextOps.add(prevOpHash, op.hash)
+                this.nextOps.add(prevOpHash, opHistory.opHash)
             }
         }
     }
 
     remove(opHash: Hash) {
 
-        const op = this.contents.get(opHash);
+        const opHistory = this.contents.get(opHash);
 
-        if (op !== undefined) {
+        if (opHistory !== undefined) {
 
-            this.contents.delete(op.hash);
-            this.terminalOps.delete(op.hash);
+            this.contents.delete(opHistory.opHash);
+            this.terminalOps.delete(opHistory.opHash);
 
-            for (const prevOpHash of op.prevOpHashes) {
-                this.nextOps.delete(prevOpHash, op.hash);
+            for (const prevOpHash of opHistory.prevOpHashes) {
+                this.nextOps.delete(prevOpHash, opHistory.opHash);
 
                 if (this.nextOps.get(prevOpHash).size === 0) {
                     if (this.contents.has(prevOpHash)) {
