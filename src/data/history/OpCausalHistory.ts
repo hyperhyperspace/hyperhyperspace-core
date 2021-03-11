@@ -3,47 +3,85 @@ import { MutationOp } from 'data/model/MutationOp';
 import { Hash, Hashing } from '../model/Hashing';
 
 type OpCausalHistoryLiteral = {
-    opHash: Hash,
-    causalHistoryHash: Hash,
+    causalHistoryHash: Hash;
+    opHash: Hash;
+    opProps?: any,
     prevOpHashes: Hash[]
 };
 
+type OpCausalHistoryProps = Map<string, number|string|BigInt>;
+
 class OpCausalHistory {
-    hash: Hash;
     causalHistoryHash: Hash;
-
+    opHash: Hash;
+    opProps: OpCausalHistoryProps;
     prevOpHashes: Set<Hash>;
+    
+    _computedProps?: { height: number, size: number };
 
-    constructor(opOrLiteral: MutationOp | OpCausalHistoryLiteral) {
+    constructor(opOrLiteral: MutationOp | OpCausalHistoryLiteral, prevOpCausalHistories?: Map<Hash, OpCausalHistory|Hash>) {
         if (opOrLiteral instanceof MutationOp) {
             const op = opOrLiteral as MutationOp;
 
-            this.hash = op.hash();
-
-            if (op._causalHistoryHash === undefined) {
-                throw new Error('Trying to get OpCausalHistory from op ' + this.hash + ', but it has not been completed yet. Persist the op to a store first.');
+            if (prevOpCausalHistories === undefined) {
+                throw new Error('Parameter prevOpCausalHistories is mandatory to create an OpCausalHistory from a MutationOp');
             }
 
-            this.causalHistoryHash = op._causalHistoryHash;
-
+            this.opHash = op.hash();
             this.prevOpHashes = new Set(Array.from((op.getPrevOps())).map((ref: HashReference<MutationOp>) => ref.hash));
+            this.opProps = op.getCausalHistoryProps();
+
+            this.causalHistoryHash = OpCausalHistory.computeCausalHistoryHash(this.opHash, this.opProps, prevOpCausalHistories);
+
 
         } else {
 
             const literal = opOrLiteral as OpCausalHistoryLiteral;
 
-            this.hash = literal.opHash;
+            OpCausalHistory.checkLiteralFormat(literal);
+            
             this.causalHistoryHash = literal.causalHistoryHash;
+            this.opHash = literal.opHash;
             this.prevOpHashes = new Set(literal.prevOpHashes);
+            this.opProps = new Map();
+
+            for (const key of Object.keys(literal.opProps)) {
+                this.opProps.set(key, literal.opProps[key]);
+            }
 
         }
     }
 
     verify(prevOpCausalHistories: Map<Hash, OpCausalHistory | Hash>): boolean {
-        return this.causalHistoryHash === OpCausalHistory.computeCausalHistoryHash(this.hash, prevOpCausalHistories);
+        return this.causalHistoryHash === this.hash(prevOpCausalHistories);
     }
 
-    static computeCausalHistoryHash(opHash: Hash, prevOpCausalHistories: Map<Hash, Hash|OpCausalHistory>): Hash {
+    hash(prevOpCausalHistories: Map<Hash, Hash|OpCausalHistory>): Hash {
+        return OpCausalHistory.computeCausalHistoryHash(this.opHash, this.opProps, prevOpCausalHistories)
+    }
+
+    literalize(): OpCausalHistoryLiteral {
+
+
+
+        const literal: OpCausalHistoryLiteral = { 
+            causalHistoryHash: this.causalHistoryHash,
+            opHash: this.opHash,
+            prevOpHashes: Array.from(this.prevOpHashes)
+        };
+
+        if (this.opProps.size > 0) {
+            literal.opProps = {};
+
+            for (const [key, val] of this.opProps.entries()) {
+                literal.opProps[key] = val;
+            }
+        }
+
+        return literal;
+    }
+
+    static computeCausalHistoryHash(opHash: Hash, opProps: OpCausalHistoryProps, prevOpCausalHistories: Map<Hash, Hash|OpCausalHistory>): Hash {
 
         const sortedPrevOpHashes = Array.from(prevOpCausalHistories.keys());
         sortedPrevOpHashes.sort();
@@ -60,8 +98,7 @@ class OpCausalHistory {
 
             if (! ( typeof(prevOpCausalHistory) === 'string' || 
                     (prevOpCausalHistory instanceof OpCausalHistory && 
-                        prevOpCausalHistory.hash === prevOpHash &&
-                        prevOpCausalHistory.causalHistoryHash !== undefined)
+                        prevOpCausalHistory.opHash === prevOpHash)
                   )
                 ) {
 
@@ -77,9 +114,63 @@ class OpCausalHistory {
 
         }
 
-        return Hashing.forValue({hash: opHash, history: causalHistoryHashes});
+        const p: any = {};
+        for (const propName of Object.keys(opProps)) {
+            p[propName] = opProps.get(propName);
+        }
 
+        return Hashing.forValue({hash: opHash, history: causalHistoryHashes, props: p});
+    }
+
+    private static checkLiteralFormat(literal: OpCausalHistoryLiteral): void {
+        const propTypes: any = {causalHistoryHash: 'string', opHash: 'string', prevOpHashes: 'object' };
+        
+        for (const propName of ['causalHistoryHash', 'opHash', 'prevOpHashes']) {
+            
+            const prop = (literal as any)[propName];
+            
+            if (prop === undefined) {
+                throw new Error('OpCausalHistory literal is missing property: ' + propName);
+            }
+
+            if (typeof(prop) !== propTypes[propName]) {
+                throw new Error('OpCausalHistory literal property ' + propName + ' has the wrong type, expected ' + propTypes[propName] + ' but found ' + typeof(prop));
+            }
+        }
+
+
+        if (!Array.isArray(literal.prevOpHashes)) {
+            throw new Error('OpCausalHistory prevOpHashes should be an array');
+        }
+
+        for (const hash of literal.prevOpHashes) {
+            if (typeof(hash) !== 'string') {
+                throw new Error('OpCausalHistory prevOpHashes should contain only strings, found ' + typeof(hash) + ' instead');
+            }
+        }
+
+        if (literal.opProps !== undefined) {
+
+            if (typeof(literal.opProps) !== 'object') {
+                throw new Error('OpCausalHistory literal property opProps has the wrong type, expected object but found ' + typeof(literal.opProps));
+            }
+
+            const keys = Object.keys(literal.opProps);
+
+            if (keys.length === 0) {
+                throw new Error('OpCausalHistory literal property opProps is empty, it should either be missing altogether or be non-empty.');
+            }
+
+            const customPropTypes = ['string', 'number', 'bigint'];
+            for (const customPropName of Object.keys(literal.opProps)) {
+                if (customPropTypes.indexOf(typeof(literal.opProps[customPropName])) < 0) {
+                    throw new Error('Unexpected type found in OpCausalHistory literal opProps: ' + typeof(literal.opProps[customPropName] + ' (expected string, number of bigint)'));
+                }
+            }
+        }
+
+        
     }
 }
 
-export { OpCausalHistory };
+export { OpCausalHistory, OpCausalHistoryLiteral, OpCausalHistoryProps };

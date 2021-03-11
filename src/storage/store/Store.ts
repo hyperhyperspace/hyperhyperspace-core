@@ -1,5 +1,5 @@
-import { Backend, BackendSearchParams, BackendSearchResults, StoredLiteral } from '../backends/Backend'; 
-import { HashedObject, MutableObject, Literal, Context, HashReference } from 'data/model';
+import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
+import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { MultiMap } from 'util/multimap';
@@ -8,11 +8,13 @@ import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Logger, LogLevel } from 'util/logging';
 
 import { Resources } from 'spaces/spaces';
+import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
 //                       dependencies: Array<Dependency>, flags: Array<PackedFlag> };
 
+type StoredOpCausalHistory = { height: number, size: number, literal: OpCausalHistoryLiteral };
 type LoadParams = BackendSearchParams;
 
 class Store {
@@ -82,8 +84,46 @@ class Store {
             throw new Error('Cannot save object ' + hash + ' because the following references are missing: ' + Array.from(missing).join(', ') + '.');
         }
 
+        let history: StoredOpCausalHistory | undefined = undefined; 
+
+        if (object instanceof MutationOp) {
+
+            const prevOpCausalHistoryHashes = new Map<Hash, Hash>();
+
+            let height = 1;
+            let size = 1;
+
+            if (object.prevOps !== undefined) {
+                for (const hashRef of object.prevOps.values()) {
+                    const backendOpHistory = await this.backend.loadOpCausalHistory(hashRef.hash);
+                    
+                    if (backendOpHistory === undefined) {
+                        throw new Error('Causal history of prevOp ' + hashRef.hash + ' of op ' + hash + ' is missing from store, cannot save');
+                    }
+                    
+                    const prevOpCausalHistory = backendOpHistory.literal;
+
+                    prevOpCausalHistoryHashes.set(hashRef.hash, prevOpCausalHistory.causalHistoryHash);
+
+                    if (backendOpHistory.height + 1 > height) {
+                        height = backendOpHistory.height + 1;
+                    }
+
+                    size = size + backendOpHistory.size;
+                }
+            }
+
+            const opHistory = new OpCausalHistory(object, prevOpCausalHistoryHashes);
+
+            history = {
+                literal: opHistory.literalize(),
+                height: height,
+                size: size
+            };
+        }
+
         Store.operationLog.debug(() => 'Saving object with hash ' + hash + ' .');
-        await this.saveWithContext(hash, context);
+        await this.saveWithContext(hash, context, history);
 
         if (object instanceof MutableObject) {
             let queuedOps = await object.saveQueuedOps(); // see (* note 1) above
@@ -137,7 +177,7 @@ class Store {
 
     }
 
-    private async saveWithContext(hash: Hash, context: Context) : Promise<void> {
+    private async saveWithContext(hash: Hash, context: Context, history?: StoredOpCausalHistory) : Promise<void> {
 
         // TODO: we could keep a set of hashes already saved by previous calls to
         //       saveWithContext in this same recursion, and skip them without
@@ -163,7 +203,7 @@ class Store {
                 }
             }
 
-            await this.backend.store(literal);
+            await this.backend.store(literal, history);
 
         } else {
             for (const [hash, obj] of context.objects.entries()) {
@@ -219,7 +259,7 @@ class Store {
 
     }
 
-    async loadLiteral(hash: Hash): Promise<StoredLiteral | undefined> {
+    async loadLiteral(hash: Hash): Promise<Literal | undefined> {
         return this.backend.load(hash);
     }
     
@@ -252,7 +292,7 @@ class Store {
 
             let literal = context.literals.get(hash);
             if (literal === undefined) {
-                literal = (await this.backend.load(hash))?.literal;// loadLiteral(hash);
+                literal = await this.loadLiteral(hash);
 
                 if (literal === undefined) {
                     return undefined;
@@ -270,7 +310,7 @@ class Store {
                         // NO NEED to this.loadLiteralWithContext(depLiteral as Literal, context)
                         // because all transitive deps are in object deps.
 
-                        let depLiteral = (await this.backend.load(dependency.hash))?.literal;// loadLiteral(dependency.hash);                            
+                        let depLiteral = await this.loadLiteral(dependency.hash);                            
                         context.literals.set(dependency.hash, depLiteral as Literal);
                     }
                 }
@@ -320,6 +360,20 @@ class Store {
         let searchResults = await this.backend.searchByReferencingClass(referringClassName, referringPath, referencedHash, params);
 
         return this.loadSearchResults(searchResults);
+    }
+
+    async loadOpCausalHistory(opHash: Hash): Promise<OpCausalHistory | undefined> {
+        const stored = await this.backend.loadOpCausalHistory(opHash);
+
+        if (stored === undefined) {
+            return undefined;
+        } else {
+            const opCausalHistory = new OpCausalHistory(stored.literal);
+            opCausalHistory._computedProps = { height: stored.height, size: stored.size };
+    
+            return opCausalHistory;
+        }
+
     }
 
     /*private async loadLiteral(hash: Hash) : Promise<Literal | undefined> {
@@ -466,4 +520,4 @@ class Store {
     }
 }
 
-export { Store };
+export { Store, StoredOpCausalHistory };

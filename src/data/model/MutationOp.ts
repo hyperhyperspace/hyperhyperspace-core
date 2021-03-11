@@ -4,16 +4,12 @@ import { MutableObject } from './MutableObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
-import { OpCausalHistory } from 'data/history/OpCausalHistory';
+import { OpCausalHistory, OpCausalHistoryProps } from 'data/history/OpCausalHistory';
 
 abstract class MutationOp extends HashedObject {
 
     target?  : MutableObject;
     prevOps? : HashedSet<HashReference<MutationOp>>;
-
-    _depth? : number;
-    _prevCount?: number;
-    _causalHistoryHash?: Hash;
 
     constructor(target?: MutableObject) {
         super();
@@ -83,12 +79,12 @@ abstract class MutationOp extends HashedObject {
 
     }
 
-    hasCausalHistory(): boolean {
-        return this._causalHistoryHash !== undefined;
+    getCausalHistory(prevOpCausalHistories: Map<Hash, Hash | OpCausalHistory> ): OpCausalHistory {
+        return new OpCausalHistory(this, prevOpCausalHistories);
     }
 
-    getCausalHistory(): OpCausalHistory {
-        return new OpCausalHistory(this);
+    getCausalHistoryProps(): OpCausalHistoryProps {
+        return new Map();
     }
 
 }
