@@ -1,6 +1,6 @@
 import { MultiMap } from 'util/multimap';
 import { Hash } from '../model/Hashing';
-import { OpCausalHistory, OpCausalHistoryLiteral } from './OpCausalHistory';
+import { OpCausalHistory } from './OpCausalHistory';
 
 
 
