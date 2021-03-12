@@ -3,10 +3,24 @@ import { Hash } from '../model/Hashing';
 import { OpCausalHistory } from './OpCausalHistory';
 
 
+// A CasualHistoryFragment is built from a (sub)set of operations
+// for a given MutableObject target, that are stored in the "contents"
+// (Hash -> OpCausalHistory) map.
+
+// The fragment keeps track of the set of terminal ops (ops without any
+// following ops, in the sense that they are the last ops to have been
+// applied according to te causal ordering defined by the "prevOps" field).
+
+// It also keeps track of the ops that are referenced by the ops in the 
+// fragment but are not in it (in the "missingOps" field).
+
+// Therefore the fragment may be seen as a set of ops that takes the target
+// MutableObject from a state that contains all the ops in "missingOps" to a
+// state that contains all the ops in "terminalOps".
 
 // lemma: if an op is new to the fragment, then it either
 //
-//        a) is in the startingOps set.
+//        a) is in the missingOps set.
 //
 //                     or
 //
@@ -14,10 +28,10 @@ import { OpCausalHistory } from './OpCausalHistory';
 //           and therefore it should go into terminalOps.
 
 // proof: assume neither a) or b) hold, then you have a
-//        new op that is not in startingOps, but is a
+//        new op that is not in missingOps, but is a
 //        direct dependency of an op present in the fragment.
 //        But then, since it is a direct dependency and it is not in
-//        startingOps, it must be present in the fragment, contrary
+//        missingOps, it must be present in the fragment, contrary
 //        to our assumption.
 
 
@@ -26,7 +40,7 @@ class CausalHistoryFragment {
     target: Hash;
 
     terminalOps : Set<Hash>;
-    startingOps  : Set<Hash>;
+    missingOps  : Set<Hash>;
 
     contents: Map<Hash, OpCausalHistory>;
     
@@ -35,7 +49,7 @@ class CausalHistoryFragment {
     constructor(target: Hash) {
         this.target = target;
         this.terminalOps = new Set();
-        this.startingOps  = new Set();
+        this.missingOps  = new Set();
 
         this.contents = new Map();
 
@@ -48,20 +62,20 @@ class CausalHistoryFragment {
             
             this.contents.set(opHistory.opHash, opHistory);
 
-            // Adjust startingOps and terminalOps (see lemma above)
-            if (this.startingOps.has(opHistory.opHash)) {
-                this.startingOps.delete(opHistory.opHash);
+            // Adjust missingOps and terminalOps (see lemma above)
+            if (this.missingOps.has(opHistory.opHash)) {
+                this.missingOps.delete(opHistory.opHash);
             } else {
                 this.terminalOps.add(opHistory.opHash);
             }
             
             for (const prevOpHash of opHistory.prevOpHashes) {
 
-                // Adjust startingOps and terminalOps with info about this new prev op
+                // Adjust missingOps and terminalOps with info about this new prev op
                 if (this.isNew(prevOpHash)) {
-                    // It may or may not be in startingOps but, since prevOp 
+                    // It may or may not be in missingOps but, since prevOp 
                     // is new, in any case add:
-                    this.startingOps.add(prevOpHash);
+                    this.missingOps.add(prevOpHash);
                 } else {
                     // It may or may not be in terminalOps but, since prevOp 
                     // is not new, in any case remove:
@@ -91,7 +105,7 @@ class CausalHistoryFragment {
                     if (this.contents.has(prevOpHash)) {
                         this.terminalOps.add(prevOpHash)
                     } else {
-                        this.startingOps.delete(prevOpHash);
+                        this.missingOps.delete(prevOpHash);
                     }
                 }
             }
@@ -99,7 +113,7 @@ class CausalHistoryFragment {
 
     }
 
-    isValid(startingOpHistories: Map<Hash, Hash|OpCausalHistory>): boolean {
+    isValid(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): boolean {
 
         const verified = new Set<Hash>();
         const checking = new Set<Hash>();
@@ -121,16 +135,16 @@ class CausalHistoryFragment {
             for (const prevOpHash of currentOp.prevOpHashes) {
 
                 if (prevOpHash === currentOpHash) {
-                    return false;
+                    return false; // self loop, bail out.
                 }
 
                 if (verified.has(prevOpHash)) {
-                    return false; // cycle detected. bail out.
+                    return false; // cycle detected, bail out.
                 }
 
-                const start = startingOpHistories.get(prevOpHash);
-                if (start !== undefined) {
-                    prevOpHistories.set(prevOpHash, start);
+                const missing = missingOpHistories.get(prevOpHash);
+                if (missing !== undefined) {
+                    prevOpHistories.set(prevOpHash, missing);
                 } else {
                     const op = this.contents.get(prevOpHash);
 
