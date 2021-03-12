@@ -45,9 +45,12 @@ class OpCausalHistory {
             this.prevOpHashes = new Set(literal.prevOpHashes);
             this.opProps = new Map();
 
-            for (const key of Object.keys(literal.opProps)) {
-                this.opProps.set(key, literal.opProps[key]);
+            if (literal.opProps !== undefined) {
+                for (const key of Object.keys(literal.opProps)) {
+                    this.opProps.set(key, literal.opProps[key]);
+                }
             }
+
 
         }
     }

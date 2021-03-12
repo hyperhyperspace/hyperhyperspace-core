@@ -1,10 +1,12 @@
 import { Store } from 'storage/store';
 import { IdbBackend, MemoryBackend } from 'storage/backends';
-import { HashedObject, HashedSet, HashReference, MutationOp } from 'data/model';
+import { Hash, HashedObject, HashedSet, HashReference, MutationOp } from 'data/model';
 
 import { SomethingHashed, createHashedObjects } from '../data/types/SomethingHashed';
 import { SomethingMutable, SomeMutation } from '../data//types/SomethingMutable';
 import { describeProxy } from 'config';
+import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
+import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
 
 describeProxy('[STR] Storage', () => {
@@ -60,12 +62,17 @@ describeProxy('[STR] Storage', () => {
 
     test('[STR12] Indexeddb-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
-        testPrevOpGeneration(store);
+        await testPrevOpGeneration(store);
     });
 
     test('[STR13] Memory-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
-        testPrevOpGeneration(store);
+        await testPrevOpGeneration(store);
+    });
+
+    test('[STR14] Validate history retrieved from IDB store', async () => {
+        let store = new Store(new IdbBackend('test-storage-backend'));
+        await testHistoryGeneration(store);
     });
 
 });
@@ -226,4 +233,49 @@ async function testPrevOpGeneration(store: Store) {
         expect(another).toBeTruthy();
         expect(hello).toBeTruthy();
     }
+}
+
+async function testHistoryGeneration(store: Store) {
+    let sm = new SomethingMutable();
+
+    await store.save(sm);
+
+    await sm.testOperation('hello');
+    await sm.testOperation('world');
+    await sm.testOperation('!');
+
+    await sm.saveQueuedOps();
+
+    let hello: SomeMutation|undefined = undefined;
+    let world: SomeMutation|undefined = undefined;
+    let bang: SomeMutation|undefined = undefined;
+
+    for (const op of sm._operations.values()) {
+        const mut = op as SomeMutation;
+
+        if (mut.payload === 'hello') {
+            hello = mut;
+        }
+        if (mut.payload === 'world') {
+            world = mut;
+        }
+        if (mut.payload === '!') {
+            bang = mut;
+        }
+    }
+
+    let frag = new CausalHistoryFragment(sm.getLastHash());
+
+    frag.add(await store.loadOpCausalHistory(bang?.hash() as Hash) as OpCausalHistory);
+    
+    expect(frag.startingOps.size).toEqual(1);
+    expect(frag.startingOps.has(world?.hash() as Hash)).toBeTruthy();
+    expect(frag.startingOps.has(bang?.hash() as Hash)).toBeFalsy();
+    frag.add(await store.loadOpCausalHistory(world?.hash() as Hash) as OpCausalHistory);
+    frag.add(await store.loadOpCausalHistory(hello?.hash() as Hash) as OpCausalHistory);
+    
+    expect(frag.terminalOps.size).toEqual(1);
+    
+
+    expect(frag.isValid(new Map())).toBeTruthy();
 }
