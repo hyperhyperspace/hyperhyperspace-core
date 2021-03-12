@@ -125,6 +125,33 @@ class OpCausalHistory {
         return Hashing.forValue({hash: opHash, history: causalHistoryHashes, props: p});
     }
 
+    static computeProps(prevOpCausalHistories: Map<Hash, Hash|OpCausalHistory>): {height: number, size: number} | undefined {
+    
+        let height = 1;
+        let size = 1;
+        let good = true;
+
+        for (const prevOpHistory of prevOpCausalHistories.values()) {
+            if (prevOpHistory instanceof OpCausalHistory && prevOpHistory._computedProps !== undefined) {
+                if (prevOpHistory._computedProps.height + 1 > height) {
+                    height = prevOpHistory._computedProps.height + 1;
+                }
+
+                size = size + prevOpHistory._computedProps.size;
+            } else {
+                good = false;
+                break;
+            }
+        }
+
+        if (good) {
+            return { height: height, size: size };
+        } else {
+            return undefined;
+        }
+
+    }
+
     private static checkLiteralFormat(literal: OpCausalHistoryLiteral): void {
         const propTypes: any = {causalHistoryHash: 'string', opHash: 'string', prevOpHashes: 'object' };
         

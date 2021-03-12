@@ -113,7 +113,7 @@ class CausalHistoryFragment {
 
     }
 
-    isValid(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): boolean {
+    checkAndComputeProps(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): boolean {
 
         const verified = new Set<Hash>();
         const checking = new Set<Hash>();
@@ -161,6 +161,23 @@ class CausalHistoryFragment {
             }
 
             if (currentOp.verify(prevOpHistories)) {
+
+                const computed = OpCausalHistory.computeProps(prevOpHistories);
+
+                if (computed !== undefined) {
+                    if (currentOp._computedProps === undefined) {
+                        currentOp._computedProps = computed;
+                    } else {
+                        if (currentOp._computedProps.size !== computed.size ||
+                            currentOp._computedProps.height !== computed.height) {
+
+                                return false;
+                                
+                        }
+                    }
+                }
+                
+
                 verified.add(currentOpHash)
                 checking.delete(currentOpHash);
             } else {

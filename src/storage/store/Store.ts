@@ -14,7 +14,7 @@ import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHi
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
 //                       dependencies: Array<Dependency>, flags: Array<PackedFlag> };
 
-type StoredOpCausalHistory = { height: number, size: number, literal: OpCausalHistoryLiteral };
+type StoredOpCausalHistory = { literal: OpCausalHistoryLiteral, computed: { height: number, size: number} };
 type LoadParams = BackendSearchParams;
 
 class Store {
@@ -88,37 +88,26 @@ class Store {
 
         if (object instanceof MutationOp) {
 
-            const prevOpCausalHistoryHashes = new Map<Hash, Hash>();
-
-            let height = 1;
-            let size = 1;
+            const prevOpCausalHistories = new Map<Hash, OpCausalHistory>();
 
             if (object.prevOps !== undefined) {
                 for (const hashRef of object.prevOps.values()) {
-                    const backendOpHistory = await this.backend.loadOpCausalHistory(hashRef.hash);
+                    const prevOpHistory = await this.loadOpCausalHistory(hashRef.hash);
                     
-                    if (backendOpHistory === undefined) {
+                    if (prevOpHistory === undefined) {
                         throw new Error('Causal history of prevOp ' + hashRef.hash + ' of op ' + hash + ' is missing from store, cannot save');
                     }
-                    
-                    const prevOpCausalHistory = backendOpHistory.literal;
 
-                    prevOpCausalHistoryHashes.set(hashRef.hash, prevOpCausalHistory.causalHistoryHash);
-
-                    if (backendOpHistory.height + 1 > height) {
-                        height = backendOpHistory.height + 1;
-                    }
-
-                    size = size + backendOpHistory.size;
+                    prevOpCausalHistories.set(hashRef.hash, prevOpHistory);
                 }
             }
 
-            const opHistory = new OpCausalHistory(object, prevOpCausalHistoryHashes);
+            const opHistory = new OpCausalHistory(object, prevOpCausalHistories);
+            const opComputedProps = OpCausalHistory.computeProps(prevOpCausalHistories) as {height: number, size: number};
 
             history = {
                 literal: opHistory.literalize(),
-                height: height,
-                size: size
+                computed: opComputedProps
             };
         }
 
@@ -369,7 +358,7 @@ class Store {
             return undefined;
         } else {
             const opCausalHistory = new OpCausalHistory(stored.literal);
-            opCausalHistory._computedProps = { height: stored.height, size: stored.size };
+            opCausalHistory._computedProps = stored.computed;
     
             return opCausalHistory;
         }
