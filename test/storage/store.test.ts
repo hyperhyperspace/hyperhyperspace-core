@@ -242,40 +242,83 @@ async function testHistoryGeneration(store: Store) {
 
     await sm.testOperation('hello');
     await sm.testOperation('world');
-    await sm.testOperation('!');
 
     await sm.saveQueuedOps();
+
+    let hash = sm.getLastHash();
+
+    let sm2 = await store.load(hash) as SomethingMutable;
+
+    await sm2.loadAllChanges();
+
+    await sm2.testOperation('!!');
+
+    await sm.testOperation('!');
+
+    await sm2.saveQueuedOps();
+    await sm.saveQueuedOps();
+
+    await sm.loadAllChanges();
 
     let hello: SomeMutation|undefined = undefined;
     let world: SomeMutation|undefined = undefined;
     let bang: SomeMutation|undefined = undefined;
+    let bangbang: SomeMutation|undefined = undefined;
 
     for (const op of sm._operations.values()) {
         const mut = op as SomeMutation;
 
         if (mut.payload === 'hello') {
             hello = mut;
+            //console.log('hello: ' + hello.hash());
         }
         if (mut.payload === 'world') {
             world = mut;
+            //console.log('world: ' + world.hash());
         }
         if (mut.payload === '!') {
             bang = mut;
+            //console.log('!: ' + bang.hash());
+        }
+
+        if (mut.payload === '!!') {
+            bangbang = mut;
+            //console.log('!!: ' + bangbang.hash());
         }
     }
 
     let frag = new CausalHistoryFragment(sm.getLastHash());
 
     frag.add(await store.loadOpCausalHistory(bang?.hash() as Hash) as OpCausalHistory);
-    
+
     expect(frag.startingOps.size).toEqual(1);
     expect(frag.startingOps.has(world?.hash() as Hash)).toBeTruthy();
-    expect(frag.startingOps.has(bang?.hash() as Hash)).toBeFalsy();
+
+    expect(frag.terminalOps.size).toEqual(1);
+    expect(frag.terminalOps.has(bang?.hash() as Hash));
+
+    frag.add(await store.loadOpCausalHistory(bangbang?.hash() as Hash) as OpCausalHistory);
+
+    expect(frag.startingOps.size).toEqual(1);
+    expect(frag.startingOps.has(world?.hash() as Hash)).toBeTruthy();
+
+    expect(frag.terminalOps.size).toEqual(2);
+    expect(frag.terminalOps.has(bang?.hash() as Hash));
+    expect(frag.terminalOps.has(bangbang?.hash() as Hash));
+
     frag.add(await store.loadOpCausalHistory(world?.hash() as Hash) as OpCausalHistory);
+    
+    expect(frag.startingOps.size).toEqual(1);
+    expect(frag.startingOps.has(hello?.hash() as Hash)).toBeTruthy();
+
+    expect(frag.terminalOps.size).toEqual(2);
+    expect(frag.terminalOps.has(bang?.hash() as Hash));
+    expect(frag.terminalOps.has(bangbang?.hash() as Hash));
+
     frag.add(await store.loadOpCausalHistory(hello?.hash() as Hash) as OpCausalHistory);
     
-    expect(frag.terminalOps.size).toEqual(1);
-    
+    expect(frag.terminalOps.size).toEqual(2);
+    expect(frag.startingOps.size).toEqual(0);
 
     expect(frag.isValid(new Map())).toBeTruthy();
 }

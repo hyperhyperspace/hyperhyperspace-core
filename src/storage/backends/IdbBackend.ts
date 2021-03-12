@@ -240,7 +240,6 @@ class IdbBackend implements Backend {
     
     async loadOpCausalHistory(opHash: string): Promise<StoredOpCausalHistory | undefined> {
         let idb = await this.idbPromise;
-
         return await (idb.get(IdbBackend.OP_CAUSAL_HISTORY_STORE, opHash) as Promise<StoredOpCausalHistory|undefined>);
     }
 
