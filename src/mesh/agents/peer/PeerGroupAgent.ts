@@ -89,11 +89,20 @@ type SecureMessage = PeerMessage | ConnectionSelectionMessage;
 
 
 enum PeerMeshEventType {
-    NewPeer = 'new-peer'
+    NewPeer  = 'new-peer',
+    LostPeer = 'lost-peer'
 }
 
 type NewPeerEvent = {
     type: PeerMeshEventType.NewPeer,
+    content: {
+        peerGroupId: string,
+        peer: PeerInfo
+    }
+}
+
+type LostPeerEvent = {
+    type: PeerMeshEventType.LostPeer,
     content: {
         peerGroupId: string,
         peer: PeerInfo
@@ -649,9 +658,13 @@ class PeerGroupAgent implements Agent {
 
                 if (conns.length === 0) {
                     this.connectionsPerEndpoint.delete(pc.peer.endpoint);
+                    conns = undefined;
                 }
             }
             
+            if (pc.status === PeerConnectionStatus.Ready && conns === undefined ) {
+                this.broadcastLostPeerEvent(pc.peer);
+            }
         }
     }
 
@@ -1037,6 +1050,20 @@ class PeerGroupAgent implements Agent {
         this.pod?.broadcastEvent(ev);
     }
 
+    private broadcastLostPeerEvent(peer: PeerInfo) {
+        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' hasa lost a peer: ' + peer.endpoint);
+
+        let ev: LostPeerEvent = {
+            type: PeerMeshEventType.LostPeer,
+            content: {
+                peerGroupId: this.peerGroupId,
+                peer: peer
+            }
+        };
+
+        this.pod?.broadcastEvent(ev);
+    }
+
     // shorthand functions
 
     private getNetworkAgent() {
@@ -1058,4 +1085,4 @@ class PeerGroupAgent implements Agent {
 }
 
 type Config = Partial<Params>;
-export { PeerGroupAgent, PeerInfo, PeerMeshEventType, NewPeerEvent, Config as PeerGroupAgentConfig };
+export { PeerGroupAgent, PeerInfo, PeerMeshEventType, NewPeerEvent, LostPeerEvent, Config as PeerGroupAgentConfig };
