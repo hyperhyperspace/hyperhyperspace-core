@@ -142,16 +142,16 @@ test('[SPA02] 2-node nested sync test', async (done) => {
     let ticks = 0;
     while (ticks++ < 400 && lastThings.size() < 1) {
         await new Promise(r => setTimeout(r, 50));
-        lastThings?.loadAllChanges();
+        await lastThings?.loadAllChanges();
         //console.log('T'+ticks);
     }
 
     let lastInner = lastThings?.size() > 0 ? lastThings.values().next().value : undefined;
 
     ticks = 0;
-    while (lastInner !== undefined && ticks++ < 400 && lastInner?.size() === 0) {
+    while (lastInner !== undefined && ticks++ < 800 && lastInner?.size() === 0) {
         await new Promise(r => setTimeout(r, 50));
-        lastInner.loadAllChanges();
+        await lastInner.loadAllChanges();
         //console.log('I'+ticks);
     }
 
