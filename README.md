@@ -5,9 +5,8 @@
 
 ## TLDR
 
-This library helps you create distributed data structures, mostly for p2p applications. It works like an object store, where objects have to follow some conventions to enable secure remote sync. You can see an example [here](https://github.com/hyperhyperspace/examples/blob/master/src/chat/model/ChatRoom.ts).
+This library helps you create distributed data structures, mostly for p2p applications. It works like an object store, where objects have to follow some conventions to enable secure remote sync. You can see an example [here](https://github.com/hyperhyperspace/examples/blob/master/src/chat/model/ChatRoom.ts) and run it:
 
-[Example code](https://github.com/hyperhyperspace/hyperhyperspace-core/tree/master/examples/chat):
 ```
 $ yarn build-chat yarn chat
 ```
