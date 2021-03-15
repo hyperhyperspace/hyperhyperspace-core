@@ -7,6 +7,11 @@
 
 This library helps you create distributed data structures, mostly for p2p applications. It works like an object store, where objects have to follow some conventions to enable secure remote sync. You can see an example [here](https://github.com/hyperhyperspace/examples/blob/master/src/chat/model/ChatRoom.ts).
 
+[Example code](https://github.com/hyperhyperspace/hyperhyperspace-core/tree/master/examples/chat):
+```
+$ yarn build-chat yarn chat
+```
+
 ## Intro
 
 In the same way in which the Internet bridges networks together, the HHS attempts to decouple data from the apps used to manage it, thus enabling individuals to have better ownership and control over their information.
