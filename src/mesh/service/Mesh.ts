@@ -519,6 +519,8 @@ class Mesh {
         const peerGroup = gossip.peerGroupAgent;
         const peerGroupId = peerGroup.peerGroupId;
 
+
+        
         let peerGroupSyncAgents = this.syncAgents.get(peerGroupId);
         
         if (peerGroupSyncAgents === undefined) {
@@ -527,14 +529,15 @@ class Mesh {
         }
 
         let sync = peerGroupSyncAgents.get(mutHash);
-    
+
         if (sync === undefined) {
             sync = mut.createSyncAgent(gossip.peerGroupAgent);
-            this.pod.registerAgent(sync);
             peerGroupSyncAgents.set(mutHash, sync);
+            gossip.trackAgentState(sync.getAgentId());
+            this.pod.registerAgent(sync);    
         }
     
-        gossip.trackAgentState(sync.getAgentId());
+        
     }
 
     private removeSingleObjectSync(gossip: StateGossipAgent, mutHash: Hash) {
