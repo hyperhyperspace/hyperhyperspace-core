@@ -22,7 +22,7 @@ Apps will most of the time work on the local store as if it were universal (i.e.
 To create datatypes that can be shared using HHS, you need to extend the `HashedObject` and `MutableObject` classes. You can learn more on the [Data Model](#data-model) section below,
 or jump to a few examples in [this repo](https://github.com/hyperhyperspace/examples).
 
-To run the example chat app, clone the examples repo and do
+To run the example chat app, clone the [examples repo](https://github.com/hyperhyperspace/examples) and do
 
 `yarn build`
 
