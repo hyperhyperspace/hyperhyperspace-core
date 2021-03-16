@@ -2,7 +2,7 @@ import { StateSyncAgent } from 'mesh/agents/state/StateSyncAgent';
 import { Endpoint } from 'mesh/agents/network';
 import { AgentPod, Event } from 'mesh/common';
 import { HashedObject, Hash } from 'data/model';
-import { StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
+import { GossipEventTypes, StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
 import { PeerGroupAgent, PeeringAgentBase } from 'mesh/agents/peer';
 
@@ -126,9 +126,10 @@ class LinearStateAgent extends PeeringAgentBase implements StateSyncAgent {
 
         this.state = new LinearState(this.seq, this.message)
 
-        
-        //FIXME: this works with events now, right?
-        this.gossipAgent?.localAgentStateUpdate(this.getAgentId(), this.state);
+        this.pod?.broadcastEvent({
+            type: GossipEventTypes.AgentStateUpdate,
+            content: { agentId: this.getAgentId(), state: this.state }
+        });
     }
 
 
