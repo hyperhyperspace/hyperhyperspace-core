@@ -5,7 +5,7 @@
 
 ## TLDR
 
-This library helps you create distributed data structures, mostly for p2p applications. It works like an object store, where objects have to follow some conventions to enable secure remote sync. You can see an example [here](https://github.com/hyperhyperspace/examples/blob/master/src/chat/model/ChatRoom.ts). More info (including how to run the examlpe) [below](#example-chat).
+This library helps you create distributed data structures, mostly for p2p applications. It works like an object store, where objects have to follow some conventions to enable secure remote sync. You can see an example [here](https://github.com/hyperhyperspace/examples/blob/master/src/chat/model/ChatRoom.ts). More info (including how to run the examlpe) [below](#examples).
 
 ## Intro
 
@@ -19,9 +19,16 @@ Apps will most of the time work on the local store as if it were universal (i.e.
 
 ## Examples
 
-Since data stored within an HHS store can be modified by 3rd parties over the network, the store needs to be able to validate any updates it receives independently of the application. This imposes a few requirements on how data is represented.
+To create datatypes that can be shared using HHS, you need to extend the `HashedObject` and `MutableObject` classes. You can learn more on the [Data Model](#data-model) section below,
+or jump to a few examples in [this repo](https://github.com/hyperhyperspace/examples).
 
-You can learn more in the [Data Model](#data-model) section below, or jump to a few examples in [this repo](https://github.com/hyperhyperspace/examples).
+To run the example chat app, clone the examples repo and do
+
+`yarn build`
+
+`yarn start`
+
+If you're using windows, replace `start` by `winstart` above.
 
 ## Objectives
 
@@ -55,15 +62,6 @@ Apps will configure groups of peers, and the HHS mesh provides primitives for ef
 ## Spaces
 
 A [space](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/spaces/Space.ts) is a data unit that can be shared and discovered easily. It has root object that can be used to bootstrap and synchronize the space.
-
-## Example: chat
-
-[Here](https://github.com/hyperhyperspace/hyperhyperspace-core/tree/master/examples/chat) you can see an example of a small console-based chat application built on HHS.
-
-To run the example, do
-
-yarn build-chat
-yarn chat
 
 ## Project status
 
