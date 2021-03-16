@@ -20,7 +20,6 @@
   },
   "devDependencies": {
     "@hyper-hyper-space/node-env": "^0.8.0",
-    "@subspace/vdf": "^0.1.0",
     "@types/jest": "^26.0.19",
     "@types/node": "^14.0.13",
     "@types/ws": "^7.2.6",
@@ -45,7 +44,6 @@
     "modulePaths": [
       "<rootDir>/test",
       "<rootDir>/src",
-      "<rootDir>/examples",
       "<rootDir>/node_modules/**"
     ],
     "roots": [
