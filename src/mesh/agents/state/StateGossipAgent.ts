@@ -493,7 +493,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
     }
 
-    private async notifyAgentOfStateArrival(sender: Endpoint, agentId: AgentId, stateHash: Hash, state?: HashedObject) : Promise<boolean> {
+    private async notifyAgentOfStateArrival(sender: Endpoint, agentId: AgentId, stateHash: Hash, state: HashedObject) : Promise<boolean> {
 
         const agent = this.getLocalStateAgent(agentId);
 

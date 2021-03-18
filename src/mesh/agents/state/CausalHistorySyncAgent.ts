@@ -1,13 +1,38 @@
 import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
+import { OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
 import { Hash, HashedObject, MutationOp } from 'data/model';
 import { AgentPod } from 'mesh/service/AgentPod';
 import { Store } from 'storage/store';
 import { Logger, LogLevel } from 'util/logging';
+import { Endpoint } from '../network/NetworkAgent';
 import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { AgentStateUpdateEvent, GossipEventTypes } from './StateGossipAgent';
 import { StateSyncAgent } from './StateSyncAgent';
 import { TerminalOpsState } from './TerminalOpsState';
+
+
+enum MessageType {
+    RequestHistory = 'request-history',
+    SendHistory = 'send-history'
+};
+
+type RequestHistoryMsg = {
+    type: MessageType.RequestHistory,
+    target: Hash,
+    terminalOps: Hash[],
+    initialOps: Hash[],
+    limit: Number
+};
+
+type SendHistoryMsg = {
+    type: MessageType.SendHistory,
+    target: Hash,
+    history: OpCausalHistoryLiteral[]
+}
+
+
+type HistoryMsg = RequestHistoryMsg | SendHistoryMsg;
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
@@ -23,7 +48,8 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     state?: TerminalOpsState;
     stateHash?: Hash;
 
-    missingHistory: CausalHistoryFragment;
+    missing: Map<Endpoint, CausalHistoryFragment>;
+    fetching: CausalHistoryFragment;
 
     controlLog: Logger;
 
@@ -34,7 +60,10 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         this.acceptedMutationOpClasses = acceptedMutationOpClasses;
         this.store = store;
 
-        this.missingHistory = new CausalHistoryFragment(this.target);
+        this.missing = new Map();
+        this.fetching = new CausalHistoryFragment(this.target);
+
+
 
         this.opCallback.bind(this);
 
@@ -42,8 +71,31 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     }
 
 
-    receiveRemoteState(_sender: string, _stateHash: string, _state: HashedObject): Promise<boolean> {
-        throw new Error('Method not implemented.');
+    async receiveRemoteState(_sender: string, _stateHash: string, _state: HashedObject): Promise<boolean> {
+
+        return false;
+
+        /*
+        let isNew = false;
+
+        if (state instanceof TerminalOpsState && state.objectHash === this.target) {
+
+            if (state.terminalOps !== undefined) {
+
+                const unknown = new Set<Hash>();
+
+                for (const opHash of state.terminalOps.values()) {
+                    if (!this.missing.contents.has(opHash) && (await this.store.loadLiteral(opHash)) === undefined) {
+                        unknown.add(opHash);
+                    }
+                }
+
+                isNew = unknown.size === 0;
+            }
+
+        }
+
+        return isNew;*/
     }
     
     getAgentId(): string {
@@ -129,4 +181,4 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
 }
 
-export { CausalHistorySyncAgent }
+export { HistoryMsg, CausalHistorySyncAgent }

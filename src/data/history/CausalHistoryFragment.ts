@@ -39,73 +39,73 @@ class CausalHistoryFragment {
 
     target: Hash;
 
-    terminalOps : Set<Hash>;
-    missingOps  : Set<Hash>;
+    terminalOpHistories : Set<Hash>;
+    missingOpHistories  : Set<Hash>;
 
     contents: Map<Hash, OpCausalHistory>;
     
-    nextOps : MultiMap<Hash, Hash>;
+    nextOpHistories : MultiMap<Hash, Hash>;
 
     constructor(target: Hash) {
         this.target = target;
-        this.terminalOps = new Set();
-        this.missingOps  = new Set();
+        this.terminalOpHistories = new Set();
+        this.missingOpHistories  = new Set();
 
         this.contents = new Map();
 
-        this.nextOps = new MultiMap();
+        this.nextOpHistories = new MultiMap();
     }
 
     add(opHistory: OpCausalHistory) {
 
-        if (this.isNew(opHistory.opHash)) {
+        if (this.isNew(opHistory.causalHistoryHash)) {
             
-            this.contents.set(opHistory.opHash, opHistory);
+            this.contents.set(opHistory.causalHistoryHash, opHistory);
 
             // Adjust missingOps and terminalOps (see lemma above)
-            if (this.missingOps.has(opHistory.opHash)) {
-                this.missingOps.delete(opHistory.opHash);
+            if (this.missingOpHistories.has(opHistory.causalHistoryHash)) {
+                this.missingOpHistories.delete(opHistory.causalHistoryHash);
             } else {
-                this.terminalOps.add(opHistory.opHash);
+                this.terminalOpHistories.add(opHistory.causalHistoryHash);
             }
             
-            for (const prevOpHash of opHistory.prevOpHashes) {
+            for (const prevOpHistory of opHistory.prevOpHistories) {
 
                 // Adjust missingOps and terminalOps with info about this new prev op
-                if (this.isNew(prevOpHash)) {
+                if (this.isNew(prevOpHistory)) {
                     // It may or may not be in missingOps but, since prevOp 
                     // is new, in any case add:
-                    this.missingOps.add(prevOpHash);
+                    this.missingOpHistories.add(prevOpHistory);
                 } else {
                     // It may or may not be in terminalOps but, since prevOp 
                     // is not new, in any case remove:
-                    this.terminalOps.delete(prevOpHash);
+                    this.terminalOpHistories.delete(prevOpHistory);
 
                 }
 
                 // Add reverse mapping to nextOps
-                this.nextOps.add(prevOpHash, opHistory.opHash)
+                this.nextOpHistories.add(prevOpHistory, opHistory.causalHistoryHash)
             }
         }
     }
 
-    remove(opHash: Hash) {
+    remove(opHistoryHash: Hash) {
 
-        const opHistory = this.contents.get(opHash);
+        const opHistory = this.contents.get(opHistoryHash);
 
         if (opHistory !== undefined) {
 
-            this.contents.delete(opHistory.opHash);
-            this.terminalOps.delete(opHistory.opHash);
+            this.contents.delete(opHistory.causalHistoryHash);
+            this.terminalOpHistories.delete(opHistory.causalHistoryHash);
 
-            for (const prevOpHash of opHistory.prevOpHashes) {
-                this.nextOps.delete(prevOpHash, opHistory.opHash);
+            for (const prevOpHistoryHash of opHistory.prevOpHistories) {
+                this.nextOpHistories.delete(prevOpHistoryHash, opHistory.causalHistoryHash);
 
-                if (this.nextOps.get(prevOpHash).size === 0) {
-                    if (this.contents.has(prevOpHash)) {
-                        this.terminalOps.add(prevOpHash)
+                if (this.nextOpHistories.get(prevOpHistoryHash).size === 0) {
+                    if (this.contents.has(prevOpHistoryHash)) {
+                        this.terminalOpHistories.add(prevOpHistoryHash)
                     } else {
-                        this.missingOps.delete(prevOpHash);
+                        this.missingOpHistories.delete(prevOpHistoryHash);
                     }
                 }
             }
@@ -113,84 +113,85 @@ class CausalHistoryFragment {
 
     }
 
-    checkAndComputeProps(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): boolean {
+    computeProps(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): void {
 
-        const verified = new Set<Hash>();
-        const checking = new Set<Hash>();
+        const done = new Set<Hash>();
+        const computing = new Set<Hash>();
 
-        for (const hash of this.terminalOps) {
-            checking.add(hash);
+        for (const hash of this.terminalOpHistories) {
+            computing.add(hash);
         }
 
-        while (checking.size > 0) {
+        while (computing.size > 0) {
 
-            const currentOpHash = checking.values().next().value as Hash;
+            const currentHistoryHash = computing.values().next().value as Hash;
 
-            checking.delete(currentOpHash);
+            computing.delete(currentHistoryHash);
 
-            const currentOp = this.contents.get(currentOpHash) as OpCausalHistory;
+            const currentHistory = this.contents.get(currentHistoryHash) as OpCausalHistory;
 
             const prevOpHistories = new Map<Hash, Hash|OpCausalHistory>();
 
-            for (const prevOpHash of currentOp.prevOpHashes) {
+            for (const prevHistoryHash of currentHistory.prevOpHistories) {
 
-                if (prevOpHash === currentOpHash) {
-                    return false; // self loop, bail out.
-                }
-
-                if (verified.has(prevOpHash)) {
-                    return false; // cycle detected, bail out.
-                }
-
-                const missing = missingOpHistories.get(prevOpHash);
+                const missing = missingOpHistories.get(prevHistoryHash);
                 if (missing !== undefined) {
-                    prevOpHistories.set(prevOpHash, missing);
+                    prevOpHistories.set(prevHistoryHash, missing);
                 } else {
-                    const op = this.contents.get(prevOpHash);
+                    const history = this.contents.get(prevHistoryHash);
 
-                    if (op === undefined) {
-                        return false;
+                    if (history === undefined) {
+                        throw new Error('Missing prevOp history: cannot compute props');
                     }
 
-                    prevOpHistories.set(prevOpHash, op);
+                    prevOpHistories.set(prevHistoryHash, history);
 
-                    if (!verified.has(prevOpHash)) {
-                        checking.add(prevOpHash);
+                    if (!done.has(prevHistoryHash)) {
+                        computing.add(prevHistoryHash);
                     }
                 }
             }
 
-            if (currentOp.verify(prevOpHistories)) {
+            const computed = OpCausalHistory.computeProps(prevOpHistories);
 
-                const computed = OpCausalHistory.computeProps(prevOpHistories);
-
-                if (computed !== undefined) {
-                    if (currentOp._computedProps === undefined) {
-                        currentOp._computedProps = computed;
-                    } else {
-                        if (currentOp._computedProps.size !== computed.size ||
-                            currentOp._computedProps.height !== computed.height) {
-
-                                return false;
-                                
-                        }
-                    }
+            if (computed !== undefined) {
+                if (currentHistory._computedProps === undefined) {
+                    currentHistory._computedProps = computed;
                 }
-                
-
-                verified.add(currentOpHash)
-                checking.delete(currentOpHash);
-            } else {
-                return false;
             }
+            
+            done.add(currentHistoryHash)
+            computing.delete(currentHistoryHash);
         }
-
-        return true;
 
     }
 
-    private isNew(opHash: Hash) {
-        return !this.contents.has(opHash);
+    getStartingOpHistories(): Set<Hash> {
+        const startingOpHistories = new Set<Hash>();
+
+        for (const missing of this.missingOpHistories) {
+            for (const starting of this.nextOpHistories.get(missing)) {
+                startingOpHistories.add(starting);
+            }
+        }
+
+        return startingOpHistories;
+    }
+
+    getTerminalOps(): Set<Hash> {
+        return this.getOpsForHistories(this.terminalOpHistories);
+    }
+
+    getStartingOps(): Set<Hash> {
+        return this.getOpsForHistories(this.getStartingOpHistories());
+    }
+
+    private isNew(historyHash: Hash) {
+        return !this.contents.has(historyHash);
+    }
+
+    private getOpsForHistories(histories: Set<Hash>): Set<Hash> {
+        return new Set(Array.from(histories).map((history: Hash) => this.contents.get(history)?.opHash)) as Set<Hash>;
     }
 }
 
