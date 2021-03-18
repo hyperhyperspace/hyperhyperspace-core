@@ -75,6 +75,11 @@ describeProxy('[STR] Storage', () => {
         await testHistoryGeneration(store);
     });
 
+    test('[STR15] Validate history retrieved from memory store', async () => {
+        let store = new Store(new MemoryBackend('test-storage-backend'));
+        await testHistoryGeneration(store);
+    });
+
 });
 
 async function testLoadStoreCycle(store: Store) {
@@ -294,6 +299,10 @@ async function testHistoryGeneration(store: Store) {
     const worldHistory = await store.loadOpCausalHistory(world?.hash() as Hash) as OpCausalHistory;
     const helloHistory = await store.loadOpCausalHistory(hello?.hash() as Hash) as OpCausalHistory
 
+    const bangHistoryByHash = await store.loadOpCausalHistoryByHash(bangHistory.causalHistoryHash);
+
+    expect(bangHistoryByHash?.causalHistoryHash).toEqual(bangHistory.causalHistoryHash);
+    expect(bangHistoryByHash?.opHash).toEqual(bangHistory.opHash);
 
     expect(bangHistory._computedProps?.height).toEqual(3);
     expect(bangHistory._computedProps?.size).toEqual(3);

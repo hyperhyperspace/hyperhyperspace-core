@@ -62,10 +62,10 @@ class IdbBackend implements Backend {
     static readonly OP_CAUSAL_HISTORY_STORE = 'op_causal_history_store';
 
     static readonly CLASS_SEQUENCE_IDX_KEY = 'class_sequence';
-
     static readonly REFERENCES_SEQUENCE_IDX_KEY = 'references_sequence';
-
     static readonly REFERENCING_CLASS_SEQUENCE_IDX_KEY = 'referencing_class_sequence';
+
+    static readonly OP_CAUSAL_HISTORY_HASH_IDX_KEY = 'op_causal_history_hash';
 
     name: string;
     idbPromise: Promise<IDBPDatabase>;
@@ -85,7 +85,8 @@ class IdbBackend implements Backend {
                 objectStore.createIndex(IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY, {multiEntry: true});
 
                 db.createObjectStore(IdbBackend.TERMINAL_OPS_STORE, {keyPath: 'mutableHash'});
-                db.createObjectStore(IdbBackend.OP_CAUSAL_HISTORY_STORE, {keyPath: 'literal.opHash'});
+                let causalHistoryStore = db.createObjectStore(IdbBackend.OP_CAUSAL_HISTORY_STORE, {keyPath: 'literal.opHash'});
+                causalHistoryStore.createIndex(IdbBackend.OP_CAUSAL_HISTORY_HASH_IDX_KEY + '_idx', 'literal.causalHistoryHash' );
                 db.createObjectStore(IdbBackend.META_STORE, { keyPath: 'name'});
             },
             blocked() {
@@ -242,6 +243,19 @@ class IdbBackend implements Backend {
         let idb = await this.idbPromise;
         return await (idb.get(IdbBackend.OP_CAUSAL_HISTORY_STORE, opHash) as Promise<StoredOpCausalHistory|undefined>);
     }
+
+    async loadOpCausalHistoryByHash(causalHistoryHash: Hash) : Promise<StoredOpCausalHistory | undefined> {
+        let idb = await this.idbPromise;
+
+        const stored = await idb.transaction([IdbBackend.OP_CAUSAL_HISTORY_STORE], 'readonly').objectStore(IdbBackend.OP_CAUSAL_HISTORY_STORE).index(IdbBackend.OP_CAUSAL_HISTORY_HASH_IDX_KEY + '_idx').get(causalHistoryHash);
+
+        if (stored) {
+            return stored;
+        } else {
+            return undefined;
+        }
+    }
+
 
     setStoredObjectCallback(objectStoreCallback: (literal: Literal) => Promise<void>): void {
         this.objectStoreCallback = objectStoreCallback;

@@ -19,6 +19,7 @@ interface Backend {
     load(hash: Hash) : Promise<Literal | undefined>;
 
     loadOpCausalHistory(opHash: Hash) : Promise<StoredOpCausalHistory | undefined>;
+    loadOpCausalHistoryByHash(causalHistoryHash: Hash) : Promise<StoredOpCausalHistory | undefined>;
 
     loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined>;
 

@@ -23,7 +23,8 @@ type MemoryRepr = {
     sortedReferencingClassIndex: Map<string, Hash[]>,
     terminalOps: MultiMap<Hash, Hash>,
     lastOps: Map<Hash, Hash>,
-    opCausalHistories: Map<Hash, MemOpCausalHistoryFormat>
+    opCausalHistories: Map<Hash, MemOpCausalHistoryFormat>,
+    opCausalHistoriesByHash: Map<Hash, MemOpCausalHistoryFormat>
 }
 
 class MemoryBackend implements Backend {
@@ -73,7 +74,8 @@ class MemoryBackend implements Backend {
                 sortedReferencingClassIndex: new Map(),
                 terminalOps: new MultiMap(),
                 lastOps: new Map(),
-                opCausalHistories: new Map()
+                opCausalHistories: new Map(),
+                opCausalHistoriesByHash: new Map()
             }
         }
 
@@ -145,7 +147,9 @@ class MemoryBackend implements Backend {
                 throw new Error('Missing causal history received by backend while trying to store op ' + literal.hash);
             }
 
-            this.repr.opCausalHistories.set(literal.hash, Object.assign({}, history));
+            const historyCopy = Object.assign({}, history);
+            this.repr.opCausalHistories.set(literal.hash, historyCopy);
+            this.repr.opCausalHistoriesByHash.set(history.literal.causalHistoryHash, historyCopy);
 
             const mutableHash = LiteralUtils.getFields(storable.literal)['target']['_hash'];
 
@@ -203,6 +207,10 @@ class MemoryBackend implements Backend {
 
     async loadOpCausalHistory(opHash: string): Promise<StoredOpCausalHistory | undefined> {
         return this.repr.opCausalHistories.get(opHash);
+    }
+
+    async loadOpCausalHistoryByHash(causalHistoryHash: string): Promise<StoredOpCausalHistory | undefined> {
+        return this.repr.opCausalHistoriesByHash.get(causalHistoryHash);
     }
 
     private async searchByIndex(key: string, sortedIndex: Map<string, Hash[]>, params?: BackendSearchParams | undefined): Promise<BackendSearchResults> {

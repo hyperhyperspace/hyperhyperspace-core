@@ -365,6 +365,20 @@ class Store {
 
     }
 
+    async loadOpCausalHistoryByHash(causalHistoryHash: Hash): Promise<OpCausalHistory | undefined> {
+        const stored = await this.backend.loadOpCausalHistoryByHash(causalHistoryHash);
+
+        if (stored === undefined) {
+            return undefined;
+        } else {
+            const opCausalHistory = new OpCausalHistory(stored.literal);
+            opCausalHistory._computedProps = stored.computed;
+    
+            return opCausalHistory;
+        }
+
+    }
+
     /*private async loadLiteral(hash: Hash) : Promise<Literal | undefined> {
 
         let packed = await this.backend.load(hash);
