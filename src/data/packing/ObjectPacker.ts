@@ -1,4 +1,3 @@
-import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
 import { HashedSet } from 'data/model/HashedSet';
 import { Hash } from 'data/model/Hashing';
 import { HashReference } from 'data/model/HashReference';
@@ -16,11 +15,11 @@ class ObjectPacker {
 
     allowedOmissions: Set<Hash>;
 
-    maxObjs: number;
+    maxLiterals: number;
     
     filterPrevOpsFromDeps: (lit: Literal) => Dependency[];
 
-    constructor(store: Store, maxObjs: number) {
+    constructor(store: Store, maxLiterals: number) {
 
         this.store = store;
 
@@ -30,7 +29,7 @@ class ObjectPacker {
 
         this.allowedOmissions = new Set();
 
-        this.maxObjs = maxObjs;
+        this.maxLiterals = maxLiterals;
 
         this.filterPrevOpsFromDeps = (lit: Literal) => {
 
@@ -45,15 +44,16 @@ class ObjectPacker {
         this.allowedOmissions.add(hash);
     }
 
-    async allowOmissionWithReferences(hashes: IterableIterator<Hash>, maxAllowedOmissions: number) {
+    async allowOmissionsRecursively(initialHashesToOmit: IterableIterator<Hash>, maxAllowedOmissions: number) {
 
-        const toOmitAsSet = new Set<Hash>(hashes);
-        const toOmit = Array.from(hashes);
+        const omittableRefs = Array.from(initialHashesToOmit);
+        const omittableRefsAsSet = new Set<Hash>(initialHashesToOmit);
+        
 
-        while (toOmit.length > 0 && this.allowedOmissions.size < maxAllowedOmissions) {
+        while (omittableRefs.length > 0 && this.allowedOmissions.size < maxAllowedOmissions) {
 
-            const nextHash = toOmit.shift() as Hash;
-            toOmitAsSet.delete(nextHash);
+            const nextHash = omittableRefs.shift() as Hash;
+            omittableRefsAsSet.delete(nextHash);
 
             this.allowOmission(nextHash);
 
@@ -61,9 +61,9 @@ class ObjectPacker {
 
             if (literal !== undefined) {
                 for (const dep of literal.dependencies) {
-                    if (!this.allowedOmissions.has(dep.hash) && !toOmitAsSet.has(dep.hash)) {
-                        toOmitAsSet.add(dep.hash);
-                        toOmit.push(dep.hash);
+                    if (!this.allowedOmissions.has(dep.hash) && !omittableRefsAsSet.has(dep.hash)) {
+                        omittableRefsAsSet.add(dep.hash);
+                        omittableRefs.push(dep.hash);
                     }
                 }
             }
@@ -71,70 +71,73 @@ class ObjectPacker {
 
     }
 
-    async tryToAddObjectWithDeps(hash: Hash, maxObjects: number, filterDeps?: (lit: Literal) => Dependency[]): Promise<boolean> {
+    async addObject(hash: Hash): Promise<boolean> {
+
+        const literals = await this.toMissingLiterals(hash, this.maxLiterals - this.content.length);
+
+        if (literals !== undefined) {
+
+            // Since literals is in inverse causal order, its elements should be reversed 
+            // when added to the pack.
+
+            while (literals.length > 0) {
+                const literal = literals.pop() as Literal;
+                this.content.push();
+                this.contentHashes.add(literal.hash);
+            }
+
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
+    // toMissingLiterals impotant note: the literal array is in inverse causal order.
+    //                                  (i.e. the last element should be applied first)
+
+    private async toMissingLiterals(hash: Hash, maxAllowedLiterals: number): Promise<Literal[]|undefined> {
 
         const missing = new Array<Hash>();
         const missingAsSet = new Set<Hash>();
-        
-        const added   = new Set<Hash>();
 
-        const packed = new Array<Literal>();
+        const packed       = new Array<Literal>();
+        const packedHashes = new Set<Hash>();
 
         if (!this.contentHashes.has(hash) && !this.allowedOmissions.has(hash)) {
             missing.push(hash);
             missingAsSet.add(hash);    
         }
 
-        while (missing.length > 0 && packed.length <= maxObjects) {
+        while (missing.length > 0 && packed.length < maxAllowedLiterals) {
 
-            const nextHash = missing.shift() as Hash;
+            const nextHash = missing.pop() as Hash;
             missingAsSet.delete(nextHash);
 
-            if (!added.has(nextHash)) {
+            const literal = await this.store.loadLiteral(nextHash) as Literal;
 
-                // yikes! we really need to add it.
-                const literal = await this.store.loadLiteral(nextHash) as Literal;
+            packed.push(literal);
+            packedHashes.add(nextHash);
 
-                packed.unshift(literal);
+            let deps = literal.dependencies;
 
-                let deps = literal.dependencies;
-                if (filterDeps !== undefined) {
-                    deps = filterDeps(literal);
+            for (const dep of deps) {
+                if (!this.contentHashes.has(dep.hash) && 
+                    !this.allowedOmissions.has(dep.hash) &&
+                    !packedHashes.has(dep.hash)) {
+
+                    missing.push(dep.hash);
+                    missingAsSet.add(dep.hash);
                 }
-
-                for (const dep of deps) {
-                    if (!this.contentHashes.has(dep.hash) && 
-                        !this.allowedOmissions.has(dep.hash) &&
-                        !added.has(dep.hash)) {
-
-                        missing.push(dep.hash);
-                        missingAsSet.add(dep.hash);
-
-                    }
-                }
-
             }
 
         }
 
-        if (missing.length === 0 && packed.length <= maxObjects) {
-
-            for (const literal of packed) {
-                this.contentHashes.add(literal.hash);
-                this.content.push(literal);
-            }
-
-            return true;
+        if (missing.length === 0) {
+            return packed;
         } else {
-
-            return false;
+            return undefined;
         }
-
-
-
-    }
-
-    async addForwardOps(initHistoryHashes: Set<Hash>, causalHistory: CausalHistoryFragment) {
 
 
 

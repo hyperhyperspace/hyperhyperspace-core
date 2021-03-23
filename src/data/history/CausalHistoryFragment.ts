@@ -1,5 +1,6 @@
 import { MultiMap } from 'util/multimap';
 import { Hash } from '../model/Hashing';
+import { CausalHistoryWalk } from './CausalHistoryWalk';
 import { OpCausalHistory } from './OpCausalHistory';
 
 
@@ -184,6 +185,25 @@ class CausalHistoryFragment {
 
     getStartingOps(): Set<Hash> {
         return this.getOpsForHistories(this.getStartingOpHistories());
+    }
+
+    reachableFrom(initial: Set<Hash>, direction:'forward'|'backward'='forward', includeInitial=false): CausalHistoryWalk {
+        return new CausalHistoryWalk({direction: direction, includeInitial: includeInitial}, initial, this);
+    }
+
+    isReachable(originOpHistories: Set<Hash>, destinationOpHistories: Set<Hash>, direction: 'forward'|'backward', includeInitial: boolean): boolean {
+        
+        const targets = new Set<Hash>(destinationOpHistories.values());
+
+        for (const opHistory of this.reachableFrom(originOpHistories, direction, includeInitial)) {
+            targets.delete(opHistory.causalHistoryHash);
+
+            if (targets.size === 0) {
+                break;
+            }
+        }
+
+        return targets.size === 0;
     }
 
     private isNew(historyHash: Hash) {
