@@ -47,7 +47,13 @@ type SendMessage = {
     contents: any
 }
 
-type WebRTCConnectionEvent = ConnectionReady | ConnectionStatusChange | MessageReceived;
+type UpdateBufferedAmount = {
+    type: 'update-buffered-amount',
+    connId: string,
+    bufferedAmount: number
+}
+
+type WebRTCConnectionEvent = ConnectionReady | ConnectionStatusChange | MessageReceived | UpdateBufferedAmount;
 
 type ConnectionReady = {
     type: 'connection-ready',
@@ -74,7 +80,8 @@ class WebRTCConnectionsHost {
 
         return (type === 'connection-ready' || 
                 type === 'connection-status-change' || 
-                type === 'message-received')
+                type === 'message-received' ||
+                type === 'update-buffered-amount')
     }
 
     static isCommand(msg: any): boolean {
@@ -96,6 +103,7 @@ class WebRTCConnectionsHost {
     messageCallback: ((data: any, conn: Connection) => void);
     connectionReadyCallback: (conn: Connection) => void;
     connectionStatusChangeCallback: (status: string, conn: Connection) => void;
+    emptyBufferCallback: (conn: Connection) => void;
 
 
     constructor(eventCallback: (ev: WebRTCConnectionEvent) => void, linkup?: LinkupManager) {
@@ -133,6 +141,16 @@ class WebRTCConnectionsHost {
 
             this.eventCallback(ev);
         };
+
+        this.emptyBufferCallback = (conn: Connection) => {
+            let ev: UpdateBufferedAmount = {
+                type: 'update-buffered-amount',
+                connId: conn.getConnectionId(),
+                bufferedAmount: conn.bufferedAmount()
+            }
+
+            this.eventCallback(ev);
+        }
 
     }
 
@@ -179,7 +197,17 @@ class WebRTCConnectionsHost {
                 console.log('WARNING: trying to send message on ' + cmd.connId + ', but there is no such connection.');
             }
 
-            this.connections.get(cmd.connId)?.send(cmd.contents);
+            const conn = this.connections.get(cmd.connId);
+            if (conn !== undefined) {
+                conn.send(cmd.contents);
+                const ev: UpdateBufferedAmount = {
+                    type: 'update-buffered-amount',
+                    connId: cmd.contents,
+                    bufferedAmount: conn.bufferedAmount()
+                }
+                this.eventCallback(ev);
+            }
+            
 
         }
 
@@ -187,4 +215,4 @@ class WebRTCConnectionsHost {
 
 }
 
-export { WebRTCConnectionsHost, WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage, WebRTCConnectionEvent, MessageReceived, ConnectionReady, ConnectionStatusChange };
+export { WebRTCConnectionsHost, WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage, WebRTCConnectionEvent, MessageReceived, ConnectionReady, ConnectionStatusChange, UpdateBufferedAmount };

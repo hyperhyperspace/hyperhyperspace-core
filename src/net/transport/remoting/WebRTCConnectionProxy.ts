@@ -1,5 +1,5 @@
 import { WebRTCConnectionCommand, CreateConnection, InformCallbackSet, OpenConnection, AnswerConnection, ReceiveSignalling, CloseConnection, SendMessage } from './WebRTCConnectionsHost';
-import { WebRTCConnectionEvent, ConnectionStatusChange, MessageReceived } from './WebRTCConnectionsHost';
+import { WebRTCConnectionEvent, ConnectionStatusChange, MessageReceived, UpdateBufferedAmount } from './WebRTCConnectionsHost';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { Connection } from '../Connection';
 /* functions that actually used:
@@ -27,6 +27,7 @@ class WebRTCConnectionProxy implements Connection {
     messageCallback: ((data: any, conn: Connection) => void) | undefined;
     cachedChannelStatus : string;
     closed: boolean;
+    lastKnownBufferedAmount: number;
 
     connectionEventIngestFn: (ev: WebRTCConnectionEvent) => void;
 
@@ -41,6 +42,7 @@ class WebRTCConnectionProxy implements Connection {
         this.readyCallback = readyCallback;
         this.cachedChannelStatus = 'unknown';
         this.closed = false;
+        this.lastKnownBufferedAmount = 0;
 
         this.connectionEventIngestFn = (ev: WebRTCConnectionEvent) => {
 
@@ -67,6 +69,11 @@ class WebRTCConnectionProxy implements Connection {
                         console.log('WARNING: lost message due to missing callback in WebRTCConnectionProxy for ' + msg.connId);
                     }
                     
+                } else if (ev.type === 'update-buffered-amount') {
+
+                    const msg = ev as UpdateBufferedAmount;
+                    this.lastKnownBufferedAmount = msg.bufferedAmount;
+
                 }
             }
 
@@ -166,6 +173,10 @@ class WebRTCConnectionProxy implements Connection {
         };
 
         this.commandForwardingFn(cmd);
+    }
+
+    bufferedAmount(): number {
+        return this.lastKnownBufferedAmount;
     }
 
 }

@@ -31,6 +31,8 @@ class WebRTCConnection implements Connection {
 
     readyCallback   : (conn: Connection) => void;
     messageCallback : ((data: any, conn: Connection) => void) | undefined;
+    bufferedAmountLowCallback: ((conn: Connection) => void) | undefined;
+    bufferedAmountLowThreshold?: number;
 
     incomingMessages : any[];
 
@@ -52,6 +54,7 @@ class WebRTCConnection implements Connection {
 
         this.readyCallback   = readyCallback;
         this.messageCallback = undefined;
+        this.bufferedAmountLowCallback = undefined
 
         this.incomingMessages = [];
 
@@ -192,6 +195,19 @@ class WebRTCConnection implements Connection {
         
     }
 
+    bufferedAmount(): number {
+        if (this.channel !== undefined) {
+            return this.channel.bufferedAmount;
+        } else {
+            return 0;
+        }
+    }
+
+    setBufferedAmountLowCallback(callback: (conn: Connection) => void, bufferedAmountLowThreshold: number = 0) {
+        this.bufferedAmountLowCallback = callback;
+        this.bufferedAmountLowThreshold = bufferedAmountLowThreshold;
+    }
+
     private init(ICEServers? : any) {
         let servers     = ICEServers === undefined ? {iceServers : [{urls : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}]} : ICEServers;
 
@@ -306,14 +322,29 @@ class WebRTCConnection implements Connection {
             if (this.channelStatusChangeCallback !== undefined) {
                 this.channelStatusChangeCallback(this.channel?.readyState || 'unknown', this);
             }
-        }
+        };
+
+        let bufferAmountLow = () => {
+            WebRTCConnection.logger.trace(this.callId + ' bufferedAmountLow reached');
+
+            if (this.bufferedAmountLowCallback !== undefined) {
+                this.bufferedAmountLowCallback(this);
+            }
+        };
 
         if (this.channel !== undefined) {
             this.channel.onmessage = this.onmessage;
             this.channel.onopen    = stateChange;
             this.channel.onclose   = stateChange;
+            this.channel.onbufferedamountlow = bufferAmountLow;
+
+            if (this.bufferedAmountLowThreshold !== undefined) {
+                this.channel.bufferedAmountLowThreshold = this.bufferedAmountLowThreshold;
+            }
         }
-  }
+    }
+
+
 }
 
 export { WebRTCConnection };

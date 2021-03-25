@@ -15,6 +15,8 @@ interface Connection {
     close(): void;
 
     send(message: any) : void;
+
+    bufferedAmount(): number;
 }
 
 export { Connection };

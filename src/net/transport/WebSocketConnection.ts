@@ -151,6 +151,15 @@ class WebSocketConnection implements Connection {
         this.ws?.send(message);
     }
 
+    bufferedAmount(): number {
+
+        if (this.ws !== undefined) {
+            return this.ws?.bufferedAmount;
+        } else {
+            return 0;
+        }
+    }
+
 }
 
 export { WebSocketConnection };
