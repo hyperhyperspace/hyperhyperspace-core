@@ -13,40 +13,44 @@ import { StateSyncAgent } from './StateSyncAgent';
 
 
 enum MessageType {
-    RequestHistory = 'request-history',
-    RequestHistoryReply = 'request-history-reply',
-    SendObject = 'send-object'
+    SyncRequest = 'sync-request',
+    SyncReply = 'sync-reply',
+    SendObject = 'send-object',
+    CancelRequest = 'cancel-request'
 };
 
-type RequestHistoryMsg = {
-    type: MessageType.RequestHistory,
+type SyncRequestMsg = {
+    type: MessageType.SyncRequest,
 
     requestId: string,
     
     mutableObj: Hash,
     
-    targetOpHistories: Hash[],
-    backtrackOpHistories: Hash[], 
-    knownOpHistories: Hash[],
+    expecting: 'history' | 'ops' | 'both';
+
+    targetOpHistories?: Hash[],
+    startOpHistories?: Hash[],
+
+    requestedOps?: Hash[]
     
-    omissionProofsSecret: string,
+    omissionProofsSecret?: string,
     
-    maxHistory: number,
-    maxObjs: number
+    maxHistory?: number,
+    maxLiterals?: number
 };
 
-type RequestHistoryReplyMsg = {
-    type: MessageType.RequestHistoryReply,
+type SyncReplyMsg = {
+    type: MessageType.SyncReply,
 
     requestId: string,
     
-    history: OpCausalHistoryLiteral[],
-
-    opHistorySequence: Hash[],
-    objCount: number,
+    history?: OpCausalHistoryLiteral[],
+    sendingOps?: Hash[],
 
     omittedObjs: Hash[],
-    omissionProofs: string[]
+    omissionProofs: string[],
+
+    literalCount: number
 };
 
 type SendObjectMsg = {
@@ -58,7 +62,13 @@ type SendObjectMsg = {
     literal: Literal
 }
 
-type HistoryMsg = RequestHistoryMsg | RequestHistoryReplyMsg | SendObjectMsg;
+type CancelRequestMsg = {
+    type: MessageType.CancelRequest,
+
+    requestId: string
+}
+
+type HistoryMsg = SyncRequestMsg | SyncReplyMsg | SendObjectMsg | CancelRequestMsg;
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
@@ -205,64 +215,6 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
         return this.mutableObj === op.target?.hash() &&
                this.acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
-    }
-
-
-    private findSources(opHistoryHash: Hash): Set<Endpoint> {
-
-        const sources = new Set<Endpoint>();
-
-        const successors = new Set<Hash>();
-
-        successors.add(opHistoryHash);
-
-        while (successors.size > 0) {
-            const hash = successors.values().next().value as Hash;
-            successors.delete(hash);
-
-            for (const [endpoint, state] of this.remoteStates.entries()) {
-                if (state.has(hash)) {
-                    sources.add(endpoint);
-                }
-            }
-
-            for (const nextHash of this.discovered.nextOpHistories.get(hash)) {
-                successors.add(nextHash);
-            }
-        }
-
-        return sources;
-
-    }
-
-    private createPack(opHistoryHash: Hash, source: Endpoint, maxSize: number): Array<Hash> {
-
-        const sourceState = this.remoteStates.get(source) as HashedSet<Hash>;
-
-        const toProcess = new Array<Hash>();
-        const seen = new Set<Hash>()
-        const contents = new Array<Hash>();
-
-        toProcess.push(opHistoryHash);
-        seen.add(opHistoryHash)
-
-        while (toProcess.length > 0 && contents.length <= maxSize) {
-            const current = toProcess.shift() as Hash;
-            contents.push(current);
-
-            if (! sourceState?.has(current)) {
-                for (const next of this.discovered.nextOpHistories.get(current)) {
-                    if (!seen.has(next)) {
-                        toProcess.push(next);
-                        seen.add(next);
-                    }
-                }
-            }
-            
-
-        }
-
-        return contents;
     }
 
 }
