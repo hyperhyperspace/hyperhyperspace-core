@@ -1,3 +1,4 @@
+import { RNGImpl } from 'crypto/random';
 import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
 import { OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
 import { Hash, HashedObject, HashedSet, Literal, MutationOp } from 'data/model';
@@ -13,23 +14,25 @@ import { StateSyncAgent } from './StateSyncAgent';
 
 
 enum MessageType {
-    SyncRequest = 'sync-request',
-    SyncReply = 'sync-reply',
-    SendObject = 'send-object',
+    SyncRequest   = 'sync-request',
+    SyncReply     = 'sync-reply',
+    SendLiteral   = 'send-literal',
     CancelRequest = 'cancel-request'
 };
+
+type RequestId = string;
 
 type SyncRequestMsg = {
     type: MessageType.SyncRequest,
 
-    requestId: string,
+    requestId: RequestId,
     
     mutableObj: Hash,
     
-    expecting: 'history' | 'ops' | 'both';
+    expecting: 'history' | 'ops' | 'any';
 
     targetOpHistories?: Hash[],
-    startOpHistories?: Hash[],
+    knownOpHistories?: Hash[],
 
     requestedOps?: Hash[]
     
@@ -42,7 +45,7 @@ type SyncRequestMsg = {
 type SyncReplyMsg = {
     type: MessageType.SyncReply,
 
-    requestId: string,
+    requestId: RequestId,
     
     history?: OpCausalHistoryLiteral[],
     sendingOps?: Hash[],
@@ -53,10 +56,10 @@ type SyncReplyMsg = {
     literalCount: number
 };
 
-type SendObjectMsg = {
-    type: MessageType.SendObject,
+type SendLiteralMsg = {
+    type: MessageType.SendLiteral,
 
-    requestId: string,
+    requestId: RequestId,
 
     sequence: number,
     literal: Literal
@@ -65,10 +68,19 @@ type SendObjectMsg = {
 type CancelRequestMsg = {
     type: MessageType.CancelRequest,
 
-    requestId: string
+    requestId: RequestId,
+    reason: 'invalid-reply'|'invalid-literal'|'out-of-order-literal'
 }
 
-type HistoryMsg = SyncRequestMsg | SyncReplyMsg | SendObjectMsg | CancelRequestMsg;
+type SyncMsg = SyncRequestMsg | SyncReplyMsg | SendLiteralMsg | CancelRequestMsg;
+
+type RequestInfo = {
+    request: SyncRequestMsg,
+    reply?: SyncReplyMsg,
+    remote: Endpoint,
+    timestamp: number,
+    lastObjectTimestamp?: number
+};
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
@@ -88,6 +100,11 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
     discovered: CausalHistoryFragment;
     
+    sentRequests: Map<RequestId, RequestInfo>;
+    
+    activeReceivedRequests: Map<RequestId, RequestInfo>;
+    queuedReceivedRequests: Map<Endpoint, RequestInfo>;
+     
 
     controlLog: Logger;
 
@@ -103,37 +120,50 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         this.discovered = new CausalHistoryFragment(this.mutableObj);
 
 
+        this.sentRequests = new Map();
+        
+        this.activeReceivedRequests = new Map();
+        this.queuedReceivedRequests = new Map();
+
         this.opCallback.bind(this);
 
         this.controlLog = CausalHistorySyncAgent.controlLog;
     }
 
 
-    async receiveRemoteState(_sender: string, _stateHash: string, _state: HashedObject): Promise<boolean> {
-
-        return false;
-
-        /*
+    async receiveRemoteState(sender: string, stateHash: string, state: HashedObject): Promise<boolean> {
+        
         let isNew = false;
 
-        if (state instanceof TerminalOpsState && state.objectHash === this.target) {
+        if (state instanceof CausalHistoryState && state.mutableObj === this.mutableObj) {
 
-            if (state.terminalOps !== undefined) {
+            if (state.terminalOpHistories !== undefined) {
 
-                const unknown = new Set<Hash>();
+                this.remoteStates.set(sender, new HashedSet<Hash>(state.terminalOpHistories?.values()))
 
-                for (const opHash of state.terminalOps.values()) {
-                    if (!this.missing.contents.has(opHash) && (await this.store.loadLiteral(opHash)) === undefined) {
-                        unknown.add(opHash);
+                if (this.stateHash !== stateHash) {
+
+                    const unknown = new Set<Hash>();
+
+                    for (const opHistory of state.terminalOpHistories.values()) {
+                        if (!this.discovered.contents.has(opHistory) && (await this.store.loadOpCausalHistoryByHash(opHistory)) === undefined) {
+                            unknown.add(opHistory);
+                        }
                     }
+
+                    isNew = unknown.size > 0;
+
+                    if (isNew) {
+                        this.requestUnknownOpHistories(sender, unknown);
+                    }
+
                 }
 
-                isNew = unknown.size === 0;
             }
 
         }
 
-        return isNew;*/
+        return isNew;
     }
     
     getAgentId(): string {
@@ -151,8 +181,20 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         throw new Error('Method not implemented.');
     }
 
-    receivePeerMessage(_source: string, _sender: string, _recipient: string, _content: any): void {
-        throw new Error('Method not implemented.');
+    receivePeerMessage(source: string, sender: string, recipient: string, content: any): void {
+        
+        const msg: SyncMsg = content as SyncMsg;
+
+        if (msg.type === MessageType.SyncRequest) {
+
+        } else if (msg.type === MessageType.SyncReply) {
+
+        } else if (msg.type === MessageType.SendLiteral) {
+
+        } else if (msg.type === MessageType.CancelRequest) {
+            
+        }
+
     }
 
 
@@ -217,6 +259,38 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
                this.acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
+    // requesting history
+
+    private requestUnknownOpHistories(destination: Endpoint, unknown: Set<Hash>) {
+
+        const msg: SyncRequestMsg = {
+            type: MessageType.SyncRequest,
+            requestId: this.newRequestId(),
+            mutableObj: this.mutableObj,
+            expecting: 'any',
+            targetOpHistories: Array.from(unknown.values()),
+            // FIXME: if there's no local state yet, maybe the following is unwise?
+            knownOpHistories: this.state === undefined? [] : Array.from(this.state.values()),
+            omissionProofsSecret: new RNGImpl().randomHexString(128),
+            maxHistory: 256,
+            maxLiterals: 256
+        };
+
+        const reqInfo: RequestInfo = {
+            request: msg,
+            remote: destination,
+            timestamp: Date.now()
+        };
+
+        this.sentRequests.set(msg.requestId, reqInfo);
+
+        this.sendMessageToPeer(destination, this.getAgentId(), msg);
+    }
+
+    private newRequestId() {
+        return new RNGImpl().randomHexString(128);
+    }
+
 }
 
-export { HistoryMsg, CausalHistorySyncAgent }
+export { SyncMsg as HistoryMsg, CausalHistorySyncAgent }

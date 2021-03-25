@@ -6,10 +6,10 @@ class CausalHistoryState extends HashedObject {
 
     static className = 'hhs/v0/CausalHistoryState';
 
-    target?  : Hash;
+    mutableObj?  : Hash;
     terminalOpHistories? : HashedSet<Hash>;
 
-    static async createFromTerminalOps(target: Hash, terminalOps: Array<Hash>, store: Store): Promise<CausalHistoryState> {
+    static async createFromTerminalOps(mutableObj: Hash, terminalOps: Array<Hash>, store: Store): Promise<CausalHistoryState> {
 
         const terminalOpHistories: Array<Hash> = [];
 
@@ -18,17 +18,17 @@ class CausalHistoryState extends HashedObject {
             terminalOpHistories.push(history?.causalHistoryHash as Hash);
         }
 
-        return CausalHistoryState.create(target, terminalOpHistories);
+        return CausalHistoryState.create(mutableObj, terminalOpHistories);
     }
 
     static create(target: Hash, terminalOpHistories: Array<Hash>) {
         return new CausalHistoryState(target, terminalOpHistories);
     }
 
-    constructor(objectHash?: Hash, terminalOpHistories?: Array<Hash>) {
+    constructor(mutableObj?: Hash, terminalOpHistories?: Array<Hash>) {
         super();
 
-        this.target = objectHash;
+        this.mutableObj = mutableObj;
         if (terminalOpHistories !== undefined) { 
             this.terminalOpHistories = new HashedSet<Hash>(new Set(terminalOpHistories).values());
         }
@@ -40,7 +40,7 @@ class CausalHistoryState extends HashedObject {
 
     validate(_references: Map<Hash, HashedObject>) {
 
-        if (this.target === undefined) {
+        if (this.mutableObj === undefined) {
             return false;
         }
 
@@ -62,5 +62,7 @@ class CausalHistoryState extends HashedObject {
     }
 
 }
+
+HashedObject.registerClass(CausalHistoryState.className, CausalHistoryState);
 
 export { CausalHistoryState };
