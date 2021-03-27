@@ -45,6 +45,8 @@ class CausalHistoryFragment {
 
     contents: Map<Hash, OpCausalHistory>;
     
+    opHistoriesForOp: MultiMap<Hash, Hash>;
+
     nextOpHistories : MultiMap<Hash, Hash>;
 
     constructor(target: Hash) {
@@ -54,6 +56,8 @@ class CausalHistoryFragment {
 
         this.contents = new Map();
 
+        this.opHistoriesForOp = new MultiMap();
+
         this.nextOpHistories = new MultiMap();
     }
 
@@ -62,6 +66,7 @@ class CausalHistoryFragment {
         if (this.isNew(opHistory.causalHistoryHash)) {
             
             this.contents.set(opHistory.causalHistoryHash, opHistory);
+            this.opHistoriesForOp.add(opHistory.opHash, opHistory.causalHistoryHash)
 
             // Adjust missingOps and terminalOps (see lemma above)
             if (this.missingOpHistories.has(opHistory.causalHistoryHash)) {
@@ -88,6 +93,17 @@ class CausalHistoryFragment {
                 this.nextOpHistories.add(prevOpHistory, opHistory.causalHistoryHash)
             }
         }
+    }
+
+    verifyUniqueOps(): boolean {
+
+        for (const opHashes of this.opHistoriesForOp.values()) {
+            if (opHashes.size > 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     remove(opHistoryHash: Hash) {
@@ -187,15 +203,80 @@ class CausalHistoryFragment {
         return this.getOpsForHistories(this.getStartingOpHistories());
     }
 
-    reachableFrom(initial: Set<Hash>, direction:'forward'|'backward'='forward', includeInitial=false): CausalHistoryWalk {
-        return new CausalHistoryWalk({direction: direction, includeInitial: includeInitial}, initial, this);
+    getOpHistoryForOp(opHash: Hash): OpCausalHistory | undefined {
+
+        let opHistories = this.opHistoriesForOp.get(opHash);
+
+        if (opHistories === undefined) {
+            return undefined;
+        } else {
+            if (opHistories.size > 1) {
+                throw new Error('Op histories matching op ' + opHash + ' were requested from fragment, but there is more than one (' + opHistories.size + ')');                
+            } else {
+                return opHistories.values().next().value;
+            }
+        }
+ 
     }
 
-    isReachable(originOpHistories: Set<Hash>, destinationOpHistories: Set<Hash>, direction: 'forward'|'backward', includeInitial: boolean): boolean {
+    // The following 3 functions operate on the known part of the fragment (what's
+    // in this.contents, not the hashes in missingOpHistories).
+
+    // Returns an iterator that visits all opHistories reachable from the initial set, in BFS order.
+
+    iterateFrom(initial: Set<Hash>|Hash, direction:'forward'|'backward'='forward'): CausalHistoryWalk {
+        
+        if (!(initial instanceof Set)) {
+            initial = new Set([initial]);
+        }
+        
+        return new CausalHistoryWalk(direction, initial, this);
+    }
+
+    // Returns the set of terminal opHistories reachable from initial.
+
+    terminalOpsFor(originOpHistories: Set<Hash>|Hash, direction:'forward'|'backward'='forward'): Set<OpCausalHistory> {
+        
+        if (!(originOpHistories instanceof Set)) {
+            originOpHistories = new Set([originOpHistories]);
+        }
+
+        const terminal = new Set<OpCausalHistory>();
+
+        for (const opHistory of this.iterateFrom(originOpHistories, direction)) {
+        
+            let isTerminal: boolean;
+
+            if (direction === 'forward') {
+                isTerminal = this.nextOpHistories.get(opHistory.causalHistoryHash).size === 0;
+            } else if (direction === 'backward') {
+                
+                isTerminal = true;
+                for (const prevOpHistory of opHistory.prevOpHistories) {
+                    if (!this.missingOpHistories.has(prevOpHistory)) {
+                        isTerminal = false;
+                        break;
+                    }
+                }
+            } else {
+                throw new Error("Direction should be 'forward' or 'backward'.")
+            }
+
+            if (isTerminal) {
+                terminal.add(opHistory);
+            }
+        }
+
+        return terminal;
+    }
+
+    // Returns true if ALL the hashes in destination are reachable from origin.
+
+    isReachable(originOpHistories: Set<Hash>, destinationOpHistories: Set<Hash>, direction: 'forward'|'backward'): boolean {
         
         const targets = new Set<Hash>(destinationOpHistories.values());
 
-        for (const opHistory of this.reachableFrom(originOpHistories, direction, includeInitial)) {
+        for (const opHistory of this.iterateFrom(originOpHistories, direction)) {
             targets.delete(opHistory.causalHistoryHash);
 
             if (targets.size === 0) {

@@ -21,7 +21,7 @@ class CausalHistoryObjectPacker extends ObjectPacker {
     // false.
     async addForwardOps(initHistoryHashes: Set<Hash>): Promise<boolean> {
 
-        for (const opHistory of this.causalHistory.reachableFrom(initHistoryHashes, 'forward')) {
+        for (const opHistory of this.causalHistory.iterateFrom(initHistoryHashes, 'forward')) {
             if (!await this.addObject(opHistory.opHash)) {
                 return false;
             }

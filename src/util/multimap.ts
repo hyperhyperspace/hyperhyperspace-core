@@ -65,6 +65,10 @@ class MultiMap<K, V> {
     keys() {
         return this.inner.keys();
     }
+
+    values() {
+        return this.inner.values();
+    }
 }
 
 class DedupMultiMap<K, V> {

@@ -3,15 +3,13 @@ import { CausalHistoryFragment } from "./CausalHistoryFragment";
 import { OpCausalHistory } from "./OpCausalHistory";
 
 type Config = {
-    direction: 'forward'|'backward',
-    includeInitial: boolean
-}
+    direction: 'forward'|'backward'
+};
 
 class CausalHistoryWalk implements IterableIterator<OpCausalHistory> {
 
-    config   : Config;
+    direction: 'forward'|'backward';
 
-    initial  : Set<Hash>;
     fragment : CausalHistoryFragment;
 
     visited : Set<Hash>;
@@ -19,15 +17,10 @@ class CausalHistoryWalk implements IterableIterator<OpCausalHistory> {
     queue         : Array<Hash>;
     queueContents : Set<Hash>;
 
-    constructor(config: Config, initial: Set<Hash>, fragment: CausalHistoryFragment) {
+    constructor(direction: 'forward'|'backward', initial: Set<Hash>, fragment: CausalHistoryFragment) {
 
-        if (config.direction === 'forward' && config.includeInitial) {
-            throw new Error("Cannot create a causal history walk with direction 'forward' and includeInitial=true, since the initial elements are missing in this case!");
-        }
-
-        this.config = config;
+        this.direction = direction;
         
-        this.initial  = initial;
         this.fragment = fragment;
 
         this.visited = new Set();
@@ -37,13 +30,7 @@ class CausalHistoryWalk implements IterableIterator<OpCausalHistory> {
         this.queueContents = new Set();
         
         for (const hash of initial.values()) {
-            if (config.includeInitial) {
-                this.enqueueIfNew(hash);
-            } else {
-                for (const succ of this.goFrom(hash)) {
-                    this.enqueueIfNew(succ);
-                }
-            }
+            this.enqueueIfNew(hash);
         }
     }
 
@@ -51,8 +38,13 @@ class CausalHistoryWalk implements IterableIterator<OpCausalHistory> {
         if (this.queue.length > 0) {
             const hash = this.dequeue();
             for (const succ of this.goFrom(hash)) {
-                this.enqueueIfNew(succ);
+
+                // if succ is in fragment.missing do not go there
+                if (this.fragment.contents.has(succ)) {
+                    this.enqueueIfNew(succ);
+                }
             }
+
             const nextOp = this.fragment.contents.get(hash);
 
             if (nextOp === undefined) {
@@ -84,7 +76,7 @@ class CausalHistoryWalk implements IterableIterator<OpCausalHistory> {
     }
 
     private goFrom(opHistoryHash: Hash) {
-        if (this.config.direction === 'forward') {
+        if (this.direction === 'forward') {
             return this.goForwardFrom(opHistoryHash);
         } else {
             return this.goBackwardFrom(opHistoryHash);
