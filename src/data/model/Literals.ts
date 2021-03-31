@@ -1,4 +1,4 @@
-import { Hash } from './Hashing';
+import { Hash, Hashing } from './Hashing';
 
 type Literal           = { hash: Hash, value: any, author?: Hash, signature?: string, dependencies: Array<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };
@@ -19,6 +19,10 @@ class LiteralUtils {
 
     static getFlags(literal: Literal): string[] {
         return literal.value['_flags'];
+    }
+
+    static validateHash(literal: Literal): boolean {
+        return literal.hash === Hashing.forValue(literal.value);
     }
 
 }

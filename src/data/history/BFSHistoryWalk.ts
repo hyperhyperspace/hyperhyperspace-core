@@ -3,7 +3,7 @@ import { OpCausalHistory } from './OpCausalHistory';
 
 
 
-class CausalHistoryWalk extends HistoryWalk implements IterableIterator<OpCausalHistory> {
+class BFSHistoryWalk extends HistoryWalk implements IterableIterator<OpCausalHistory> {
 
     next(): IteratorResult<OpCausalHistory, any> {
         if (this.queue.length > 0) {
@@ -12,7 +12,7 @@ class CausalHistoryWalk extends HistoryWalk implements IterableIterator<OpCausal
 
                 // if succ is in fragment.missing do not go there
                 if (this.fragment.contents.has(succ)) {
-                    this.enqueue(succ);
+                    this.enqueueIfNew(succ);
                 }
             }
 
@@ -30,4 +30,4 @@ class CausalHistoryWalk extends HistoryWalk implements IterableIterator<OpCausal
 
 }
 
-export { CausalHistoryWalk };
+export { BFSHistoryWalk };

@@ -1,6 +1,6 @@
 
 import { HashedObject } from './HashedObject';
-import { Literal } from './Literals';
+import { Literal, LiteralUtils } from './Literals';
 import { Hash, Hashing } from './Hashing';
 import { Resources } from 'spaces/spaces';
 
@@ -105,7 +105,7 @@ class Context {
         let result = true;
 
         for (const [hash, literal] of this.literals.entries()) {
-            if (hash !== literal.hash || hash !== Hashing.forValue(literal.value)) {
+            if (hash !== literal.hash || !LiteralUtils.validateHash(literal)) {
                 result = false;
                 break;
             }

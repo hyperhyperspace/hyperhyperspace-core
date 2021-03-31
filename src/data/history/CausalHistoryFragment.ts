@@ -1,23 +1,34 @@
+import { start } from 'node:repl';
+import { fileURLToPath } from 'node:url';
 import { MultiMap } from 'util/multimap';
 import { Hash } from '../model/Hashing';
+import { BFSHistoryWalk } from './BFSHistoryWalk';
 import { CausalHistoryWalk } from './CausalHistoryWalk';
-import { OpCausalHistory } from './OpCausalHistory';
+import { OpCausalHistory, OpCausalHistoryLiteral } from './OpCausalHistory';
 
 
 // A CasualHistoryFragment is built from a (sub)set of operations
 // for a given MutableObject target, that are stored in the "contents"
 // (Hash -> OpCausalHistory) map.
 
+// Since during sync the ops themselves are not available, a supplemental
+// OpCausalHistory object is used. It only contains the hash of the op,
+// the hash of the OpCausalHistory objects of its predecessors, and some
+// extra information.
+
+// All history manipulation is done over OpCausalHistory objects, the actual
+// op hashes can be obtained once the causality has been sorted out.
+
 // The fragment keeps track of the set of terminal ops (ops without any
 // following ops, in the sense that they are the last ops to have been
 // applied according to te causal ordering defined by the "prevOps" field).
 
 // It also keeps track of the ops that are referenced by the ops in the 
-// fragment but are not in it (in the "missingOps" field).
+// fragment but are not in it (in the "missingPrevOpHistories" field).
 
 // Therefore the fragment may be seen as a set of ops that takes the target
-// MutableObject from a state that contains all the ops in "missingOps" to a
-// state that contains all the ops in "terminalOps".
+// MutableObject from a state that contains all the ops in "missingPrevOpHistories" to a
+// state that contains all the ops in "terminalOpHistories".
 
 // lemma: if an op is new to the fragment, then it either
 //
@@ -38,10 +49,10 @@ import { OpCausalHistory } from './OpCausalHistory';
 
 class CausalHistoryFragment {
 
-    target: Hash;
+    mutableObj: Hash;
 
-    terminalOpHistories : Set<Hash>;
-    missingOpHistories  : Set<Hash>;
+    terminalOpHistories    : Set<Hash>;
+    missingPrevOpHistories : Set<Hash>;
 
     contents: Map<Hash, OpCausalHistory>;
     
@@ -50,9 +61,9 @@ class CausalHistoryFragment {
     nextOpHistories : MultiMap<Hash, Hash>;
 
     constructor(target: Hash) {
-        this.target = target;
+        this.mutableObj = target;
         this.terminalOpHistories = new Set();
-        this.missingOpHistories  = new Set();
+        this.missingPrevOpHistories  = new Set();
 
         this.contents = new Map();
 
@@ -69,8 +80,8 @@ class CausalHistoryFragment {
             this.opHistoriesForOp.add(opHistory.opHash, opHistory.causalHistoryHash)
 
             // Adjust missingOps and terminalOps (see lemma above)
-            if (this.missingOpHistories.has(opHistory.causalHistoryHash)) {
-                this.missingOpHistories.delete(opHistory.causalHistoryHash);
+            if (this.missingPrevOpHistories.has(opHistory.causalHistoryHash)) {
+                this.missingPrevOpHistories.delete(opHistory.causalHistoryHash);
             } else {
                 this.terminalOpHistories.add(opHistory.causalHistoryHash);
             }
@@ -81,7 +92,7 @@ class CausalHistoryFragment {
                 if (this.isNew(prevOpHistory)) {
                     // It may or may not be in missingOps but, since prevOp 
                     // is new, in any case add:
-                    this.missingOpHistories.add(prevOpHistory);
+                    this.missingPrevOpHistories.add(prevOpHistory);
                 } else {
                     // It may or may not be in terminalOps but, since prevOp 
                     // is not new, in any case remove:
@@ -122,12 +133,34 @@ class CausalHistoryFragment {
                     if (this.contents.has(prevOpHistoryHash)) {
                         this.terminalOpHistories.add(prevOpHistoryHash)
                     } else {
-                        this.missingOpHistories.delete(prevOpHistoryHash);
+                        this.missingPrevOpHistories.delete(prevOpHistoryHash);
                     }
                 }
             }
         }
 
+    }
+
+    clone(): CausalHistoryFragment {
+        const clone = new CausalHistoryFragment(this.mutableObj);
+
+        for (const opHistory of this.contents.values()) {
+            clone.add(opHistory);
+        } 
+
+        return clone;
+    }
+
+    filterByTerminalOpHistories(terminalOpHistories: Set<Hash>): CausalHistoryFragment {
+
+        const filteredOpHistories = this.closureFrom(terminalOpHistories, 'backward');
+        const filtered = new CausalHistoryFragment(this.mutableObj);
+
+        for (const hash of filteredOpHistories.values()) {
+            filtered.add(this.contents.get(hash) as OpCausalHistory);
+        }
+
+        return filtered;
     }
 
     computeProps(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): void {
@@ -186,7 +219,7 @@ class CausalHistoryFragment {
     getStartingOpHistories(): Set<Hash> {
         const startingOpHistories = new Set<Hash>();
 
-        for (const missing of this.missingOpHistories) {
+        for (const missing of this.missingPrevOpHistories) {
             for (const starting of this.nextOpHistories.get(missing)) {
                 startingOpHistories.add(starting);
             }
@@ -222,15 +255,24 @@ class CausalHistoryFragment {
     // The following 3 functions operate on the known part of the fragment (what's
     // in this.contents, not the hashes in missingOpHistories).
 
-    // Returns an iterator that visits all opHistories reachable from the initial set, in BFS order.
+    // Returns an iterator that visits all opHistories reachable from the initial set.
+    
+    // - If method is 'bfs', each op history is visited once, in BFS order.
+    // - If method is 'causal', each op history is visited as many tomes as there is
+    //   a causality relation leading to it (in the provided direction).
 
-    iterateFrom(initial: Set<Hash>|Hash, direction:'forward'|'backward'='forward'): CausalHistoryWalk {
+    iterateFrom(initial: Set<Hash>|Hash, direction:'forward'|'backward'='forward', method: 'bfs'|'causal'='bfs'): BFSHistoryWalk {
         
         if (!(initial instanceof Set)) {
             initial = new Set([initial]);
         }
         
-        return new CausalHistoryWalk(direction, initial, this);
+        if (method === 'bfs') {
+            return new BFSHistoryWalk(direction, initial, this);
+        } else {
+            return new CausalHistoryWalk(direction, initial, this);
+        }
+        
     }
 
     // Returns the set of terminal opHistories reachable from initial.
@@ -243,7 +285,7 @@ class CausalHistoryFragment {
 
         const terminal = new Set<OpCausalHistory>();
 
-        for (const opHistory of this.iterateFrom(originOpHistories, direction)) {
+        for (const opHistory of this.iterateFrom(originOpHistories, direction, 'bfs')) {
         
             let isTerminal: boolean;
 
@@ -253,7 +295,7 @@ class CausalHistoryFragment {
                 
                 isTerminal = true;
                 for (const prevOpHistory of opHistory.prevOpHistories) {
-                    if (!this.missingOpHistories.has(prevOpHistory)) {
+                    if (!this.missingPrevOpHistories.has(prevOpHistory)) {
                         isTerminal = false;
                         break;
                     }
@@ -276,7 +318,7 @@ class CausalHistoryFragment {
         
         const targets = new Set<Hash>(destinationOpHistories.values());
 
-        for (const opHistory of this.iterateFrom(originOpHistories, direction)) {
+        for (const opHistory of this.iterateFrom(originOpHistories, direction, 'bfs')) {
             targets.delete(opHistory.causalHistoryHash);
 
             if (targets.size === 0) {
@@ -285,6 +327,79 @@ class CausalHistoryFragment {
         }
 
         return targets.size === 0;
+    }
+
+    closureFrom(originOpHistories: Set<Hash>, direction: 'forward'|'backward'): Set<Hash> {
+        const result = new Set<Hash>();
+
+        for (const opHistory of this.iterateFrom(originOpHistories, direction, 'bfs')) {
+            result.add(opHistory.causalHistoryHash);
+        }
+
+        return result;
+    }
+
+    causalClosureFrom(startingOpHistories: Set<Hash>, providedOpHistories: Set<Hash>, maxOps?: number, ignoreOp?: (h: Hash) => boolean, filterOp?: (h: Hash) => boolean): Hash[] {
+
+        const closure = new Set<Hash>();
+        const missingPrevOpHistories = new Map<Hash, Set<Hash>>();
+        const result = new Array<Hash>();
+
+        for (const startingHash of startingOpHistories) {
+            if (filterOp === undefined || filterOp(startingHash)) {
+                const startingOpHistory = this.contents.get(startingHash) as OpCausalHistory;
+                this.loadMissingPrevOpHistories(missingPrevOpHistories, startingOpHistory, providedOpHistories);    
+            }
+        }
+
+        for (const opHistory of this.iterateFrom(startingOpHistories, 'forward', 'causal')) {
+            
+            if (maxOps !== undefined && maxOps === result.length) {
+                break;
+            }
+
+            const hash = opHistory.causalHistoryHash;
+
+            if ((filterOp === undefined || filterOp(hash)) && missingPrevOpHistories.get(hash)?.size === 0) {
+                for (const nextHash of this.nextOpHistories.get(hash)) {
+                    const nextOpHistory = this.contents.get(nextHash) as OpCausalHistory;
+                    if (filterOp === undefined || filterOp(nextHash)) {
+                        this.loadMissingPrevOpHistories(missingPrevOpHistories, nextOpHistory, providedOpHistories);
+                        missingPrevOpHistories.get(nextHash)?.delete(hash);    
+                    }
+                }
+
+                closure.add(hash);
+
+                if (ignoreOp === undefined || !ignoreOp(hash)) {
+                    result.push(hash);
+                }
+            }
+
+        }
+
+        return result;
+
+    }
+
+    causalClosure(providedOpHistories: Set<Hash>, maxOps?: number, ignoreOp?: (h: Hash) => boolean, filterOp?: (h: Hash) => boolean) {    
+        return this.causalClosureFrom(this.getStartingOpHistories(), providedOpHistories, maxOps, ignoreOp, filterOp);
+    }
+
+    private loadMissingPrevOpHistories(missingPrevOpHistories: Map<Hash, Set<Hash>>, opHistory: OpCausalHistory, providedOpHistories: Set<Hash>) {
+        let missing = missingPrevOpHistories.get(opHistory.causalHistoryHash);
+        if (missing === undefined) {
+            missing = new Set<Hash>();
+
+            for (const prevOp of opHistory.prevOpHistories) {
+                if (!providedOpHistories.has(prevOp)) {
+                    missing.add(prevOp);
+                }
+            }
+            
+            missingPrevOpHistories.set(opHistory.causalHistoryHash, missing);
+        }
+
     }
 
     private isNew(historyHash: Hash) {
