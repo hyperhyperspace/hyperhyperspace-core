@@ -8,7 +8,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
 
-import { RequestId, MessageType, SendLiteralMsg } from './CausalHistoryProvider';
+import { RequestId, MessageType, SendLiteralMsg, RejectRequestMsg } from './CausalHistoryProvider';
 import { RequestMsg, ResponseMsg, CancelRequestMsg } from './CausalHistoryProvider';
 
 const MaxRequestsPerRemote = 2;
@@ -480,7 +480,11 @@ class CausalHistorySynchronizer {
 
         }
 
+    }
 
+    // We're not rejecting anything for now, will implement when I do the retry logic.
+    onReceivingRequestRejection(remote: Endpoint, msg: RejectRequestMsg) {
+        remote; msg;
     }
 
     private async attemptNewRequest(remote: Endpoint, additionalPrevOpHistories?: Set<Hash>, additionalTerminalOpHistories?: Set<Hash>) {

@@ -114,11 +114,11 @@ class CausalHistoryProvider {
     }
 
     onReceivingRequest(remote: Endpoint, msg: RequestMsg) {
-
+        
     }
 
     onReceivingCancelRequest(remote: Endpoint, msg: CancelRequestMsg) {
-        
+
     }
 
 }

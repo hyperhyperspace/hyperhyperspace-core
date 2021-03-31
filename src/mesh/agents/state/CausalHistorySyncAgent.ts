@@ -125,9 +125,9 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         } else if (msg.type === MessageType.SendLiteral) {
             this.synchronizer.onReceivingLiteral(source, msg);
         } else if (msg.type === MessageType.RejectRequest) { 
-
+            this.synchronizer.onReceivingRequestRejection(source, msg);
         } else if (msg.type === MessageType.CancelRequest) {
-             this.provider.onReceivingCancelRequest(source, msg);
+             this.provider.onReceivingRequestCancellation(source, msg);
         }
 
     }
