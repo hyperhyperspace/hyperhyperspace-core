@@ -1,10 +1,8 @@
-import { start } from 'node:repl';
-import { fileURLToPath } from 'node:url';
 import { MultiMap } from 'util/multimap';
 import { Hash } from '../model/Hashing';
 import { BFSHistoryWalk } from './BFSHistoryWalk';
 import { CausalHistoryWalk } from './CausalHistoryWalk';
-import { OpCausalHistory, OpCausalHistoryLiteral } from './OpCausalHistory';
+import { OpCausalHistory } from './OpCausalHistory';
 
 
 // A CasualHistoryFragment is built from a (sub)set of operations
