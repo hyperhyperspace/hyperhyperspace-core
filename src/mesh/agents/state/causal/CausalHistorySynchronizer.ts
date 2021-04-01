@@ -1,22 +1,20 @@
 import { RNGImpl } from 'crypto/random';
+
 import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
 import { OpCausalHistory } from 'data/history/OpCausalHistory';
 import { Context, Hash, HashedObject, LiteralUtils } from 'data/model';
+
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
-import { SSL_OP_SSLEAY_080_CLIENT_DH_BUG } from 'node:constants';
+
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
+
 import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
 
-import { RequestId, MessageType, SendLiteralMsg, RejectRequestMsg } from './CausalHistoryProvider';
+import { ProviderLimits, RequestId, MessageType, SendLiteralMsg, RejectRequestMsg } from './CausalHistoryProvider';
 import { RequestMsg, ResponseMsg, CancelRequestMsg } from './CausalHistoryProvider';
 
 const MaxRequestsPerRemote = 2;
-
-const MaxLiteralsPerResponse = 256;
-const MaxHistoryPerResponse = 256;
-
-const MaxOpsToRequest = 128;
 
 const RequestTimeout = 12;
 const LiteralArrivalTimeout = 6;
@@ -241,11 +239,8 @@ class CausalHistorySynchronizer {
                         omittedObjsOk = false;
                         break;
                     }
-                    const refOpFields = LiteralUtils.getFields(refOpLit);
-                    const refOpClass = LiteralUtils.getClassName(refOpLit);
-                    const acceptedOpClasses = this.syncAgent.acceptedMutationOpClasses as string[];
-                    if (refOpFields['target'] !== this.syncAgent.mutableObj ||
-                        acceptedOpClasses.indexOf(refOpClass) < 0) {
+
+                    if (!this.syncAgent.literalIsValidOp(refOpLit)) {
                         omittedObjsOk = false;
                         break;
                     }
@@ -439,13 +434,7 @@ class CausalHistorySynchronizer {
 
             if (reqInfo.response.sendingOps[reqInfo.nextOpSequence] === literal.hash) {
 
-                const acceptedMutationOpClasses = this.syncAgent.acceptedMutationOpClasses as string[];
-                const className = LiteralUtils.getClassName(literal);
-                const target    = LiteralUtils.getFields(literal)['target']
-    
-                
-                if (acceptedMutationOpClasses.indexOf(className) >= 0 &&
-                    target === this.syncAgent.mutableObj) {
+                if (this.syncAgent.literalIsValidOp(literal)) {
                     
                     try {
                         const op = HashedObject.fromContext(reqInfo.receivedObjects as Context, literal.hash, true);
@@ -525,12 +514,12 @@ class CausalHistorySynchronizer {
             }
         }
 
-        const opsToRequest = remoteHistory.causalClosure(providedOpHistores, MaxOpsToRequest, (h: Hash) => this.requestsForOpHistory.hasKey(h))
+        const opsToRequest = remoteHistory.causalClosure(providedOpHistores, ProviderLimits.MaxOpsToRequest, (h: Hash) => this.requestsForOpHistory.hasKey(h))
                              .map((opHistoryHash: Hash) => (remoteHistory.contents.get(opHistoryHash) as OpCausalHistory).opHash);
 
         // See if we need to follow up with another request:
 
-        const doRequest = opHistoriesToRequest.size > 0 || opsToRequest.length > SSL_OP_SSLEAY_080_CLIENT_DH_BUG;
+        const doRequest = opHistoriesToRequest.size > 0 || opsToRequest.length > 0;
 
         if (doRequest) {
             this.request(remote, { requestedOpHistories: opHistoriesToRequest, requestedOps: opsToRequest });
@@ -585,11 +574,11 @@ class CausalHistorySynchronizer {
         
         if (msg.expecting !== 'history') {
             msg.omissionProofsSecret = new RNGImpl().randomHexString(128);
-            msg.maxLiterals = MaxLiteralsPerResponse;
+            msg.maxLiterals = ProviderLimits.MaxLiteralsPerResponse;
         }
 
         if (msg.expecting !== 'ops') {
-            msg.maxHistory = MaxHistoryPerResponse;
+            msg.maxHistory = ProviderLimits.MaxHistoryPerResponse;
         }
 
 

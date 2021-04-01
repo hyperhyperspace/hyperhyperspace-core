@@ -1,3 +1,4 @@
+import { Store } from 'storage/store';
 import { MultiMap } from 'util/multimap';
 import { Hash } from '../model/Hashing';
 import { BFSHistoryWalk } from './BFSHistoryWalk';
@@ -382,6 +383,41 @@ class CausalHistoryFragment {
 
     causalClosure(providedOpHistories: Set<Hash>, maxOps?: number, ignoreOp?: (h: Hash) => boolean, filterOp?: (h: Hash) => boolean) {    
         return this.causalClosureFrom(this.getStartingOpHistories(), providedOpHistories, maxOps, ignoreOp, filterOp);
+    }
+
+    async loadFromTerminalOpHistories(store: Store, terminalOpHistories: Set<Hash>, maxOpHistories?: number, forbiddenOpHistories?: Set<Hash>) {
+
+        let next = new Array<Hash>();
+
+        for (const opHistoryHash of terminalOpHistories) {
+            if (forbiddenOpHistories === undefined || !forbiddenOpHistories.has(opHistoryHash)) {
+
+                next.push(opHistoryHash);
+            }
+        }
+
+
+        do {
+            for (const opHistoryHash of next) {
+
+                const opHistory = await store.loadOpCausalHistoryByHash(opHistoryHash) as OpCausalHistory;
+            
+                this.add(opHistory);
+
+                if (maxOpHistories === this.contents.size) {
+                    break;
+                }    
+            }
+
+            next = [];
+
+            for (const opHistoryHash of this.missingPrevOpHistories) {
+                if (forbiddenOpHistories === undefined || !forbiddenOpHistories.has(opHistoryHash)) {
+                    next.push(opHistoryHash);
+                }
+            }
+
+        } while (next.length > 0 && !(this.contents.size === maxOpHistories))
     }
 
     private loadMissingPrevOpHistories(missingPrevOpHistories: Map<Hash, Set<Hash>>, opHistory: OpCausalHistory, providedOpHistories: Set<Hash>) {

@@ -1,4 +1,4 @@
-import { Hash, HashedObject, HashedSet, MutationOp } from 'data/model';
+import { Hash, HashedObject, HashedSet, Literal, LiteralUtils, MutationOp } from 'data/model';
 import { AgentPod } from 'mesh/service/AgentPod';
 import { Store } from 'storage/store';
 import { Logger, LogLevel } from 'util/logging';
@@ -152,6 +152,24 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
             await this.updateStateFromStore();  
         }
     };
+
+    literalIsValidOp(literal?: Literal): boolean {
+        
+        let valid = false;
+
+        if (this.acceptedMutationOpClasses !== undefined && literal !== undefined) {
+            const fields    = LiteralUtils.getFields(literal);
+            const className = LiteralUtils.getClassName(literal);
+
+            if (fields['target'] === this.mutableObj &&
+                this.acceptedMutationOpClasses.indexOf(className) >= 0) {
+
+                valid = true;
+            }
+        }
+
+        return valid;
+    }
 
     // Loading local state:
 

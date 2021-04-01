@@ -57,7 +57,7 @@ type RejectRequestMsg = {
 
     requestId: RequestId,
 
-    reason: 'too-busy'|'invalid-request'|'unknown-target'|'other',
+    reason: 'too-busy'|'invalid-request',
     detail: string
 };
 
@@ -80,17 +80,24 @@ type CancelRequestMsg = {
 
 type SyncMsg = RequestMsg | ResponseMsg | RejectRequestMsg | SendLiteralMsg | CancelRequestMsg;
 
+const ProviderLimits = {
+    MaxOpsToRequest: 128,
+    MaxLiteralsPerResponse: 256,
+    MaxHistoryPerResponse: 256
+};
+
 type ResponseInfo = {
 
     request: RequestMsg,
-    response: ResponseMsg,
+    response?: ResponseMsg,
     remote: Endpoint,
     status: 'created'|'replied'|'queued',
 
-    repliedTimestamp?: number,
+    requestArrivalTimestamp: number,
+    responseSentTimestamp?: number,
     lastLiteralTimestamp?: number,
 
-    sendingQueue: Array<Literal>
+    sendingQueue?: Array<Literal>
 
 }
 
@@ -98,30 +105,157 @@ class CausalHistoryProvider {
 
     syncAgent: CausalHistorySyncAgent;
 
-    replies  : Map<RequestId, ResponseInfo>;   
+    responses  : Map<RequestId, ResponseInfo>;   
 
-    currentReplies: Map<Endpoint, RequestId>;
-    queuedReplies: Map<Endpoint, RequestId[]>;
+    currentResponses: Map<Endpoint, RequestId>;
+    queuedResponses: Map<Endpoint, RequestId[]>;
 
 
     constructor(syncAgent: CausalHistorySyncAgent) {
         this.syncAgent = syncAgent;
 
-        this.replies  = new Map();
+        this.responses  = new Map();
 
-        this.currentReplies  = new Map();
-        this.queuedReplies   = new Map();
+        this.currentResponses  = new Map();
+        this.queuedResponses   = new Map();
     }
 
-    onReceivingRequest(remote: Endpoint, msg: RequestMsg) {
+    async onReceivingRequest(remote: Endpoint, msg: RequestMsg) {
+
+        if (this.responses.get(msg.requestId) === undefined) {
+
+            const respInfo: ResponseInfo = {
+                request: msg,
+                remote: remote,
+                status: 'created',
+                requestArrivalTimestamp: Date.now()
+            };
+
+            this.responses.set(msg.requestId, respInfo);
+
+            if (respInfo.request.mutableObj !== this.syncAgent.mutableObj) {
+                const detail = 'Rejecting request ' + respInfo.request.requestId + ', mutableObj is ' + respInfo.request.mutableObj + ' but it should be ' + this.syncAgent.mutableObj;
+                this.rejectRequest(respInfo, 'invalid-request', detail);
+                return;
+            }
+
+            // Validate history request, if present
+            if (respInfo.request.requestedOpHistories !== undefined || respInfo.request.terminalFetchedOpHistories !== undefined) {
+
+                const toCheck = new Set<Hash>();
+                if (respInfo.request.requestedOpHistories !== undefined) {
+                    for (const hash of respInfo.request.requestedOpHistories) {
+                        toCheck.add(hash);
+                    }
+                }
+                if (respInfo.request.terminalFetchedOpHistories !== undefined) {
+                    for (const hash of respInfo.request.terminalFetchedOpHistories) {
+                        toCheck.add(hash);
+                    }
+                }
+
+                for (const opHistoryHash of toCheck) {
+                    const opHistory = await this.syncAgent.store.loadOpCausalHistoryByHash(opHistoryHash);
+                    if (opHistory !== undefined) {
+                        const literal = await this.syncAgent.store.loadLiteral(opHistory.opHash);
+
+                        if (this.syncAgent.literalIsValidOp(literal)) {
+                            const detail = 'Invalid requestedOpHistories/terminalFetchedOpHistories for request ' + respInfo.request.requestId + ', rejecting';
+                            this.rejectRequest(respInfo, 'invalid-request', detail);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // Validate requested ops, if present
+            if (respInfo.request.requestedOps !== undefined) {
+
+                for (const opHash of respInfo.request.requestedOps) {
+                    const literal = await this.syncAgent.store.loadLiteral(opHash);
+                    if (!this.syncAgent.literalIsValidOp(literal)) {
+                        const detail = 'Invalid requestedOps for request ' + respInfo.request.requestId + ', rejecting';
+                        this.rejectRequest(respInfo, 'invalid-request', detail);
+                        return;
+                    }
+                }
+            }
+
+            // TODO: load history, if requested
+
+            // TODO: load and pack ops, deal with omissions, if requested
+
+            // TODO: if still room for more ops, check if history connected and request accepts 'any'
+
+
+        }
+
+    }
+
+    onReceivingRequestCancellation(remote: Endpoint, msg: CancelRequestMsg) {
+
+    }
+
+    private rejectRequest(respInfo: ResponseInfo, reason: 'too-busy'|'invalid-request', detail: string) {
+
+        CausalHistorySyncAgent.controlLog.warning(detail);
+
+        this.removeResponse(respInfo);
+
+        const msg: RejectRequestMsg = {
+            type: MessageType.RejectRequest,
+            requestId: respInfo.request.requestId,
+            reason: reason,
+            detail: detail
+        }
+
+        this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), msg);
+    }
+
+    private removeResponse(respInfo: ResponseInfo) {
+
+        const requestId = respInfo.request.requestId;
+
+        // remove from current & queue
+
+        if (this.currentResponses.get(respInfo.remote) === requestId) {
+            this.currentResponses.delete(respInfo.remote);
+        }
         
+        this.dequeueResponse(respInfo);
+
+        // remove request info
+
+        this.responses.delete(respInfo.request.requestId);
     }
 
-    onReceivingCancelRequest(remote: Endpoint, msg: CancelRequestMsg) {
+    private sendResponse(respInfo: ResponseInfo) {
+        const reqId = respInfo.request.requestId;
+        this.currentResponses.set(respInfo.remote, reqId);
+        this.dequeueResponse(respInfo);
+        this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), respInfo.request);
+    }
 
+    private enqueueRequest(respInfo: ResponseInfo) {
+        const reqId = respInfo.request.requestId;
+        let queued = this.queuedResponses.get(respInfo.remote);
+        if (queued === undefined) {
+            queued = [];
+        }
+        queued.push(reqId);
+    }
+
+    private dequeueResponse(respInfo: ResponseInfo) {
+        const reqId = respInfo.request.requestId;
+        const queued = this.queuedResponses.get(respInfo.remote);
+        const idx = queued?.indexOf(reqId);
+
+        if (idx !== undefined) {
+            queued?.splice(idx);
+        }
     }
 
 }
 
 
-export { CausalHistoryProvider, RequestId, MessageType, SyncMsg, RequestMsg, ResponseMsg, RejectRequestMsg, SendLiteralMsg, CancelRequestMsg };
+export { CausalHistoryProvider, ProviderLimits, RequestId, MessageType, SyncMsg, RequestMsg, ResponseMsg, RejectRequestMsg, SendLiteralMsg, CancelRequestMsg };
