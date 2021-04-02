@@ -1,3 +1,4 @@
+import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
 import { HashedSet } from 'data/model/HashedSet';
 import { Hash } from 'data/model/Hashing';
 import { HashReference } from 'data/model/HashReference';
@@ -73,24 +74,45 @@ class ObjectPacker {
 
     async addObject(hash: Hash): Promise<boolean> {
 
-        const literals = await this.toMissingLiterals(hash, this.maxLiterals - this.content.length);
-
-        if (literals !== undefined) {
-
-            // Since literals is in inverse causal order, its elements should be reversed 
-            // when added to the pack.
-
-            while (literals.length > 0) {
-                const literal = literals.pop() as Literal;
-                this.content.push();
-                this.contentHashes.add(literal.hash);
-            }
-
+        if (this.contentHashes.has(hash)) {
             return true;
         } else {
-            return false;
+            const literals = await this.toMissingLiterals(hash, this.maxLiterals - this.content.length);
+
+            if (literals !== undefined) {
+    
+                // Since literals is in inverse causal order, its elements should be reversed 
+                // when added to the pack.
+    
+                while (literals.length > 0) {
+                    const literal = literals.pop() as Literal;
+                    this.content.push();
+                    this.contentHashes.add(literal.hash);
+                }
+    
+                return true;
+            } else {
+                return false;
+            }
+        }
+        
+
+    }
+
+    // Attempt to add all causal history ops and their needed dependencies
+    // starting from the given set until the very last ones.
+
+    // If successful, return true. If there are more ops to send, return
+    // false.
+    async addForwardOps(initHistoryHashes: Set<Hash>, causalHistory: CausalHistoryFragment): Promise<boolean> {
+
+        for (const opHistory of causalHistory.iterateFrom(initHistoryHashes, 'forward')) {
+            if (!await this.addObject(opHistory.opHash)) {
+                return false;
+            }
         }
 
+        return true;
     }
 
     // toMissingLiterals impotant note: the literal array is in inverse causal order.

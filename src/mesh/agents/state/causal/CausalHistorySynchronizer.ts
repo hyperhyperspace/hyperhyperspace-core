@@ -109,7 +109,7 @@ class CausalHistorySynchronizer {
 
             // Validate received history
 
-            if (req.expecting !== 'ops' && resp.history !== undefined) {
+            if (resp.history !== undefined) {
                 receivedHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
 
                 // Verify all received op history literals and create a fragment from 'em:
@@ -172,7 +172,7 @@ class CausalHistorySynchronizer {
             // Make a history fragment using this additional ops to check that is indeed the case.
             const additionalOpsHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
 
-            if (req.expecting !== 'history' && resp.sendingOps !== undefined) {
+            if (resp.sendingOps !== undefined) {
                 for (const hash of resp.sendingOps) {
                     if (!requestedOps.has(hash)) {
                         const opHistory = receivedHistory?.getOpHistoryForOp(hash);
@@ -188,11 +188,17 @@ class CausalHistorySynchronizer {
 
                 // Check if the additional ops follow from provided history
                 if (additionalOpsHistory.contents.size > 0) {
-                    for (const opHistoryHash of additionalOpsHistory.missingPrevOpHistories) {
-                        if (reqInfo.request.expecting !== 'any' || !informedAsFetchedOpHistories.has(opHistoryHash)) {
-                            const detail = 'Request informs it will send op with hash ' + additionalOpsHistory.contents.get(opHistoryHash)?.opHash + ', but it was neither requested or follows directly from informed fetched op histories.';
-                            this.cancelRequest(reqInfo, 'invalid-response', detail);
-                            return;
+                    if (reqInfo.request.mode !== 'infer-req-ops') {
+                        const detail = 'Response to request ' + req.requestId + ' includes additional ops, but mode is not infer-req-ops';
+                        this.cancelRequest(reqInfo, 'invalid-response', detail);
+                        return;
+                    } else {
+                        for (const opHistoryHash of additionalOpsHistory.missingPrevOpHistories) {
+                            if (!informedAsFetchedOpHistories.has(opHistoryHash)) {
+                                const detail = 'Request informs it will send an op depending upon another with history hash ' + opHistoryHash + ', but it was neither requested or follows directly from informed fetched op histories.';
+                                this.cancelRequest(reqInfo, 'invalid-response', detail);
+                                return;
+                            }
                         }
                     }
                 }
@@ -549,7 +555,7 @@ class CausalHistorySynchronizer {
             type: MessageType.Request,
             requestId: new RNGImpl().randomHexString(128),
             mutableObj: this.syncAgent.mutableObj,
-            expecting: aim.requestedOpHistories !== undefined? 'any' : 'ops',
+            mode: aim.requestedOpHistories !== undefined? 'infer-req-ops' : 'as-requested',
         };
 
         if (aim.requestedOpHistories !== undefined) {
@@ -572,12 +578,13 @@ class CausalHistorySynchronizer {
             }
         }
         
-        if (msg.expecting !== 'history') {
+        if ((msg.requestedOps !== undefined) ||
+            (msg.mode === 'infer-req-ops' && msg.requestedOpHistories !== undefined && msg.terminalFetchedOpHistories !== undefined)) {
             msg.omissionProofsSecret = new RNGImpl().randomHexString(128);
             msg.maxLiterals = ProviderLimits.MaxLiteralsPerResponse;
         }
 
-        if (msg.expecting !== 'ops') {
+        if (msg.requestedOpHistories !== undefined) {
             msg.maxHistory = ProviderLimits.MaxHistoryPerResponse;
         }
 

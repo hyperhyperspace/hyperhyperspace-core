@@ -1,6 +1,9 @@
-import { OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
+import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
+import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
 import { Hash, Literal } from 'data/model';
+import { ObjectPacker } from 'data/packing/ObjectPacker';
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
+import { request } from 'node:http';
 import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
 
 
@@ -21,7 +24,7 @@ type RequestMsg = {
     
     mutableObj: Hash,
     
-    expecting: 'history' | 'ops' | 'any';
+    mode: 'as-requested' | 'infer-req-ops';
 
     requestedOpHistories?       : Hash[], // op histories we want to get
     terminalFetchedOpHistories? : Hash[],  // last op histories whose op was already fetched
@@ -133,6 +136,12 @@ class CausalHistoryProvider {
 
             this.responses.set(msg.requestId, respInfo);
 
+            const resp: ResponseMsg = {
+                type: MessageType.Response,
+                requestId: msg.requestId,
+                literalCount: 0
+            }
+
             if (respInfo.request.mutableObj !== this.syncAgent.mutableObj) {
                 const detail = 'Rejecting request ' + respInfo.request.requestId + ', mutableObj is ' + respInfo.request.mutableObj + ' but it should be ' + this.syncAgent.mutableObj;
                 this.rejectRequest(respInfo, 'invalid-request', detail);
@@ -181,12 +190,110 @@ class CausalHistoryProvider {
                 }
             }
 
-            // TODO: load history, if requested
+            // Generate history fragment to include in the response
 
-            // TODO: load and pack ops, deal with omissions, if requested
+            const respHistoryFragment = new CausalHistoryFragment(this.syncAgent.mutableObj);
 
-            // TODO: if still room for more ops, check if history connected and request accepts 'any'
+            let maxHistory = msg.maxHistory;
 
+            if (maxHistory === undefined || maxHistory > ProviderLimits.MaxHistoryPerResponse) {
+                maxHistory = ProviderLimits.MaxHistoryPerResponse;
+            }
+
+            if (msg.requestedOpHistories !== undefined && msg.requestedOpHistories.length > 0) {
+                
+                respHistoryFragment.loadFromTerminalOpHistories(
+                    this.syncAgent.store,
+                    new Set<Hash>(msg.requestedOpHistories),
+                    maxHistory,
+                    new Set<Hash>(msg.terminalFetchedOpHistories)
+                );
+
+                if (respHistoryFragment.contents.size > 0) {
+
+                    resp.history = Array.from(respHistoryFragment.contents.values()).map((h: OpCausalHistory) => h.literalize());
+                }
+            }
+
+            const providedOpHistories = new Set<Hash>(respInfo.request.terminalFetchedOpHistories);
+
+            const remoteState = this.syncAgent.remoteStates.get(respInfo.remote);
+
+            if (remoteState !== undefined) {
+                for (const opHistoryHash of remoteState.values()) {
+                    providedOpHistories.add(opHistoryHash);
+                }
+            }
+
+            const providedOps = new Set<Hash>();
+        
+            for (const opHistoryHash of providedOpHistories) {
+                const opHistory = await this.syncAgent.store.loadOpCausalHistoryByHash(opHistoryHash);
+                if (opHistory !== undefined) {
+                    providedOps.add(opHistory.opHash);
+                }
+            }
+            
+            let maxLiterals = respInfo.request.maxLiterals;
+            if (maxLiterals === undefined || maxLiterals > ProviderLimits.MaxLiteralsPerResponse) {
+                maxLiterals = ProviderLimits.MaxLiteralsPerResponse;
+            }
+
+            const packer = new ObjectPacker(this.syncAgent.store, maxLiterals);
+
+            packer.allowOmissionsRecursively(providedOps.values(), 2048);
+
+            let full = false;
+
+            if (respInfo.request.requestedOps !== undefined) {
+                for (const hash of respInfo.request.requestedOps) {
+                    full = !await packer.addObject(hash);
+
+                    if (full) {
+                        break;
+                    }
+                }
+            }
+
+            if (!full &&
+                respInfo.request.mode === 'infer-req-ops' && 
+                respHistoryFragment.contents.size > 0) {
+
+                
+                let ignore: ((h: Hash) => boolean) | undefined;
+
+                // if necessary, make a function that will ignore ops we're already sending
+                if (respInfo.request.requestedOps !== undefined) {
+                    const toIgnore = new Set<Hash>();
+                    for (const hash of respInfo.request.requestedOps) {
+                        const opHistory = await this.syncAgent.store.loadOpCausalHistory(hash);
+                        if (opHistory !== undefined) {
+                            toIgnore.add(opHistory.opHash);
+                        }
+                    }
+
+                    if (toIgnore.size > 0) {
+                        ignore = (h: Hash) => toIgnore.has(h);
+                    }
+                }
+
+                // The following does the actual work: find if, using the providedOpHistories we just dug out,
+                // any of the op histories we're sending back can actually be sent in full.
+                const moreOpHistories = respHistoryFragment.causalClosure(providedOpHistories, 512, ignore);
+
+                for (const opHistoryHash of moreOpHistories) {
+                    const opHistory = respHistoryFragment.contents.get(opHistoryHash) as OpCausalHistory;
+                    
+                    full = !await packer.addObject(opHistory.opHash);
+
+                    if (full) {
+                        break;
+                    }
+
+                }
+
+
+            }
 
         }
 

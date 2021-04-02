@@ -338,16 +338,25 @@ class CausalHistoryFragment {
         return result;
     }
 
-    causalClosureFrom(startingOpHistories: Set<Hash>, providedOpHistories: Set<Hash>, maxOps?: number, ignoreOp?: (h: Hash) => boolean, filterOp?: (h: Hash) => boolean): Hash[] {
+    causalClosureFrom(startingOpHistories: Set<Hash>, providedOpHistories: Set<Hash>, maxOps?: number, ignoreOpHistory?: (h: Hash) => boolean, filterOpHistory?: (h: Hash) => boolean): Hash[] {
+
+
+        // We iterate over all the depenency "arcs", each time recording that one dependency has been
+        // fullfilled by removing it from a set in missingOpHistories. If the set ever empties, this
+        // op can be iterated over (all its prevOps have already been visited). 
 
         const closure = new Set<Hash>();
         const missingPrevOpHistories = new Map<Hash, Set<Hash>>();
         const result = new Array<Hash>();
 
+
+        // Create the initial entries in missingPrevOpHistories, not considering anyPrevOps in 
+        // providedOpHistories.
+
         for (const startingHash of startingOpHistories) {
-            if (filterOp === undefined || filterOp(startingHash)) {
+            if (filterOpHistory === undefined || filterOpHistory(startingHash)) {
                 const startingOpHistory = this.contents.get(startingHash) as OpCausalHistory;
-                this.loadMissingPrevOpHistories(missingPrevOpHistories, startingOpHistory, providedOpHistories);    
+                CausalHistoryFragment.loadMissingPrevOpHistories(missingPrevOpHistories, startingOpHistory, providedOpHistories);    
             }
         }
 
@@ -359,18 +368,18 @@ class CausalHistoryFragment {
 
             const hash = opHistory.causalHistoryHash;
 
-            if ((filterOp === undefined || filterOp(hash)) && missingPrevOpHistories.get(hash)?.size === 0) {
+            if ((filterOpHistory === undefined || filterOpHistory(hash)) && missingPrevOpHistories.get(hash)?.size === 0) {
                 for (const nextHash of this.nextOpHistories.get(hash)) {
                     const nextOpHistory = this.contents.get(nextHash) as OpCausalHistory;
-                    if (filterOp === undefined || filterOp(nextHash)) {
-                        this.loadMissingPrevOpHistories(missingPrevOpHistories, nextOpHistory, providedOpHistories);
+                    if (filterOpHistory === undefined || filterOpHistory(nextHash)) {
+                        CausalHistoryFragment.loadMissingPrevOpHistories(missingPrevOpHistories, nextOpHistory, providedOpHistories);
                         missingPrevOpHistories.get(nextHash)?.delete(hash);    
                     }
                 }
 
                 closure.add(hash);
 
-                if (ignoreOp === undefined || !ignoreOp(hash)) {
+                if (ignoreOpHistory === undefined || !ignoreOpHistory(hash)) {
                     result.push(hash);
                 }
             }
@@ -381,8 +390,8 @@ class CausalHistoryFragment {
 
     }
 
-    causalClosure(providedOpHistories: Set<Hash>, maxOps?: number, ignoreOp?: (h: Hash) => boolean, filterOp?: (h: Hash) => boolean) {    
-        return this.causalClosureFrom(this.getStartingOpHistories(), providedOpHistories, maxOps, ignoreOp, filterOp);
+    causalClosure(providedOpHistories: Set<Hash>, maxOps?: number, ignoreOpHistory?: (h: Hash) => boolean, filterOpHistory?: (h: Hash) => boolean) {
+        return this.causalClosureFrom(this.getStartingOpHistories(), providedOpHistories, maxOps, ignoreOpHistory, filterOpHistory);
     }
 
     async loadFromTerminalOpHistories(store: Store, terminalOpHistories: Set<Hash>, maxOpHistories?: number, forbiddenOpHistories?: Set<Hash>) {
@@ -420,7 +429,7 @@ class CausalHistoryFragment {
         } while (next.length > 0 && !(this.contents.size === maxOpHistories))
     }
 
-    private loadMissingPrevOpHistories(missingPrevOpHistories: Map<Hash, Set<Hash>>, opHistory: OpCausalHistory, providedOpHistories: Set<Hash>) {
+    private static loadMissingPrevOpHistories(missingPrevOpHistories: Map<Hash, Set<Hash>>, opHistory: OpCausalHistory, providedOpHistories: Set<Hash>) {
         let missing = missingPrevOpHistories.get(opHistory.causalHistoryHash);
         if (missing === undefined) {
             missing = new Set<Hash>();
