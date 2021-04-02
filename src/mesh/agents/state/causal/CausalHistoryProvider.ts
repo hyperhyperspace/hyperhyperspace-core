@@ -291,8 +291,6 @@ class CausalHistoryProvider {
                     }
 
                 }
-
-
             }
 
         }

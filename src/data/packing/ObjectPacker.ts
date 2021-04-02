@@ -12,7 +12,7 @@ class ObjectPacker {
 
     content       : Array<Literal>;
     contentHashes : Set<Hash>;
-    omitted       : Set<Hash>;
+    omissionReferenceChains       : Map<Hash, Hash[]>;
 
     allowedOmissions: Set<Hash>;
 
@@ -26,7 +26,8 @@ class ObjectPacker {
 
         this.content       = [];
         this.contentHashes = new Set();
-        this.omitted       = new Set();
+
+        this.omissionReferenceChains = new Map();
 
         this.allowedOmissions = new Set();
 
@@ -77,19 +78,23 @@ class ObjectPacker {
         if (this.contentHashes.has(hash)) {
             return true;
         } else {
-            const literals = await this.toMissingLiterals(hash, this.maxLiterals - this.content.length);
+            const result = await this.attemptToAdd(hash, this.maxLiterals - this.content.length);
 
-            if (literals !== undefined) {
+            if (result !== undefined) {
     
                 // Since literals is in inverse causal order, its elements should be reversed 
                 // when added to the pack.
     
-                while (literals.length > 0) {
-                    const literal = literals.pop() as Literal;
+                while (result.literals.length > 0) {
+                    const literal = result.literals.pop() as Literal;
                     this.content.push();
                     this.contentHashes.add(literal.hash);
                 }
     
+                for (const [hash, referenceChain] of result.omitted.entries()) {
+                    this.omissionReferenceChains.set(hash, referenceChain);
+                }
+
                 return true;
             } else {
                 return false;
@@ -115,54 +120,60 @@ class ObjectPacker {
         return true;
     }
 
-    // toMissingLiterals impotant note: the literal array is in inverse causal order.
-    //                                  (i.e. the last element should be applied first)
 
-    private async toMissingLiterals(hash: Hash, maxAllowedLiterals: number): Promise<Literal[]|undefined> {
+    // attemptToadd impotant note: the literal array is in inverse causal order.
+    //                             (i.e. the last element should be applied first)
 
-        const missing = new Array<Hash>();
-        const missingAsSet = new Set<Hash>();
+    private async attemptToAdd(hash: Hash, maxAllowedLiterals: number): Promise<{literals:Literal[], omitted: Map<Hash, Hash[]>}|undefined> {
+
+        const queued = new Array<Array<Hash>>();
 
         const packed       = new Array<Literal>();
         const packedHashes = new Set<Hash>();
 
+        const omitted      = new Map<Hash, Array<Hash>>();
+
+        const currentReferenceChain = new Array<Hash>();
+
         if (!this.contentHashes.has(hash) && !this.allowedOmissions.has(hash)) {
-            missing.push(hash);
-            missingAsSet.add(hash);    
+            queued.push([hash]);
         }
 
-        while (missing.length > 0 && packed.length < maxAllowedLiterals) {
+        while (queued.length > 0 && packed.length < maxAllowedLiterals) {
 
-            const nextHash = missing.pop() as Hash;
-            missingAsSet.delete(nextHash);
+            const nextHashes = queued.pop() as Hash[];
 
-            const literal = await this.store.loadLiteral(nextHash) as Literal;
+            if (nextHashes.length === 0) {
+                currentReferenceChain.pop();
+            } else {
+                const nextHash = nextHashes.shift() as Hash;
+                queued.push(nextHashes);
 
-            packed.push(literal);
-            packedHashes.add(nextHash);
+                if (!this.contentHashes.has(nextHash) && !packedHashes.has(nextHash) && !omitted.has(nextHash)) {
 
-            let deps = literal.dependencies;
+                    if (this.allowedOmissions.has(nextHash)) {
+                        omitted.set(nextHash, currentReferenceChain.slice());
+                    } else {
+                        const literal = await this.store.loadLiteral(nextHash) as Literal;
 
-            for (const dep of deps) {
-                if (!this.contentHashes.has(dep.hash) && 
-                    !this.allowedOmissions.has(dep.hash) &&
-                    !packedHashes.has(dep.hash)) {
+                        packed.push(literal);
+                        packedHashes.add(literal.hash);
 
-                    missing.push(dep.hash);
-                    missingAsSet.add(dep.hash);
-                }
+                        const deps = literal.dependencies.map((d: Dependency) => d.hash);
+
+                        queued.push(deps);
+                        currentReferenceChain.push(nextHash);
+                    }
+
+                }       
             }
-
         }
 
-        if (missing.length === 0) {
-            return packed;
+        if (queued.length === 0) {
+            return { literals: packed, omitted: omitted};
         } else {
             return undefined;
         }
-
-
-
     }
 
 }
