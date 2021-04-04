@@ -302,6 +302,16 @@ class PeerGroupAgent implements Agent {
         }
     }
 
+    peerSendBufferIsEmpty(ep: Endpoint): boolean {
+        let connId = this.findWorkingConnectionId(ep);
+
+        if (connId !== undefined) {
+            return this.getNetworkAgent().connectionSendBufferIsEmpty(connId);
+        } else {
+            return false;
+        }
+    }
+
     getStats() : Stats {
         let stats: Stats = {
             peers: 0,

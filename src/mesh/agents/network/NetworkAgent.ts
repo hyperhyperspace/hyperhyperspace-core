@@ -658,6 +658,17 @@ class NetworkAgent implements Agent {
         return this.connectionInfo.get(id)?.status === ConnectionStatus.Ready;
     }
 
+    connectionSendBufferIsEmpty(id: ConnectionId): boolean {
+        const conn = this.connections.get(id);
+
+        if (conn !== undefined) {
+            return conn.bufferedAmount() === 0;
+        } else {
+            return false;
+        }
+
+    }
+
     getConnIdsForEndpoints(local: Endpoint, remote: Endpoint) : Set<ConnectionId> {
 
         let connIds = new Set<ConnectionId>();

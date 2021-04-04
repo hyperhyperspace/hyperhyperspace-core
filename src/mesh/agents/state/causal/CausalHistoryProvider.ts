@@ -3,7 +3,6 @@ import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHi
 import { Hash, Literal } from 'data/model';
 import { ObjectPacker } from 'data/packing/ObjectPacker';
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
-import { request } from 'node:http';
 import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
 
 
@@ -85,9 +84,11 @@ type SyncMsg = RequestMsg | ResponseMsg | RejectRequestMsg | SendLiteralMsg | Ca
 
 const ProviderLimits = {
     MaxOpsToRequest: 128,
-    MaxLiteralsPerResponse: 256,
+    MaxLiteralsPerResponse: 1024,
     MaxHistoryPerResponse: 256
 };
+
+const LiteralBatchSize = 256;
 
 type ResponseInfo = {
 
@@ -100,7 +101,9 @@ type ResponseInfo = {
     responseSentTimestamp?: number,
     lastLiteralTimestamp?: number,
 
-    sendingQueue?: Array<Literal>
+    literalsToSend?: Array<Literal>,
+    nextLiteralIdx?: number
+
 
 }
 
@@ -122,6 +125,9 @@ class CausalHistoryProvider {
         this.currentResponses  = new Map();
         this.queuedResponses   = new Map();
     }
+
+    // TODO: check if we answer right away, or if we're already streaming literals
+    //       from a previous request and this needs to be queued
 
     async onReceivingRequest(remote: Endpoint, msg: RequestMsg) {
 
@@ -293,11 +299,67 @@ class CausalHistoryProvider {
                 }
             }
 
+            // All set: send response
+
+            if (packer.content.length > 0) {
+                resp.sendingOps = packer.content.filter((literal: Literal) => this.syncAgent.literalIsValidOp(literal)).map((literal: Literal) => literal.hash);
+                respInfo.literalsToSend = packer.content;
+                respInfo.nextLiteralIdx = 0;
+
+                this.sendLiterals(respInfo.request.requestId, LiteralBatchSize);
+            }
+
+            //TODO: check if respInfo can be cleaned up
+            //TODO: check if timer for sending should be enabled
+
         }
 
     }
 
     onReceivingRequestCancellation(remote: Endpoint, msg: CancelRequestMsg) {
+
+    }
+
+    private sendLiterals(requestId: RequestId, maxLiterals: number): number {
+        const respInfo = this.responses.get(requestId);
+
+        let sent = 0;
+
+        if (respInfo?.literalsToSend !== undefined) {
+            for (let i=0; i<maxLiterals; i++) {
+                const nextIdx = respInfo.nextLiteralIdx as number;
+
+                if (nextIdx < respInfo.literalsToSend.length) {
+                    try {
+                        this.sendLiteral(respInfo, nextIdx, respInfo.literalsToSend[nextIdx]);
+                    } catch (e) {
+                        break;
+                    }
+
+                    respInfo.nextLiteralIdx = nextIdx + 1;
+                    sent = sent + 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        //TODO: check if respInfo can be cleaned up?
+        //TODO: check if timer for sending should be enabled?
+
+        return sent;
+    }
+
+    private sendLiteral(respInfo: ResponseInfo, sequence: number, literal: Literal) {
+
+        const msg: SendLiteralMsg = {
+            requestId: respInfo.request.requestId,
+            type: MessageType.SendLiteral,
+            sequence: sequence,
+            literal: literal
+        };
+
+        this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), msg);
 
     }
 

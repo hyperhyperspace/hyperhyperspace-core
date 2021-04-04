@@ -132,7 +132,6 @@ class CausalHistorySynchronizer {
                 }
 
                 // Check that the terminal op histories of the received fragment are amongst the requested histories
-                
                 for (const opHistoryHash of receivedHistory.terminalOpHistories) {
                     if (!requestedOpHistories.has(opHistoryHash)) {
                         const detail = 'Received op history ' + opHistoryHash + ' is terminal in the reconstructed fragment, but was not requested.';

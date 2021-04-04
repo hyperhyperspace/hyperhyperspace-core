@@ -29,6 +29,10 @@ abstract class PeeringAgentBase implements Agent {
         return this.peerGroupAgent.sendToPeer(destination, agentId, content);
     }
 
+    sendingQueueToPeerIsEmpty(destination: Endpoint): boolean {
+        return false;
+    }
+
     abstract receivePeerMessage(source: Endpoint, sender: Hash, recipient: Hash, content: any) : void;
 
 }
