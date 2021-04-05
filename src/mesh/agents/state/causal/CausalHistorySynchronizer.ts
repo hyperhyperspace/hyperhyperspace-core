@@ -460,9 +460,6 @@ class CausalHistorySynchronizer {
                         this.cancelRequest(reqInfo, 'invalid-literal', detail);
                         return;    
                     }
-                    
-                        
-                    
 
                 } else {
                     const detail = 'Received op '+ literal.hash +' is not valid for mutableObj ' + this.syncAgent.mutableObj + ', in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
@@ -476,7 +473,7 @@ class CausalHistorySynchronizer {
 
     }
 
-    // We're not rejecting anything for now, will implement when I do the retry logic.
+    // We're not rejecting anything for now, will implement when the retry logic is done.
     onReceivingRequestRejection(remote: Endpoint, msg: RejectRequestMsg) {
         remote; msg;
     }
