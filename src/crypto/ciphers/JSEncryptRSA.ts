@@ -67,7 +67,7 @@ class JSEncryptRSA implements RSA {
 
     getPublicKey() {
         if (this.crypto === undefined) {
-            throw new Error("RSA key par initialization is missing, attempted to get public key");
+            throw new Error("RSA key pair initialization is missing, attempted to get public key");
         } else {
             return this.crypto.getPublicKey();
         }
@@ -75,7 +75,7 @@ class JSEncryptRSA implements RSA {
 
     getPrivateKey() {
         if (this.crypto === undefined) {
-            throw new Error("RSA key par initialization is missing, attempted to get private key");
+            throw new Error("RSA key pair initialization is missing, attempted to get private key");
         } else {
             return this.crypto.getPrivateKey();
         }
@@ -87,7 +87,7 @@ class JSEncryptRSA implements RSA {
 
     sign(text: string) {
         if (this.crypto === undefined) {
-            throw new Error("RSA key par initialization is missing, attempted to sign");
+            throw new Error("RSA key pair initialization is missing, attempted to sign");
         } else {
             return this.crypto.sign(text, this.sha.sha256heximpl(), 'sha256');
         }
@@ -96,7 +96,7 @@ class JSEncryptRSA implements RSA {
 
     verify(text: string, signature: string) {
         if (this.crypto === undefined) {
-            throw new Error("RSA key par initialization is missing, attempted to verify");
+            throw new Error("RSA key pair initialization is missing, attempted to verify");
         } else {
             return this.crypto.verify(text, signature, this.sha.sha256heximpl());
         }
@@ -105,7 +105,7 @@ class JSEncryptRSA implements RSA {
 
     encrypt(plainText: string) {
         if (this.crypto === undefined) {
-            throw new Error("RSA key par initialization is missing, attempted to encrypt");
+            throw new Error("RSA key pair initialization is missing, attempted to encrypt");
         } else {
             return this.crypto.encrypt(plainText);
         }
@@ -113,7 +113,7 @@ class JSEncryptRSA implements RSA {
 
     decrypt(cypherText : string) {
         if (this.crypto === undefined) {
-            throw new Error("RSA key par initialization is missing, attempted to decrypt");
+            throw new Error("RSA key pair initialization is missing, attempted to decrypt");
         } else {
             return this.crypto.decrypt(cypherText);
         }
