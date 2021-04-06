@@ -14,7 +14,12 @@ import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHist
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
-    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
+    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.TRACE);
+    static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.DEBUG);
+
+    static syncAgentIdFor(objHash: Hash, peerGroupId: string) {
+        return 'causal-sync-for-' + objHash + '-in-peer-group-' + peerGroupId;
+    }
 
     static MaxRequestsPerRemote = 2;
 
@@ -35,6 +40,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
 
     controlLog: Logger;
+    messageLog: Logger;
 
     constructor(peerGroupAgent: PeerGroupAgent, mutableObj: Hash, store: Store, acceptedMutationOpClasses : string[]) {
         super(peerGroupAgent);
@@ -49,16 +55,17 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         this.synchronizer = new CausalHistorySynchronizer(this);
         this.provider     = new CausalHistoryProvider(this);
 
-        this.opCallback.bind(this);
+        this.opCallback = this.opCallback.bind(this);
 
         this.controlLog = CausalHistorySyncAgent.controlLog;
+        this.messageLog = CausalHistorySyncAgent.messageLog;
     }
 
 
 
     
     getAgentId(): string {
-        throw new Error('Method not implemented.');
+        return CausalHistorySyncAgent.syncAgentIdFor(this.mutableObj, this.peerGroupAgent.peerGroupId);
     }
 
     ready(pod: AgentPod): void {
@@ -69,7 +76,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     }
 
     shutdown(): void {
-        throw new Error('Method not implemented.');
+        
     }
 
 
@@ -118,6 +125,10 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         
         const msg: SyncMsg = content as SyncMsg;
 
+        if (this.messageLog.level <= LogLevel.DEBUG) {
+            this.messageLog.debug('Msg received from: ' + source + ' to: ' + this.peerGroupAgent.getLocalPeer().endpoint, msg);
+        }
+
         if (msg.type === MessageType.Request) {
             this.provider.onReceivingRequest(source, msg);
         } else if (msg.type === MessageType.Response) {
@@ -161,7 +172,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
             const fields    = LiteralUtils.getFields(literal);
             const className = LiteralUtils.getClassName(literal);
 
-            if (fields['target'] === this.mutableObj &&
+            if (fields['target']._hash === this.mutableObj &&
                 this.acceptedMutationOpClasses.indexOf(className) >= 0) {
 
                 valid = true;

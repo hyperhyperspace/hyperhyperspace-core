@@ -26,6 +26,11 @@ abstract class PeeringAgentBase implements Agent {
     }
 
     sendMessageToPeer(destination: Endpoint, agentId: AgentId, content: any) : boolean {
+
+        if (content === undefined) {
+            throw new Error('Missing message content');
+        }
+
         return this.peerGroupAgent.sendToPeer(destination, agentId, content);
     }
 

@@ -53,7 +53,9 @@ class CausalHistoryFragment {
     terminalOpHistories    : Set<Hash>;
     missingPrevOpHistories : Set<Hash>;
 
-    contents: Map<Hash, OpCausalHistory>;
+    contents : Map<Hash, OpCausalHistory>;
+
+    roots : Set<Hash>;
     
     opHistoriesForOp: MultiMap<Hash, Hash>;
 
@@ -66,6 +68,8 @@ class CausalHistoryFragment {
 
         this.contents = new Map();
 
+        this.roots = new Set();
+
         this.opHistoriesForOp = new MultiMap();
 
         this.nextOpHistories = new MultiMap();
@@ -77,6 +81,10 @@ class CausalHistoryFragment {
             
             this.contents.set(opHistory.causalHistoryHash, opHistory);
             this.opHistoriesForOp.add(opHistory.opHash, opHistory.causalHistoryHash)
+
+            if (opHistory.prevOpHistories.size === 0) {
+                this.roots.add(opHistory.causalHistoryHash);
+            }
 
             // Adjust missingOps and terminalOps (see lemma above)
             if (this.missingPrevOpHistories.has(opHistory.causalHistoryHash)) {
@@ -124,6 +132,10 @@ class CausalHistoryFragment {
 
             this.contents.delete(opHistory.causalHistoryHash);
             this.terminalOpHistories.delete(opHistory.causalHistoryHash);
+
+            if (opHistory.prevOpHistories.size === 0) {
+                this.roots.delete(opHistory.causalHistoryHash);
+            }
 
             for (const prevOpHistoryHash of opHistory.prevOpHistories) {
                 this.nextOpHistories.delete(prevOpHistoryHash, opHistory.causalHistoryHash);
@@ -218,6 +230,10 @@ class CausalHistoryFragment {
     getStartingOpHistories(): Set<Hash> {
         const startingOpHistories = new Set<Hash>();
 
+        for (const root of this.roots) {
+            startingOpHistories.add(root);
+        }
+
         for (const missing of this.missingPrevOpHistories) {
             for (const starting of this.nextOpHistories.get(missing)) {
                 startingOpHistories.add(starting);
@@ -245,7 +261,7 @@ class CausalHistoryFragment {
             if (opHistories.size > 1) {
                 throw new Error('Op histories matching op ' + opHash + ' were requested from fragment, but there is more than one (' + opHistories.size + ')');                
             } else {
-                return opHistories.values().next().value;
+                return this.contents.get(opHistories.values().next().value);
             }
         }
  
@@ -391,6 +407,9 @@ class CausalHistoryFragment {
     }
 
     causalClosure(providedOpHistories: Set<Hash>, maxOps?: number, ignoreOpHistory?: (h: Hash) => boolean, filterOpHistory?: (h: Hash) => boolean) {
+        
+        console.log('starting closure from');
+        console.log(this.getStartingOpHistories());
         return this.causalClosureFrom(this.getStartingOpHistories(), providedOpHistories, maxOps, ignoreOpHistory, filterOpHistory);
     }
 
@@ -410,8 +429,8 @@ class CausalHistoryFragment {
             for (const opHistoryHash of next) {
 
                 const opHistory = await store.loadOpCausalHistoryByHash(opHistoryHash) as OpCausalHistory;
-            
-                this.add(opHistory);
+
+                this.add(opHistory);                
 
                 if (maxOpHistories === this.contents.size) {
                     break;

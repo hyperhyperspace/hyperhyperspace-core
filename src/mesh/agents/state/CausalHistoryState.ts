@@ -31,6 +31,8 @@ class CausalHistoryState extends HashedObject {
         this.mutableObj = mutableObj;
         if (terminalOpHistories !== undefined) { 
             this.terminalOpHistories = new HashedSet<Hash>(new Set(terminalOpHistories).values());
+        } else {
+            this.terminalOpHistories = new HashedSet<Hash>();
         }
     }
 

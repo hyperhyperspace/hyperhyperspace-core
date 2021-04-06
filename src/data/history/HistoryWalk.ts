@@ -29,7 +29,9 @@ abstract class HistoryWalk {
         this.queueContents = new Set();
         
         for (const hash of initial.values()) {
-            this.enqueueIfNew(hash);
+            if (this.fragment.contents.has(hash)) {
+                this.enqueueIfNew(hash);
+            }
         }
     }
 

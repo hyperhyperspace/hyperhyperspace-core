@@ -11,10 +11,11 @@ import { Store } from 'storage/store';
 import { IdbBackend } from 'storage/backends';
 import { MutableSet } from 'data/containers';
 import { Identity } from 'data/identity';
-import { TerminalOpsSyncAgent } from 'mesh/agents/state/TerminalOpsSyncAgent';
 import { describeProxy } from 'config';
+import { CausalHistorySyncAgent } from 'mesh/agents/state';
 
-describeProxy('[SYN] State sync', () => {
+describeProxy
+describe('[SYN] State sync', () => {
     test('[SYN01] Gossip agent in small peer group (wrtc)', async (done) => {
 
         await gossipInSmallPeerGroup(done, 'wrtc');
@@ -33,7 +34,7 @@ describeProxy('[SYN] State sync', () => {
 
     }, 300000);
 
-    test('[SYN04] Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
+    test.only('[SYN04] Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'wrtc');
 
@@ -177,7 +178,8 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
 
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
-        let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
+        //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
+        let agent = new CausalHistorySyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
         let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;

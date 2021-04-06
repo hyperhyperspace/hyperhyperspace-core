@@ -128,7 +128,7 @@ class CausalHistoryProvider {
 
         this.streamingResponses = 0;
 
-        this.continueStreamingResponses.bind(this);
+        this.continueStreamingResponses = this.continueStreamingResponses.bind(this);
     }
 
 
@@ -215,7 +215,7 @@ class CausalHistoryProvider {
                 if (opHistory !== undefined) {
                     const literal = await this.syncAgent.store.loadLiteral(opHistory.opHash);
 
-                    if (this.syncAgent.literalIsValidOp(literal)) {
+                    if (!this.syncAgent.literalIsValidOp(literal)) {
                         const detail = 'Invalid requestedOpHistories/terminalFetchedOpHistories for request ' + respInfo.request.requestId + ', rejecting';
                         this.rejectRequest(respInfo, 'invalid-request', detail);
                         return false;
@@ -229,6 +229,7 @@ class CausalHistoryProvider {
 
             for (const opHash of respInfo.request.requestedOps) {
                 const literal = await this.syncAgent.store.loadLiteral(opHash);
+                
                 if (!this.syncAgent.literalIsValidOp(literal)) {
                     const detail = 'Invalid requestedOps for request ' + respInfo.request.requestId + ', rejecting';
                     this.rejectRequest(respInfo, 'invalid-request', detail);
@@ -248,13 +249,17 @@ class CausalHistoryProvider {
         }
 
         if (req.requestedOpHistories !== undefined && req.requestedOpHistories.length > 0) {
-            
-            respHistoryFragment.loadFromTerminalOpHistories(
+
+            await respHistoryFragment.loadFromTerminalOpHistories(
                 this.syncAgent.store,
                 new Set<Hash>(req.requestedOpHistories),
                 maxHistory,
                 new Set<Hash>(req.terminalFetchedOpHistories)
             );
+
+            console.log('loaded histories: ' + respHistoryFragment.contents.size);
+            console.log('requested:');
+            console.log(req.requestedOpHistories);
 
             if (respHistoryFragment.contents.size > 0) {
 
@@ -295,12 +300,16 @@ class CausalHistoryProvider {
         const sendingOps = new Array<Hash>();
 
         if (respInfo.request.requestedOps !== undefined) {
+            console.log('Trying to pack ' + respInfo.request.requestedOps.length + ' ops');
             for (const hash of respInfo.request.requestedOps) {
                 full = !await packer.addObject(hash);
 
                 if (full) {
+                    console.log('Cannot pack, no room')
                     break;
                 } else {
+                    console.log('packed ' + hash);
+                    console.log(packer.content.length + ' literals packed so far');
                     sendingOps.push(hash);
                 }
             }
@@ -354,6 +363,8 @@ class CausalHistoryProvider {
             respInfo.literalsToSend = packer.content;
             respInfo.nextLiteralIdx = 0;                
         }
+
+        respInfo.response = resp;
 
         return true;
 
@@ -420,27 +431,36 @@ class CausalHistoryProvider {
             requestId: respInfo.request.requestId,
             reason: reason,
             detail: detail
-        }
+        };
 
         this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), msg);
     }
 
-    private sendResponse(respInfo: ResponseInfo) {
+    private async sendResponse(respInfo: ResponseInfo) {
         const reqId = respInfo.request.requestId;
         this.currentResponses.set(respInfo.remote, reqId);
-
-        this.createResponse(respInfo);
-
         this.dequeueResponse(respInfo);
-        this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), respInfo.request);
-        
-        if (respInfo.response?.literalCount as number > 0) {
-            this.startStreamingResponse(respInfo);
-        }
 
-        if (this.isResponseComplete(respInfo)) {
+        if (await this.createResponse(respInfo)) {
+            this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), respInfo.response);
+        
+            await new Promise(r => { window.setTimeout( r, 1500); });
+
+            if (respInfo.response?.literalCount as number > 0) {
+                this.startStreamingResponse(respInfo);
+            }
+
+            if (this.isResponseComplete(respInfo)) {
+                this.removeResponse(respInfo);
+            }
+        } else {
             this.removeResponse(respInfo);
         }
+
+
+        
+
+        
     }
 
     private enqueueResponse(respInfo: ResponseInfo) {

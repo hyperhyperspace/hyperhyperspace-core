@@ -87,7 +87,7 @@ class ObjectPacker {
     
                 while (result.literals.length > 0) {
                     const literal = result.literals.pop() as Literal;
-                    this.content.push();
+                    this.content.push(literal);
                     this.contentHashes.add(literal.hash);
                 }
     

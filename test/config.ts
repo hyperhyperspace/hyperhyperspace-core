@@ -1,5 +1,5 @@
 import '@hyper-hyper-space/node-env';
 
-let describeProxy = describe;
+let describeProxy = describe.skip;
 
 export { describeProxy };

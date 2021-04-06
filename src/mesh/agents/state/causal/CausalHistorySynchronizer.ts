@@ -37,7 +37,7 @@ type RequestInfo = {
 };
 
 class CausalHistorySynchronizer {
-    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
+    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.TRACE);
 
     syncAgent: CausalHistorySyncAgent;
 
@@ -347,7 +347,7 @@ class CausalHistorySynchronizer {
 
                     const opHistoryHash = opHistory.causalHistoryHash;
 
-                    const isStored = this.syncAgent.store.loadOpCausalHistoryByHash(opHistoryHash) !== undefined;
+                    const isStored = await this.syncAgent.store.loadOpCausalHistoryByHash(opHistoryHash) !== undefined;
                     const isKnown  = this.discoveredHistory.contents.has(opHistoryHash);
 
                     if (!isStored && !isKnown) {
@@ -359,6 +359,8 @@ class CausalHistorySynchronizer {
                 // Only add history for ops we have not yet received.
                 // Do it backwards, so if new ops are added while this loop is running, we will never
                 // add an op but omit one of its predecessors because it was stored in-between.
+
+                console.log('new history: ' + newHistory.contents.size);
 
                 for (const opHistory of newHistory.iterateFrom(newHistory.terminalOpHistories, 'backward')) {
 
@@ -408,6 +410,8 @@ class CausalHistorySynchronizer {
             
             const removed = this.checkRequestRemoval(reqInfo);
             
+            console.log('removed: ' + removed);
+
             if (removed) {
                 this.attemptNewRequest(reqInfo.remote, newMissingPrevOpHistories, receivedHistory?.terminalOpHistories);                
             } else {
@@ -469,6 +473,11 @@ class CausalHistorySynchronizer {
             }
 
 
+        } else {
+            if (reqInfo?.nextOpSequence === undefined) {
+                console.log('LITERAL ARRIVED BEFORE PROCESSING OF RESPONSE FINISHED')
+            }
+            
         }
 
     }
@@ -479,6 +488,12 @@ class CausalHistorySynchronizer {
     }
 
     private async attemptNewRequest(remote: Endpoint, additionalPrevOpHistories?: Set<Hash>, additionalTerminalOpHistories?: Set<Hash>) {
+
+
+        CausalHistorySynchronizer.controlLog.debug('About to attempt new request from ' + this.syncAgent.peerGroupAgent.getLocalPeer().endpoint + ' to ' + remote);
+        CausalHistorySynchronizer.controlLog.trace('additionalPrevOpHistories: ', additionalPrevOpHistories);
+        CausalHistorySynchronizer.controlLog.trace('additionalTerminalOpHistories: ', additionalTerminalOpHistories);
+
 
         const opHistoriesToRequest = new Set<Hash>(additionalPrevOpHistories);
         const remoteState = this.syncAgent.remoteStates.get(remote)
@@ -498,7 +513,12 @@ class CausalHistorySynchronizer {
         }
 
         const remoteTerminalOps = new Set<Hash>(additionalTerminalOpHistories);
+
+        CausalHistorySynchronizer.controlLog.trace('discoveredHistory: ' + this.discoveredHistory.contents.size);
+
         const remoteHistory = this.discoveredHistory.filterByTerminalOpHistories(remoteTerminalOps);
+
+        CausalHistorySynchronizer.controlLog.trace('remoteHistory (filtered): ' + remoteHistory.contents.size);
 
         const providedOpHistores = new Set<Hash>();
 
@@ -524,7 +544,10 @@ class CausalHistorySynchronizer {
         const doRequest = opHistoriesToRequest.size > 0 || opsToRequest.length > 0;
 
         if (doRequest) {
+            CausalHistorySynchronizer.controlLog.trace('Doing new request for ' + opHistoriesToRequest.size + ' op histories and ' + opsToRequest.length + ' ops');
             this.request(remote, { requestedOpHistories: opHistoriesToRequest, requestedOps: opsToRequest });
+        } else {
+            CausalHistorySynchronizer.controlLog.trace('Not doing new request');
         }
 
         return doRequest;
