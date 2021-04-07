@@ -443,9 +443,7 @@ class CausalHistoryProvider {
 
         if (await this.createResponse(respInfo)) {
             this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), respInfo.response);
-        
-            await new Promise(r => { window.setTimeout( r, 1500); });
-
+            
             if (respInfo.response?.literalCount as number > 0) {
                 this.startStreamingResponse(respInfo);
             }

@@ -14,8 +14,7 @@ import { Identity } from 'data/identity';
 import { describeProxy } from 'config';
 import { CausalHistorySyncAgent } from 'mesh/agents/state';
 
-describeProxy
-describe('[SYN] State sync', () => {
+describeProxy('[SYN] State sync', () => {
     test('[SYN01] Gossip agent in small peer group (wrtc)', async (done) => {
 
         await gossipInSmallPeerGroup(done, 'wrtc');
@@ -34,7 +33,7 @@ describe('[SYN] State sync', () => {
 
     }, 300000);
 
-    test.only('[SYN04] Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
+    test('[SYN04] Terminal ops agent-based set sync in small peer group (wrtc)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'wrtc');
 

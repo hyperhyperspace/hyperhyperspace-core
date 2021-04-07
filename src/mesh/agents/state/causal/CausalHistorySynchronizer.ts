@@ -2,7 +2,7 @@ import { RNGImpl } from 'crypto/random';
 
 import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
 import { OpCausalHistory } from 'data/history/OpCausalHistory';
-import { Context, Hash, HashedObject, LiteralUtils } from 'data/model';
+import { Context, Hash, HashedObject, Literal, LiteralUtils } from 'data/model';
 
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
 
@@ -25,13 +25,16 @@ type RequestInfo = {
     response? : ResponseMsg,
 
     remote : Endpoint,
-    status : 'created'|'sent'|'queued',
+    status : 'created'|'sent'|'queued'|'accepted-response',
 
     requestSendingTimestamp?  : number,
     responseArrivalTimestamp? : number,
     lastLiteralTimestamp?     : number,
-    receivedLiteralsCount?      : number,
-    nextOpSequence?           : number,
+    receivedLiteralsCount     : number,
+    nextOpSequence            : number,
+    nextLiteralSequence       : number
+
+    outOfOrderLiterals    : Map<number, Literal>;
 
     receivedObjects? : Context
 };
@@ -360,8 +363,6 @@ class CausalHistorySynchronizer {
                 // Do it backwards, so if new ops are added while this loop is running, we will never
                 // add an op but omit one of its predecessors because it was stored in-between.
 
-                console.log('new history: ' + newHistory.contents.size);
-
                 for (const opHistory of newHistory.iterateFrom(newHistory.terminalOpHistories, 'backward')) {
 
                     this.discoveredHistory.add(opHistory);
@@ -387,8 +388,6 @@ class CausalHistorySynchronizer {
 
             if (resp.sendingOps !== undefined && resp.sendingOps.length > 0) {
                 reqInfo.receivedObjects = new Context();
-                reqInfo.receivedLiteralsCount = 0;
-                reqInfo.nextOpSequence        = 0;
             }
 
             if (resp.omittedObjsOwnershipProofs !== undefined &&
@@ -407,6 +406,10 @@ class CausalHistorySynchronizer {
                 }
     
             }
+
+            this.attemptToProcessLiterals(reqInfo);
+
+            reqInfo.status = 'accepted-response';
             
             const removed = this.checkRequestRemoval(reqInfo);
             
@@ -425,61 +428,115 @@ class CausalHistorySynchronizer {
 
         const reqInfo = this.requests.get(msg.requestId);
 
-        if (reqInfo !== undefined && reqInfo.remote === remote && 
-            reqInfo.response !== undefined && 
-            reqInfo.response.sendingOps !== undefined && reqInfo.nextOpSequence !== undefined) {
+        if (reqInfo === undefined || reqInfo.remote !== remote) {
+            return;
+        }
 
-            const literal = msg.literal;
+        let enqueue = false;
+        let process = false;
 
-            if (!LiteralUtils.validateHash(literal)) {
-                const detail = 'Wrong hash found when receiving literal ' + literal.hash + ' in response to request ' + reqInfo.request.requestId;
-                this.cancelRequest(reqInfo, 'invalid-literal', detail);
-                return;
+        if (reqInfo.request.maxLiterals === undefined || reqInfo.receivedLiteralsCount < reqInfo.request.maxLiterals) {
+
+        
+
+            if (reqInfo.status === 'sent') {
+
+                // if we are expecting ops
+                if ( (reqInfo.request.requestedOps !== undefined && 
+                    reqInfo.request.requestedOps.length > 0) ||
+                    (reqInfo.request.mode === 'infer-req-ops' && 
+                    reqInfo.request.requestedOpHistories !== undefined &&
+                    reqInfo.request.requestedOpHistories.length > 0)) {
+
+                        enqueue = true;
+
+                }
+
+            } else if (reqInfo.status === 'accepted-response' &&
+                reqInfo.response !== undefined && 
+                reqInfo.response.sendingOps !== undefined && reqInfo.nextOpSequence !== undefined) {
+
+                enqueue = true;
+                process = true;
+                
+
+
+            } else {
+                if (reqInfo?.nextOpSequence === undefined) {
+                    console.log('LITERAL ARRIVED BEFORE PROCESSING OF RESPONSE FINISHED')
+                }
+                
             }
-            
-            reqInfo.receivedObjects?.literals.set(literal.hash, literal);
-            reqInfo.receivedLiteralsCount = reqInfo.receivedLiteralsCount as number + 1;
-            reqInfo.lastLiteralTimestamp  = Date.now();
 
-            if (reqInfo.response.sendingOps[reqInfo.nextOpSequence] === literal.hash) {
-
-                if (this.syncAgent.literalIsValidOp(literal)) {
-                    
-                    try {
-                        const op = HashedObject.fromContext(reqInfo.receivedObjects as Context, literal.hash, true);
-
-                        await this.syncAgent.store.save(op);
-
-                        reqInfo.nextOpSequence = reqInfo.nextOpSequence + 1;
-                        this.checkRequestRemoval(reqInfo);
-
-                        const removed = this.checkRequestRemoval(reqInfo);
-            
-                        if (removed) {
-                            this.attemptQueuedRequest(reqInfo.remote);
-                        }
-
-                    } catch (e) {
-                        const detail = 'Error while deliteralzing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
-                        this.cancelRequest(reqInfo, 'invalid-literal', detail);
-                        return;    
-                    }
-
-                } else {
-                    const detail = 'Received op '+ literal.hash +' is not valid for mutableObj ' + this.syncAgent.mutableObj + ', in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
-                    this.cancelRequest(reqInfo, 'invalid-literal', detail);
-                    return;
+            if (enqueue) {
+                reqInfo.receivedLiteralsCount = reqInfo.receivedLiteralsCount + 1;
+                if (reqInfo.request.maxLiterals === undefined || reqInfo.outOfOrderLiterals.size < reqInfo.request.maxLiterals) {
+                    reqInfo.outOfOrderLiterals.set(msg.sequence, msg.literal);
                 }
             }
 
-
-        } else {
-            if (reqInfo?.nextOpSequence === undefined) {
-                console.log('LITERAL ARRIVED BEFORE PROCESSING OF RESPONSE FINISHED')
+            if (process) {
+                this.processLiteral(reqInfo, msg.literal);
             }
-            
         }
 
+    }
+
+    private async attemptToProcessLiterals(reqInfo: RequestInfo) {
+        while (reqInfo.outOfOrderLiterals.size > 0) {
+            const literal = reqInfo.outOfOrderLiterals.get(reqInfo.nextLiteralSequence);
+            if (literal === undefined) {
+                break;
+            } else {
+                this.processLiteral(reqInfo, literal);
+            }
+        }
+    }
+
+    private async processLiteral(reqInfo: RequestInfo, literal: Literal) {
+        
+
+        if (!LiteralUtils.validateHash(literal)) {
+            const detail = 'Wrong hash found when receiving literal ' + literal.hash + ' in response to request ' + reqInfo.request.requestId;
+            this.cancelRequest(reqInfo, 'invalid-literal', detail);
+            return;
+        }
+        
+        reqInfo.receivedObjects?.literals.set(literal.hash, literal);
+        reqInfo.nextLiteralSequence = reqInfo.nextLiteralSequence + 1;
+        reqInfo.lastLiteralTimestamp  = Date.now();
+
+        if ((reqInfo.response?.sendingOps as Hash[])[reqInfo.nextOpSequence as number] === literal.hash) {
+
+            if (this.syncAgent.literalIsValidOp(literal)) {
+                
+                try {
+                    const op = HashedObject.fromContext(reqInfo.receivedObjects as Context, literal.hash, true);
+
+                    await this.syncAgent.store.save(op);
+
+                    reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
+                    this.checkRequestRemoval(reqInfo);
+
+                    const removed = this.checkRequestRemoval(reqInfo);
+        
+                    if (removed) {
+                        this.attemptQueuedRequest(reqInfo.remote);
+                    }
+
+                } catch (e) {
+                    const detail = 'Error while deliteralzing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
+                    this.cancelRequest(reqInfo, 'invalid-literal', detail);
+                    CausalHistorySynchronizer.controlLog.warning(e);
+                    return;    
+                }
+
+            } else {
+                const detail = 'Received op '+ literal.hash +' is not valid for mutableObj ' + this.syncAgent.mutableObj + ', in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
+                this.cancelRequest(reqInfo, 'invalid-literal', detail);
+                return;
+            }
+        }
     }
 
     // We're not rejecting anything for now, will implement when the retry logic is done.
@@ -612,6 +669,10 @@ class CausalHistorySynchronizer {
             request: msg,
             remote: remote,
             status: 'created',
+            nextOpSequence: 0,
+            nextLiteralSequence: 0,
+            receivedLiteralsCount: 0,
+            outOfOrderLiterals: new Map(),
             requestSendingTimestamp: Date.now()
         };
 
@@ -684,10 +745,14 @@ class CausalHistorySynchronizer {
         const reqId = reqInfo.request.requestId;
         this.currentRequests.add(reqInfo.remote, reqId);
         this.dequeueRequest(reqInfo);
+        reqInfo.status = 'sent';
         this.syncAgent.sendMessageToPeer(reqInfo.remote, this.syncAgent.getAgentId(), reqInfo.request);
     }
 
     private enqueueRequest(reqInfo: RequestInfo) {
+
+        reqInfo.status = 'queued';
+
         const reqId = reqInfo.request.requestId;
         let queued = this.queuedRequests.get(reqInfo.remote);
         if (queued === undefined) {
