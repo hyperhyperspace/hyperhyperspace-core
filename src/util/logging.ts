@@ -42,6 +42,11 @@ class Logger {
       if (obj !== undefined) {
         console.log(obj);
       }
+
+      if (level >= LogLevel.WARNING) {
+        var err = new Error();
+        console.log(err.stack);
+      }
     } else if (this.chained !== undefined) {
       // in case another logger in the chain has a more verbose log level.
       this.chained.log(msg, level);
