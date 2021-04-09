@@ -428,6 +428,13 @@ class CausalHistorySynchronizer {
         const reqInfo = this.requests.get(msg.requestId);
 
         if (reqInfo === undefined || reqInfo.remote !== remote) {
+
+            if (reqInfo === undefined) {
+                CausalHistorySynchronizer.controlLog.warning('Received literal for unknown request ' + msg.requestId);
+            } else if (reqInfo.remote !== remote) {
+                CausalHistorySynchronizer.controlLog.warning('Received literal claiming to come from ' + reqInfo.remote + ', but it actually came from ' + msg.requestId);
+            }
+
             return;
         }
 
@@ -435,8 +442,6 @@ class CausalHistorySynchronizer {
         let process = false;
 
         if (reqInfo.request.maxLiterals === undefined || reqInfo.receivedLiteralsCount < reqInfo.request.maxLiterals) {
-
-        
 
             if (reqInfo.status === 'sent') {
 
@@ -460,6 +465,8 @@ class CausalHistorySynchronizer {
                 
 
 
+            } else {
+                CausalHistorySynchronizer.controlLog.warning('Received literal for request ' + msg.requestId + ' which is in unexpected state ' + reqInfo.status);
             }
 
             if (enqueue) {
