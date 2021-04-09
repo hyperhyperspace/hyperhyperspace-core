@@ -202,7 +202,7 @@ class WebRTCConnectionsHost {
                 conn.send(cmd.contents);
                 const ev: UpdateBufferedAmount = {
                     type: 'update-buffered-amount',
-                    connId: cmd.contents,
+                    connId: cmd.connId,
                     bufferedAmount: conn.bufferedAmount()
                 }
                 this.eventCallback(ev);
