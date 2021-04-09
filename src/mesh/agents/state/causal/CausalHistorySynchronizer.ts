@@ -29,10 +29,13 @@ type RequestInfo = {
 
     requestSendingTimestamp?  : number,
     responseArrivalTimestamp? : number,
+
     lastLiteralTimestamp?     : number,
     receivedLiteralsCount     : number,
+    
     nextOpSequence            : number,
-    nextLiteralSequence       : number
+    nextLiteralSequence       : number,
+    nextLiteralPromise?       : Promise<boolean>,
 
     outOfOrderLiterals    : Map<number, Literal>;
 
@@ -470,6 +473,7 @@ class CausalHistorySynchronizer {
             }
 
             if (enqueue) {
+                reqInfo.lastLiteralTimestamp  = Date.now();
                 reqInfo.receivedLiteralsCount = reqInfo.receivedLiteralsCount + 1;
                 if (reqInfo.request.maxLiterals === undefined || reqInfo.outOfOrderLiterals.size < reqInfo.request.maxLiterals) {
                     reqInfo.outOfOrderLiterals.set(msg.sequence, msg.literal);
@@ -477,35 +481,53 @@ class CausalHistorySynchronizer {
             }
 
             if (process) {
-                this.processLiteral(reqInfo, msg.literal);
+                this.attemptToProcessLiterals(reqInfo);
             }
         }
 
     }
 
     private async attemptToProcessLiterals(reqInfo: RequestInfo) {
+
+        if (reqInfo.nextLiteralPromise !== undefined) {
+            return;
+        }
+
         while (reqInfo.outOfOrderLiterals.size > 0) {
+
+            // Check if the request has not been cancelled
+            if (this.requests.get(reqInfo.request.requestId) === undefined) {
+                break;
+            }
+
             const literal = reqInfo.outOfOrderLiterals.get(reqInfo.nextLiteralSequence);
+
             if (literal === undefined) {
                 break;
             } else {
-                this.processLiteral(reqInfo, literal);
+
+                reqInfo.outOfOrderLiterals.delete(reqInfo.nextLiteralSequence);
+                reqInfo.nextLiteralPromise = this.processLiteral(reqInfo, literal);
+                if (!await reqInfo.nextLiteralPromise) {
+                    break;
+                }
             }
         }
+
+        reqInfo.nextLiteralPromise = undefined;
     }
 
-    private async processLiteral(reqInfo: RequestInfo, literal: Literal) {
+    private async processLiteral(reqInfo: RequestInfo, literal: Literal): Promise<boolean> {
         
 
         if (!LiteralUtils.validateHash(literal)) {
             const detail = 'Wrong hash found when receiving literal ' + literal.hash + ' in response to request ' + reqInfo.request.requestId;
             this.cancelRequest(reqInfo, 'invalid-literal', detail);
-            return;
+            return false;
         }
         
         reqInfo.receivedObjects?.literals.set(literal.hash, literal);
         reqInfo.nextLiteralSequence = reqInfo.nextLiteralSequence + 1;
-        reqInfo.lastLiteralTimestamp  = Date.now();
 
         if ((reqInfo.response?.sendingOps as Hash[])[reqInfo.nextOpSequence as number] === literal.hash) {
 
@@ -531,15 +553,17 @@ class CausalHistorySynchronizer {
                     CausalHistorySynchronizer.controlLog.warning(e);
                     CausalHistorySynchronizer.controlLog.warning('nextLiteralSquence='+reqInfo.nextLiteralSequence);
                     CausalHistorySynchronizer.controlLog.warning('receivedLiteralsCount='+reqInfo.receivedLiteralsCount)
-                    return;    
+                    return false;    
                 }
 
             } else {
                 const detail = 'Received op '+ literal.hash +' is not valid for mutableObj ' + this.syncAgent.mutableObj + ', in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                 this.cancelRequest(reqInfo, 'invalid-literal', detail);
-                return;
+                return false;
             }
         }
+
+        return true;
     }
 
     // We're not rejecting anything for now, will implement when the retry logic is done.
