@@ -513,10 +513,10 @@ class CausalHistorySynchronizer {
                 
                 try {
                     const op = HashedObject.fromContext(reqInfo.receivedObjects as Context, literal.hash, true);
-
+                    reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     await this.syncAgent.store.save(op);
 
-                    reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
+                    
                     this.checkRequestRemoval(reqInfo);
 
                     const removed = this.checkRequestRemoval(reqInfo);
