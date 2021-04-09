@@ -14,7 +14,7 @@ import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHist
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
-    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.TRACE);
+    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.DEBUG);
     static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.DEBUG);
 
     static syncAgentIdFor(objHash: Hash, peerGroupId: string) {
@@ -172,7 +172,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
             const fields    = LiteralUtils.getFields(literal);
             const className = LiteralUtils.getClassName(literal);
 
-            if (fields['target']._hash === this.mutableObj &&
+            if (fields['target'] !== undefined && fields['target']._hash === this.mutableObj &&
                 this.acceptedMutationOpClasses.indexOf(className) >= 0) {
 
                 valid = true;
@@ -205,7 +205,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         const stateHash = state.hash();
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
-            CausalHistorySyncAgent.controlLog.debug('Found new state ' + stateHash + ' for ' + this.mutableObj + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
+            CausalHistorySyncAgent.controlLog.trace('Found new state ' + stateHash + ' for ' + this.mutableObj + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
             this.state = state.terminalOpHistories;
             this.stateHash = stateHash;
             let stateUpdate: AgentStateUpdateEvent = {

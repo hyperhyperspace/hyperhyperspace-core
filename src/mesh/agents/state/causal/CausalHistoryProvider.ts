@@ -1,6 +1,6 @@
 import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
 import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
-import { Hash, Literal } from 'data/model';
+import { Hash, HashedObject, Literal } from 'data/model';
 import { ObjectPacker } from 'data/packing/ObjectPacker';
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
 import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
@@ -117,6 +117,8 @@ class CausalHistoryProvider {
     streamingResponsesInterval?: any;
     streamingResponses: number;
 
+    checkIfLiteralIsValidOp: (literal: Literal) => boolean;
+
 
     constructor(syncAgent: CausalHistorySyncAgent) {
         this.syncAgent = syncAgent;
@@ -127,6 +129,8 @@ class CausalHistoryProvider {
         this.queuedResponses   = new Map();
 
         this.streamingResponses = 0;
+
+        this.checkIfLiteralIsValidOp = (literal: Literal) => this.syncAgent.literalIsValidOp(literal);
 
         this.continueStreamingResponses = this.continueStreamingResponses.bind(this);
     }
@@ -257,9 +261,9 @@ class CausalHistoryProvider {
                 new Set<Hash>(req.terminalFetchedOpHistories)
             );
 
-            console.log('loaded histories: ' + respHistoryFragment.contents.size);
-            console.log('requested:');
-            console.log(req.requestedOpHistories);
+            //console.log('loaded histories: ' + respHistoryFragment.contents.size);
+            //console.log('requested:');
+            //console.log(req.requestedOpHistories);
 
             if (respHistoryFragment.contents.size > 0) {
 
@@ -277,14 +281,38 @@ class CausalHistoryProvider {
             }
         }
 
+        // Collect the provided terminal ops, used to infer possible omissions for packing objects
         const providedOps = new Set<Hash>();
+
+        // If any of the provided op histories are unknown, see if we can use discovered history to at
+        // least map them to known ops
+        const discoveredProvidedOpHistories = new Set<Hash>();
     
+        // Iterate over provided terminal op histories, save the unknown ones
         for (const opHistoryHash of providedOpHistories) {
             const opHistory = await this.syncAgent.store.loadOpCausalHistoryByHash(opHistoryHash);
             if (opHistory !== undefined) {
                 providedOps.add(opHistory.opHash);
+            } else {
+                const discoveredOpHistory = this.syncAgent.synchronizer.discoveredHistory.contents.has(opHistoryHash);
+                if (discoveredOpHistory !== undefined) {
+                    discoveredProvidedOpHistories.add(opHistoryHash);
+                }
             }
         }
+
+        // Try to map the unknwon ones, it there are any
+        if (discoveredProvidedOpHistories.size > 0) {
+            const providedFragment = this.syncAgent.synchronizer.discoveredHistory.filterByTerminalOpHistories(discoveredProvidedOpHistories);
+
+            for (const opHistoryHash of providedFragment.missingPrevOpHistories) {
+                const opHistory = await this.syncAgent.store.loadOpCausalHistoryByHash(opHistoryHash);   
+                if (opHistory !== undefined) {
+                    providedOps.add(opHistory.opHash);
+                }
+            }
+        }
+        
         
         let maxLiterals = respInfo.request.maxLiterals;
         if (maxLiterals === undefined || maxLiterals > ProviderLimits.MaxLiteralsPerResponse) {
@@ -293,23 +321,23 @@ class CausalHistoryProvider {
 
         const packer = new ObjectPacker(this.syncAgent.store, maxLiterals);
 
-        packer.allowOmissionsRecursively(providedOps.values(), 2048);
+        await packer.allowOmissionsRecursively(providedOps.values(), 2048, this.checkIfLiteralIsValidOp);
 
         let full = false;
 
         const sendingOps = new Array<Hash>();
 
         if (respInfo.request.requestedOps !== undefined) {
-            console.log('Trying to pack ' + respInfo.request.requestedOps.length + ' ops');
+            //console.log('Trying to pack ' + respInfo.request.requestedOps.length + ' ops');
             for (const hash of respInfo.request.requestedOps) {
                 full = !await packer.addObject(hash);
 
                 if (full) {
-                    console.log('Cannot pack, no room')
+                    //console.log('Cannot pack, no room')
                     break;
                 } else {
-                    console.log('packed ' + hash);
-                    console.log(packer.content.length + ' literals packed so far');
+                    //console.log('packed ' + hash);
+                    //console.log(packer.content.length + ' literals packed so far');
                     sendingOps.push(hash);
                 }
             }
@@ -361,7 +389,25 @@ class CausalHistoryProvider {
             resp.sendingOps = sendingOps;
             resp.literalCount = packer.content.length;
             respInfo.literalsToSend = packer.content;
-            respInfo.nextLiteralIdx = 0;                
+            respInfo.nextLiteralIdx = 0;
+            
+            if (packer.omissions.size > 0) {
+
+                //console.log('omitting ' + packer.omissions.size + ' references');
+
+                resp.omittedObjs = [];
+                resp.omittedObjsReferenceChains = [];
+                resp.omittedObjsOwnershipProofs = [];
+                for (const [hash, refChain] of packer.omissions.entries()) {
+
+                    resp.omittedObjs.push(hash);
+                    resp.omittedObjsReferenceChains.push(refChain);
+                    const dep = await this.syncAgent.store.load(hash) as HashedObject;
+                    resp.omittedObjsOwnershipProofs.push(dep.hash(req.omissionProofsSecret))
+
+                }
+            }
+
         }
 
         respInfo.response = resp;
@@ -521,7 +567,7 @@ class CausalHistoryProvider {
 
     private isStreamingCompleted(respInfo: ResponseInfo): boolean {
         return respInfo.literalsToSend !== undefined && 
-               respInfo.nextLiteralIdx as number < respInfo.literalsToSend.length;
+               respInfo.nextLiteralIdx as number === respInfo.literalsToSend.length;
     }
 
     private startStreamingResponse(respInfo: ResponseInfo) {

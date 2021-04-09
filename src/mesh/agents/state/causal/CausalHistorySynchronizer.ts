@@ -40,7 +40,7 @@ type RequestInfo = {
 };
 
 class CausalHistorySynchronizer {
-    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.TRACE);
+    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
 
     syncAgent: CausalHistorySyncAgent;
 
@@ -89,7 +89,9 @@ class CausalHistorySynchronizer {
             }
         }
 
-        this.request(remote, { requestedOpHistories: newOpHistories});
+        if (newOpHistories.size > 0) {
+            this.request(remote, { requestedOpHistories: newOpHistories});
+        }
     }
 
     async onReceivingResponse(remote: Endpoint, msg: ResponseMsg) {
@@ -239,17 +241,20 @@ class CausalHistorySynchronizer {
 
                     if (refOpHash === undefined) {
                         omittedObjsOk = false;
+                        CausalHistorySynchronizer.controlLog.warning('Reference chain for object ' + hash + ' is empty, cancelling request ' + req.requestId);
                         break;
                     }
 
                     const refOpLit = await this.syncAgent.store.loadLiteral(refOpHash);
                     if (refOpLit === undefined) {
                         omittedObjsOk = false;
+                        CausalHistorySynchronizer.controlLog.warning('Referenced op in reference chain ' + refOpHash + ' not found locally, cancelling request ' + req.requestId);
                         break;
                     }
 
                     if (!this.syncAgent.literalIsValidOp(refOpLit)) {
                         omittedObjsOk = false;
+                        CausalHistorySynchronizer.controlLog.warning('Referenced op ' + refOpHash + 'in reference chain for omitted obj ' + hash + ' is not a valid op, cancelling request ' + req.requestId);
                         break;
                     }
 
@@ -270,9 +275,11 @@ class CausalHistorySynchronizer {
                                 currLit = nextLit;
                                 referenceChain.shift();
                             } else {
+                                CausalHistorySynchronizer.controlLog.warning('Referenced obj in reference chain ' + nextHash + ' not found locally, cancelling request ' + req.requestId);
                                 break;
                             }
                         } else {
+                            CausalHistorySynchronizer.controlLog.warning('Dep ' + nextHash + 'in reference chain for omitted obj ' + hash + ' not found amongst dependencies of ' + currLit.hash + ', cancelling request ' + req.requestId);                            
                             break;
                         }
                     }
@@ -282,16 +289,9 @@ class CausalHistorySynchronizer {
                         break;
                     }
 
-                    let foundDep = false;
-                    for (const dep of currLit.dependencies) {
-                        if (dep.hash === hash) {
-                            foundDep = true;
-                            break;
-                        }
-                    }
-
-                    if (!foundDep) {
+                    if (currLit.hash !== hash) {
                         omittedObjsOk = false;
+                        CausalHistorySynchronizer.controlLog.warning('Reference chain for omitted obj ' + hash + ' ends in another object: ' + currLit.hash + ', cancelling request ' + req.requestId);
                         break;
                     }
 
@@ -301,6 +301,7 @@ class CausalHistorySynchronizer {
     
                     if (dep === undefined || dep.hash(reqInfo.request.omissionProofsSecret) !== ownershipProof) {
                         omittedObjsOk = false;
+                        CausalHistorySynchronizer.controlLog.warning('Omission proof for obj ' + hash + ' is wrong, cancelling request ' + req.requestId);                            
                         break;
                     }
                 }
@@ -412,8 +413,6 @@ class CausalHistorySynchronizer {
             reqInfo.status = 'accepted-response';
             
             const removed = this.checkRequestRemoval(reqInfo);
-            
-            console.log('removed: ' + removed);
 
             if (removed) {
                 this.attemptNewRequest(reqInfo.remote, newMissingPrevOpHistories, receivedHistory?.terminalOpHistories);                
@@ -461,11 +460,6 @@ class CausalHistorySynchronizer {
                 
 
 
-            } else {
-                if (reqInfo?.nextOpSequence === undefined) {
-                    console.log('LITERAL ARRIVED BEFORE PROCESSING OF RESPONSE FINISHED')
-                }
-                
             }
 
             if (enqueue) {
@@ -525,9 +519,11 @@ class CausalHistorySynchronizer {
                     }
 
                 } catch (e) {
-                    const detail = 'Error while deliteralzing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
+                    const detail = 'Error while deliteralizing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                     this.cancelRequest(reqInfo, 'invalid-literal', detail);
                     CausalHistorySynchronizer.controlLog.warning(e);
+                    CausalHistorySynchronizer.controlLog.warning('nextLiteralSquence='+reqInfo.nextLiteralSequence);
+                    CausalHistorySynchronizer.controlLog.warning('receivedLiteralsCount='+reqInfo.receivedLiteralsCount)
                     return;    
                 }
 

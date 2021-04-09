@@ -12,9 +12,9 @@ class ObjectPacker {
 
     content       : Array<Literal>;
     contentHashes : Set<Hash>;
-    omissionReferenceChains       : Map<Hash, Hash[]>;
+    omissions     : Map<Hash, Hash[]>;
 
-    allowedOmissions: Set<Hash>;
+    allowedOmissions: Map<Hash, Hash[]>;
 
     maxLiterals: number;
     
@@ -27,9 +27,9 @@ class ObjectPacker {
         this.content       = [];
         this.contentHashes = new Set();
 
-        this.omissionReferenceChains = new Map();
+        this.omissions = new Map();
 
-        this.allowedOmissions = new Set();
+        this.allowedOmissions = new Map();
 
         this.maxLiterals = maxLiterals;
 
@@ -42,30 +42,50 @@ class ObjectPacker {
         
     }
 
-    allowOmission(hash: Hash) {
-        this.allowedOmissions.add(hash);
+    allowOmission(hash: Hash, referenceChain: Hash[]) {
+
+        if (!this.allowedOmissions.has(hash)) {
+            this.allowedOmissions.set(hash, referenceChain);
+        }
+        
     }
 
-    async allowOmissionsRecursively(initialHashesToOmit: IterableIterator<Hash>, maxAllowedOmissions: number) {
+    async allowOmissionsRecursively(initialHashesToOmit: IterableIterator<Hash>, maxAllowedOmissions?: number, isAdditionalReferenceRoot?: (literal: Literal) => boolean) {
 
-        const omittableRefs = Array.from(initialHashesToOmit);
-        const omittableRefsAsSet = new Set<Hash>(initialHashesToOmit);
-        
+        const omittableRefsQueue = Array.from(initialHashesToOmit);
+        const omittableRefs = new Set<Hash>();
+        const refChains = new Map<Hash, Hash[]>();
 
-        while (omittableRefs.length > 0 && this.allowedOmissions.size < maxAllowedOmissions) {
+        for (const hash of omittableRefsQueue) {
+            omittableRefs.add(hash)
+            refChains.set(hash, [hash]);
+        }
 
-            const nextHash = omittableRefs.shift() as Hash;
-            omittableRefsAsSet.delete(nextHash);
+        while (omittableRefsQueue.length > 0 && (maxAllowedOmissions === undefined || this.allowedOmissions.size < maxAllowedOmissions)) {
 
-            this.allowOmission(nextHash);
-
+            const nextHash = omittableRefsQueue.shift() as Hash;
             const literal = await this.store.loadLiteral(nextHash);
 
             if (literal !== undefined) {
+
+                let refChain = refChains.get(nextHash) as Hash[];            
+
+                if (isAdditionalReferenceRoot !== undefined && isAdditionalReferenceRoot(literal)) {
+                    refChain = [nextHash];
+                }
+    
+                this.allowOmission(nextHash, refChain);
+                
                 for (const dep of literal.dependencies) {
-                    if (!this.allowedOmissions.has(dep.hash) && !omittableRefsAsSet.has(dep.hash)) {
-                        omittableRefsAsSet.add(dep.hash);
-                        omittableRefs.push(dep.hash);
+                    if (!this.allowedOmissions.has(dep.hash) && !omittableRefs.has(dep.hash)) {
+
+                        omittableRefs.add(dep.hash);
+                        omittableRefsQueue.push(dep.hash);
+
+                        const depRefChain = refChain.slice();
+                        depRefChain.push(dep.hash);
+
+                        refChains.set(dep.hash, depRefChain);
                     }
                 }
             }
@@ -91,8 +111,17 @@ class ObjectPacker {
                     this.contentHashes.add(literal.hash);
                 }
     
-                for (const [hash, referenceChain] of result.omitted.entries()) {
-                    this.omissionReferenceChains.set(hash, referenceChain);
+                for (const hash of result.omitted.keys()) {
+
+                    // We're currently computing two different reference chains: attemptToAdd will return
+                    // how the added object references the omitted one, while this.allowedOmissions has
+                    // the ref chain saved back from when the omission was allowed.
+
+                    // We're currently using the second one, so the verifier can verify just as he receives
+                    // his response, and withouth risking leaking any information unrelated to the mutable
+                    // being synchronized.
+
+                    this.omissions.set(hash, this.allowedOmissions.get(hash) as Hash[]);
                 }
 
                 return true;

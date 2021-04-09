@@ -408,8 +408,6 @@ class CausalHistoryFragment {
 
     causalClosure(providedOpHistories: Set<Hash>, maxOps?: number, ignoreOpHistory?: (h: Hash) => boolean, filterOpHistory?: (h: Hash) => boolean) {
         
-        console.log('starting closure from');
-        console.log(this.getStartingOpHistories());
         return this.causalClosureFrom(this.getStartingOpHistories(), providedOpHistories, maxOps, ignoreOpHistory, filterOpHistory);
     }
 
