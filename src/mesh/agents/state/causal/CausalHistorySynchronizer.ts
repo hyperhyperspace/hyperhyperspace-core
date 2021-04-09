@@ -16,8 +16,8 @@ import { RequestMsg, ResponseMsg, CancelRequestMsg } from './CausalHistoryProvid
 
 const MaxRequestsPerRemote = 2;
 
-const RequestTimeout = 12;
-const LiteralArrivalTimeout = 6;
+const RequestTimeout = 20;
+const LiteralArrivalTimeout = 10;
 
 type RequestInfo = {
 
@@ -755,7 +755,7 @@ class CausalHistorySynchronizer {
                     lastLiteralRequestTimestamp = reqInfo.lastLiteralTimestamp;
                 }
 
-                if (lastLiteralRequestTimestamp !== undefined && Date.now() > lastLiteralRequestTimestamp + LiteralArrivalTimeout * 1000) {
+                if (reqInfo.receivedLiteralsCount < reqInfo.response.literalCount && lastLiteralRequestTimestamp !== undefined && Date.now() > lastLiteralRequestTimestamp + LiteralArrivalTimeout * 1000) {
                     this.cancelRequest(reqInfo, 'slow-connection', 'Timeout waiting for a literal to arrive');
                     this.removeRequest(reqInfo);
                     return true;
