@@ -302,7 +302,7 @@ class CausalHistoryProvider {
         }
 
         // Try to map the unknwon ones, it there are any
-        if (discoveredProvidedOpHistories.size > 0) {
+/*        if (discoveredProvidedOpHistories.size > 0) {
             const providedFragment = this.syncAgent.synchronizer.discoveredHistory.filterByTerminalOpHistories(discoveredProvidedOpHistories);
 
             for (const opHistoryHash of providedFragment.missingPrevOpHistories) {
@@ -311,7 +311,7 @@ class CausalHistoryProvider {
                     providedOps.add(opHistory.opHash);
                 }
             }
-        }
+        }*/ // TODO FIXME
         
         
         let maxLiterals = respInfo.request.maxLiterals;
