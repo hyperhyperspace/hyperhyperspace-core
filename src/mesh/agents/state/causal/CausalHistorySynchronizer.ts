@@ -201,7 +201,7 @@ class CausalHistorySynchronizer {
                         return;
                     } else {
                         for (const opHistoryHash of additionalOpsHistory.missingPrevOpHistories) {
-                            if (!informedAsFetchedOpHistories.has(opHistoryHash)) {
+                            if (this.syncAgent.store.loadOpCausalHistory(opHistoryHash) === undefined) {
                                 const detail = 'Request informs it will send an op depending upon another with history hash ' + opHistoryHash + ', but it was neither requested or follows directly from informed fetched op histories.';
                                 this.cancelRequest(reqInfo, 'invalid-response', detail);
                                 return;
