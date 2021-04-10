@@ -67,6 +67,12 @@ describeProxy('[SYN] State sync', () => {
 
     }, 300000);
 
+    test('[SYN10] Causal history agent-based set diamond-shaped sync in small peer group (wrtc)', async (done) => {
+
+        await diamondSyncInSmallPeerGroup(done, 'wrtc');
+
+    }, 300000);
+
 });
 
 async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
@@ -538,6 +544,166 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
                 
                 await sr.loadAllChanges();
                 replicated = sr.size() === 10;
+                //console.log(Array.from(sr.values()));
+                //for (const elmt of sr.values()) {
+                    //console.log('FOUND ELMT:');
+                    //console.log(elmt);
+                //}
+            }
+
+            count = count + 1;
+        }
+    }
+
+
+
+    //const meshAgent = pods[0].getAgent(PeerMeshAgent.agentIdForMesh(peerNetworkId)) as PeerMeshAgent
+    //expect(meshAgent.getPeers().length).toEqual(size-1);
+
+    for (const pod of pods) {
+        pod.shutdown();
+    }
+
+    expect(meshReady).toBeTruthy();
+    expect(replicated).toBeTruthy();
+
+    done();
+}
+
+async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number, useRemoting?: boolean) {
+
+    const size = 3;
+        
+    let peerNetworkId = new RNGImpl().randomHexString(64);
+
+    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
+
+    let stores : Array<Store> = [];
+    
+    for (let i=0; i<size; i++) {
+        const peerNetwork = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
+        const store = new Store(new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
+        stores.push(store);
+        let gossip = new StateGossipAgent(peerNetworkId, peerNetwork);
+        
+        pods[i].registerAgent(gossip);
+    }
+
+    let kp = TestIdentity.getFistTestKeyPair();
+    
+    let s = new MutableSet<HashedObject>();
+    
+    
+    await stores[0].save(kp);
+    await stores[0].save(s);
+
+    await s.add(new HashedLiteral('common root'));
+
+    await stores[0].save(s);
+
+    for (let i=0; i<size; i++) {
+        const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
+        //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
+        let agent = new CausalHistorySyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
+        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
+        gossip.trackAgentState(agent.getAgentId());
+        //agent;
+        pods[i].registerAgent(agent);
+    }
+
+
+    let meshReady = false;
+
+    let count = 0;
+
+    while (!meshReady && count < 1000) {
+        await new Promise(r => setTimeout(r, 100));
+        const meshAgent = pods[size-1].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent
+        meshReady = meshAgent.getPeers().length === (size-1);
+        //console.log(count + '. peers: ' + meshAgent.getPeers().length);
+        count = count + 1;
+    }
+
+    let replicated = false;
+
+    if (meshReady) {
+        count = 0;
+
+        while (!replicated && count < 1500) {
+
+            await new Promise(r => setTimeout(r, 100));
+
+            const sr = await stores[size-1].load(s.hash()) as MutableSet<HashedLiteral> | undefined;
+
+            if (sr !== undefined) {
+                
+                
+                await sr.loadAllChanges();
+                replicated = sr.size() === 1;
+                //for (const elmt of sr.values()) {
+                    //console.log('FOUND ELMT:');
+                    //console.log(elmt);
+                //}
+            }
+
+            count = count + 1;
+        }
+    }
+
+    const scopy = await stores[size-1].load(s.hash()) as MutableSet<HashedLiteral>;
+
+    await scopy.add(new HashedLiteral('remote change'))
+    await s.add(new HashedLiteral('local change'));
+
+    await stores[size-1].save(scopy);
+    await stores[0].save(s);
+    
+    if (meshReady) {
+        count = 0;
+
+        while (!replicated && count < 1500) {
+
+            await new Promise(r => setTimeout(r, 100));
+
+            const sr = await stores[0].load(s.hash()) as MutableSet<HashedLiteral> | undefined;
+
+            if (sr !== undefined) {
+                
+                
+                await sr.loadAllChanges();
+                replicated = sr.size() === 3;
+                //for (const elmt of sr.values()) {
+                    //console.log('FOUND ELMT:');
+                    //console.log(elmt);
+                //}
+            }
+
+            count = count + 1;
+        }
+    }
+    
+    await s.add(new HashedLiteral('further change'));
+    await s.add(new HashedLiteral('another further change'));
+
+    await stores[0].save(s);
+
+
+    replicated = false;
+
+    if (meshReady) {
+        count = 0;
+
+        while (!replicated && count < 1500) {
+
+            await new Promise(r => setTimeout(r, 100));
+
+            const sr = await stores[size-1].load(s.hash()) as MutableSet<Identity> | undefined;
+
+            if (sr !== undefined) {
+                
+                
+                await sr.loadAllChanges();
+                replicated = sr.size() === 5;
                 //console.log(Array.from(sr.values()));
                 //for (const elmt of sr.values()) {
                     //console.log('FOUND ELMT:');

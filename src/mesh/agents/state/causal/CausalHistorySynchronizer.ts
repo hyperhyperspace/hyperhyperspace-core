@@ -112,7 +112,7 @@ class CausalHistorySynchronizer {
 
             // Make sets out of these arrays for easy membership check:
             const requestedOpHistories = new Set<Hash>(req.requestedOpHistories);
-            const informedAsFetchedOpHistories = new Set<Hash>(req.terminalFetchedOpHistories);
+            //const informedAsFetchedOpHistories = new Set<Hash>(req.terminalFetchedOpHistories);
             const requestedOps = new Set<Hash>(req.requestedOps);
 
             // Validate received history

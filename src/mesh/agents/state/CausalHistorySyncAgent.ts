@@ -15,7 +15,7 @@ import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHist
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
-    static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
+    static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.TRACE);
 
     static syncAgentIdFor(objHash: Hash, peerGroupId: string) {
         return 'causal-sync-for-' + objHash + '-in-peer-group-' + peerGroupId;
