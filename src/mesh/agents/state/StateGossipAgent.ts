@@ -118,7 +118,7 @@ class StateGossipAgent extends PeeringAgentBase {
         return 'state-gossip-agent-for-' + gossipId;
     }
 
-    static peerMessageLog = new Logger(StateGossipAgent.name, LogLevel.INFO);
+    static peerMessageLog = new Logger(StateGossipAgent.name, LogLevel.TRACE);
     static controlLog     = new Logger(StateGossipAgent.name, LogLevel.INFO);
 
     // tunable working parameters
@@ -486,7 +486,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
         }
 
-        if (receivedOldState) {
+        if (receivedOldState && this.localState.get(agentId) !== state) {
             this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
             this.sendStateObject(sender, agentId);
         }
