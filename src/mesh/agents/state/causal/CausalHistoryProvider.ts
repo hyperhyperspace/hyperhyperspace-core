@@ -302,7 +302,7 @@ class CausalHistoryProvider {
         }
 
         // Try to map the unknwon ones, it there are any
-/*        if (discoveredProvidedOpHistories.size > 0) {
+        if (discoveredProvidedOpHistories.size > 0) {
             const providedFragment = this.syncAgent.synchronizer.discoveredHistory.filterByTerminalOpHistories(discoveredProvidedOpHistories);
 
             for (const opHistoryHash of providedFragment.missingPrevOpHistories) {
@@ -311,7 +311,7 @@ class CausalHistoryProvider {
                     providedOps.add(opHistory.opHash);
                 }
             }
-        }*/ // TODO FIXME
+        }
         
         
         let maxLiterals = respInfo.request.maxLiterals;
@@ -330,15 +330,18 @@ class CausalHistoryProvider {
         if (respInfo.request.requestedOps !== undefined) {
             //console.log('Trying to pack ' + respInfo.request.requestedOps.length + ' ops');
             for (const hash of respInfo.request.requestedOps) {
-                full = !await packer.addObject(hash);
+                if (!packer.allowedOmissions.has(hash)) {
+                    full = !await packer.addObject(hash);
 
-                if (full) {
-                    //console.log('Cannot pack, no room')
-                    break;
-                } else {
-                    //console.log('packed ' + hash);
-                    //console.log(packer.content.length + ' literals packed so far');
-                    sendingOps.push(hash);
+                    if (full) {
+                        //console.log('Cannot pack, no room')
+                        break;
+                    } else {
+                        //console.log('packed ' + hash);
+                        //console.log(packer.content.length + ' literals packed so far');
+                        sendingOps.push(hash);
+                    }
+    
                 }
             }
         }
@@ -372,13 +375,16 @@ class CausalHistoryProvider {
             for (const opHistoryHash of moreOpHistories) {
                 const opHistory = respHistoryFragment.contents.get(opHistoryHash) as OpCausalHistory;
                 
-                full = !await packer.addObject(opHistory.opHash);
+                if (!packer.allowedOmissions.has(opHistory.opHash)) {
+                    full = !await packer.addObject(opHistory.opHash);
 
-                if (full) {
-                    break;
-                } else {
-                    sendingOps.push(opHistory.opHash);
+                    if (full) {
+                        break;
+                    } else {
+                        sendingOps.push(opHistory.opHash);
+                    }    
                 }
+
 
             }
         }
