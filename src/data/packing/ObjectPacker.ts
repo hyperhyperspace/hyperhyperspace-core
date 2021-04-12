@@ -75,6 +75,8 @@ class ObjectPacker {
                 }
     
                 this.allowOmission(nextHash, refChain);
+                console.log('allowing omission of ' + nextHash + ' with chain:')
+                console.log(refChain)
                 
                 for (const dep of literal.dependencies) {
                     if (!this.allowedOmissions.has(dep.hash) && !omittableRefs.has(dep.hash)) {
