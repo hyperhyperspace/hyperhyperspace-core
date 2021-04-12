@@ -95,13 +95,7 @@ class CausalHistoryDelta {
 
     opHistoriesFollowingFromStart(maxOps?: number): Hash[] {
 
-        const start = new Set<Hash>();
-
-        for (const hash of this.fragment.missingPrevOpHistories) {
-            if (this.start.contents.has(hash)) {
-                start.add(hash);
-            }
-        }
+        const start = new Set<Hash>(this.start.contents.keys());
 
         return this.fragment.causalClosure(start, maxOps);
     }
