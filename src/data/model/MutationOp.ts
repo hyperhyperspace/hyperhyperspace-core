@@ -19,10 +19,12 @@ abstract class MutationOp extends HashedObject {
     validate(references: Map<Hash, HashedObject>) {
 
         if (this.target === undefined) {
+            console.log('no target')
             return false;
         }
 
         if (this.prevOps === undefined) {
+            console.log('no prevops')
             return false;
         }
 
@@ -30,10 +32,13 @@ abstract class MutationOp extends HashedObject {
             let prevOp = references.get(prevOpRef.hash);
 
             if (prevOp === undefined) {
+                console.log('prevop ' + prevOpRef.hash + ' missing from references')
                 return false;
             } else if (! (prevOp instanceof MutationOp)) {
+                console.log('prevop ' + prevOpRef.hash + ' is not a mutation op')
                 return false
             } else if (! ((prevOp as MutationOp).target as MutableObject).equals(this.target)) { 
+                console.log('prevop ' + prevOpRef.hash + ' points to a different target')
                 return false;
             }
         }
