@@ -6,89 +6,117 @@ import { OpCausalHistory } from './OpCausalHistory';
 
 class CausalHistoryDelta {
 
-    static async compute(mutableObj: Hash, targetOpHistories: Array<Hash>, startingOpHistories: Array<Hash>, store: Store, maxDeltaSize: number, maxBacktrackSize: number) {
+    mutableObj: Hash;
 
-        const start = new CausalHistoryFragment(mutableObj);
+    store: Store;
+
+    fragment: CausalHistoryFragment;
+    start: CausalHistoryFragment;
+
+    gap: Set<Hash>;
+
+    constructor(mutableObj: Hash, store: Store) {
+
+        this.mutableObj = mutableObj;
+        this.store = store;
+
+        this.fragment = new CausalHistoryFragment(mutableObj);
+        this.start = new CausalHistoryFragment(mutableObj);
+
+        this.gap = new Set<Hash>();
+    }
+
+    async compute(targetOpHistories: Array<Hash>, startingOpHistories: Array<Hash>, maxDeltaSize: number, maxBacktrackSize: number) {
 
         for (const hash of startingOpHistories) {
-            const opHistory = await store.loadOpCausalHistoryByHash(hash);
+            const opHistory = await this.store.loadOpCausalHistoryByHash(hash);
             if (opHistory !== undefined) {
-                start.add(opHistory);
+                this.start.add(opHistory);
+                this.fragment.remove(opHistory.causalHistoryHash);
             }
         }
 
-        const delta = new CausalHistoryFragment(mutableObj);
-
         for (const hash of targetOpHistories) {
-            if (!start.contents.has(hash)) {
-                const opHistory = await store.loadOpCausalHistoryByHash(hash);
+            if (!this.start.contents.has(hash)) {
+                const opHistory = await this.store.loadOpCausalHistoryByHash(hash);
                 if (opHistory !== undefined) {
-                    delta.add(opHistory)
+                    this.fragment.add(opHistory)
                 }
             }
         }
 
-        let gap = CausalHistoryDelta.computeGap(delta, start);
+        this.updateGap();
 
-        while (gap.size > 0 && delta.contents.size < maxDeltaSize) {
+        while (this.gap.size > 0 && this.fragment.contents.size < maxDeltaSize) {
 
             let h: number | undefined = undefined;
 
-            for (const hash of delta.getStartingOpHistories()) {
+            for (const hash of this.fragment.getStartingOpHistories()) {
 
-                const op = delta.contents.get(hash) as OpCausalHistory;
+                const op = this.fragment.contents.get(hash) as OpCausalHistory;
                 if (h === undefined || op._computedProps?.height as number < h) {
                     h = op._computedProps?.height;
                 }
             }
 
-            for (const hash of Array.from(start.missingPrevOpHistories)) {
+            for (const hash of Array.from(this.start.missingPrevOpHistories)) {
 
-                if (start.contents.size >= maxBacktrackSize) {
+                if (this.start.contents.size >= maxBacktrackSize) {
                     break;
                 }
 
-                const op = await store.loadOpCausalHistoryByHash(hash);
+                const op = await this.store.loadOpCausalHistoryByHash(hash);
                 if (op !== undefined && (op._computedProps?.height as number) > (h as number)) {
-                    start.add(op);
-                    delta.remove(hash);
+                    this.start.add(op);
+                    this.fragment.remove(hash);
                 }
             }
 
-            for (const hash of Array.from(delta.missingPrevOpHistories)) {
+            for (const hash of Array.from(this.fragment.missingPrevOpHistories)) {
 
-                if (delta.contents.size >= maxDeltaSize) {
+                if (this.fragment.contents.size >= maxDeltaSize) {
                     break;
                 }
 
-                if (!start.contents.has(hash)) {
-                    const op = await store.loadOpCausalHistoryByHash(hash);
+                if (!this.start.contents.has(hash)) {
+                    const op = await this.store.loadOpCausalHistoryByHash(hash);
 
                     if (op !== undefined) {
-                        delta.add(op);
+                        this.fragment.add(op);
                     }
                 }
             }
 
-            gap = CausalHistoryDelta.computeGap(delta, start);
+            this.updateGap();
 
         }
 
-        return delta;
-
     }
 
-    private static computeGap(current: CausalHistoryFragment, backtrack: CausalHistoryFragment) {
+    opHistoriesFollowingFromStart(maxOps?: number): Hash[] {
+
+        const start = new Set<Hash>();
+
+        for (const hash of this.fragment.missingPrevOpHistories) {
+            if (this.start.contents.has(hash)) {
+                start.add(hash);
+            }
+        }
+
+        return this.fragment.causalClosure(start, maxOps);
+    }
+
+    private updateGap() {
 
         const gap = new Set<Hash>();
 
-        for (const hash of current.missingPrevOpHistories) {
-            if (!backtrack.contents.has(hash)) {
+        for (const hash of this.fragment.missingPrevOpHistories) {
+            if (!this.start.contents.has(hash)) {
                 gap.add(hash);
             }
         }
 
-        return gap;
+        this.gap = gap;
 
     }
 

@@ -356,7 +356,6 @@ class CausalHistoryFragment {
 
     causalClosureFrom(startingOpHistories: Set<Hash>, providedOpHistories: Set<Hash>, maxOps?: number, ignoreOpHistory?: (h: Hash) => boolean, filterOpHistory?: (h: Hash) => boolean): Hash[] {
 
-
         // We iterate over all the depenency "arcs", each time recording that one dependency has been
         // fullfilled by removing it from a set in missingOpHistories. If the set ever empties, this
         // op can be iterated over (all its prevOps have already been visited). 
@@ -384,20 +383,25 @@ class CausalHistoryFragment {
 
             const hash = opHistory.causalHistoryHash;
 
-            if ((filterOpHistory === undefined || filterOpHistory(hash)) && missingPrevOpHistories.get(hash)?.size === 0) {
-                for (const nextHash of this.nextOpHistories.get(hash)) {
-                    const nextOpHistory = this.contents.get(nextHash) as OpCausalHistory;
-                    if (filterOpHistory === undefined || filterOpHistory(nextHash)) {
-                        CausalHistoryFragment.loadMissingPrevOpHistories(missingPrevOpHistories, nextOpHistory, providedOpHistories);
-                        missingPrevOpHistories.get(nextHash)?.delete(hash);    
+            if ((filterOpHistory === undefined || filterOpHistory(hash))) {
+
+                if (missingPrevOpHistories.get(hash)?.size === 0) {
+                    
+                    for (const nextHash of this.nextOpHistories.get(hash)) {
+                        const nextOpHistory = this.contents.get(nextHash) as OpCausalHistory;
+                        if (filterOpHistory === undefined || filterOpHistory(nextHash)) {
+                            CausalHistoryFragment.loadMissingPrevOpHistories(missingPrevOpHistories, nextOpHistory, providedOpHistories);
+                            missingPrevOpHistories.get(nextHash)?.delete(hash); 
+                        }
+                    }
+    
+                    closure.add(hash);
+    
+                    if (ignoreOpHistory === undefined || !ignoreOpHistory(hash)) {
+                        result.push(hash);
                     }
                 }
-
-                closure.add(hash);
-
-                if (ignoreOpHistory === undefined || !ignoreOpHistory(hash)) {
-                    result.push(hash);
-                }
+                
             }
 
         }

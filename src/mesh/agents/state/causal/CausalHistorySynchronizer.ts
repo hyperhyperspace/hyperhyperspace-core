@@ -111,7 +111,7 @@ class CausalHistorySynchronizer {
             let receivedHistory: CausalHistoryFragment | undefined = undefined;
 
             // Make sets out of these arrays for easy membership check:
-            const requestedOpHistories = new Set<Hash>(req.requestedOpHistories);
+            const requestedOpHistories = new Set<Hash>(req.requestedTerminalOpHistory);
             //const informedAsFetchedOpHistories = new Set<Hash>(req.terminalFetchedOpHistories);
             const requestedOps = new Set<Hash>(req.requestedOps);
 
@@ -149,8 +149,8 @@ class CausalHistorySynchronizer {
                 }
 
                 // Check that the histories we sent as already known were not included
-                if (req.terminalFetchedOpHistories !== undefined) {
-                    for (const opHistoryHash of req.terminalFetchedOpHistories) {
+                if (req.requestedStartingOpHistory !== undefined) {
+                    for (const opHistoryHash of req.requestedStartingOpHistory) {
                         if (receivedHistory.contents.has(opHistoryHash)) {
                             const detail = 'Received history contains op history ' + opHistoryHash + ' which was informed as already present in request ' + req.requestId + ', cancelling it.';
                             this.cancelRequest(reqInfo, 'invalid-response', detail);
@@ -321,8 +321,8 @@ class CausalHistorySynchronizer {
 
             // Update the expected op history arrivals
 
-            if (req.requestedOpHistories !== undefined) {
-                for (const opHistoryHash of req.requestedOpHistories) {
+            if (req.requestedTerminalOpHistory !== undefined) {
+                for (const opHistoryHash of req.requestedTerminalOpHistory) {
                     this.requestsForOpHistory.delete(opHistoryHash, req.requestId)
                 }
             }
@@ -452,8 +452,8 @@ class CausalHistorySynchronizer {
                 if ( (reqInfo.request.requestedOps !== undefined && 
                     reqInfo.request.requestedOps.length > 0) ||
                     (reqInfo.request.mode === 'infer-req-ops' && 
-                    reqInfo.request.requestedOpHistories !== undefined &&
-                    reqInfo.request.requestedOpHistories.length > 0)) {
+                    reqInfo.request.requestedTerminalOpHistory !== undefined &&
+                    reqInfo.request.requestedTerminalOpHistory.length > 0)) {
 
                         enqueue = true;
 
@@ -662,15 +662,22 @@ class CausalHistorySynchronizer {
         };
 
         if (aim.requestedOpHistories !== undefined) {
-            msg.requestedOpHistories = Array.from(aim.requestedOpHistories.values());
-            msg.terminalFetchedOpHistories = this.syncAgent.state === undefined? 
-                                                [] 
-                                             :
-                                                Array.from(this.syncAgent.state.values());
+            msg.requestedTerminalOpHistory = Array.from(aim.requestedOpHistories.values());
 
-            for (const opHistoryHash of msg.requestedOpHistories) {
+            for (const opHistoryHash of msg.requestedTerminalOpHistory) {
                 this.requestsForOpHistory.add(opHistoryHash, remote);
             }
+
+            const startingOpHistories = this.syncAgent.state === undefined? 
+                                                new Set<Hash>()
+                                             :
+                                                new Set<Hash>(this.syncAgent.state.values());
+
+            for (const hash of this.discoveredHistory.terminalOpHistories) {
+                startingOpHistories.add(hash);
+            }
+
+            msg.requestedStartingOpHistory = Array.from(startingOpHistories);
         }
 
         if (aim.requestedOps !== undefined) {
@@ -680,14 +687,19 @@ class CausalHistorySynchronizer {
                 this.requestsForOp.add(opHash, remote);
             }
         }
+
+        msg.currentState = this.syncAgent.state === undefined?
+                                []
+                            :
+                                Array.from(this.syncAgent.state.values());
         
         if ((msg.requestedOps !== undefined) ||
-            (msg.mode === 'infer-req-ops' && msg.requestedOpHistories !== undefined && msg.terminalFetchedOpHistories !== undefined)) {
+            (msg.mode === 'infer-req-ops' && msg.requestedTerminalOpHistory !== undefined && msg.requestedStartingOpHistory !== undefined)) {
             msg.omissionProofsSecret = new RNGImpl().randomHexString(128);
             msg.maxLiterals = ProviderLimits.MaxLiteralsPerResponse;
         }
 
-        if (msg.requestedOpHistories !== undefined) {
+        if (msg.requestedTerminalOpHistory !== undefined) {
             msg.maxHistory = ProviderLimits.MaxHistoryPerResponse;
         }
 
@@ -841,8 +853,8 @@ class CausalHistorySynchronizer {
 
         // remove pending opHistories
 
-        if (reqInfo.request.requestedOpHistories !== undefined) {
-            for (const opHistoryHash of reqInfo.request.requestedOpHistories) {
+        if (reqInfo.request.requestedTerminalOpHistory !== undefined) {
+            for (const opHistoryHash of reqInfo.request.requestedTerminalOpHistory) {
                 this.requestsForOpHistory.delete(opHistoryHash, requestId)
             }
         }
