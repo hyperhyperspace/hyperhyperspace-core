@@ -368,12 +368,14 @@ class CausalHistoryFragment {
         // Create the initial entries in missingPrevOpHistories, not considering anyPrevOps in 
         // providedOpHistories.
 
+        /*
         for (const startingHash of startingOpHistories) {
             if (filterOpHistory === undefined || filterOpHistory(startingHash)) {
                 const startingOpHistory = this.contents.get(startingHash) as OpCausalHistory;
                 CausalHistoryFragment.loadMissingPrevOpHistories(missingPrevOpHistories, startingOpHistory, providedOpHistories);    
             }
         }
+        */
 
         for (const opHistory of this.iterateFrom(startingOpHistories, 'forward', 'causal')) {
             
@@ -384,6 +386,8 @@ class CausalHistoryFragment {
             const hash = opHistory.causalHistoryHash;
 
             if ((filterOpHistory === undefined || filterOpHistory(hash))) {
+
+                CausalHistoryFragment.loadMissingPrevOpHistories(missingPrevOpHistories, opHistory, providedOpHistories);
 
                 if (missingPrevOpHistories.get(hash)?.size === 0) {
 
