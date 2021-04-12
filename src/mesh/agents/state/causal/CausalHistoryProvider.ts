@@ -369,7 +369,7 @@ class CausalHistoryProvider {
                         sendingOps.push(opHistory.opHash);
                     }    
                 } else {
-                    console.log('packer allows omission')
+                    console.log('packer allows omission of ' + opHistory.opHash);
                 }
 
 
