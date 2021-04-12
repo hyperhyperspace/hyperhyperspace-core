@@ -401,10 +401,12 @@ class CausalHistoryFragment {
                         }
                     }
     
-                    closure.add(hash);
+                    if (!closure.has(hash)) {
+                        closure.add(hash);
     
-                    if (ignoreOpHistory === undefined || !ignoreOpHistory(hash)) {
-                        result.push(hash);
+                        if (ignoreOpHistory === undefined || !ignoreOpHistory(hash)) {
+                            result.push(hash);
+                        }    
                     }
                 } else {
                     console.log('causality not satisfied yet for op ' + this.contents.get(hash)?.opHash) + ', missing:';
