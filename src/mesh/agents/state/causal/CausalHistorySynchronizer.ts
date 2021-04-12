@@ -598,29 +598,24 @@ class CausalHistorySynchronizer {
 
         const remoteTerminalOps = new Set<Hash>(additionalTerminalOpHistories);
 
+        // unsure if the following is wise:
+        
+        /*if (remoteState !== undefined) {
+            for (const opHistory of remoteState.values()) {
+                remoteTerminalOps.add(opHistory);
+            }
+        }*/
+
         CausalHistorySynchronizer.controlLog.trace('discoveredHistory: ' + this.discoveredHistory.contents.size);
 
         const remoteHistory = this.discoveredHistory.filterByTerminalOpHistories(remoteTerminalOps);
 
         CausalHistorySynchronizer.controlLog.trace('remoteHistory (filtered): ' + remoteHistory.contents.size);
 
-        const providedOpHistores = new Set<Hash>();
-
-        for (const missingPrevOp of remoteHistory.missingPrevOpHistories) {
-            if (await this.syncAgent.store.loadOpCausalHistoryByHash(missingPrevOp) !== undefined) {
-                providedOpHistores.add(missingPrevOp);
-            }
-        }
-
         
 
-        if (remoteState !== undefined) {
-            for (const opHistory of remoteState.values()) {
-                remoteTerminalOps.add(opHistory);
-            }
-        }
-
-        const opsToRequest = remoteHistory.causalClosure(providedOpHistores, ProviderLimits.MaxOpsToRequest, (h: Hash) => this.requestsForOpHistory.hasKey(h))
+        const start = new Set<Hash>(this.syncAgent.state?.values());
+        const opsToRequest = remoteHistory.causalClosure(start, ProviderLimits.MaxOpsToRequest, (h: Hash) => this.requestsForOpHistory.hasKey(h))
                              .map((opHistoryHash: Hash) => (remoteHistory.contents.get(opHistoryHash) as OpCausalHistory).opHash);
 
         // See if we need to follow up with another request:
