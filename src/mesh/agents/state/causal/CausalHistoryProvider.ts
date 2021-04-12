@@ -286,9 +286,10 @@ class CausalHistoryProvider {
             const start = req.requestedStartingOpHistory === undefined? [] : req.requestedStartingOpHistory;
 
             await respDelta.compute(req.requestedTerminalOpHistory, start, maxHistory, 512);
+            const respFragment = respDelta.fragment.filterByTerminalOpHistories(new Set<Hash>(req.requestedTerminalOpHistory))
 
-            if (respDelta.fragment.contents.size > 0) {
-                resp.history = Array.from(respDelta.fragment.contents.values()).map((h: OpCausalHistory) => h.literalize());
+            if (respFragment.contents.size > 0) {
+                resp.history = Array.from(respFragment.contents.values()).map((h: OpCausalHistory) => h.literalize());
             }
         }
         
