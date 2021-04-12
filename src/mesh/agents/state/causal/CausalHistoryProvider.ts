@@ -363,10 +363,13 @@ class CausalHistoryProvider {
                     full = !await packer.addObject(opHistory.opHash);
 
                     if (full) {
+                        console.log('packer is full')
                         break;
                     } else {
                         sendingOps.push(opHistory.opHash);
                     }    
+                } else {
+                    console.log('packer allows omission')
                 }
 
 
