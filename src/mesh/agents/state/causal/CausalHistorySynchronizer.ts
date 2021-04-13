@@ -571,7 +571,7 @@ class CausalHistorySynchronizer {
         remote; msg;
     }
 
-    private async attemptNewRequest(remote: Endpoint, additionalPrevOpHistories?: Set<Hash>, additionalTerminalOpHistories?: Set<Hash>) {
+    private async attemptNewRequest(remote: Endpoint, additionalPrevOpHistories?: Set<Hash>, additionalTerminalOpHistories?: Set<Hash>, starto?: {startingOpHistories?: Set<Hash>, currentState?: Set<Hash>} ) {
 
 
         CausalHistorySynchronizer.controlLog.debug('About to attempt new request from ' + this.syncAgent.peerGroupAgent.getLocalPeer().endpoint + ' to ' + remote);
@@ -614,15 +614,15 @@ class CausalHistorySynchronizer {
 
         
 
-        const start = new Set<Hash>(this.syncAgent.state?.values());
+        const currentState = new Set<Hash>(this.syncAgent.state?.values());
 
         for (const opHistoryHash of remoteHistory.contents.keys()) {
             if (this.requestsForOpHistory.get(opHistoryHash).has(remote)) {
-                start.add(opHistoryHash);
+                currentState.add(opHistoryHash);
             }
         }
 
-        const opsToRequest = remoteHistory.causalClosure(start, ProviderLimits.MaxOpsToRequest, (h: Hash) => this.requestsForOpHistory.hasKey(h))
+        const opsToRequest = remoteHistory.causalClosure(currentState, ProviderLimits.MaxOpsToRequest, (h: Hash) => this.requestsForOpHistory.hasKey(h))
                              .map((opHistoryHash: Hash) => (remoteHistory.contents.get(opHistoryHash) as OpCausalHistory).opHash);
 
         // See if we need to follow up with another request:
@@ -653,7 +653,7 @@ class CausalHistorySynchronizer {
 
     // Low-level: create requests, receive literals.
 
-    private request(remote: Endpoint, aim: {requestedOpHistories?: Set<Hash>, requestedOps?: Hash[]}) {
+    private request(remote: Endpoint, aim: {requestedOpHistories?: Set<Hash>, requestedOps?: Hash[]}, start?: {startingOpHistories?: Set<Hash>, currentState?: Set<Hash>}) {
 
 
         const msg: RequestMsg = {
@@ -670,10 +670,15 @@ class CausalHistorySynchronizer {
                 this.requestsForOpHistory.add(opHistoryHash, remote);
             }
 
-            const startingOpHistories = this.syncAgent.state === undefined? 
-                                                new Set<Hash>()
-                                             :
-                                                new Set<Hash>(this.syncAgent.state.values());
+            const startingOpHistories = start?.startingOpHistories === undefined? 
+                                                    (
+                                                        this.syncAgent.state === undefined? 
+                                                            new Set<Hash>()
+                                                        :
+                                                            new Set<Hash>(this.syncAgent.state.values())
+                                                    )
+                                                :
+                                                    start?.startingOpHistories;
 
             for (const hash of this.discoveredHistory.terminalOpHistories) {
                 startingOpHistories.add(hash);
@@ -690,10 +695,15 @@ class CausalHistorySynchronizer {
             }
         }
 
-        msg.currentState = this.syncAgent.state === undefined?
-                                []
+        msg.currentState = start?.currentState === undefined? 
+                                (
+                                    this.syncAgent.state === undefined?
+                                        []
+                                    :
+                                        Array.from(this.syncAgent.state.values())
+                                )
                             :
-                                Array.from(this.syncAgent.state.values());
+                                Array.from(start?.currentState);
         
         if ((msg.requestedOps !== undefined) ||
             (msg.mode === 'infer-req-ops' && msg.requestedTerminalOpHistory !== undefined && msg.requestedStartingOpHistory !== undefined)) {
