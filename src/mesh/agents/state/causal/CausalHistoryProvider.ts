@@ -84,7 +84,7 @@ type CancelRequestMsg = {
 type SyncMsg = RequestMsg | ResponseMsg | RejectRequestMsg | SendLiteralMsg | CancelRequestMsg;
 
 const ProviderLimits = {
-    MaxOpsToRequest: 128,
+    MaxOpsToRequest: 16,//128,
     MaxLiteralsPerResponse: 1024,
     MaxHistoryPerResponse: 256
 };
