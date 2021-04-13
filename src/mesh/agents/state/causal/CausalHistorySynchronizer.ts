@@ -599,7 +599,7 @@ class CausalHistorySynchronizer {
         const remoteTerminalOps = new Set<Hash>(additionalTerminalOpHistories);
 
         // unsure if the following is wise:
-        
+
         /*if (remoteState !== undefined) {
             for (const opHistory of remoteState.values()) {
                 remoteTerminalOps.add(opHistory);
@@ -615,6 +615,13 @@ class CausalHistorySynchronizer {
         
 
         const start = new Set<Hash>(this.syncAgent.state?.values());
+
+        for (const opHistoryHash of remoteHistory.contents.keys()) {
+            if (this.requestsForOpHistory.get(opHistoryHash).has(remote)) {
+                start.add(opHistoryHash);
+            }
+        }
+
         const opsToRequest = remoteHistory.causalClosure(start, ProviderLimits.MaxOpsToRequest, (h: Hash) => this.requestsForOpHistory.hasKey(h))
                              .map((opHistoryHash: Hash) => (remoteHistory.contents.get(opHistoryHash) as OpCausalHistory).opHash);
 
