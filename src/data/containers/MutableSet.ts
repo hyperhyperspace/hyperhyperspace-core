@@ -31,18 +31,15 @@ abstract class MutableSetOp<T extends HashedObject> extends MutationOp {
     validate(references: Map<Hash, HashedObject>) {
 
         if (!super.validate(references)) {
-            console.log('super validation failed')
             return false;
         }
 
         if (! (this.getTarget() instanceof MutableSet)) {
-            console.log('target is off')
             return false;
             //throw new Error('MutableSetOp.target must be a MutableSet, got a ' + this.getTarget().getClassName() + ' instead.');
         }
 
         if (this.getTarget().getAuthor() !== undefined && !(this.getTarget().getAuthor()?.equals(this.getAuthor()))) {
-            console.log('author is off')
             return false;
             //throw new Error('MutableSetOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTarget().getAuthor()?.hash() + '.');
         }

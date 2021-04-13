@@ -391,8 +391,6 @@ class CausalHistoryFragment {
 
                 if (missingPrevOpHistories.get(hash)?.size === 0) {
 
-                    console.log('causality satisfied for op ' + this.contents.get(hash)?.opHash);
-
                     for (const nextHash of this.nextOpHistories.get(hash)) {
                         const nextOpHistory = this.contents.get(nextHash) as OpCausalHistory;
                         if (filterOpHistory === undefined || filterOpHistory(nextHash)) {
@@ -408,9 +406,6 @@ class CausalHistoryFragment {
                             result.push(hash);
                         }    
                     }
-                } else {
-                    console.log('causality not satisfied yet for op ' + this.contents.get(hash)?.opHash) + ', missing:';
-                    console.log(Array.from(new Set(missingPrevOpHistories.get(hash))));
                 }
                 
             }

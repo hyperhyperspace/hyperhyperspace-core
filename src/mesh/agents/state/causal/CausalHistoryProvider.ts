@@ -335,9 +335,6 @@ class CausalHistoryProvider {
             respInfo.request.requestedTerminalOpHistory !== undefined &&
             sendingOps.length < maxOps) {
 
-
-            console.log('TRYING TO INFER')
-
             const extraOpsDelta = new CausalHistoryDelta(this.syncAgent.mutableObj, this.syncAgent.store);
 
             const start = new Set<Hash>(respInfo.request.currentState);
@@ -348,13 +345,8 @@ class CausalHistoryProvider {
             }
 
             await extraOpsDelta.compute(respInfo.request.requestedTerminalOpHistory, Array.from(start), maxHistory, 512);
-            
-            console.log('extra ops found: ' + extraOpsDelta.fragment.contents.size);
-            console.log('gap size: ' + extraOpsDelta.gap.size);
 
             const extraOpsToSend = extraOpsDelta.opHistoriesFollowingFromStart(maxOps - sendingOps.length);
-
-            console.log('causally valid extra ops: ' + extraOpsToSend.length);
 
             for (const opHistoryHash of extraOpsToSend) {
                 const opHistory = extraOpsDelta.fragment.contents.get(opHistoryHash) as OpCausalHistory;
@@ -363,15 +355,11 @@ class CausalHistoryProvider {
                     full = !await packer.addObject(opHistory.opHash);
 
                     if (full) {
-                        console.log('packer is full')
                         break;
                     } else {
                         sendingOps.push(opHistory.opHash);
                     }    
-                } else {
-                    console.log('packer allows omission of ' + opHistory.opHash);
                 }
-
 
             }
         }
