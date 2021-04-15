@@ -3,6 +3,7 @@ import { Literal } from 'data/model';
 import { Store, StoredOpCausalHistory } from 'storage/store/Store';
 import { Backend } from './Backend';
 import { IdbBackend } from './IdbBackend';
+import { SafeBroadcastChannel } from 'util/broadcastchannel';
 
 
 class WorkerSafeIdbBackend extends IdbBackend implements Backend {
@@ -17,7 +18,7 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
         if (WorkerSafeIdbBackend.broadcastId === undefined) {
             
             WorkerSafeIdbBackend.broadcastId = new RNGImpl().randomHexString(128);
-            WorkerSafeIdbBackend.broadcastChannel = new BroadcastChannel(WorkerSafeIdbBackend.channelName);
+            WorkerSafeIdbBackend.broadcastChannel = new SafeBroadcastChannel(WorkerSafeIdbBackend.channelName);
             
             WorkerSafeIdbBackend.broadcastChannel.onmessage = (ev: MessageEvent<any>) => {
                 
