@@ -30,6 +30,7 @@
     "typescript": "^4.1.2"
   },
   "dependencies": {
+    "broadcast-channel": "^3.5.3",
     "chacha-js": "^2.1.1",
     "get-random-values": "^1.2.0",
     "idb": "^5.0.4",
