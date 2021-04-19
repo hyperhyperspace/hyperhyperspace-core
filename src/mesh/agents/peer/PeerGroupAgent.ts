@@ -270,32 +270,38 @@ class PeerGroupAgent implements Agent {
         return count;
     }
 
-    sendToPeer(ep: Endpoint, agentId: AgentId, content: any) {
+    sendToPeer(ep: Endpoint, agentId: AgentId, content: any): boolean {
         
         let connId = this.findWorkingConnectionId(ep);
         
         if (connId !== undefined) {
 
-            let pc = this.connections.get(connId) as PeerConnection;
+            try {
+                let pc = this.connections.get(connId) as PeerConnection;
 
-            let peerMsg: PeerMessage = {
-                type: SecureMessageTypes.PeerMessage,
-                peerGroupId: this.peerGroupId,
-                agentId: agentId,
-                content: content
-            };
+                let peerMsg: PeerMessage = {
+                    type: SecureMessageTypes.PeerMessage,
+                    peerGroupId: this.peerGroupId,
+                    agentId: agentId,
+                    content: content
+                };
+    
+                let secureConnAgent = this.getSecureConnAgent();
+                secureConnAgent.sendSecurely(
+                    connId, 
+                    this.localPeer.identityHash, 
+                    pc.peer.identityHash, 
+                    this.getAgentId(), 
+                    peerMsg
+                );
+    
+                this.controlLog.trace(this.localPeer.endpoint + ' sending peer message to ' + ep);
+                return true;    
+            } catch (e) {
 
-            let secureConnAgent = this.getSecureConnAgent();
-            secureConnAgent.sendSecurely(
-                connId, 
-                this.localPeer.identityHash, 
-                pc.peer.identityHash, 
-                this.getAgentId(), 
-                peerMsg
-            );
-
-            this.controlLog.trace(this.localPeer.endpoint + ' sending peer message to ' + ep);
-            return true;
+                this.controlLog.warning('Could not send message', e);
+                return false;
+            }
         } else {
             this.controlLog.trace(this.localPeer.endpoint + ' could not send peer message to ' + ep);
             return false;

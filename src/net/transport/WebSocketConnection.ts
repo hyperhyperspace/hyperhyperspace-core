@@ -148,7 +148,16 @@ class WebSocketConnection implements Connection {
     }
 
     send(message: any): void {
-        this.ws?.send(message);
+
+        if (this.ws === undefined) {
+            throw new Error('Trying to send a message through a websocket that is not yet ready.')
+        }
+
+        this.ws.send(message);
+
+        if (this.ws.readyState !== WebSocket.OPEN) {
+            throw new Error('Error while trying to send a message through WebSocket');
+        }
     }
 
     bufferedAmount(): number {

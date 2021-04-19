@@ -187,10 +187,14 @@ class WebRTCConnection implements Connection {
     send(message: any) {
 
         WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' sending msg to ' + this.remoteAddress?.linkupId + ' through channel ' + this.channelName + ' on call ' + this.callId);
-        this.channel?.send(message);
+
         if (this.channel === undefined) {
             WebRTCConnection.logger.warning('Attemting to send over missing channel in connection ' + this.callId + ' at ' + Date.now());
+            throw new Error('Attemting to send over missing channel in connection ' + this.callId + ' at ' + Date.now())
         }
+        
+        this.channel.send(message);
+        
         WebRTCConnection.logger.trace('Done sending msg');
         
     }
