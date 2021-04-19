@@ -3,9 +3,11 @@ import { HashedSet } from 'data/model';
 class MultiMap<K, V> {
     
     inner: Map<K, Set<V>>;
+    size: number;
     
     constructor() {
         this.inner = new Map();
+        this.size = 0;
     }
 
     add(key: K, value: V) : void {
@@ -16,7 +18,11 @@ class MultiMap<K, V> {
             this.inner.set(key, s);
         }
 
-        s.add(value);
+        if (!s.has(value)) {
+            s.add(value);
+            this.size = this.size + 1;
+        }
+        
     }
 
     delete(key: K, value: V) : boolean {
@@ -32,10 +38,21 @@ class MultiMap<K, V> {
             this.inner.delete(key);
         }
 
+        if (ret) {
+            this.size = this.size - 1;
+        }
+
         return ret;
     }
 
     deleteKey(key: K) : boolean {
+
+        const vals = this.inner.get(key);
+
+        if (vals !== undefined) {
+            this.size = this.size - vals.size;
+        }
+
         return this.inner.delete(key);
     }
 
@@ -72,6 +89,16 @@ class MultiMap<K, V> {
 
     entries() {
         return this.inner.entries();
+    }
+
+    clone() {
+        const clone = new MultiMap<K, V>();
+
+        for (const [k, s] of this.inner.entries()) {
+            clone.inner.set(k, new Set(s));
+        }
+
+        return clone;
     }
 }
 
