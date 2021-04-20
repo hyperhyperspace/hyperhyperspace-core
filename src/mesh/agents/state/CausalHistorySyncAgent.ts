@@ -1,16 +1,17 @@
-import { Hash, HashedObject, HashedSet, Literal, LiteralUtils, MutationOp } from 'data/model';
+import { Hash, HashedObject, HashedSet, Literal, LiteralUtils, MutableObject, MutationOp } from 'data/model';
 import { AgentPod } from 'mesh/service/AgentPod';
 import { Store } from 'storage/store';
 import { Logger, LogLevel } from 'util/logging';
 import { Endpoint } from '../network/NetworkAgent';
 import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { PeeringAgentBase } from '../peer/PeeringAgentBase';
-import { CausalHistoryState } from './CausalHistoryState';
+import { CausalHistoryState } from './causal/CausalHistoryState';
 import { AgentStateUpdateEvent, GossipEventTypes } from './StateGossipAgent';
 import { StateSyncAgent } from './StateSyncAgent';
 
 import { CausalHistorySynchronizer } from './causal/CausalHistorySynchronizer';
 import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHistoryProvider';
+import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
@@ -71,8 +72,20 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     ready(pod: AgentPod): void {
         
         this.pod = pod;
-        this.updateStateFromStore();
+        this.updateStateFromStore().then(async () => {
+                if (this.state !== undefined) {
+                    for (const hash of this.state.values()) {
+                        const opHistory = await this.store.loadOpCausalHistoryByHash(hash) as OpCausalHistory;
+                        const op = await this.store.load(opHistory?.opHash) as MutationOp;
+                        await this.synchronizer.onNewLocalOp(op);
+                    }
+                }
+            }
+        );
         this.watchStoreForOps();
+
+        
+
     }
 
     shutdown(): void {
@@ -160,6 +173,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
         let op = await this.store.load(opHash) as MutationOp;
         if (this.shouldAcceptMutationOp(op)) {
+            this.synchronizer.onNewLocalOp(op);
             await this.updateStateFromStore();  
         }
     };

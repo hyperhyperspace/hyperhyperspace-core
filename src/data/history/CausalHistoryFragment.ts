@@ -267,6 +267,13 @@ class CausalHistoryFragment {
  
     }
 
+    getAllOpHistoriesForOp(opHash: Hash): Array<OpCausalHistory> {
+        const opHistories = (Array.from(this.opHistoriesForOp.get(opHash))
+                                  .map((hash: Hash) => this.contents.get(hash)));
+
+        return opHistories as Array<OpCausalHistory>;
+    }
+
     // The following 3 functions operate on the known part of the fragment (what's
     // in this.contents, not the hashes in missingOpHistories).
 
