@@ -298,6 +298,7 @@ class CausalHistoryProvider {
             maxLiterals = ProviderLimits.MaxLiteralsPerResponse;
         }
 
+        // TODO: only load packer if we're going to send ops
         const packer = new ObjectPacker(this.syncAgent.store, maxLiterals);
 
         await packer.allowOmissionsRecursively(remoteStateOps.values(), 2048, this.checkIfLiteralIsValidOp);

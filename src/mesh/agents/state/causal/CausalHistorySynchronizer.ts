@@ -27,7 +27,7 @@ type RequestInfo = {
     response? : ResponseMsg,
 
     remote : Endpoint,
-    status : 'created'|'queued'|'sent'|'accepted-response-processing'|'accepted-response-blocked',
+    status : 'created'|'sent'|'validating'|'accepted-response-processing'|'accepted-response-blocked'|'accepted-response',
 
     requestSendingTimestamp?  : number,
     responseArrivalTimestamp? : number,
@@ -384,19 +384,111 @@ class CausalHistorySynchronizer {
 
     async onReceivingResponse(remote: Endpoint, msg: ResponseMsg) {
 
-
-
-    }
-
-    private async attemptToUnblock(reqInfo: RequestInfo) {
-        
-    }
-
-    private async processResponse(remote: Endpoint, msg: ResponseMsg) {
+        if (this.requests.get(msg.requestId)?.status !== 'sent') {
+            return;
+        }
 
         if (await this.validateResponse(remote, msg)) {
 
             const reqInfo = this.requests.get(msg.requestId) as RequestInfo;
+            const req  = reqInfo.request;
+
+            reqInfo.status = 'accepted-response-blocked';
+            reqInfo.missingCurrentState = new Set<Hash>(req.currentState);
+
+            if (req.currentState !== undefined) {
+                for (const opHistory of req.currentState.values()) {
+                    if (await this.isMissingOpHistory(opHistory)) {
+                        this.requestsBlockedByOpHistory.add(opHistory, req.requestId);
+                    } else {
+                        reqInfo.missingCurrentState.delete(opHistory);
+                    }
+                }
+            }
+
+            this.attemtpToProcessResponse(reqInfo);
+            
+        }
+
+
+    }
+
+    async onReceivingLiteral(remote: Endpoint, msg: SendLiteralMsg) {
+
+        const reqInfo = this.requests.get(msg.requestId);
+
+        if (reqInfo === undefined || reqInfo.remote !== remote) {
+
+            if (reqInfo === undefined) {
+                CausalHistorySynchronizer.controlLog.warning('Received literal for unknown request ' + msg.requestId);
+            } else if (reqInfo.remote !== remote) {
+                CausalHistorySynchronizer.controlLog.warning('Received literal claiming to come from ' + reqInfo.remote + ', but it actually came from ' + msg.requestId);
+            }
+
+            return;
+        }
+
+        let enqueue = false;
+        let process = false;
+
+        if (reqInfo.request.maxLiterals === undefined || reqInfo.receivedLiteralsCount < reqInfo.request.maxLiterals) {
+
+            if (reqInfo.status !== 'accepted-response-processing') {
+
+                // if we are expecting ops
+                if ( (reqInfo.request.requestedOps !== undefined && 
+                    reqInfo.request.requestedOps.length > 0) ||
+                    (reqInfo.request.mode === 'infer-req-ops' && 
+                    reqInfo.request.requestedTerminalOpHistory !== undefined &&
+                    reqInfo.request.requestedTerminalOpHistory.length > 0)) {
+
+                        enqueue = true;
+
+                }
+
+            } else { // reqInfo.status === 'accepted-response'
+                
+                enqueue = true;
+                process = true;
+                
+            }
+
+            if (enqueue) {
+                reqInfo.lastLiteralTimestamp  = Date.now();
+                reqInfo.receivedLiteralsCount = reqInfo.receivedLiteralsCount + 1;
+                if (reqInfo.request.maxLiterals === undefined || reqInfo.outOfOrderLiterals.size < reqInfo.request.maxLiterals) {
+                    reqInfo.outOfOrderLiterals.set(msg.sequence, msg.literal);
+                }
+            }
+
+            if (process) {
+                this.attemptToProcessLiterals(reqInfo);
+            }
+        }
+
+    }
+
+    // We're not rejecting anything for now, will implement when the retry logic is done.
+    onReceivingRequestRejection(remote: Endpoint, msg: RejectRequestMsg) {
+        remote; msg;
+    }
+
+    private async attemtpToProcessResponse(reqInfo: RequestInfo) {
+
+        if (this.requests.get(reqInfo.request.requestId) === undefined) {
+            return; // already processed
+        }
+
+        if (reqInfo.status !== 'accepted-response-blocked' || 
+            (reqInfo.missingCurrentState as Set<Hash>).size > 0) {
+            
+            return;
+        }
+
+        reqInfo.status = 'accepted-response-processing';
+
+
+        if (await this.validateOmissionProofs(reqInfo)) {
 
             const req = reqInfo.request;
             const resp = reqInfo.response as ResponseMsg;
@@ -461,18 +553,14 @@ class CausalHistorySynchronizer {
             
             }
 
-            reqInfo.status = 'accepted-response-processing';
+            reqInfo.status = 'accepted-response';
 
             this.attemptToProcessLiterals(reqInfo);
-
-            
             
             const removed = this.checkRequestRemoval(reqInfo);
 
             if (removed) {
-                this.attemptNewRequest(reqInfo.remote, newMissingPrevOpHistories, receivedHistory?.terminalOpHistories);                
-            } else {
-                this.attemptQueuedRequest(reqInfo.remote);
+                this.attemptNewRequests();                
             }
         }
 
@@ -493,20 +581,8 @@ class CausalHistorySynchronizer {
 
             const literal = reqInfo.outOfOrderLiterals.get(reqInfo.nextLiteralSequence);
 
-            const unmetDeps   = reqInfo.unmetDependencies;
 
-            if (unmetDeps !== undefined) {
-                let good = true;
-
-                for (const opHash of unmetDeps.values()) {
-
-                }
-            } else {
-                
-            }
-
-
-            if (literal === undefined || unmetDeps !== undefined) {
+            if (literal === undefined) {
                 break;
             } else {
 
@@ -548,7 +624,7 @@ class CausalHistorySynchronizer {
                     const removed = this.checkRequestRemoval(reqInfo);
         
                     if (removed) {
-                        this.attemptQueuedRequest(reqInfo.remote);
+                        this.attemptNewRequests();
                     }
 
                 } catch (e) {
@@ -585,6 +661,17 @@ class CausalHistorySynchronizer {
 
         // in case we were trying to fetch history for this op
         this.markOpHistoryAsFetched(opHistoryHash);
+
+        for (const requestId of this.requestsBlockedByOpHistory.get(opHistoryHash)) {
+            const reqInfo = this.requests.get(requestId);
+
+            if (reqInfo !== undefined) {
+                reqInfo.missingCurrentState?.delete(opHistoryHash);
+                this.attemtpToProcessResponse(reqInfo);
+            }
+        }
+
+        this.requestsBlockedByOpHistory.deleteKey(opHistoryHash);
     }
 
     private markOpHistoryAsFetched(opHistoryHash: Hash) {
@@ -646,6 +733,7 @@ class CausalHistorySynchronizer {
         // if request is known and was sent to 'remote' and unreplied as of now:
         if (reqInfo !== undefined && reqInfo.remote === remote && reqInfo.response === undefined) {
 
+            reqInfo.status = 'validating';
             reqInfo.response = msg;
 
             const req   = reqInfo.request;
@@ -757,16 +845,15 @@ class CausalHistorySynchronizer {
 
             reqInfo.receivedHistory = receivedHistory;
 
-            return await this.validateOmissionProofs(remote, msg);
+            return true;
         } else {
             return false;
         }        
     }
     
     // If the response has any omission proofs, validate them
-    private async validateOmissionProofs(remote: Endpoint, msg: ResponseMsg): Promise<boolean> {
+    private async validateOmissionProofs(reqInfo: RequestInfo): Promise<boolean> {
 
-        const reqInfo = this.requests.get(msg.requestId) as RequestInfo;
         const req  = reqInfo.request;
         const resp = reqInfo.response as ResponseMsg;
 
@@ -928,12 +1015,74 @@ class CausalHistorySynchronizer {
         this.syncAgent.sendMessageToPeer(reqInfo.remote, this.syncAgent.getAgentId(), msg);
     }
 
+    private checkRequestRemoval(reqInfo: RequestInfo) {
 
-    // TODO: check this
+        if (reqInfo.response === undefined && reqInfo.requestSendingTimestamp !== undefined &&
+            Date.now() > reqInfo.requestSendingTimestamp + RequestTimeout * 1000) {
+
+            // Remove due to timeout waiting for response.
+
+            this.cancelRequest(reqInfo, 'slow-connection', 'Timeout waiting for response');
+            this.cleanupRequest(reqInfo);
+            return true;
+
+        } else if (reqInfo.response !== undefined) {
+            if (reqInfo.response.sendingOps === undefined || reqInfo.response.sendingOps.length === 0) {
+
+                // This request is not sending any ops, so it can be removed as soon as there is a response
+
+                this.cleanupRequest(reqInfo);
+                return true;
+
+            } else if (reqInfo.nextOpSequence === reqInfo.response.sendingOps.length) {
+
+                // All the ops in the request have been received, it can be removed
+
+                this.cleanupRequest(reqInfo);
+                return true;
+
+            } else {
+                // Check if the receiving of the ops has not timed out
+
+                let lastLiteralRequestTimestamp: number | undefined;
+
+                if (reqInfo.lastLiteralTimestamp === undefined) {
+                    if (reqInfo.responseArrivalTimestamp !== undefined) {
+                        lastLiteralRequestTimestamp = reqInfo.responseArrivalTimestamp;
+                    } else {
+                        lastLiteralRequestTimestamp = reqInfo.requestSendingTimestamp;
+                    }
+                    
+                } else {
+                    lastLiteralRequestTimestamp = reqInfo.lastLiteralTimestamp;
+                }
+
+                if (reqInfo.receivedLiteralsCount < reqInfo.response.literalCount && lastLiteralRequestTimestamp !== undefined && Date.now() > lastLiteralRequestTimestamp + LiteralArrivalTimeout * 1000) {
+                    this.cancelRequest(reqInfo, 'slow-connection', 'Timeout waiting for a literal to arrive');
+                    this.cleanupRequest(reqInfo);
+                    return true;
+                }
+
+            }
+        }
+
+        return false;
+
+    }
 
     private cleanupRequest(reqInfo: RequestInfo) {
 
+        if (this.requests.get(reqInfo.request.requestId) === undefined) {
+            return;
+        }
+
         const requestId = reqInfo.request.requestId;
+
+        if (reqInfo.request.currentState !== undefined) {
+            for (const hash of reqInfo.request.currentState.values()) {
+                this.requestsBlockedByOpHistory.delete(hash, requestId);
+            }
+        }
 
         if (reqInfo.response?.sendingOps !== undefined) {
 
