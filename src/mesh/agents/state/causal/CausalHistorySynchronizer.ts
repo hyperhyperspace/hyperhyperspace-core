@@ -161,7 +161,7 @@ class CausalHistorySynchronizer {
             if (await this.isUnknownOpHistory(hash) && this.isUnrequestedOpHistory(hash)) {
 
                 for (const [ep, history] of this.remoteHistories.entries()) {
-                    if (this.canSendNewRequestTo(ep) && history.contents.has(hash)) {
+                    if (this.canSendNewRequestTo(ep) && history.missingPrevOpHistories.has(hash)) {
                         missingOpHistories.add(hash); // this way we only add it if there is at least one source
                         missingOpHistorySources.add(ep, hash);
                     }
