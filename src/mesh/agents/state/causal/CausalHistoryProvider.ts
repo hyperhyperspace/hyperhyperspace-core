@@ -1,4 +1,5 @@
 import { CausalHistoryDelta } from 'data/history/CausalHistoryDelta';
+import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
 import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
 import { Hash, HashedObject, Literal } from 'data/model';
 import { ObjectPacker } from 'data/packing/ObjectPacker';
@@ -84,7 +85,7 @@ type CancelRequestMsg = {
 type SyncMsg = RequestMsg | ResponseMsg | RejectRequestMsg | SendLiteralMsg | CancelRequestMsg;
 
 const ProviderLimits = {
-    MaxOpsToRequest: 16,//128,
+    MaxOpsToRequest: 16,//128, FIXME!
     MaxLiteralsPerResponse: 1024,
     MaxHistoryPerResponse: 256
 };
@@ -281,15 +282,17 @@ class CausalHistoryProvider {
             maxOps = ProviderLimits.MaxOpsToRequest;
         }
 
+        let respHistoryFragment: CausalHistoryFragment | undefined = undefined;
+
         if (req.requestedTerminalOpHistory !== undefined && req.requestedTerminalOpHistory.length > 0) {
 
             const start = req.requestedStartingOpHistory === undefined? [] : req.requestedStartingOpHistory;
 
             await respDelta.compute(req.requestedTerminalOpHistory, start, maxHistory, 512);
-            const respFragment = respDelta.fragment.filterByTerminalOpHistories(new Set<Hash>(req.requestedTerminalOpHistory))
+            respHistoryFragment = respDelta.fragment.filterByTerminalOpHistories(new Set<Hash>(req.requestedTerminalOpHistory))
 
-            if (respFragment.contents.size > 0) {
-                resp.history = Array.from(respFragment.contents.values()).map((h: OpCausalHistory) => h.literalize());
+            if (respHistoryFragment.contents.size > 0) {
+                resp.history = Array.from(respHistoryFragment.contents.values()).map((h: OpCausalHistory) => h.literalize());
             }
         }
         
@@ -334,23 +337,26 @@ class CausalHistoryProvider {
         if (!full &&
             respInfo.request.mode === 'infer-req-ops' &&
             respInfo.request.requestedTerminalOpHistory !== undefined &&
+            respHistoryFragment !== undefined &&
             sendingOps.length < maxOps) {
 
-            const extraOpsDelta = new CausalHistoryDelta(this.syncAgent.mutableObj, this.syncAgent.store);
+            
 
             const start = new Set<Hash>(respInfo.request.currentState);
+            const sending = new Set<Hash>();
 
             for (const opHash of sendingOps) {
-                const opHistory = await this.syncAgent.store.loadOpCausalHistory(opHash) as OpCausalHistory;
-                start.add(opHistory.causalHistoryHash);
+                const opHistory = respHistoryFragment.getOpHistoryForOp(opHash);
+                if (opHistory !== undefined) {
+                    sending.add(opHistory.causalHistoryHash);
+                }
             }
 
-            await extraOpsDelta.compute(respInfo.request.requestedTerminalOpHistory, Array.from(start), maxHistory, 512);
-
-            const extraOpsToSend = extraOpsDelta.opHistoriesFollowingFromStart(maxOps - sendingOps.length);
+            const ignore = (opHistoryHash: Hash) => sending.has(opHistoryHash);            
+            const extraOpsToSend = respHistoryFragment.causalClosure(start, maxOps - sendingOps.length, ignore);
 
             for (const opHistoryHash of extraOpsToSend) {
-                const opHistory = extraOpsDelta.fragment.contents.get(opHistoryHash) as OpCausalHistory;
+                const opHistory = respHistoryFragment.contents.get(opHistoryHash) as OpCausalHistory;
                 
                 if (!packer.allowedOmissions.has(opHistory.opHash)) {
                     full = !await packer.addObject(opHistory.opHash);

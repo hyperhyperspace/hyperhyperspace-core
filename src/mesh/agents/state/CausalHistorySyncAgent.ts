@@ -15,7 +15,7 @@ import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
-    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
+    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.TRACE);
     static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.TRACE);
 
     static syncAgentIdFor(objHash: Hash, peerGroupId: string) {
@@ -83,9 +83,6 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
             }
         );
         this.watchStoreForOps();
-
-        
-
     }
 
     shutdown(): void {

@@ -59,7 +59,7 @@ class CausalHistorySynchronizer {
     currentState       : CausalHistoryFragment;
 
     discoveredHistory  : CausalHistoryFragment;
-    remoteHistories    : Map<Hash, CausalHistoryFragment>;
+    //remoteHistories    : Map<Hash, CausalHistoryFragment>;
 
     requests     : Map<RequestId, RequestInfo>;
 
@@ -83,7 +83,7 @@ class CausalHistorySynchronizer {
         this.endpointsForUnknownHistory = new MultiMap();
         
         this.discoveredHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
-        this.remoteHistories   = new Map();
+        //this.remoteHistories   = new Map();
 
         this.requestedOps      = new CausalHistoryFragment(this.syncAgent.mutableObj);
 
@@ -160,10 +160,18 @@ class CausalHistorySynchronizer {
         for (const hash of opHistoryFromPrevOps) {
             if (await this.isUnknownOpHistory(hash) && this.isUnrequestedOpHistory(hash)) {
 
-                for (const [ep, history] of this.remoteHistories.entries()) {
-                    if (this.canSendNewRequestTo(ep) && history.missingPrevOpHistories.has(hash)) {
-                        missingOpHistories.add(hash); // this way we only add it if there is at least one source
-                        missingOpHistorySources.add(ep, hash);
+                // Note: we're potentially computing the same remote history many times here,
+                //       but since isUnknownOpHistory is async I don't want to risk seeing
+                //       stale info here. Still, I feel this could be improved upon.
+
+                for (const ep of this.syncAgent.remoteStates.keys()) {
+                    const history = this.getRemoteHistory(ep);
+
+                    if (history !== undefined) {
+                        if (this.canSendNewRequestTo(ep) && history.missingPrevOpHistories.has(hash)) {
+                            missingOpHistories.add(hash); // this way we only add it if there is at least one source
+                            missingOpHistorySources.add(ep, hash);
+                        }    
                     }
                 }
             }
@@ -326,7 +334,10 @@ class CausalHistorySynchronizer {
     // Do some intelligence over which ops can be requested from an endpoint
 
     private findOpsToRequest(remote: Endpoint, startingOps: Set<Hash>) {
-        const remoteHistory = this.remoteHistories.get(remote);
+        
+        const remoteHistory = this.getRemoteHistory(remote);
+
+        //this.remoteHistories.get(remote);
         let max = MaxPendingOps - this.requestedOps.contents.size;
         if (max > ProviderLimits.MaxOpsToRequest) {
             max = ProviderLimits.MaxOpsToRequest;
@@ -406,7 +417,7 @@ class CausalHistorySynchronizer {
                 }
             }
 
-            this.attemtpToProcessResponse(reqInfo);
+            this.attemptToProcessResponse(reqInfo);
             
         }
 
@@ -473,7 +484,7 @@ class CausalHistorySynchronizer {
         remote; msg;
     }
 
-    private async attemtpToProcessResponse(reqInfo: RequestInfo) {
+    private async attemptToProcessResponse(reqInfo: RequestInfo) {
 
         if (this.requests.get(reqInfo.request.requestId) === undefined) {
             return; // already processed
@@ -506,7 +517,8 @@ class CausalHistorySynchronizer {
             // add an op but omit one of its predecessors because it was stored in-between.
 
             if (reqInfo.receivedHistory !== undefined) {
-                for (const opHistory of reqInfo.receivedHistory.contents.values()) {
+                const rcvdHistory = reqInfo.receivedHistory;
+                for (const opHistory of rcvdHistory.iterateFrom(rcvdHistory.terminalOpHistories, 'backward', 'bfs')) {
                     if (await this.isUnknownOpHistory(opHistory.causalHistoryHash)) {
                         this.discoveredHistory.add(opHistory);
                         this.endpointsForUnknownHistory.deleteKey(opHistory.causalHistoryHash);
@@ -646,15 +658,26 @@ class CausalHistorySynchronizer {
         return true;
     }
 
+    private getRemoteHistory(remote: Endpoint): CausalHistoryFragment | undefined {
+        
+        const remoteState   = this.syncAgent.remoteStates.get(remote);
+        let remoteHistory: CausalHistoryFragment | undefined;
+        if (remoteState !== undefined) {
+            remoteHistory = this.discoveredHistory.filterByTerminalOpHistories(new Set<Hash>(remoteState.values()))
+        }
+        
+        return remoteHistory;
+    }
+
     private markOpAsFetched(opCausalHistory: OpCausalHistory) {
         const opHistoryHash = opCausalHistory.causalHistoryHash;
         const opHash        = opCausalHistory.opHash;
 
         this.discoveredHistory.remove(opHistoryHash);
 
-        for (const history of this.remoteHistories.values()) {
+        /*for (const history of this.remoteHistories.values()) {
             history.remove(opHistoryHash);
-        }
+        }*/
 
         this.requestedOps.remove(opHistoryHash);
         this.requestsForOp.deleteKey(opHash);
@@ -667,7 +690,7 @@ class CausalHistorySynchronizer {
 
             if (reqInfo !== undefined) {
                 reqInfo.missingCurrentState?.delete(opHistoryHash);
-                this.attemtpToProcessResponse(reqInfo);
+                this.attemptToProcessResponse(reqInfo);
             }
         }
 

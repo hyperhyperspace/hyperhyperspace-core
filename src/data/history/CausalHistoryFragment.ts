@@ -227,6 +227,12 @@ class CausalHistoryFragment {
 
     }
 
+    addAllPredecessors(origin: Hash | Set<Hash>, fragment: CausalHistoryFragment) {
+        for (const opHistory of fragment.iterateFrom(origin, 'backward', 'bfs')) {
+            this.add(opHistory);
+        }
+    }
+
     getStartingOpHistories(): Set<Hash> {
         const startingOpHistories = new Set<Hash>();
 
