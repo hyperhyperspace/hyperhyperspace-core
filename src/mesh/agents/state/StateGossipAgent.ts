@@ -118,8 +118,8 @@ class StateGossipAgent extends PeeringAgentBase {
         return 'state-gossip-agent-for-' + gossipId;
     }
 
-    static peerMessageLog = new Logger(StateGossipAgent.name, LogLevel.TRACE);
-    static controlLog     = new Logger(StateGossipAgent.name, LogLevel.TRACE);
+    static peerMessageLog = new Logger(StateGossipAgent.name, LogLevel.INFO);
+    static controlLog     = new Logger(StateGossipAgent.name, LogLevel.INFO);
 
     // tunable working parameters
 
@@ -229,8 +229,6 @@ class StateGossipAgent extends PeeringAgentBase {
             if (newPeerEv.content.peerGroupId === this.peerGroupAgent.peerGroupId) {
                 this.controlLog.trace(this.peerGroupAgent.localPeer.endpoint + ' detected new peer: ' + newPeerEv.content.peer.endpoint)
                 this.sendFullState(newPeerEv.content.peer.endpoint);
-            } else {
-                console.log('WRONG')
             }
             
         } else if (ev.type === PeerMeshEventType.LostPeer) {

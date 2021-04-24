@@ -15,8 +15,8 @@ import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
-    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.TRACE);
-    static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.TRACE);
+    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
+    static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
 
     static syncAgentIdFor(objHash: Hash, peerGroupId: string) {
         return 'causal-sync-for-' + objHash + '-in-peer-group-' + peerGroupId;
@@ -95,6 +95,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     //                   - Messages from peers with requests, replies, literals, etc.
 
     async receiveRemoteState(sender: string, stateHash: string, state: HashedObject): Promise<boolean> {
+        
         let isNew = false;
 
         if (state instanceof CausalHistoryState && state.mutableObj === this.mutableObj) {

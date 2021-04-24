@@ -15,7 +15,9 @@ class Lock {
     }
 
     release(): boolean {
-        return false;
+        const success = this.inUse;
+        this.inUse = false;
+        return success;
     }
 
 }
