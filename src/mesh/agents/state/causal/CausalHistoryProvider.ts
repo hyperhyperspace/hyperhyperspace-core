@@ -340,8 +340,6 @@ class CausalHistoryProvider {
             respHistoryFragment !== undefined &&
             sendingOps.length < maxOps) {
 
-            console.log('WILL TRY TO ADD OPS')
-
             const start = new Set<Hash>(respInfo.request.currentState);
             const sending = new Set<Hash>();
 
@@ -354,8 +352,6 @@ class CausalHistoryProvider {
 
             const ignore = (opHistoryHash: Hash) => sending.has(opHistoryHash);            
             const extraOpsToSend = respHistoryFragment.causalClosure(start, maxOps - sendingOps.length, ignore);
-
-            console.log('FOUND ' + extraOpsToSend.length + ' CANDIDATE OPS')
 
             for (const opHistoryHash of extraOpsToSend) {
                 const opHistory = respHistoryFragment.contents.get(opHistoryHash) as OpCausalHistory;
