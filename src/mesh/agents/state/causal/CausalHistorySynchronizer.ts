@@ -50,10 +50,11 @@ type RequestInfo = {
 };
 
 class CausalHistorySynchronizer {
-    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.TRACE);
+    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
     static causalLog  = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
-    static sourcesLog = new Logger(CausalHistorySynchronizer.name, LogLevel.TRACE);
-    static stateLog   = new Logger(CausalHistorySynchronizer.name, LogLevel.TRACE);
+    static sourcesLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
+    static stateLog   = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
+    static opXferLog  = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
 
     syncAgent: CausalHistorySyncAgent;
 
@@ -62,7 +63,7 @@ class CausalHistorySynchronizer {
     currentState       : CausalHistoryFragment;
 
     discoveredHistory  : CausalHistoryFragment;
-    //remoteHistories    : Map<Hash, CausalHistoryFragment>;
+    remoteHistories    : Map<Hash, CausalHistoryFragment>;
 
     requests     : Map<RequestId, RequestInfo>;
 
@@ -87,7 +88,7 @@ class CausalHistorySynchronizer {
         this.endpointsForUnknownHistory = new MultiMap();
         
         this.discoveredHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
-        //this.remoteHistories   = new Map();
+        this.remoteHistories   = new Map();
 
         this.requestedOps      = new CausalHistoryFragment(this.syncAgent.mutableObj);
 
@@ -108,11 +109,21 @@ class CausalHistorySynchronizer {
 
         CausalHistorySynchronizer.controlLog.debug('Received new state from ' + remote);
         
+        const newKnownHistory = new MultiMap<Endpoint, Hash>();
+
         for (const opHistory of receivedOpHistories) {
-            if (await this.opHistoryIsMissingFromStore(opHistory) && this.opHistoryIsUndiscovered(opHistory)) {
-                CausalHistorySynchronizer.controlLog.trace('Adding new unknown op history: ' + opHistory)
-                this.endpointsForUnknownHistory.add(opHistory, remote);
+            if (await this.opHistoryIsMissingFromStore(opHistory)) {
+                if (this.opHistoryIsUndiscovered(opHistory)) {
+                    CausalHistorySynchronizer.controlLog.trace('Adding new unknown op history: ' + opHistory)
+                    this.endpointsForUnknownHistory.add(opHistory, remote);    
+                } else {
+                    newKnownHistory.add(remote, opHistory);
+                }
             }
+        }
+
+        if (newKnownHistory.size > 0) {
+            this.updateRemoteHistories(newKnownHistory);
         }
 
         this.attemptNewRequests();
@@ -146,7 +157,10 @@ class CausalHistorySynchronizer {
 
         CausalHistorySynchronizer.controlLog.debug('Attempting new request...');
 
-        if (this.endpointsForUnknownHistory.size === 0 && this.discoveredHistory.missingPrevOpHistories.size === 0) {
+        if (this.endpointsForUnknownHistory.size === 0 && 
+            this.discoveredHistory.missingPrevOpHistories.size === 0 && 
+            this.discoveredHistory.contents.size === 0) {
+            
             CausalHistorySynchronizer.controlLog.debug('There is nothing to request.');
             return;
         }
@@ -200,18 +214,14 @@ class CausalHistorySynchronizer {
         for (const hash of opHistoryFromPrevOps) {
 
             const isUnrequested = this.opHistoryIsUnrequested(hash);
-            const isMissingFromStore = isUnrequested && this.opHistoryIsMissingFromStore(hash);
+            const isMissingFromStore = isUnrequested && await this.opHistoryIsMissingFromStore(hash);
 
             if (isUnrequested && isMissingFromStore) {
-
-                // Note: we're potentially computing the same remote history many times here,
-                //       but since isUnknownOpHistory is async I don't want to risk seeing
-                //       stale info here. Still, I feel this could be improved upon.
 
                 const sources = new Array<Hash>();
 
                 for (const ep of this.syncAgent.remoteStates.keys()) {
-                    const history = this.getRemoteHistory(ep);
+                    const history = this.remoteHistories.get(ep);
 
                     if (history !== undefined) {
                         if (history.missingPrevOpHistories.has(hash)) {
@@ -244,9 +254,13 @@ class CausalHistorySynchronizer {
 
         sortedOpHistorySources.sort((s1:[Endpoint, Set<Hash>], s2:[Endpoint, Set<Hash>]) => s2[1].size - s1[1].size);
 
+        
+
         const opHistoriesToRequest = new Array<[Endpoint, Set<Hash>]>();
 
         CausalHistorySynchronizer.controlLog.trace('Will check ' + sortedOpHistorySources.length + ' remote sources');
+
+        const considered = new Set<Endpoint>();
 
         for (const [ep, opHistories] of sortedOpHistorySources) {
 
@@ -263,10 +277,17 @@ class CausalHistorySynchronizer {
 
             if (toRequest.size > 0) {
                 opHistoriesToRequest.push([ep, toRequest]);
+                considered.add(ep);
             }
 
             if (missingOpHistories.size === 0) {
                 break;
+            }
+        }
+
+        for (const remote of this.remoteHistories.keys()) {
+            if (!considered.has(remote)) {
+                opHistoriesToRequest.push([remote, new Set<Hash>()]);
             }
         }
 
@@ -391,8 +412,8 @@ class CausalHistorySynchronizer {
     // Do some intelligence over which ops can be requested from an endpoint
 
     private findOpsToRequest(remote: Endpoint, startingOps: Set<Hash>) {
-        
-        const remoteHistory = this.getRemoteHistory(remote);
+
+        const remoteHistory = this.remoteHistories.get(remote);
 
         //this.remoteHistories.get(remote);
         let max = MaxPendingOps - this.requestedOps.contents.size;
@@ -400,7 +421,7 @@ class CausalHistorySynchronizer {
             max = ProviderLimits.MaxOpsToRequest;
         }
         if (max > 0 && remoteHistory !== undefined) {
-            return remoteHistory.causalClosure(startingOps, max, undefined, (h: Hash) => this.requestsForOpHistory.hasKey(h))
+            return remoteHistory.causalClosure(startingOps, max, undefined, (h: Hash) => !this.requestsForOp.hasKey((remoteHistory.contents.get(h) as OpCausalHistory).opHash))
                                 .map( (opHistoryHash: Hash) => 
                     (remoteHistory.contents.get(opHistoryHash) as OpCausalHistory).opHash );
         } else {
@@ -457,8 +478,10 @@ class CausalHistorySynchronizer {
             return;
         }
 
-        CausalHistorySynchronizer.controlLog.debug('Received response for request ' + msg.requestId + ' from ' + remote + ' with ' + msg.history?.length + ' op histories and ' + msg.sendingOps?.length + ' ops.');
+        CausalHistorySynchronizer.controlLog.debug('Received response for request ' + msg.requestId + ' from ' + remote + ' with ' + msg.history?.length + ' op histories, ' + msg.sendingOps?.length + ' ops and expecting ' + msg.literalCount + ' literals.');
 
+        CausalHistorySynchronizer.controlLog.trace('Histories:', msg.history);
+        CausalHistorySynchronizer.controlLog.trace('Ops:', msg.sendingOps);
 
         if (await this.validateResponse(remote, msg)) {
 
@@ -472,13 +495,14 @@ class CausalHistorySynchronizer {
                 for (const opHistory of req.currentState.values()) {
                     if (await this.opHistoryIsMissingFromStore(opHistory)) {
                         this.requestsBlockedByOpHistory.add(opHistory, req.requestId);
+                        CausalHistorySynchronizer.controlLog.debug('Resuest ' + req.requestId + ' is blocked by missing op w/history ' + opHistory)
                     } else {
                         reqInfo.missingCurrentState.delete(opHistory);
                     }
                 }
             }
 
-            this.attemptToProcessResponse(reqInfo);
+            await this.attemptToProcessResponse(reqInfo);
             
         }
 
@@ -492,9 +516,9 @@ class CausalHistorySynchronizer {
         if (reqInfo === undefined || reqInfo.remote !== remote) {
 
             if (reqInfo === undefined) {
-                CausalHistorySynchronizer.controlLog.warning('Received literal for unknown request ' + msg.requestId);
+                CausalHistorySynchronizer.opXferLog.warning('Received literal for unknown request ' + msg.requestId);
             } else if (reqInfo.remote !== remote) {
-                CausalHistorySynchronizer.controlLog.warning('Received literal claiming to come from ' + reqInfo.remote + ', but it actually came from ' + msg.requestId);
+                CausalHistorySynchronizer.opXferLog.warning('Received literal claiming to come from ' + reqInfo.remote + ', but it actually came from ' + msg.requestId);
             }
 
             return;
@@ -514,11 +538,14 @@ class CausalHistorySynchronizer {
                     reqInfo.request.requestedTerminalOpHistory !== undefined &&
                     reqInfo.request.requestedTerminalOpHistory.length > 0)) {
 
+                        CausalHistorySynchronizer.opXferLog.trace('Will enqueue literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId);
                         enqueue = true;
 
                 }
 
             } else { // reqInfo.status === 'accepted-response'
+
+                CausalHistorySynchronizer.opXferLog.trace('Will process literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId);
                 
                 enqueue = true;
                 process = true;
@@ -536,6 +563,13 @@ class CausalHistorySynchronizer {
             if (process) {
                 this.attemptToProcessLiterals(reqInfo);
             }
+
+            if (!enqueue && !process) {
+                CausalHistorySynchronizer.opXferLog.warning('Will ignore literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId);
+            }
+
+        } else {
+            CausalHistorySynchronizer.opXferLog.warning('Ignored received literal for request ' + reqInfo.request.requestId + ', all literals were already received.');
         }
 
     }
@@ -548,20 +582,20 @@ class CausalHistorySynchronizer {
     private async attemptToProcessResponse(reqInfo: RequestInfo) {
 
         if (this.requests.get(reqInfo.request.requestId) === undefined) {
+            CausalHistorySynchronizer.controlLog.debug('Ignoring response to ' + reqInfo.request.requestId + ', the request is no longer there.')
             return; // already processed
         }
 
         if (reqInfo.status !== 'accepted-response-blocked' || 
             (reqInfo.missingCurrentState as Set<Hash>).size > 0) {
             
+            CausalHistorySynchronizer.controlLog.debug('Ignoring response to ' + reqInfo.request.requestId + ', the request is blocked by missing prevOps.');
             return;
         }
 
         reqInfo.status = 'accepted-response-processing';
 
-
         if (await this.validateOmissionProofs(reqInfo)) {
-
             const req = reqInfo.request;
             const resp = reqInfo.response as ResponseMsg;
 
@@ -579,13 +613,20 @@ class CausalHistorySynchronizer {
 
             if (reqInfo.receivedHistory !== undefined) {
                 const rcvdHistory = reqInfo.receivedHistory;
+                const newKnownHistoriesByRemote = new MultiMap<Hash, Endpoint>();
                 for (const opHistory of rcvdHistory.iterateFrom(rcvdHistory.terminalOpHistories, 'backward', 'bfs')) {
                     if (await this.opHistoryIsUndiscovered(opHistory.causalHistoryHash)) {
                         this.discoveredHistory.add(opHistory);
+                        const endpoints = this.endpointsForUnknownHistory.get(opHistory.causalHistoryHash);
+                        for (const ep of endpoints.values()) {
+                            newKnownHistoriesByRemote.add(ep, opHistory.causalHistoryHash);
+                        }
                         this.endpointsForUnknownHistory.deleteKey(opHistory.causalHistoryHash);
                         this.requestsForOpHistory.delete(opHistory.causalHistoryHash, req.requestId)
                     }
                 }
+
+                this.updateRemoteHistories(newKnownHistoriesByRemote);
             }
             
             // Update expected op arrivals: delete what we asked and use what the server actually is sending instead
@@ -613,7 +654,10 @@ class CausalHistorySynchronizer {
                 resp.omittedObjs    !== undefined &&
                 resp.omittedObjs.length === resp.omittedObjsOwnershipProofs.length) {
 
+                CausalHistorySynchronizer.opXferLog.trace('Have to load ' + resp.omittedObjs.length + ' omitted deps for ' + req.requestId);
+
                 for (const idx of resp.omittedObjs.keys()) {
+
                     const hash = resp.omittedObjs[idx];
                     const omissionProof = resp.omittedObjsOwnershipProofs[idx];
     
@@ -624,12 +668,15 @@ class CausalHistorySynchronizer {
                     }
                 }
     
+                CausalHistorySynchronizer.opXferLog.trace('Done loading ' + resp.omittedObjs.length + ' omitted deps for ' + req.requestId);
             
             }
 
+            
+
             reqInfo.status = 'accepted-response';
 
-            this.attemptToProcessLiterals(reqInfo);
+            await this.attemptToProcessLiterals(reqInfo);
             
             const removed = this.checkRequestRemoval(reqInfo);
 
@@ -640,11 +687,39 @@ class CausalHistorySynchronizer {
 
     }
 
+    private updateRemoteHistories(newKnownHistories: MultiMap<Endpoint, Hash>) {
+        for (const ep of newKnownHistories.keys()) {
+
+            let remoteHistory = this.remoteHistories.get(ep);
+            if (remoteHistory === undefined) {
+                remoteHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
+                this.remoteHistories.set(ep, remoteHistory);
+            }
+
+            const oldKnownHistories = new Set<Hash>(remoteHistory.contents.keys());
+
+            const filter = (opHistory: Hash) => !oldKnownHistories.has(opHistory);
+
+            for (const hash of this.discoveredHistory.closureFrom(newKnownHistories.get(ep), 'backward', filter)) {
+                const opHistory = this.discoveredHistory.contents.get(hash);
+                if (opHistory !== undefined) {
+                    remoteHistory.add(opHistory);
+                }
+            }
+        }
+    }
+
     private async attemptToProcessLiterals(reqInfo: RequestInfo) {
 
         if (reqInfo.nextLiteralPromise !== undefined) {
+            CausalHistorySynchronizer.opXferLog.trace('Skipping attemptToProcessLiterals call for ' + reqInfo.request.requestId + ', there is a literal being processed already.')
             return;
+        } else {
+            CausalHistorySynchronizer.opXferLog.trace('Skipping attemptToProcessLiterals call for ' + reqInfo.request.requestId + ', there is a literal being processed already.')
         }
+
+        CausalHistorySynchronizer.opXferLog.trace('Called attemptToProcessLiterals for ' + reqInfo.request.requestId + ': ' + reqInfo.outOfOrderLiterals.size + ' literals to process');
+
 
         while (reqInfo.outOfOrderLiterals.size > 0) {
 
@@ -692,6 +767,7 @@ class CausalHistorySynchronizer {
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     await this.syncAgent.store.save(op);
 
+                    CausalHistorySynchronizer.opXferLog.debug('Received op ' + literal.hash + ' from request ' + reqInfo.request.requestId);
                     
                     this.checkRequestRemoval(reqInfo);
 
@@ -704,9 +780,9 @@ class CausalHistorySynchronizer {
                 } catch (e) {
                     const detail = 'Error while deliteralizing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                     this.cancelRequest(reqInfo, 'invalid-literal', detail);
-                    CausalHistorySynchronizer.controlLog.warning(e);
-                    CausalHistorySynchronizer.controlLog.warning('nextLiteralSquence='+reqInfo.nextLiteralSequence);
-                    CausalHistorySynchronizer.controlLog.warning('receivedLiteralsCount='+reqInfo.receivedLiteralsCount)
+                    CausalHistorySynchronizer.opXferLog.warning(e);
+                    CausalHistorySynchronizer.opXferLog.warning('nextLiteralSquence='+reqInfo.nextLiteralSequence);
+                    CausalHistorySynchronizer.opXferLog.warning('receivedLiteralsCount='+reqInfo.receivedLiteralsCount)
                     return false;    
                 }
 
@@ -720,26 +796,18 @@ class CausalHistorySynchronizer {
         return true;
     }
 
-    private getRemoteHistory(remote: Endpoint): CausalHistoryFragment | undefined {
-        
-        const remoteState   = this.syncAgent.remoteStates.get(remote);
-        let remoteHistory: CausalHistoryFragment | undefined;
-        if (remoteState !== undefined) {
-            remoteHistory = this.discoveredHistory.filterByTerminalOpHistories(new Set<Hash>(remoteState.values()))
-        }
-        
-        return remoteHistory;
-    }
-
     private markOpAsFetched(opCausalHistory: OpCausalHistory) {
+
+        CausalHistorySynchronizer.opXferLog.debug('Marking op ' + opCausalHistory.opHash + ' as fetched (op history is ' + opCausalHistory.causalHistoryHash + ').')
+
         const opHistoryHash = opCausalHistory.causalHistoryHash;
         const opHash        = opCausalHistory.opHash;
 
         this.discoveredHistory.remove(opHistoryHash);
 
-        /*for (const history of this.remoteHistories.values()) {
+        for (const history of this.remoteHistories.values()) {
             history.remove(opHistoryHash);
-        }*/
+        }
 
         this.requestedOps.remove(opHistoryHash);
         this.requestsForOp.deleteKey(opHash);
@@ -751,8 +819,11 @@ class CausalHistorySynchronizer {
             const reqInfo = this.requests.get(requestId);
 
             if (reqInfo !== undefined) {
+                CausalHistorySynchronizer.opXferLog.debug('Attempting to process blocked request ' + requestId);
                 reqInfo.missingCurrentState?.delete(opHistoryHash);
                 this.attemptToProcessResponse(reqInfo);
+            } else {
+                CausalHistorySynchronizer.opXferLog.debug('Not attempting to process blocked request ' + requestId + ': it is no longer there.');
             }
         }
 

@@ -113,17 +113,6 @@ class CausalHistoryFragment {
         }
     }
 
-    verifyUniqueOps(): boolean {
-
-        for (const opHashes of this.opHistoriesForOp.values()) {
-            if (opHashes.size > 1) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     remove(opHistoryHash: Hash) {
 
         const opHistory = this.contents.get(opHistoryHash);
@@ -131,10 +120,15 @@ class CausalHistoryFragment {
         if (opHistory !== undefined) {
 
             this.contents.delete(opHistory.causalHistoryHash);
+            this.opHistoriesForOp.delete(opHistory.opHash, opHistory.causalHistoryHash);
             this.terminalOpHistories.delete(opHistory.causalHistoryHash);
 
             if (opHistory.prevOpHistories.size === 0) {
                 this.roots.delete(opHistory.causalHistoryHash);
+            }
+
+            if (this.nextOpHistories.get(opHistoryHash).size > 0) {
+                this.missingPrevOpHistories.add(opHistoryHash);
             }
 
             for (const prevOpHistoryHash of opHistory.prevOpHistories) {
@@ -150,6 +144,17 @@ class CausalHistoryFragment {
             }
         }
 
+    }
+
+    verifyUniqueOps(): boolean {
+
+        for (const opHashes of this.opHistoriesForOp.values()) {
+            if (opHashes.size > 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     clone(): CausalHistoryFragment {
@@ -289,16 +294,16 @@ class CausalHistoryFragment {
     // - If method is 'causal', each op history is visited as many tomes as there is
     //   a causality relation leading to it (in the provided direction).
 
-    iterateFrom(initial: Set<Hash>|Hash, direction:'forward'|'backward'='forward', method: 'bfs'|'causal'='bfs'): BFSHistoryWalk {
+    iterateFrom(initial: Set<Hash>|Hash, direction:'forward'|'backward'='forward', method: 'bfs'|'causal'='bfs', filter?: (opHistory: Hash) => boolean): BFSHistoryWalk {
         
         if (!(initial instanceof Set)) {
             initial = new Set([initial]);
         }
         
         if (method === 'bfs') {
-            return new BFSHistoryWalk(direction, initial, this);
+            return new BFSHistoryWalk(direction, initial, this, filter);
         } else {
-            return new CausalHistoryWalk(direction, initial, this);
+            return new CausalHistoryWalk(direction, initial, this, filter);
         }
         
     }
@@ -357,10 +362,10 @@ class CausalHistoryFragment {
         return targets.size === 0;
     }
 
-    closureFrom(originOpHistories: Set<Hash>, direction: 'forward'|'backward'): Set<Hash> {
+    closureFrom(originOpHistories: Set<Hash>, direction: 'forward'|'backward', filter?: (opHistory: Hash) => boolean): Set<Hash> {
         const result = new Set<Hash>();
 
-        for (const opHistory of this.iterateFrom(originOpHistories, direction, 'bfs')) {
+        for (const opHistory of this.iterateFrom(originOpHistories, direction, 'bfs', filter)) {
             result.add(opHistory.causalHistoryHash);
         }
 

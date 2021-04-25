@@ -16,7 +16,9 @@ abstract class HistoryWalk {
     queue         : Array<Hash>;
     queueContents : Set<Hash>;
 
-    constructor(direction: 'forward'|'backward', initial: Set<Hash>, fragment: CausalHistoryFragment) {
+    filter? : (opHistory: Hash) => boolean;
+
+    constructor(direction: 'forward'|'backward', initial: Set<Hash>, fragment: CausalHistoryFragment, filter?: (opHistory: Hash) => boolean) {
 
         this.direction = direction;
         
@@ -27,9 +29,11 @@ abstract class HistoryWalk {
         
         this.queue         = [];
         this.queueContents = new Set();
+
+        this.filter = filter;
         
         for (const hash of initial.values()) {
-            if (this.fragment.contents.has(hash)) {
+            if (this.fragment.contents.has(hash) && (filter === undefined || filter(hash))) {
                 this.enqueueIfNew(hash);
             }
         }
@@ -64,11 +68,27 @@ abstract class HistoryWalk {
     }
 
     protected goFrom(opHistoryHash: Hash) {
+
+        let unfiltered: Set<Hash>;
+
         if (this.direction === 'forward') {
-            return this.goForwardFrom(opHistoryHash);
+            unfiltered = this.goForwardFrom(opHistoryHash);
         } else {
-            return this.goBackwardFrom(opHistoryHash);
+            unfiltered = this.goBackwardFrom(opHistoryHash);
         }
+
+        if (this.filter === undefined) {
+            return unfiltered;
+        } else {
+            const filtered = new Set<Hash>();
+            for (const hash of unfiltered.values()) {
+                if (this.filter(hash)) {
+                    filtered.add(hash);
+                }
+            }
+            return filtered;
+        }
+        
     }
 
     private goForwardFrom(opHistoryHash: Hash): Set<Hash> {
