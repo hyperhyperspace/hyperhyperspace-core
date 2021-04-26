@@ -273,21 +273,12 @@ class IdbBackend implements Backend {
         let range_start = null;
         let range_end   = null;
 
-        if (order === 'asc') {
-            if (params === undefined || params.start === undefined) {
-              range_start = value + '_';
-            } else {
-              range_start = params.start;
-            }
-            range_end = value + '_Z';
+        if (params === undefined || params.start === undefined) {
+            range_start = value + '_';
         } else {
-            if (params === undefined || params.start === undefined) {
-              range_start = value + '_Z';
-            } else {
-              range_start = params.start;
-            }
-            range_end = value + '_';
+            range_start = params.start;
         }
+        range_end = value + '_Z';
 
         const range = IDBKeyRange.bound(range_start, range_end, true, true);
         const direction = order === 'desc' ? 'prev' : 'next';
