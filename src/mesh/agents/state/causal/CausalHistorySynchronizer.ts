@@ -652,7 +652,8 @@ class CausalHistorySynchronizer {
 
             if (resp.omittedObjsOwnershipProofs !== undefined &&
                 resp.omittedObjs    !== undefined &&
-                resp.omittedObjs.length === resp.omittedObjsOwnershipProofs.length) {
+                resp.omittedObjs.length === resp.omittedObjsOwnershipProofs.length &&
+                reqInfo.receivedObjects !== undefined) {
 
                 CausalHistorySynchronizer.opXferLog.trace('Have to load ' + resp.omittedObjs.length + ' omitted deps for ' + req.requestId);
 
@@ -781,7 +782,7 @@ class CausalHistorySynchronizer {
                     const detail = 'Error while deliteralizing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                     this.cancelRequest(reqInfo, 'invalid-literal', detail);
                     CausalHistorySynchronizer.opXferLog.warning(e);
-                    CausalHistorySynchronizer.opXferLog.warning('nextLiteralSquence='+reqInfo.nextLiteralSequence);
+                    CausalHistorySynchronizer.opXferLog.warning('nextLiteralSequence='+reqInfo.nextLiteralSequence);
                     CausalHistorySynchronizer.opXferLog.warning('receivedLiteralsCount='+reqInfo.receivedLiteralsCount)
                     return false;    
                 }
