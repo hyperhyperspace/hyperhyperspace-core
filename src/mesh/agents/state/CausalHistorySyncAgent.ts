@@ -235,6 +235,24 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
                this.acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
+    async lastStoredOpsDescription(limit=25) {
+
+        const load = await this.store.loadByReference('target', this.mutableObj, { order: 'desc', limit: limit});
+
+        const last = load.objects.length === limit? 'last ' : '';
+
+        let contents = 'Showing ' + last + load.objects.length + ' ops in store for ' + this.mutableObj + '\n';
+
+        let idx=0;
+        for (const op of load.objects) {
+            const opHistory = await this.store.loadOpCausalHistory(op.getLastHash()) as OpCausalHistory;
+            contents = contents + idx + ': ' + opHistory.opHash + ' causal: ' + opHistory.causalHistoryHash + ' -> [' + Array.from(opHistory.prevOpHistories) + ']\n';
+            idx=idx+1;
+        }
+
+        return contents;            
+    }
+
 }
 
 export { SyncMsg as HistoryMsg, CausalHistorySyncAgent }

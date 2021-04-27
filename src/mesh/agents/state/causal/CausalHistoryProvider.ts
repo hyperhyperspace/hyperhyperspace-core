@@ -4,6 +4,7 @@ import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHi
 import { Hash, HashedObject, Literal } from 'data/model';
 import { ObjectPacker } from 'data/packing/ObjectPacker';
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
+import { Logger, LogLevel } from 'util/logging';
 import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
 
 
@@ -85,7 +86,7 @@ type CancelRequestMsg = {
 type SyncMsg = RequestMsg | ResponseMsg | RejectRequestMsg | SendLiteralMsg | CancelRequestMsg;
 
 const ProviderLimits = {
-    MaxOpsToRequest: 16,//128, FIXME!
+    MaxOpsToRequest: 1,//128, FIXME!
     MaxLiteralsPerResponse: 1024,
     MaxHistoryPerResponse: 256
 };
@@ -108,6 +109,9 @@ type ResponseInfo = {
 }
 
 class CausalHistoryProvider {
+
+    static storeLog  = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
+    static opXferLog = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
 
     syncAgent: CausalHistorySyncAgent;
 
@@ -192,6 +196,8 @@ class CausalHistoryProvider {
     }
 
     private async createResponse(respInfo: ResponseInfo): Promise<boolean> {
+
+        await this.logStoreContents(respInfo.request.requestId);
 
         const req = respInfo.request;
 
@@ -322,14 +328,15 @@ class CausalHistoryProvider {
                     full = !await packer.addObject(hash);
 
                     if (full) {
-                        //console.log('Cannot pack, no room')
+                        CausalHistoryProvider.opXferLog.trace('Cannot pack ' + hash + ', no room.')
                         break;
                     } else {
-                        //console.log('packed ' + hash);
-                        //console.log(packer.content.length + ' literals packed so far');
+                        CausalHistoryProvider.opXferLog.trace('Packed ' + hash + '. ' + packer.content.length + ' literals packed so far.');
                         sendingOps.push(hash);
                     }
     
+                } else {
+                    CausalHistoryProvider.opXferLog.debug('Cannot pack ' + hash + ': it is an allowed omision.\nreference chain is: ' + packer.allowedOmissions.get(hash));
                 }
             }
         }
@@ -365,7 +372,7 @@ class CausalHistoryProvider {
                         sendingOps.push(opHistory.opHash);
                     }    
                 } else {
-                    console.log('OMITTING 1 OP DUE TO ALLOWED OMISSION')
+                    CausalHistoryProvider.opXferLog.debug('Omitting one inferred op due tu allowed omission: ' + opHistory.opHash);
                 }
 
             }
@@ -472,6 +479,7 @@ class CausalHistoryProvider {
 
     private async sendResponse(respInfo: ResponseInfo) {
         const reqId = respInfo.request.requestId;
+        console.log('SENDING RESPONSE FOR ' + reqId);
         this.currentResponses.set(respInfo.remote, reqId);
         this.dequeueResponse(respInfo);
 
@@ -497,6 +505,7 @@ class CausalHistoryProvider {
 
     private enqueueResponse(respInfo: ResponseInfo) {
         const reqId = respInfo.request.requestId;
+        console.log('ENQUEING RESPONSE FOR ' + reqId);
         let queued = this.queuedResponses.get(respInfo.remote);
         if (queued === undefined) {
             queued = [];
@@ -506,6 +515,7 @@ class CausalHistoryProvider {
 
     private dequeueResponse(respInfo: ResponseInfo) {
         const reqId = respInfo.request.requestId;
+        console.log('DEQUEUING RESPONSE FOR ' + reqId);
         const queued = this.queuedResponses.get(respInfo.remote);
         const idx = queued?.indexOf(reqId);
 
@@ -569,6 +579,11 @@ class CausalHistoryProvider {
 
     }
 
+    private async logStoreContents(requestId: string) {
+        if (CausalHistoryProvider.storeLog.level <= LogLevel.DEBUG) {
+            CausalHistoryProvider.storeLog.debug('Stored state before response to request ' + requestId + '\n' + await this.syncAgent.lastStoredOpsDescription())            
+        }
+    }
 }
 
 export { CausalHistoryProvider, ProviderLimits, RequestId, MessageType, SyncMsg, RequestMsg, ResponseMsg, RejectRequestMsg, SendLiteralMsg, CancelRequestMsg };
