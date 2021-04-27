@@ -86,7 +86,7 @@ type CancelRequestMsg = {
 type SyncMsg = RequestMsg | ResponseMsg | RejectRequestMsg | SendLiteralMsg | CancelRequestMsg;
 
 const ProviderLimits = {
-    MaxOpsToRequest: 1,//128, FIXME!
+    MaxOpsToRequest: 128,
     MaxLiteralsPerResponse: 1024,
     MaxHistoryPerResponse: 256
 };
@@ -110,8 +110,8 @@ type ResponseInfo = {
 
 class CausalHistoryProvider {
 
-    static storeLog  = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
-    static opXferLog = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
+    static storeLog  = new Logger(CausalHistoryProvider.name, LogLevel.DEBUG);
+    static opXferLog = new Logger(CausalHistoryProvider.name, LogLevel.DEBUG);
 
     syncAgent: CausalHistorySyncAgent;
 
@@ -581,7 +581,7 @@ class CausalHistoryProvider {
 
     private async logStoreContents(requestId: string) {
         if (CausalHistoryProvider.storeLog.level <= LogLevel.DEBUG) {
-            CausalHistoryProvider.storeLog.debug('Stored state before response to request ' + requestId + '\n' + await this.syncAgent.lastStoredOpsDescription())            
+            CausalHistoryProvider.storeLog.debug('\nStored state before response to request ' + requestId + '\n' + await this.syncAgent.lastStoredOpsDescription())            
         }
     }
 }
