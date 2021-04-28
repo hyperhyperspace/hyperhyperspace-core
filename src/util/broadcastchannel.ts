@@ -1,10 +1,10 @@
 import { BroadcastChannel as PhonyChannel } from 'broadcast-channel';
 
 
-let SafeBroadcastChannel = window?.BroadcastChannel;
+let SafeBroadcastChannel = globalThis.window?.BroadcastChannel;
 
 if (SafeBroadcastChannel === undefined) {
-    SafeBroadcastChannel = self?.BroadcastChannel;
+    SafeBroadcastChannel = globalThis.self?.BroadcastChannel;
 }
 
 
