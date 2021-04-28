@@ -575,7 +575,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
 
 async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number, useRemoting?: boolean) {
 
-    const size = 3;
+    const size = 2;
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
@@ -611,6 +611,7 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
         
         agent.synchronizer.controlLog = new Logger('synchronizer', LogLevel.INFO);
         agent.synchronizer.stateLog   = new Logger('synchronizer', LogLevel.INFO);
+        agent.synchronizer.storeLog   = new Logger('synchronizer', LogLevel.INFO);
         agent.synchronizer.opXferLog  = new Logger('synchronizer', LogLevel.INFO);
 
         agent.provider.controlLog     = new Logger('provider', LogLevel.INFO);
