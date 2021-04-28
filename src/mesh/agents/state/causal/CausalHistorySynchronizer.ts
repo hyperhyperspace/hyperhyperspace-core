@@ -50,12 +50,12 @@ type RequestInfo = {
 };
 
 class CausalHistorySynchronizer {
-    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.DEBUG);
+    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
     static causalLog  = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
     static sourcesLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
     static stateLog   = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
-    static opXferLog  = new Logger(CausalHistorySynchronizer.name, LogLevel.DEBUG);
-    static storeLog   = new Logger(CausalHistorySynchronizer.name, LogLevel.DEBUG);
+    static opXferLog  = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
+    static storeLog   = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
 
     syncAgent: CausalHistorySyncAgent;
 

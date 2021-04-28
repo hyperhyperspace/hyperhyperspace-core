@@ -110,8 +110,9 @@ type ResponseInfo = {
 
 class CausalHistoryProvider {
 
-    static storeLog  = new Logger(CausalHistoryProvider.name, LogLevel.DEBUG);
-    static opXferLog = new Logger(CausalHistoryProvider.name, LogLevel.DEBUG);
+    static controlLog = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
+    static storeLog   = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
+    static opXferLog  = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
 
     syncAgent: CausalHistorySyncAgent;
 
@@ -126,6 +127,10 @@ class CausalHistoryProvider {
     checkIfLiteralIsValidOp: (literal: Literal) => boolean;
 
 
+    controlLog : Logger;
+    storeLog   : Logger;
+    opXferLog  : Logger;
+
     constructor(syncAgent: CausalHistorySyncAgent) {
         this.syncAgent = syncAgent;
 
@@ -139,6 +144,10 @@ class CausalHistoryProvider {
         this.checkIfLiteralIsValidOp = (literal: Literal) => this.syncAgent.literalIsValidOp(literal);
 
         this.continueStreamingResponses = this.continueStreamingResponses.bind(this);
+
+        this.controlLog = CausalHistoryProvider.controlLog; 
+        this.storeLog   = CausalHistoryProvider.storeLog;
+        this.opXferLog  = CausalHistoryProvider.opXferLog;
     }
 
 
@@ -146,12 +155,7 @@ class CausalHistoryProvider {
         for (const requesId of this.currentResponses.values()) {
             const respInfo = this.responses.get(requesId);
             if (respInfo !== undefined) {
-
                 this.sendLiterals(respInfo.request.requestId, LiteralBatchSize);
-
-                if (this.isResponseComplete(respInfo)) {
-                    this.removeResponse(respInfo);
-                }
             }
         }
     }
@@ -328,15 +332,15 @@ class CausalHistoryProvider {
                     full = !await packer.addObject(hash);
 
                     if (full) {
-                        CausalHistoryProvider.opXferLog.trace('Cannot pack ' + hash + ', no room.')
+                        this.opXferLog.trace('Cannot pack ' + hash + ', no room.')
                         break;
                     } else {
-                        CausalHistoryProvider.opXferLog.trace('Packed ' + hash + '. ' + packer.content.length + ' literals packed so far.');
+                        this.opXferLog.trace('Packed ' + hash + '. ' + packer.content.length + ' literals packed so far.');
                         sendingOps.push(hash);
                     }
     
                 } else {
-                    CausalHistoryProvider.opXferLog.debug('Cannot pack ' + hash + ': it is an allowed omision.\nreference chain is: ' + packer.allowedOmissions.get(hash));
+                    this.opXferLog.debug('Cannot pack ' + hash + ': it is an allowed omision.\nreference chain is: ' + packer.allowedOmissions.get(hash));
                 }
             }
         }
@@ -372,7 +376,7 @@ class CausalHistoryProvider {
                         sendingOps.push(opHistory.opHash);
                     }    
                 } else {
-                    CausalHistoryProvider.opXferLog.debug('Omitting one inferred op due tu allowed omission: ' + opHistory.opHash);
+                    this.opXferLog.debug('Omitting one inferred op due tu allowed omission: ' + opHistory.opHash);
                 }
 
             }
@@ -416,33 +420,43 @@ class CausalHistoryProvider {
 
         let sent = 0;
 
-        if (respInfo?.literalsToSend !== undefined) {
-            for (let i=0; i<maxLiterals; i++) {
-
-                if (this.responses.get(requestId) === undefined) {
-                    // this response is done
-                    // (there could be overlap in the firing of 'sendStreamingResponses')
-                    break;
-                }
-
-                const nextIdx = respInfo.nextLiteralIdx as number;
-
-                if (nextIdx < respInfo.literalsToSend.length) {
-                    try {
-                        this.sendLiteral(respInfo, nextIdx, respInfo.literalsToSend[nextIdx]);
-                    } catch (e) {
+        if (respInfo !== undefined) {
+            if (respInfo.literalsToSend !== undefined) {
+                for (let i=0; i<maxLiterals; i++) {
+    
+                    if (this.responses.get(requestId) === undefined) {
+                        // this response is done
+                        // (there could be overlap in the firing of 'sendStreamingResponses')
                         break;
                     }
+    
+                    const nextIdx = respInfo.nextLiteralIdx as number;
+    
+                    if (nextIdx < respInfo.literalsToSend.length) {
+                        try {
+                            if (!this.sendLiteral(respInfo, nextIdx, respInfo.literalsToSend[nextIdx])) {
+                                break;
+                            }
+                        } catch (e) {
+                            break;
+                        }
+    
+                        respInfo.nextLiteralIdx = nextIdx + 1;
+                        sent = sent + 1;
+                    } else {
+                        break;
+                    }
+                }
 
-                    respInfo.nextLiteralIdx = nextIdx + 1;
-                    sent = sent + 1;
-                } else {
-                    break;
+                if (this.isResponseComplete(respInfo)) {
+                    this.removeResponse(respInfo);
                 }
             }
         }
 
-        //TODO: check if respInfo can be cleaned up?
+
+
+
         //TODO: check if timer for sending should be enabled?
 
         return sent;
@@ -457,7 +471,7 @@ class CausalHistoryProvider {
             literal: literal
         };
 
-        this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), msg);
+        return this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), msg);
 
     }
 
@@ -479,7 +493,7 @@ class CausalHistoryProvider {
 
     private async sendResponse(respInfo: ResponseInfo) {
         const reqId = respInfo.request.requestId;
-        console.log('SENDING RESPONSE FOR ' + reqId);
+        this.controlLog.debug('\nSending response for ' + reqId);
         this.currentResponses.set(respInfo.remote, reqId);
         this.dequeueResponse(respInfo);
 
@@ -496,30 +510,41 @@ class CausalHistoryProvider {
         } else {
             this.removeResponse(respInfo);
         }
-
-
         
+    }
 
-        
+    private attemptQueuedResponse(remote: Endpoint) {
+
+        const queued = this.queuedResponses.get(remote);
+
+        if (queued !== undefined && queued.length > 0) {
+            const reqId = queued.shift() as RequestId;
+            this.controlLog.debug('\nFound queued request ' + reqId);
+            const respInfo = this.responses.get(reqId) as ResponseInfo;
+            this.sendResponse(respInfo);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     private enqueueResponse(respInfo: ResponseInfo) {
         const reqId = respInfo.request.requestId;
-        console.log('ENQUEING RESPONSE FOR ' + reqId);
+        this.controlLog.debug('\nEnqueuing response for ' + reqId + ' currently processing ' + this.currentResponses.get(respInfo.remote));
         let queued = this.queuedResponses.get(respInfo.remote);
         if (queued === undefined) {
             queued = [];
+            this.queuedResponses.set(respInfo.remote, queued);
         }
         queued.push(reqId);
     }
 
     private dequeueResponse(respInfo: ResponseInfo) {
         const reqId = respInfo.request.requestId;
-        console.log('DEQUEUING RESPONSE FOR ' + reqId);
         const queued = this.queuedResponses.get(respInfo.remote);
         const idx = queued?.indexOf(reqId);
 
-        if (idx !== undefined) {
+        if (idx !== undefined && idx >= 0) {
             queued?.splice(idx);
         }
     }
@@ -528,25 +553,35 @@ class CausalHistoryProvider {
 
         const requestId = respInfo.request.requestId;
 
-        // remove from current & queue
+        if (this.responses.get(requestId) !== undefined) {
+            this.controlLog.debug('Removing sent request ' + requestId);
+            this.controlLog.debug('Queue after for ' + respInfo.remote + ': ' + this.queuedResponses.get(respInfo.remote));
 
-        if (this.currentResponses.get(respInfo.remote) === requestId) {
-            this.currentResponses.delete(respInfo.remote);
-        }
-        
-        this.dequeueResponse(respInfo);
-
-        // remove request info
-
-        this.responses.delete(respInfo.request.requestId);
-
-        if (this.isStreamingResponse(respInfo)) {
-            this.streamingResponses = this.streamingResponses - 1;
-            if (this.streamingResponses === 0 && this.streamingResponsesInterval !== undefined) {
-                clearInterval(this.streamingResponsesInterval);
-                this.streamingResponsesInterval = undefined;
+            // remove from current & queue
+    
+            if (this.currentResponses.get(respInfo.remote) === requestId) {
+                this.currentResponses.delete(respInfo.remote);
             }
+            
+            this.dequeueResponse(respInfo);
+    
+            // remove request info
+    
+            this.responses.delete(respInfo.request.requestId);
+    
+            if (this.isStreamingResponse(respInfo)) {
+                this.streamingResponses = this.streamingResponses - 1;
+                if (this.streamingResponses === 0 && this.streamingResponsesInterval !== undefined) {
+                    clearInterval(this.streamingResponsesInterval);
+                    this.streamingResponsesInterval = undefined;
+                }
+            }
+    
+            const queued = this.attemptQueuedResponse(respInfo.remote);
+
+            this.controlLog.debug('Found following request after ' + requestId + ': ' + queued);
         }
+
     }
 
     private isResponseComplete(respInfo: ResponseInfo): boolean {
@@ -580,8 +615,8 @@ class CausalHistoryProvider {
     }
 
     private async logStoreContents(requestId: string) {
-        if (CausalHistoryProvider.storeLog.level <= LogLevel.DEBUG) {
-            CausalHistoryProvider.storeLog.debug('\nStored state before response to request ' + requestId + '\n' + await this.syncAgent.lastStoredOpsDescription())            
+        if (this.storeLog.level <= LogLevel.DEBUG) {
+            this.storeLog.debug('\nStored state before response to request ' + requestId + '\n' + await this.syncAgent.lastStoredOpsDescription())            
         }
     }
 }

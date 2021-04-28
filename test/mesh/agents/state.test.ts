@@ -13,6 +13,7 @@ import { MutableSet } from 'data/containers';
 import { Identity } from 'data/identity';
 import { describeProxy } from 'config';
 import { CausalHistorySyncAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
+import { Logger, LogLevel } from 'util/logging';
 
 describeProxy('[SYN] State sync', () => {
     test('[SYN01] Gossip agent in small peer group (wrtc)', async (done) => {
@@ -607,6 +608,15 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
         let agent = new CausalHistorySyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
+        
+        agent.synchronizer.controlLog = new Logger('synchronizer', LogLevel.INFO);
+        agent.synchronizer.stateLog   = new Logger('synchronizer', LogLevel.INFO);
+        agent.synchronizer.opXferLog  = new Logger('synchronizer', LogLevel.INFO);
+
+        agent.provider.controlLog     = new Logger('provider', LogLevel.INFO);
+        agent.provider.opXferLog      = new Logger('provider', LogLevel.INFO);
+        agent.provider.storeLog       = new Logger('provider', LogLevel.INFO);
+        
         let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
@@ -686,6 +696,7 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
     
     await s.add(new HashedLiteral('further change'));
     await s.add(new HashedLiteral('another further change'));
+
 
     await stores[0].save(s);
 
