@@ -846,7 +846,8 @@ class CausalHistorySynchronizer {
             if (this.syncAgent.literalIsValidOp(literal)) {
                 
                 try {
-                    const op = HashedObject.fromContext(reqInfo.receivedObjects as Context, literal.hash, true);
+
+                    const op = await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     await this.syncAgent.store.save(op);
 

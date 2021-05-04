@@ -1,5 +1,31 @@
 
 class Strings {
+
+    static stingToArrayBuffer(str: string): ArrayBuffer {
+        const buf = new ArrayBuffer(str.length);
+        const bufView = new Uint8Array(buf);
+        for (let i = 0, strLen = str.length; i < strLen; i++) {
+          bufView[i] = str.charCodeAt(i);
+        }
+        return buf;
+    }
+    
+    static Uint8arrayToBase64(u8: Uint8Array) {
+        return btoa(String.fromCharCode.apply(null, Array.from(u8)));
+    }
+
+    static base64ToUint8array(base64: string): Uint8Array {
+        const raw = atob(base64);
+
+        const array = new Uint8Array(raw.length);
+
+        for (let i=0; i<raw.length; i++) {
+            array[i] = raw.charCodeAt(i);
+        }
+
+        return array;
+    }
+
     static base64toHex(base64: string): string {
 
         var raw = atob(base64);
@@ -17,6 +43,8 @@ class Strings {
         return hex.toUpperCase();
       
     }
+
+
 
     static hexToBase64(hex: string) {
         return btoa((hex.match(/\w{2}/g) as string[]).map(function(a) {

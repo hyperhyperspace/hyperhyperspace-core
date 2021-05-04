@@ -18,7 +18,7 @@ describeProxy('[SPA] Group shared spaces', () => {
 
         let spaceId = new RNGImpl().randomHexString(32);
 
-        let samplePeers = generateSamplePeers(size);
+        let samplePeers = await generateSamplePeers(size);
         let spaces      = generateSpacesForPeers(spaceId, samplePeers);
 
 
@@ -87,7 +87,7 @@ test('[SPA02] 2-node nested sync test', async (done) => {
 
     let spaceId = new RNGImpl().randomHexString(32);
 
-    let samplePeers = generateSamplePeers(size);
+    let samplePeers = await generateSamplePeers(size);
     let spaces      = generateSpacesForPeers(spaceId, samplePeers);
 
 
@@ -172,11 +172,11 @@ test('[SPA02] 2-node nested sync test', async (done) => {
 
 
 
-let generateSamplePeers = (size: number) => {
+let generateSamplePeers = async (size: number) => {
 
     let samplePeers = new Array<SamplePeer>();
     for (let i=0; i<size; i++) {
-        let id = Identity.fromKeyPair({'order': i}, RSAKeyPair.generate(512));
+        let id = Identity.fromKeyPair({'order': i}, await RSAKeyPair.generate(512));
         let samplePeer = new SamplePeer(id);
         samplePeers.push(samplePeer);
     }

@@ -40,7 +40,7 @@ class CausalHistoryState extends HashedObject {
         return CausalHistoryState.className;
     }
 
-    validate(_references: Map<Hash, HashedObject>) {
+    async validate(_references: Map<Hash, HashedObject>) {
 
         if (this.mutableObj === undefined) {
             return false;

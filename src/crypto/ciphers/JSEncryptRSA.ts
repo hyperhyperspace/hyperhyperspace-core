@@ -1,6 +1,6 @@
 //import { JSEncrypt } from 'jsencrypt';
-import { RSA } from './RSA';
 import { SHA, SHAImpl } from '../hashing';
+import { RSA } from './RSA';
 
 // dummy objects for JSEncrypt
 
@@ -47,12 +47,12 @@ class JSEncryptRSA implements RSA {
         }
     }
 
-    generateKey(bits: number) {
+    async generateKey(bits: number) {
         this.crypto = new JSEncrypt({default_key_size : bits.toString()});
         this.crypto.getKey();
     };
 
-    loadKeyPair(format: string, publicKey: string, privateKey?: string) {
+    async loadKeyPair(format: string, publicKey: string, privateKey?: string) {
 
         if (format !== JSEncryptRSA.PKCS8) {
             throw new Error("Currently only pkcs8 encoded RSA keys are supported, sorry");
@@ -85,7 +85,7 @@ class JSEncryptRSA implements RSA {
         return 'pkcs8';
     }
 
-    sign(text: string) {
+    async sign(text: string) {
         if (this.crypto === undefined) {
             throw new Error("RSA key pair initialization is missing, attempted to sign");
         } else {
@@ -94,7 +94,7 @@ class JSEncryptRSA implements RSA {
         
     };
 
-    verify(text: string, signature: string) {
+    async verify(text: string, signature: string) {
         if (this.crypto === undefined) {
             throw new Error("RSA key pair initialization is missing, attempted to verify");
         } else {
@@ -103,7 +103,7 @@ class JSEncryptRSA implements RSA {
         
     };
 
-    encrypt(plainText: string) {
+    async encrypt(plainText: string) {
         if (this.crypto === undefined) {
             throw new Error("RSA key pair initialization is missing, attempted to encrypt");
         } else {
@@ -111,7 +111,7 @@ class JSEncryptRSA implements RSA {
         }
     };
 
-    decrypt(cypherText : string) {
+    async decrypt(cypherText : string) {
         if (this.crypto === undefined) {
             throw new Error("RSA key pair initialization is missing, attempted to decrypt");
         } else {

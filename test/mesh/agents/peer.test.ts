@@ -57,7 +57,7 @@ describeProxy('[PGM] Peer group management', () => {
 async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number) {
 
     let peerGroupId = new RNGImpl().randomHexString(64);
-    let pods = TestPeerGroupPods.generate(peerGroupId, 2, 2, 1, network, discovery, basePort);
+    let pods = await TestPeerGroupPods.generate(peerGroupId, 2, 2, 1, network, discovery, basePort);
     pods;
 
 
@@ -90,7 +90,7 @@ async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' =
 async function fourPeerCliqueGroupTest(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number) {
 
     let peerGroupId = new RNGImpl().randomHexString(64);
-    let pods = TestPeerGroupPods.generate(peerGroupId, 4, 4, 3, network, discovery, basePort);
+    let pods = await TestPeerGroupPods.generate(peerGroupId, 4, 4, 3, network, discovery, basePort);
 
     let control0 = pods[0].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId)) as PeerGroupAgent;
 

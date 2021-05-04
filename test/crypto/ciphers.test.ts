@@ -30,7 +30,7 @@ describeProxy('[ENC] Ciphers', () => {
         expect(chacha.encryptHex(message, key, nonce)).toEqual("76b8e0ada0f13d90405d6ae55386bd28bdd219b8a08ded1aa836efcc8b770dc7da41597c5157488d7724e03fb8d84a376a43b8f41518a11cc387b669b2ee6586");
     });
 
-    test('[ENC03] RSA self test', () => {
+    test('[ENC03] RSA self test', async () => {
 
         let privateKey = 
     "-----BEGIN RSA PRIVATE KEY-----\n" +
@@ -74,21 +74,21 @@ describeProxy('[ENC] Ciphers', () => {
 
 
         let rsa = new RSAImpl() as RSA;
-        rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
+        await rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
 
         let rsaPublic = new RSAImpl() as RSA;
-        rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
+        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
 
         let message = 'this is a small text message';
 
-        let ciphertext = rsaPublic.encrypt(message);
-        expect(rsa.decrypt(ciphertext)).toEqual(message);
+        let ciphertext = await rsaPublic.encrypt(message);
+        expect(await rsa.decrypt(ciphertext)).toEqual(message);
 
-        let signature = rsa.sign(message);
-        expect(rsaPublic.verify(message, signature)).toEqual(true);
+        let signature = await rsa.sign(message);
+        expect(await rsaPublic.verify(message, signature)).toEqual(true);
 
         let wrongSignature = "NU6k7ilRspYc6O7fUvGOnPdS7VkW3e1nYsrz6MflCUSNffTCpH/tS3J+2fvICWqN9dkCYXE/La969Gsod5nIPbonxvzNHpJKW/7Dnn2q62AN+k3ZFOGJ17qLrAu1mg9bcu4B0m3cbwrNLdUV1MBWp4poQI5bn8uM+A1IkdOLOFyyeWSgrlWstc2RvTnZlKR5Dk4F/kZMh4tzfC3sbktlirk7IbT0HvlU4V2hpu6lx3uw2wRbvH8CGTavToQeBI/StPh98JDZcdaB7nfWYZ2MIBwt9NpXQvcoaUuee4T7UkynIgYngmnmZnD/X9/WP0kO7tWa89I6uOVsiWowOBYsew==";
-        expect(rsaPublic.verify(message, wrongSignature)).toEqual(false);
+        expect(await rsaPublic.verify(message, wrongSignature)).toEqual(false);
     });
 
     test('[ENC04] RSA encrpyt test', () => {

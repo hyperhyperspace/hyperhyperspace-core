@@ -13,13 +13,14 @@ import { RSAKeyPair } from 'data/identity';
 
 type Config = {
     linkupServers: Array<string>,
-    id?: Identity,
+    id: Identity,
     peersForDiscovery?: Array<PeerInfo>,
     endpointParserForDiscovery?: (ep: Endpoint) => Promise<PeerInfo>
 };
 
-type ResourceInit = { store: Store, mesh: Mesh, config: Partial<Config>, aliasing: Map<Hash, HashedObject> };
 
+type ResourceInit = { store?: Store, mesh?: Mesh, config: Partial<Config>, aliasing?: Map<Hash, HashedObject> };
+type ResourceInitWithId = ResourceInit & { config: {id: Identity}};
 
 class Resources {
 
@@ -28,47 +29,40 @@ class Resources {
     config: Config; 
     aliasing: Map<Hash, HashedObject>;
 
-    constructor(init?: Partial<ResourceInit>) {
+    constructor(init: ResourceInitWithId) {
 
-        const linkupServers = init?.config?.linkupServers !== undefined && init?.config.linkupServers.length > 0?
-                        init.config.linkupServers :
-                        [LinkupManager.defaultLinkupServer]; 
+
+        const linkupServers = init?.config?.linkupServers !== undefined && init.config.linkupServers.length > 0?
+                                    init.config.linkupServers
+                                :
+                                    [LinkupManager.defaultLinkupServer]; 
 
         this.config = {
-            linkupServers: linkupServers
+            linkupServers: linkupServers,
+            id: init.config.id
         }
 
-        if (init?.store === undefined) {
+        if (init.store === undefined) {
             this.store = new Store(new MemoryBackend('auto-generated store ' + new RNGImpl().randomHexString(64)));
         } else {
             this.store = init?.store;
         }
 
-        if (init?.mesh === undefined) {
+        if (init.mesh === undefined) {
             this.mesh = new Mesh();
         } else {
             this.mesh = init.mesh;
         }
 
-        if (init?.config?.peersForDiscovery !== undefined &&
-            init?.config?.endpointParserForDiscovery !== undefined) {
+        if (init.config.peersForDiscovery !== undefined &&
+            init.config.endpointParserForDiscovery !== undefined) {
 
             this.config.peersForDiscovery = init.config.peersForDiscovery;
             this.config.endpointParserForDiscovery = init.config.endpointParserForDiscovery;
 
         } else {
 
-            let localId: Identity;
-
-            if (init?.config?.id !== undefined) {
-                localId = init.config.id;
-            } else {
-                let key = RSAKeyPair.generate(1024);
-                localId = Identity.fromKeyPair({name: 'auto-generated id ' + new RNGImpl().randomHexString(64)}, key);
-                this.config.id = localId;
-            }
-
-            this.config.peersForDiscovery = [(new IdentityPeer(this.config.linkupServers[0], localId.hash(), localId)).asPeerIfReady()];
+            this.config.peersForDiscovery = [(new IdentityPeer(linkupServers[0], this.config.id.hash(), this.config.id)).asPeerIfReady()];
             this.config.endpointParserForDiscovery = IdentityPeer.getEndpointParser(this.store);
         }
 
@@ -100,6 +94,31 @@ class Resources {
         return this.config.endpointParserForDiscovery;
 
 
+    }
+
+    static async create(init?: Partial<ResourceInit>): Promise<Resources> {
+
+        let localId: Identity;
+
+        if (init?.config?.id !== undefined) {
+            localId = init?.config.id;
+        } else {
+            let key = await RSAKeyPair.generate(1024);
+            localId = Identity.fromKeyPair({name: 'auto-generated id ' + new RNGImpl().randomHexString(64)}, key);
+        }
+
+        const config = {
+            linkupServers: init?.config?.linkupServers,
+            id: localId,
+            peersForDiscovery: init?.config?.peersForDiscovery,
+            endpointParserForDiscovery: init?.config?.endpointParserForDiscovery
+        }
+
+        return new Resources({store: init?.store, mesh: init?.mesh, config: config, aliasing: init?.aliasing});
+    }
+
+    static dummy(): Resources {
+        return Object();
     }
 
 

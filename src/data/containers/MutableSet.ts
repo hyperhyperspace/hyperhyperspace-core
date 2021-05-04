@@ -28,9 +28,9 @@ abstract class MutableSetOp<T extends HashedObject> extends MutationOp {
 
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
 
-        if (!super.validate(references)) {
+        if (!await super.validate(references)) {
             return false;
         }
 
@@ -72,9 +72,9 @@ class MutableSetAddOp<T extends HashedObject> extends MutableSetOp<T> {
         super.init();
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
 
-        if (!super.validate(references)) {
+        if (!await super.validate(references)) {
             return false;
         }
 
@@ -131,9 +131,9 @@ class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
 
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
 
-        if (!super.validate(references)) {
+        if (!await super.validate(references)) {
             return false;
         }
 
@@ -233,7 +233,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
         references;
         return Types.isTypeConstraint(this.typeConstraints);
     }

@@ -77,6 +77,25 @@ class Store {
         let context = object.toContext();
         let hash    = context.rootHashes[0] as Hash;
 
+        for (const [hash, obj] of context.objects.entries()) {
+
+            const author = obj.getAuthor();
+
+            if (author !== undefined) {
+
+                if (obj.shouldSignOnSave()) {
+
+                    obj.setLastSignature(await author.sign(hash));
+                    (context.literals.get(hash) as Literal).signature = obj.getLastSignature();
+                }
+
+                if (!obj.hasLastSignature()) {
+                    throw new Error('Cannot save ' + hash + ', its signature is missing');
+                }
+
+            }
+        }
+
         let missing = await this.findMissingReferencesWithContext(hash, context);
 
         if (missing.size > 0) {

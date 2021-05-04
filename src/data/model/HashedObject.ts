@@ -47,21 +47,20 @@ abstract class HashedObject {
     private author? : Identity;
 
     
-    private _signOnLiteraliz  : boolean;
-    //private _store?           : Store;
+    private _signOnSave  : boolean;
     private _lastHash?        : Hash;
     private _lastSignature?   : string;
 
     private _resources? : Resources;
 
     constructor() {
-        this._signOnLiteraliz = false;
+        this._signOnSave = false;
     } 
 
     abstract getClassName() : string;
 
     abstract init() : void;
-    abstract validate(references: Map<Hash, HashedObject>) : boolean;
+    abstract validate(references: Map<Hash, HashedObject>) : Promise<boolean>;
 
     getId() : (string | undefined) {
         return this.id;
@@ -83,7 +82,7 @@ abstract class HashedObject {
 
         if (!author.equals(this.author)) {
             this.author = author;
-            this._signOnLiteraliz = true;
+            this._signOnSave = true;
         }
         
     }
@@ -176,6 +175,10 @@ abstract class HashedObject {
         return this._lastHash as Hash;
     }
 
+    shouldSignOnSave() {
+        return this._signOnSave;
+    }
+  
     hash(seed?: string): Hash {
 
         let hash = this.customHash(seed);
@@ -317,15 +320,19 @@ abstract class HashedObject {
             literal.author = value['_fields']['author']['_hash'];
         }
 
+        // if we have a signature, we add it to the literal
+        if (this.author !== undefined && this.hasLastSignature()) {
+            literal.signature = this.getLastSignature();
+        }
+
+
+// MEGA FIXME: do this in some other place:
+        /*
         if (this._signOnLiteraliz) {
             literal.signature = this.author?.sign(hash);
         } else {
-            if (this.author !== undefined) {
-                if (this.hasLastSignature() && this.author.verifySignature(hash, this.getLastSignature())) {
-                    literal.signature = this.getLastSignature();
-                }
-            }
         }
+        */
 
         
 
@@ -439,29 +446,82 @@ abstract class HashedObject {
     }
 
 
-    static fromLiteralContext(literalContext: LiteralContext, hash?: Hash, validate=false) : HashedObject {
+    static fromLiteralContext(literalContext: LiteralContext, hash?: Hash) : HashedObject {
 
         let context = new Context();
         context.fromLiteralContext(literalContext);
 
-        return HashedObject.fromContext(context, hash, validate);
+        return HashedObject.fromContext(context, hash);
     }
 
     
-    static fromLiteral(literal: Literal, validate=false) : HashedObject {
+    static fromLiteral(literal: Literal) : HashedObject {
 
         let context = new Context();
         context.rootHashes.push(literal.hash);
         context.literals.set(literal.hash, literal);
 
-        return HashedObject.fromContext(context, undefined, validate);
+        return HashedObject.fromContext(context);
 
+    }
+
+    // IMPORTANT: this method is NOT thread safe!
+
+    static async fromContextWithValidation(context: Context, hash?: Hash): Promise<HashedObject> {
+        if (hash === undefined) {
+            if (context.rootHashes.length === 0) {
+                throw new Error('Cannot deliteralize object because the hash was not provided, and there are no hashes in its literal representation.');
+            } else if (context.rootHashes.length > 1) {
+                throw new Error('Cannot deliteralize object because the hash was not provided, and there are more than one hashes in its literal representation.');
+            }
+            hash = context.rootHashes[0];
+        }
+
+        if (context.objects.has(hash)) {
+            return context.objects.get(hash) as HashedObject;
+        } else {
+
+            const literal = context.literals.get(hash);
+
+            if (literal === undefined) {
+                console.log('NO LITERAL')
+                throw new Error('Literal for ' + hash + ' missing from context');
+            }
+
+            for (const dep of literal.dependencies) {
+
+                if (!context.objects.has(dep.hash)) {
+                    await HashedObject.fromContextWithValidation(context, dep.hash);
+                }
+            }
+
+            const obj = HashedObject.fromContext(context, hash);
+
+            if (obj.author !== undefined) {
+                if (literal.signature === undefined) {
+                    context.objects.delete(hash);
+                    throw new Error('Missing signature for ' + hash);
+                }
+
+                if (!await obj.author.verifySignature(hash, literal.signature)) {
+                    context.objects.delete(hash);
+                    throw new Error('Invalid signature for ' + hash);
+                }
+            }
+
+            if (!await obj.validate(context.objects)) {
+                context.objects.delete(hash);
+                throw new Error('Validation failed for ' + hash);
+            }
+
+            return obj;
+        }
     }
 
     // Note: If validate=true, then all the HashReferences present in all the literals that
     //       need to be deliteralized to re-create the root object MUST be present in
     //       context.objects, since they are necessary for validation.
-    static fromContext(context: Context, hash?: Hash, validate=false) : HashedObject {
+    static fromContext(context: Context, hash?: Hash) : HashedObject {
 
         if (hash === undefined) {
             if (context.rootHashes.length === 0) {
@@ -472,7 +532,7 @@ abstract class HashedObject {
             hash = context.rootHashes[0];
         }
 
-        HashedObject.deliteralizeInContext(hash, context, validate);
+        HashedObject.deliteralizeInContext(hash, context);
 
         return context.objects.get(hash) as HashedObject;
     }
@@ -481,7 +541,7 @@ abstract class HashedObject {
     //                        recreate the object and insert it into the context
     //                        (be smart and only do it if it hasn't been done already)
 
-    static deliteralizeInContext(hash: Hash, context: Context, validate=false) : void {
+    static deliteralizeInContext(hash: Hash, context: Context) : void {
 
         let hashedObject = context.objects.get(hash);
 
@@ -521,7 +581,7 @@ abstract class HashedObject {
 
         for (const [fieldName, fieldValue] of Object.entries(value['_fields'])) {
             if (fieldName.length>0 && fieldName[0] !== '_') {
-                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context, validate);
+                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context);
             }
         }
 
@@ -530,24 +590,6 @@ abstract class HashedObject {
         }
         
         hashedObject.setLastHash(hash);
-
-        if (validate) {
-
-            if (hashedObject.author !== undefined) {
-                if (literal.signature === undefined) {
-                    throw new Error('Singature is missing for object ' + hash);
-                }
-
-                if (!hashedObject.author.verifySignature(hash, literal.signature)) {
-                    throw new Error('Invalid signature for obejct ' + hash);
-                }
-            }
-
-            if (!hashedObject.validate(context.objects)) {
-                throw new Error('Validation failed for object ' + hash);
-            }
-
-        }
 
         hashedObject.init();
 
@@ -604,7 +646,7 @@ abstract class HashedObject {
                 } else if (value['_type'] === 'hashed_object_dependency') {
                     let hash = value['_hash'];
 
-                    HashedObject.deliteralizeInContext(hash, context, validate);
+                    HashedObject.deliteralizeInContext(hash, context);
                     something = context.objects.get(hash) as HashedObject;
 
                 } else if (value['_type'] === 'hashed_object') {

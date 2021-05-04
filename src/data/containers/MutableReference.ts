@@ -59,7 +59,7 @@ class MutableReference<T> extends MutableObject {
         
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
         references;
 
         return Types.isTypeConstraint(this.typeConstraints);
@@ -95,7 +95,7 @@ class RefUpdateOp<T> extends MutationOp {
 
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
 
         if (!super.validate(references)) {
             return false;

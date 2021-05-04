@@ -37,7 +37,7 @@ class Identity extends HashedObject {
         
     }
 
-    validate() {
+    async validate() {
         return true;
     }
 
@@ -47,7 +47,13 @@ class Identity extends HashedObject {
 
     verifySignature(text: string, signature: string) {
         //text; signature; return true; // mock
-        return this.publicKey?.verifySignature(text, signature);
+
+        if (this.publicKey === undefined) {
+            throw new Error('Cannot verify signature, Identity is uninitialized')
+        }
+
+
+        return this.publicKey.verifySignature(text, signature);
     }
 
     encrypt(text: string) {

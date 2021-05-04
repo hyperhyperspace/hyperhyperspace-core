@@ -25,7 +25,7 @@ class HasId extends MutableObject {
         throw new Error();
     }
 
-    validate(references: Map<string, HashedObject>) : boolean {
+    async validate(references: Map<string, HashedObject>) : Promise<boolean> {
         references;
         return true;
     }
@@ -55,7 +55,7 @@ class OverrideIds extends HashedObject {
         
     }
 
-    validate(references: Map<string, HashedObject>): boolean {
+    async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
         return true;
     }

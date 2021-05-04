@@ -79,7 +79,7 @@ describeProxy('[SYN] State sync', () => {
 async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number) {
 
     let peerGroupId = new RNGImpl().randomHexString(64);
-    let pods = TestPeerGroupPods.generate(peerGroupId, 3, 3, 2, network, 'no-discovery', basePort);
+    let pods = await TestPeerGroupPods.generate(peerGroupId, 3, 3, 2, network, 'no-discovery', basePort);
 
     const objCount = 3;
     const objIds   = new Array<Hash>();
@@ -172,7 +172,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
+    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
 
     let stores : Array<Store> = [];
     
@@ -185,8 +185,8 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
         pods[i].registerAgent(gossip);
     }
 
-    let id = TestIdentity.getFirstTestIdentity();
-    let kp = TestIdentity.getFistTestKeyPair();
+    let id = await TestIdentity.getFirstTestIdentity();
+    let kp = await TestIdentity.getFistTestKeyPair();
     
     let s = new MutableSet<Identity>();
     
@@ -292,7 +292,7 @@ async function stagedSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
+    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
 
     let stores : Array<Store> = [];
     
@@ -305,8 +305,8 @@ async function stagedSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'
         pods[i].registerAgent(gossip);
     }
 
-    let id = TestIdentity.getFirstTestIdentity();
-    let kp = TestIdentity.getFistTestKeyPair();
+    let id = await TestIdentity.getFirstTestIdentity();
+    let kp = await TestIdentity.getFistTestKeyPair();
     
     let s = new MutableSet<Identity>();
     
@@ -441,7 +441,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
+    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
 
     let stores : Array<Store> = [];
     
@@ -454,8 +454,8 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         pods[i].registerAgent(gossip);
     }
 
-    let id = TestIdentity.getFirstTestIdentity();
-    let kp = TestIdentity.getFistTestKeyPair();
+    let id = await TestIdentity.getFirstTestIdentity();
+    let kp = await TestIdentity.getFistTestKeyPair();
     
     let s = new MutableSet<HashedObject>();
     
@@ -579,7 +579,7 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
+    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort, useRemoting);
 
     let stores : Array<Store> = [];
     
@@ -592,7 +592,7 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
         pods[i].registerAgent(gossip);
     }
 
-    let kp = TestIdentity.getFistTestKeyPair();
+    let kp = await TestIdentity.getFistTestKeyPair();
     
     let s = new MutableSet<HashedObject>();
     

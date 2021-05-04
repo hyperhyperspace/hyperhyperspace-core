@@ -21,7 +21,7 @@ class HashedLiteral extends HashedObject {
 
     }
 
-    validate(references: Map<string, HashedObject>): boolean {
+    async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
         return true;
     }

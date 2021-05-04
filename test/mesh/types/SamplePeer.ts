@@ -27,7 +27,7 @@ class SamplePeer extends HashedObject {
 
     }
 
-    validate() {
+    async validate() {
         return true;
     }
 

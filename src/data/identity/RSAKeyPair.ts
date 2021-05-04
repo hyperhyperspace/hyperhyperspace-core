@@ -16,20 +16,20 @@ class RSAKeyPair extends HashedObject {
 
     static className = 'hhs/v0/RSAKeyPair';
 
-    static generate(bits: number) {
+    static async generate(bits: number) {
         let rsa = new RSAImpl();
         rsa.generateKey(bits);
 
         return RSAKeyPair.fromKeys(rsa.getFormat(), rsa.getPublicKey(), rsa.getPrivateKey());
     }
 
-    static fromKeys(format: string, publicKey: string, privateKey: string) {
+    static async fromKeys(format: string, publicKey: string, privateKey: string) {
         let keyPair = new RSAKeyPair();
         keyPair.format = format;
         keyPair.publicKey = publicKey;
         keyPair.privateKey = privateKey;
-        keyPair.initRSA();
-        keyPair.selfSign();
+        await keyPair.initRSA();
+        await keyPair.selfSign();
         return keyPair;
     }
 
@@ -44,25 +44,30 @@ class RSAKeyPair extends HashedObject {
         super();
     }
 
-    init() {
+    async init() {
         this.initRSA();
         if (!this.checkSelfSignature()) {
             throw new Error("Self signature check failed for private key");
         }
     }
 
-    validate() {
-        this.initRSA();
+    async validate() {
+        await this.initRSA();
         return this.checkSelfSignature();
     }
 
-    private initRSA() {
+    private async initRSA() {
         this._rsa = new RSAImpl();
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey(), this.getPrivateKey());
     }
 
-    private selfSign() {
-        this.privateKeySignature = this._rsa?.sign(this.privateKey as string);
+    private async selfSign() {
+
+        if (this._rsa === undefined) {
+            throw new Error('Attempting to self sign keypair, but RSA has not been initialized.');
+        }
+
+        this.privateKeySignature = await this._rsa.sign(this.privateKey as string);
     }
 
     private checkSelfSignature() {
@@ -94,7 +99,12 @@ class RSAKeyPair extends HashedObject {
     }
 
     sign(text: string) {
-        return this._rsa?.sign(text) as string;
+
+        if (this._rsa === undefined) {
+            throw new Error('Attempting to create signature, but RSA has not been initialized.');
+        }
+
+        return this._rsa.sign(text);
     }
 
     verifySignature(text: string, signature: string) {
@@ -102,10 +112,20 @@ class RSAKeyPair extends HashedObject {
     }
 
     encrypt(plainText: string) {
-        return this._rsa?.encrypt(plainText);
+
+        if (this._rsa === undefined) {
+            throw new Error('Attempting to encrypt, but RSA has not been initialized.');
+        }
+
+        return this._rsa.encrypt(plainText);
     }
 
     decrypt(cypherText : string) {
+
+        if (this._rsa === undefined) {
+            throw new Error('Attempting to decrypt, but RSA has not been initialized.');
+        }
+
         return this._rsa?.decrypt(cypherText);
     }
 

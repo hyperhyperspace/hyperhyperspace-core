@@ -32,7 +32,7 @@ class RSAPublicKey extends HashedObject {
         this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey());
     }
 
-    validate() {
+    async validate() {
         return true;
     }
 

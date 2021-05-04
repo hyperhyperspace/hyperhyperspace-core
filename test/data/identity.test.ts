@@ -4,11 +4,11 @@ import { TestIdentity } from './types/TestIdentity';
 import { describeProxy } from '../config';
 
 describeProxy('[IDN] Identity', () => {
-    test( '[IDN01] Basic identity', () => {
+    test( '[IDN01] Basic identity', async () => {
 
-        let keyPair = TestIdentity.getFistTestKeyPair();
+        let keyPair = await TestIdentity.getFistTestKeyPair();
 
-        let id = TestIdentity.getFirstTestIdentity();
+        let id = await TestIdentity.getFirstTestIdentity();
 
         let literal1 = id.toLiteralContext();
 
@@ -18,16 +18,16 @@ describeProxy('[IDN] Identity', () => {
 
         let text = 'a short string';
 
-        let signature = keyPair.sign(text);
+        let signature = await keyPair.sign(text);
 
         expect(id.verifySignature(text, signature)).toBeTruthy();
 
     });
 
-    test( '[IDN01] Identity keypair hash generation', () => {
-        let keyPair = TestIdentity.getFistTestKeyPair();
+    test( '[IDN01] Identity keypair hash generation', async () => {
+        let keyPair = await TestIdentity.getFistTestKeyPair();
 
-        let id = TestIdentity.getFirstTestIdentity();
+        let id = await TestIdentity.getFirstTestIdentity();
         
         expect(id.getKeyPairHash()).toEqual(keyPair.hash());
     });

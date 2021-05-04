@@ -44,9 +44,9 @@ class TestIdentity {
     "AgMBAAE=\n" +
     "-----END PUBLIC KEY-----";
 
-    static getFirstTestIdentity() {
+    static async getFirstTestIdentity() {
 
-        let keyPair = TestIdentity.getFistTestKeyPair();
+        let keyPair = await TestIdentity.getFistTestKeyPair();
         
         let info = { type: 'person', name: 'Eric', last: 'Hobsbawm'};
 

@@ -17,7 +17,7 @@ class ImmutableReference<T extends MutableObject> extends HashedObject {
 
     }
 
-    validate(references: Map<string, HashedObject>): boolean {
+    async validate(references: Map<string, HashedObject>): Promise<boolean> {
         if (this.value === undefined || !(this.value instanceof HashReference)) {
             return false;
         }

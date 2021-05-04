@@ -16,7 +16,7 @@ abstract class MutationOp extends HashedObject {
         this.target  = target;
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
 
         if (this.target === undefined) {
             return false;

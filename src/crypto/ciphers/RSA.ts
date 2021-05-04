@@ -1,18 +1,17 @@
 
 interface RSA {
 
-    generateKey(bits: number) : void;
-    loadKeyPair(format: string, publicKey: string, privateKey?: string) : void;
+    generateKey(bits: number) : Promise<void>;
+    loadKeyPair(format: string, publicKey: string, privateKey?: string) : Promise<void>;
 
     getPublicKey()  : string;
     getPrivateKey() : string | undefined;
-    getFormat()     : string;
+    
+    sign(text: string) : Promise<string>;
+    verify(text: string, signature: string) : Promise<boolean>;
 
-    sign(text: string) : string;
-    verify(text: string, signature: string) : boolean;
-
-    encrypt(plainText: string) : string;
-    decrypt(cypherText : string) : string;
+    encrypt(plainText: string) : Promise<string>;
+    decrypt(cypherText : string) : Promise<string>;
 
 }
 

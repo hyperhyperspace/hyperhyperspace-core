@@ -17,12 +17,12 @@ import { RemotingMesh } from './RemotingMesh';
 
 class TestPeerGroupPods {
     
-    static generate(peerGroupId: string, activePeers: number, totalPeers: number, peerConnCount: number, network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number, useRemoting=false): Array<AgentPod> {
+    static async generate(peerGroupId: string, activePeers: number, totalPeers: number, peerConnCount: number, network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number, useRemoting=false): Promise<Array<AgentPod>> {
 
         let peers = new Array<PeerInfo>();
 
         for (let i=0; i<totalPeers; i++) {
-            let id = Identity.fromKeyPair({'id':'peer' + i}, RSAKeyPair.generate(512));
+            let id = Identity.fromKeyPair({'id':'peer' + i}, await RSAKeyPair.generate(512));
             
             let host = LinkupManager.defaultLinkupServer;
 

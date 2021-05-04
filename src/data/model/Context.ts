@@ -31,8 +31,8 @@ class Context {
 
     fromLiteralContext(literalContext: LiteralContext) : void {
         this.rootHashes = Array.from(literalContext.rootHashes);
-        this.literals = new Map(Object.entries(literalContext.literals));
-        this.objects = new Map();
+        this.literals   = new Map(Object.entries(literalContext.literals));
+        this.objects    = new Map();
     }
 
     merge(other: Context) {

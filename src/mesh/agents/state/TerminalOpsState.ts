@@ -27,7 +27,7 @@ class TerminalOpsState extends HashedObject {
         return TerminalOpsState.className;
     }
 
-    validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>) {
         references;
         return this.objectHash !== undefined && this.terminalOps !== undefined;
     }

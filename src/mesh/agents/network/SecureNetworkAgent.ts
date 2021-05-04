@@ -204,7 +204,7 @@ class OneWaySecuredConnection {
         // use 256 bits so it can be use as a ChaCha20 key
     }
 
-    encryptSecret() {
+    async encryptSecret() {
 
         if (this.secret === undefined) {
             throw new Error('Attempted to encrypt connection secret before generating it.');
@@ -214,10 +214,17 @@ class OneWaySecuredConnection {
             throw new Error('Attempted to encrypt connection secret, but identity is missing.');
         }
 
-        this.encryptedSecret = Strings.chunk(this.secret, 32).map((x: string) => (this.identity?.encrypt(x) as string));
+        const encryptedSecret = new Array<string>();
+
+        for (const chunk of Strings.chunk(this.secret, 32)) {
+            encryptedSecret.push(await this.identity.encrypt(chunk) as string)
+        }
+
+
+        this.encryptedSecret = encryptedSecret;
     }
 
-    decryptSecret() {
+    async decryptSecret() {
         
         if (this.identity === undefined) {
             throw new Error('Secured connection cannot decrypt received secret: identity is missing');
@@ -231,7 +238,13 @@ class OneWaySecuredConnection {
             throw new Error('Secured connection cannot decrypt received secret: it is missing');
         }
 
-        this.secret = Strings.unchunk(this.encryptedSecret.map((x: string) => (this.identity?.decrypt(x) as string)));
+        const chunks = new Array<string>();
+
+        for (const encryptedChunk of this.encryptedSecret) {
+            chunks.push(await this.identity.decrypt(encryptedChunk));
+        }
+
+        this.secret = Strings.unchunk(chunks);
     }
 
     computeSecretHash() {
@@ -344,9 +357,11 @@ class SecureNetworkAgent implements Agent {
             this.sendIdentity(connId, localIdentity, identityHash);
             secured.status = IdHolderStatus.SentIdentity;
         } else if (secured.status === IdHolderStatus.ReceivedUnexpectedChallenge) {
-            secured.decryptSecret();
-            this.answerReceivedChallenge(connId, identityHash, secured.computeSecretHash());
-            secured.status = IdHolderStatus.SentChallengeAnswer;
+            secured.decryptSecret().then(() => {
+                //TODO: see if we have introduced a race condition by making decryptSecret async.
+                this.answerReceivedChallenge(connId, identityHash, secured.computeSecretHash());
+                secured.status = IdHolderStatus.SentChallengeAnswer;
+            })
         } else if (secured.status === undefined) {
             secured.status = IdHolderStatus.ExpectingChallenge;
         } // else, negotiation is already running, just let it run its course
@@ -389,9 +404,11 @@ class SecureNetworkAgent implements Agent {
             secured.status  = IdChallengerStatus.SentIdentityRequest;
         } else {
             secured.generateSecret();
-            secured.encryptSecret();
-            this.sendKnownIdentityChallenge(secured.connId, secured.identityHash, secured.encryptedSecret as Array<string>);
-            secured.status = IdChallengerStatus.SentChallenge;
+            //TODO: see if we have introduced a race condition by making encryptSecret async
+            secured.encryptSecret().then(() => {
+                this.sendKnownIdentityChallenge(secured.connId, secured.identityHash, secured.encryptedSecret as Array<string>);
+                secured.status = IdChallengerStatus.SentChallenge;
+            });
         }
     }
 
@@ -474,9 +491,12 @@ class SecureNetworkAgent implements Agent {
                 secured.status === IdHolderStatus.SentIdentity) {
                 
                 secured.encryptedSecret = sendChallengeMessage.encrypedSecret;
-                secured.decryptSecret();
-                this.answerReceivedChallenge(connId, identityHash, secured.computeSecretHash());
-                secured.status = IdHolderStatus.SentChallengeAnswer;
+                secured.decryptSecret().then(() => {
+                    //TODO: see if we have introduced a race condition by making decryptSecret async.
+                    this.answerReceivedChallenge(connId, identityHash, secured.computeSecretHash());
+                    secured.status = IdHolderStatus.SentChallengeAnswer;
+                });
+                
             } else if (secured.status === undefined) {
                 secured.encryptedSecret = sendChallengeMessage.encrypedSecret;
                 secured.status = IdHolderStatus.ReceivedUnexpectedChallenge;
@@ -517,9 +537,11 @@ class SecureNetworkAgent implements Agent {
                 if (identity.hash() === identityHash && identity instanceof Identity) {
                     secured.identity = identity;
                     secured.generateSecret();
-                    secured.encryptSecret();
-                    this.sendKnownIdentityChallenge(connId, identityHash, secured.encryptedSecret as Array<string>);
-                    secured.status = IdChallengerStatus.SentChallenge;
+                    //TODO: see if we have introduced a race condition by making encryptSecret async
+                    secured.encryptSecret().then(() => {
+                        this.sendKnownIdentityChallenge(connId, identityHash, secured.encryptedSecret as Array<string>);
+                        secured.status = IdChallengerStatus.SentChallenge;
+                    });
                 } else {
                     secured.status = IdChallengerStatus.IdentityRejected;
                 }

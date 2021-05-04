@@ -622,7 +622,8 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }
 
     private async processReceivedObject(hash: Hash, context: Context) {
-        let obj = HashedObject.fromContext(context, hash, true);
+
+        let obj = await HashedObject.fromContextWithValidation(context, hash);
 
         if (this.shouldAcceptMutationOp(obj as MutationOp)) {
             this.controlLog.trace(() => 'saving object with hash ' + hash + ' in ' + this.peerGroupAgent.localPeer.endpoint);
