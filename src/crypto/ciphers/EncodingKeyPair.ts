@@ -1,5 +1,5 @@
 
-interface CypherKeyPair {
+interface EncodingKeyPair {
 
     generateKey(params: any): Promise<void>;
     loadKeyPair(publicKey: string, privateKey?: string): Promise<void>;
@@ -11,4 +11,4 @@ interface CypherKeyPair {
     decrypt(cypherText : string) : Promise<string>;
 }
 
-export { CypherKeyPair };
+export { EncodingKeyPair };

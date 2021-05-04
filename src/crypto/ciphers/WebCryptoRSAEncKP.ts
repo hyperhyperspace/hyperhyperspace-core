@@ -1,9 +1,9 @@
 import { Strings } from 'util/strings';
-import { CypherKeyPair } from './CypherKeyPair';
+import { EncodingKeyPair } from './EncodingKeyPair';
 
 const ALGORITHM = 'RSA-OAEP';
 
-class WebCryptoRSACypKP implements CypherKeyPair {
+class WebCryptoRSAEncKP implements EncodingKeyPair {
 
     publicKeyPEM?  : string;
     publicKey?     : CryptoKey;
@@ -161,4 +161,4 @@ class WebCryptoRSACypKP implements CypherKeyPair {
 
 }
 
-export { WebCryptoRSACypKP };
+export { WebCryptoRSAEncKP };
