@@ -58,7 +58,7 @@ class WebCryptoRSACypKP implements CypherKeyPair {
             const privPEMContents = privateKeyPEM.substring(privPEMHeader.length, privateKeyPEM.length - privPEMFooter.length).replaceAll('\n', '');
   
             const binaryDerString = atob(privPEMContents);
-            const binaryDer = str2ab(binaryDerString);
+            const binaryDer = Strings.stingToArrayBuffer(binaryDerString);
 
             const privateKey = await window.crypto.subtle.importKey(
                                     'pkcs8',
@@ -84,7 +84,7 @@ class WebCryptoRSACypKP implements CypherKeyPair {
         const pemFooter = '-----END PUBLIC KEY-----';
         const pemContents = publicKeyPEM.substring(pemHeader.length, publicKeyPEM.length - pemFooter.length);
         const binaryDerString = atob(pemContents);
-        const binaryDer = str2ab(binaryDerString);
+        const binaryDer = Strings.stingToArrayBuffer(binaryDerString);
 
         const publicKey = await window.crypto.subtle.importKey(
                     'spki',
