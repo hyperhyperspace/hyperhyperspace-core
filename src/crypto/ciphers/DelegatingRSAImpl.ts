@@ -25,9 +25,7 @@ class DelegatingRSAImpl implements RSA {
 
     }
 
-    async loadKeyPair(format: string, publicKey: string, privateKey?: string): Promise<void> {
-        
-        format; // ignore
+    async loadKeyPair(publicKey: string, privateKey?: string): Promise<void> {
 
         if (this.initialized) {
             throw new Error('RSA key cannot be re-initialized.')

@@ -517,10 +517,7 @@ abstract class HashedObject {
             return obj;
         }
     }
-
-    // Note: If validate=true, then all the HashReferences present in all the literals that
-    //       need to be deliteralized to re-create the root object MUST be present in
-    //       context.objects, since they are necessary for validation.
+    
     static fromContext(context: Context, hash?: Hash) : HashedObject {
 
         if (hash === undefined) {

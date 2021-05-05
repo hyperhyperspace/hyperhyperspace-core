@@ -1,4 +1,4 @@
-import { RSA, RSAImpl } from 'crypto/ciphers';
+import { RSA, RSADefaults } from 'crypto/ciphers';
 import { HashedObject } from 'data/model/HashedObject';
 import { RSAKeyPair } from './RSAKeyPair';
 
@@ -6,11 +6,10 @@ class RSAPublicKey extends HashedObject {
 
     static className = 'hhs/v0/RSAPublicKey';
 
-    static fromKeys(format: string, publicKey: string) : RSAPublicKey {
+    static fromKeys(publicKey: string) : RSAPublicKey {
         
         let pk = new RSAPublicKey();
 
-        pk.format = format;
         pk.publicKey = publicKey;
 
         pk.init();
@@ -18,21 +17,26 @@ class RSAPublicKey extends HashedObject {
         return pk;
     }
 
-    format?: string;
     publicKey?: string;
 
-    _rsa?: RSA;
+    _rsaPromise?: Promise<RSA>;
 
     constructor() {
         super();
     }
 
     init() {
-        this._rsa = new RSAImpl();
-        this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey());
+        this._rsaPromise = this.initRSA();
+    }
+
+    private async initRSA(): Promise<RSA> {
+        const _rsa = new RSADefaults.impl();
+        await _rsa.loadKeyPair(this.getPublicKey());
+        return _rsa;
     }
 
     async validate() {
+        // TODO: self sign??
         return true;
     }
 
@@ -40,29 +44,30 @@ class RSAPublicKey extends HashedObject {
         return RSAPublicKey.className;
     }
 
-    getFormat() {
-        return this.format as string;
-    }
-
     getPublicKey() {
         return this.publicKey as string;
     }
 
     getKeyPairHash() {
-        return RSAKeyPair.hashPublicKeyPart(this.format as string, this.publicKey as string);
+        return RSAKeyPair.hashPublicKeyPart(this.publicKey as string);
     }
 
-    verifySignature(text: string, signature: string) {
+    async verifySignature(text: string, signature: string) {
 
-        if (this._rsa === undefined) {
+        if (this._rsaPromise === undefined) {
             throw new Error('RSA public key is empty, cannot verify signature');
         }
 
-        return this._rsa.verify(text, signature);
+        return (await this._rsaPromise).verify(text, signature);
     }
 
-    encrypt(plainText: string) {
-        return this._rsa?.encrypt(plainText);
+    async encrypt(plainText: string) {
+
+        if (this._rsaPromise === undefined) {
+            throw new Error('RSA public key is empty, cannot encrypt');
+        }
+
+        return (await this._rsaPromise).encrypt(plainText);
     }
 
 }

@@ -46,19 +46,21 @@ class Identity extends HashedObject {
     }
 
     verifySignature(text: string, signature: string) {
-        //text; signature; return true; // mock
-
+        
         if (this.publicKey === undefined) {
             throw new Error('Cannot verify signature, Identity is uninitialized')
         }
-
 
         return this.publicKey.verifySignature(text, signature);
     }
 
     encrypt(text: string) {
-        // return text; // mock
-        return this.publicKey?.encrypt(text);
+
+        if (this.publicKey === undefined) {
+            throw new Error('Cannot ecnrypt, Identity is uninitialized')
+        }
+
+        return this.publicKey.encrypt(text);
     }
 
     getPublicKey() {

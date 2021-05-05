@@ -176,7 +176,7 @@ let generateSamplePeers = async (size: number) => {
 
     let samplePeers = new Array<SamplePeer>();
     for (let i=0; i<size; i++) {
-        let id = Identity.fromKeyPair({'order': i}, await RSAKeyPair.generate(512));
+        let id = Identity.fromKeyPair({'order': i}, await RSAKeyPair.generate(1024));
         let samplePeer = new SamplePeer(id);
         samplePeers.push(samplePeer);
     }

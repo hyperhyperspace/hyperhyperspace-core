@@ -1,4 +1,4 @@
-import { RSA, RSAImpl } from 'crypto/ciphers';
+import { RSA } from 'crypto/ciphers';
 import { ChaCha20, ChaCha20Impl } from 'crypto/ciphers';
 import { describeProxy } from 'config';
 import { RSADefaults } from 'crypto/ciphers/RSA';
@@ -77,10 +77,10 @@ describeProxy('[ENC] Ciphers', () => {
     test('[ENC03] RSA self test', async () => {
 
         let rsa = new RSADefaults.impl() as RSA;
-        await rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
+        await rsa.loadKeyPair(publicKey, privateKey);
 
         let rsaPublic = new RSADefaults.impl() as RSA;
-        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
+        await rsaPublic.loadKeyPair(publicKey);
 
         let message = '₿₿₿ this is a small text message 😱';
 
@@ -98,10 +98,10 @@ describeProxy('[ENC] Ciphers', () => {
     test('[ENC04] RSA self test - force WebCrypto', async () => {
 
         let rsa = new WebCryptoRSA() as RSA;
-        await rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
+        await rsa.loadKeyPair(publicKey, privateKey);
 
         let rsaPublic = new WebCryptoRSA() as RSA;
-        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
+        await rsaPublic.loadKeyPair(publicKey);
 
         let message = '₿₿₿ this is a small text message 😱';
 
@@ -119,10 +119,10 @@ describeProxy('[ENC] Ciphers', () => {
     test('[ENC05] RSA self test - force NodeRSA', async () => {
 
         let rsa = new NodeRSA() as RSA;
-        await rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
+        await rsa.loadKeyPair(publicKey, privateKey);
 
         let rsaPublic = new NodeRSA() as RSA;
-        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
+        await rsaPublic.loadKeyPair(publicKey);
 
         let message = '₿₿₿ this is a small text message 😱';
 
@@ -142,13 +142,13 @@ describeProxy('[ENC] Ciphers', () => {
         let rsa = new NodeRSA() as RSA;
         await rsa.generateKey(2048);
         let rsaPublic = new NodeRSA() as RSA;
-        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, rsa.getPublicKey());
+        await rsaPublic.loadKeyPair(rsa.getPublicKey());
 
         let rsa2 = new WebCryptoRSA() as RSA;
-        await rsa2.loadKeyPair(RSAImpl.PKCS8, rsa.getPublicKey(), rsa.getPrivateKey());
+        await rsa2.loadKeyPair(rsa.getPublicKey(), rsa.getPrivateKey());
 
         let rsaPublic2 = new WebCryptoRSA() as RSA;
-        await rsaPublic2.loadKeyPair(RSAImpl.PKCS8, rsa2.getPublicKey());
+        await rsaPublic2.loadKeyPair(rsa2.getPublicKey());
 
         let message = '₿₿₿ this is a small text message 😱';
 

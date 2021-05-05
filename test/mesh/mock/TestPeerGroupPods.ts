@@ -22,7 +22,7 @@ class TestPeerGroupPods {
         let peers = new Array<PeerInfo>();
 
         for (let i=0; i<totalPeers; i++) {
-            let id = Identity.fromKeyPair({'id':'peer' + i}, await RSAKeyPair.generate(512));
+            let id = Identity.fromKeyPair({'id':'peer' + i}, await RSAKeyPair.generate(1024));
             
             let host = LinkupManager.defaultLinkupServer;
 

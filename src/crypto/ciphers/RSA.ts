@@ -6,7 +6,7 @@ interface RSA {
 
 
     generateKey(bits: number) : Promise<void>;
-    loadKeyPair(format: string, publicKey: string, privateKey?: string) : Promise<void>;
+    loadKeyPair(publicKey: string, privateKey?: string) : Promise<void>;
 
     getPublicKey()  : string;
     getPrivateKey() : string | undefined;

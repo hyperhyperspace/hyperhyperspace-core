@@ -27,11 +27,7 @@ class WebCryptoRSASigKP implements SignatureKeyPair {
             },
             true,
             ['sign', 'verify']
-          );
-
-        if (!(keyPair instanceof CryptoKeyPair)) {
-            throw new Error('Could not generate RSA key pair using WebCrypto, params: ' + params);
-        }
+        );
 
         this.privateKey = keyPair.privateKey;
 

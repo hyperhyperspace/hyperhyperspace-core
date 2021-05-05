@@ -52,11 +52,7 @@ class JSEncryptRSA implements RSA {
         this.crypto.getKey();
     };
 
-    async loadKeyPair(format: string, publicKey: string, privateKey?: string) {
-
-        if (format !== JSEncryptRSA.PKCS8) {
-            throw new Error("Currently only pkcs8 encoded RSA keys are supported, sorry");
-        }
+    async loadKeyPair(publicKey: string, privateKey?: string) {
 
         this.crypto = new JSEncrypt();
         this.crypto.setPublicKey(publicKey);

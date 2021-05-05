@@ -11,8 +11,14 @@ class NodeRSASigKP implements SignatureKeyPair {
     keyPair?: any;
 
     async generateKey(params?: {b?: number}): Promise<void> {
-        
-        this.keyPair = new NodeRSA({b: params?.b || 2048});
+
+        this.keyPair = new NodeRSA();
+
+        this.keyPair.setOptions({
+            environment: 'browser'
+        });
+
+        this.keyPair.generateKeyPair(params?.b || 2048);
 
         this.publicKeyPEM  = this.keyPair.exportKey('pkcs8-public-pem');
         this.privateKeyPEM = this.keyPair.exportKey('pkcs8-private-pem');
@@ -24,6 +30,11 @@ class NodeRSASigKP implements SignatureKeyPair {
         if (privateKey !== undefined) {
 
             this.keyPair = new NodeRSA();
+
+            this.keyPair.setOptions({
+                environment: 'browser'
+            });
+    
             this.keyPair.importKey(privateKey, 'pkcs8-private-pem');
 
             this.privateKeyPEM = privateKey;
@@ -36,6 +47,11 @@ class NodeRSASigKP implements SignatureKeyPair {
 
         } else if (publicKey !== undefined) {
             this.keyPair = new NodeRSA();
+
+            this.keyPair.setOptions({
+                environment: 'browser'
+            });
+
             this.keyPair.importKey(publicKey, 'pkcs8-public-pem');
             
             this.publicKeyPEM  = publicKey;

@@ -24,7 +24,7 @@ describeProxy('[IDN] Identity', () => {
 
     });
 
-    test( '[IDN01] Identity keypair hash generation', async () => {
+    test( '[IDN02] Identity keypair hash generation', async () => {
         let keyPair = await TestIdentity.getFistTestKeyPair();
 
         let id = await TestIdentity.getFirstTestIdentity();

@@ -1,4 +1,4 @@
-import { RSA, RSAImpl } from 'crypto/ciphers';
+import { RSA, RSADefaults } from 'crypto/ciphers';
 import { HashedObject } from '../model/HashedObject';
 import { RSAPublicKey } from './RSAPublicKey';
 import { Hashing } from 'data/model/Hashing';
@@ -17,57 +17,52 @@ class RSAKeyPair extends HashedObject {
     static className = 'hhs/v0/RSAKeyPair';
 
     static async generate(bits: number) {
-        let rsa = new RSAImpl();
-        rsa.generateKey(bits);
+        let rsa = new RSADefaults.impl();
+        await rsa.generateKey(bits);
 
-        return RSAKeyPair.fromKeys(rsa.getFormat(), rsa.getPublicKey(), rsa.getPrivateKey());
+        return RSAKeyPair.fromKeys(rsa.getPublicKey(), rsa.getPrivateKey());
     }
 
-    static async fromKeys(format: string, publicKey: string, privateKey: string) {
+    static async fromKeys(publicKey: string, privateKey?: string) {
         let keyPair = new RSAKeyPair();
-        keyPair.format = format;
         keyPair.publicKey = publicKey;
         keyPair.privateKey = privateKey;
-        await keyPair.initRSA();
+        keyPair.init();
         await keyPair.selfSign();
         return keyPair;
     }
 
-    format?: string;
     publicKey?: string;
     privateKey?: string;
     privateKeySignature?: string;
 
-    _rsa?: RSA;
+    _rsaPromise?: Promise<RSA>;
 
     constructor() {
         super();
     }
 
-    async init() {
-        this.initRSA();
-        if (!this.checkSelfSignature()) {
-            throw new Error("Self signature check failed for private key");
-        }
+    init() {
+        this._rsaPromise = this.initRSA();
     }
 
     async validate() {
-        await this.initRSA();
         return this.checkSelfSignature();
     }
 
-    private async initRSA() {
-        this._rsa = new RSAImpl();
-        this._rsa.loadKeyPair(this.getFormat(), this.getPublicKey(), this.getPrivateKey());
+    private async initRSA(): Promise<RSA> {
+        const _rsa = new RSADefaults.impl();
+        await _rsa.loadKeyPair(this.getPublicKey(), this.getPrivateKey());
+        return _rsa;
     }
 
     private async selfSign() {
 
-        if (this._rsa === undefined) {
+        if (this._rsaPromise === undefined) {
             throw new Error('Attempting to self sign keypair, but RSA has not been initialized.');
         }
 
-        this.privateKeySignature = await this._rsa.sign(this.privateKey as string);
+        this.privateKeySignature = await (await this._rsaPromise).sign(this.privateKey as string);
     }
 
     private checkSelfSignature() {
@@ -79,11 +74,7 @@ class RSAKeyPair extends HashedObject {
     }
 
     customHash(seed?: string) {
-        return RSAKeyPair.hashPublicKeyPart(this.format as string, this.publicKey as string, seed);
-    }
-
-    getFormat(): string {
-        return this.format as string;
+        return RSAKeyPair.hashPublicKeyPart(this.publicKey as string, seed);
     }
 
     getPublicKey() {
@@ -95,42 +86,47 @@ class RSAKeyPair extends HashedObject {
     }
 
     makePublicKey() {
-        return RSAPublicKey.fromKeys(this.getFormat(), this.getPublicKey());
+        return RSAPublicKey.fromKeys(this.getPublicKey());
     }
 
-    sign(text: string) {
+    async sign(text: string) {
 
-        if (this._rsa === undefined) {
+        if (this._rsaPromise === undefined) {
             throw new Error('Attempting to create signature, but RSA has not been initialized.');
         }
 
-        return this._rsa.sign(text);
+        return (await this._rsaPromise).sign(text);
     }
 
-    verifySignature(text: string, signature: string) {
-        return this._rsa?.verify(text, signature);
+    async verifySignature(text: string, signature: string) {
+
+        if (this._rsaPromise === undefined) {
+            throw new Error('Attempting to verify signature, but RSA has not been initialized.');
+        }
+
+        return (await this._rsaPromise).verify(text, signature);
     }
 
-    encrypt(plainText: string) {
+    async encrypt(plainText: string) {
 
-        if (this._rsa === undefined) {
+        if (this._rsaPromise === undefined) {
             throw new Error('Attempting to encrypt, but RSA has not been initialized.');
         }
 
-        return this._rsa.encrypt(plainText);
+        return (await this._rsaPromise).encrypt(plainText);
     }
 
-    decrypt(cypherText : string) {
+    async decrypt(cypherText : string) {
 
-        if (this._rsa === undefined) {
+        if (this._rsaPromise === undefined) {
             throw new Error('Attempting to decrypt, but RSA has not been initialized.');
         }
 
-        return this._rsa?.decrypt(cypherText);
+        return (await this._rsaPromise).decrypt(cypherText);
     }
 
-    static hashPublicKeyPart(format: string, publicKey: string, seed?: string) {
-        return Hashing.forValue({'_type': 'custom_hashed_object', '_class': RSAKeyPair.className, '_contents': {'format' : format, 'publicKey': publicKey}}, seed);
+    static hashPublicKeyPart(publicKey: string, seed?: string) {
+        return Hashing.forValue({'_type': 'custom_hashed_object', '_class': RSAKeyPair.className, '_contents': {'publicKey': publicKey}}, seed);
     }
 }
 
