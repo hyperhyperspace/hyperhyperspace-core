@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@hyper-hyper-space/node-env": "^0.8.0",
+    "@peculiar/webcrypto": "^1.1.6",
     "@types/jest": "^26.0.19",
     "@types/node": "^14.0.13",
     "@types/ws": "^7.2.6",
@@ -33,6 +34,7 @@
     "@types/node-rsa": "^1.1.0",
     "broadcast-channel": "^3.5.3",
     "chacha-js": "^2.1.1",
+    "fast-text-encoding": "^1.0.3",
     "get-random-values": "^1.2.0",
     "idb": "^5.0.4",
     "jsencrypt": "3.0.0-rc.1",

@@ -8,11 +8,13 @@ export * from './data/containers';
 export * from './storage/backends';
 export * from './storage/store';
 
+export * from './crypto/config';
 export * from './crypto/ciphers';
 export * from './crypto/hashing';
 export * from './crypto/random';
 export * from './crypto/hmac';
 export * from './crypto/wordcoding';
+export * from './crypto/sign';
 
 export * from './net/linkup';
 export * from './net/transport';

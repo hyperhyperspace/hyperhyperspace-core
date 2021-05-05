@@ -1,3 +1,4 @@
+import { WebCryptoConfig } from 'crypto/config/WebCryptoConfig';
 import { Strings } from 'util/strings';
 import { EncodingKeyPair } from './EncodingKeyPair';
 
@@ -18,7 +19,7 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
         const modulusLength = params?.b || 2048;
         const hash          = 'SHA-256';
 
-        const keyPair = await window.crypto.subtle.generateKey(
+        const keyPair = await WebCryptoConfig.getSubtle().generateKey(
             {
               name: ALGORITHM,
               // Consider using a 4096-bit key for systems that require long-term security
@@ -36,7 +37,7 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
 
         this.privateKey = keyPair.privateKey;
 
-        const exportedPrivKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+        const exportedPrivKey = await WebCryptoConfig.getSubtle().exportKey("pkcs8", keyPair.privateKey);
 
         this.privateKeyPEM = '-----BEGIN PRIVATE KEY-----\n' +  
                              (btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(exportedPrivKey)))).match(/.{1,64}/g) as string[]).join('\n') +
@@ -44,7 +45,7 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
 
         this.publicKey = keyPair.publicKey;
 
-        const exportedPubKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+        const exportedPubKey = await WebCryptoConfig.getSubtle().exportKey("spki", keyPair.publicKey);
 
         this.publicKeyPEM = '-----BEGIN PUBLIC KEY-----\n' +  
                             (btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(exportedPubKey)))).match(/.{1,64}/g) as string[]).join('\n') +
@@ -55,12 +56,13 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
         if (privateKeyPEM !== undefined) {
             const privPEMHeader = '-----BEGIN PRIVATE KEY-----';
             const privPEMFooter = '-----END PRIVATE KEY-----';
-            const privPEMContents = privateKeyPEM.substring(privPEMHeader.length, privateKeyPEM.length - privPEMFooter.length).replaceAll('\n', '');
+            const privPEMNoNewlines = privateKeyPEM.replace(/\r?\n|\r/g, '');
+            const privPEMContents = privPEMNoNewlines.substring(privPEMHeader.length, privPEMNoNewlines.length - privPEMFooter.length);
   
             const binaryDerString = atob(privPEMContents);
             const binaryDer = Strings.stingToArrayBuffer(binaryDerString);
 
-            const privateKey = await window.crypto.subtle.importKey(
+            const privateKey = await WebCryptoConfig.getSubtle().importKey(
                                     'pkcs8',
                                     binaryDer,
                                     {
@@ -71,22 +73,20 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
                                     ['decrypt']
                                 );
             
-            if (privateKey instanceof CryptoKey) {
-                this.privateKeyPEM = privateKeyPEM;
-                this.privateKey = privateKey;
-            } else {
-                throw new Error('Could not import RSA private key using WebCrypto');
-            }
+
+            this.privateKeyPEM = privateKeyPEM;
+            this.privateKey = privateKey;
 
         }
         
         const pemHeader = '-----BEGIN PUBLIC KEY-----';
         const pemFooter = '-----END PUBLIC KEY-----';
-        const pemContents = publicKeyPEM.substring(pemHeader.length, publicKeyPEM.length - pemFooter.length);
+        const pemNoNewlines = publicKeyPEM.replace(/\r?\n|\r/g, '');
+        const pemContents = pemNoNewlines.substring(pemHeader.length, pemNoNewlines.length - pemFooter.length);
         const binaryDerString = atob(pemContents);
         const binaryDer = Strings.stingToArrayBuffer(binaryDerString);
 
-        const publicKey = await window.crypto.subtle.importKey(
+        const publicKey = await WebCryptoConfig.getSubtle().importKey(
                     'spki',
                     binaryDer,
                     {
@@ -96,13 +96,10 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
                     true,
                     ['encrypt']
                 );
-        if (publicKey instanceof CryptoKey) {
-            this.publicKeyPEM = publicKeyPEM;
-            this.publicKey    = publicKey;
 
-        } else {
-            throw new Error('Could not import RSA public key using WebCrypto');
-        }
+        this.publicKeyPEM = publicKeyPEM;
+        this.publicKey    = publicKey;
+
     }
 
     getPublicKey(): string {
@@ -127,12 +124,12 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
             throw new Error('Trying to encrypt with WebCrypto, but keypair is uninitialized');
         }
 
-        const cypherBuf = await window.crypto.subtle.encrypt(
+        const cypherBuf = await WebCryptoConfig.getSubtle().encrypt(
             {
                 name: ALGORITHM
             },
             this.publicKey,
-            this.encoder.encode(plainText) 
+            this.encoder.encode(plainText)
         );
       
         const cypherUint = new Uint8Array(cypherBuf);
@@ -151,12 +148,12 @@ class WebCryptoRSAEncKP implements EncodingKeyPair {
         const cypherTextRaw = atob(cypherText);
         const cypherTextBuffer = Strings.stingToArrayBuffer(cypherTextRaw);
 
-        const plain2 = await window.crypto.subtle.decrypt(
+        const plain = await WebCryptoConfig.getSubtle().decrypt(
                                 {name: ALGORITHM },
                                 this.privateKey, 
                                 cypherTextBuffer);
 
-        return this.decoder.decode(plain2);
+        return this.decoder.decode(plain);
   }
 
 }

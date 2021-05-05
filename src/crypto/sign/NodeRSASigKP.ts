@@ -1,14 +1,14 @@
 import { SignatureKeyPair } from './SignatureKeyPair';
-
-import NodeRSA = require('node-rsa');
 import { Strings } from 'util/strings';
+
+const NodeRSA = require('node-rsa');
 
 class NodeRSASigKP implements SignatureKeyPair {
 
     publicKeyPEM?: string;
     privateKeyPEM?: string;
 
-    keyPair?: NodeRSA;
+    keyPair?: any;
 
     async generateKey(params?: {b?: number}): Promise<void> {
         

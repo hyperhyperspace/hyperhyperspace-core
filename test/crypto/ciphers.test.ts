@@ -1,6 +1,50 @@
 import { RSA, RSAImpl } from 'crypto/ciphers';
 import { ChaCha20, ChaCha20Impl } from 'crypto/ciphers';
 import { describeProxy } from 'config';
+import { RSADefaults } from 'crypto/ciphers/RSA';
+import { WebCryptoRSA } from 'crypto/ciphers/WebCryptoRSA';
+import { NodeRSA } from 'crypto/ciphers/NodeRSA';
+
+const privateKey = 
+"-----BEGIN PRIVATE KEY-----\n" +
+"MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDcl6HjhLeboXhS\n" +
+"h+DZa1JhePf5wUYxLdFibd6L5biKpzjuPb1QiYKNWbIdNVuM16j0zzLwd06GFw7O\n" +
+"Dr/XVuQQFJedLzb2SLbLfDs6D2FIyLYsDFqYwXzsClUmXpzqq4V9kDtowuAl6YW8\n" +
+"WbJ6xTvfz39ieRN3r00etjdF87q2wT1mO6eFjER8KLU5G6GIRNtzCwZ32k9Gpq96\n" +
+"x/5BPrqRm4IvGzq3jGHmxAGeP+9/9LmeIboQmXM8vbCW5gmZPWsJbH0fXzioPk3G\n" +
+"6Pal11I4Xti342Kl5CKhDFd3LKw7WK0ZSHrcd5622oiXgQWFtXiw+YTYUe5O356E\n" +
+"EnTaU/FLAgMBAAECggEAMbbyw0X741VGusLox9dKH7GVoXIPkbHTyK0eRMUnDAiX\n" +
+"6gl8CxSSmaynWbHWyi0oZNP1lQAucEXuDj6AudVZXM5nRQOJDYRhvgZnirRAppil\n" +
+"hdPa7yZcMw45FoaoMrMpSJ0i5n9U6PZyL3q/oK+myNAI03aaDpUxekRyvI8re1gy\n" +
+"kwqYshYAjKDCdEhHveTB2e+TyoyM7K/Funim5pzZwKvWFU3VkO/Q2H9aCX4dnFQH\n" +
+"eywnCi7gISbddaJBzXPQEBrAomrequ0NyBRB0Btgde5mDYcW1CdGWwfDvMceo10w\n" +
+"14xbalrIa7TnIUi5UrCtU6cDB7jFTEv5bZKy8DUbAQKBgQDuJmCSJNTBUdEeP8ga\n" +
+"imh59lkl4cEthKIh5Y8XxTD2b1tga6O2Z6dAlsbkSfqDPxDzZJRodQkmW2RqmLaD\n" +
+"9IWSKfUoTbYyfF4i3AV8cvMiB6LbBi9F+cwltdOIg1/2k71iRy0PanPt8v9TY96X\n" +
+"S0iQOnHiFYqxGW0Lgwo4hVNaCwKBgQDtIFwcVWds7y5jngGdI7TMRwsk37htECzK\n" +
+"sV0RENb0ZUPLFOVjrdj3bo9JekLfioYut/JLOTiO4bZ6BCckljwi/OHpuA0vzrOK\n" +
+"rUnYNB5hdgyWSkdK9oRyC84G/vtGTYP+cPSUD2ySqt/oYZFmTNUcPyEnlXmJl3Ut\n" +
+"yl0NPc+NwQKBgQC/OBVmgyhJqXYtwazckrHc7A8cua4w7ER6zyYcQftUhIlsXEFx\n" +
+"nrzOwcIlX7lEVQk5RVNcpEyafdudM82pGld9yy7ME8nts6qqdtv41xueAV+kWczv\n" +
+"dOmUhfC5tjMBfBMerGPj8ufu8aRNwuzhslMra6IxlHZuSSojii5Uv8jzjQKBgAUl\n" +
+"JJqAx+O3NNx4ezR7p9qe2AEO0aOcLDyhqJFMOj3HTLdFVszY4tJLldRUUMsk6FBv\n" +
+"MVSsgyumfh0bpfXHRLrFnelCUxbsdzzVEbsdNmOK+i7woadgvfLzip7gPXeDCxAk\n" +
+"R0pHI2XzSzRxmYQMursIK6H+Pkrb/HDn6Sj2ZGCBAoGBAIfsGm1uWJjFMTIOEFjR\n" +
+"UdgKeDxRlxjUfSEAQaT/0puBPl8DPtzHtNPXppo0RjJudFplD0XeiUpe8iEpGmMm\n" +
+"M/UIriB8oyEBClTF0Wby+tVSy3Yo68Y+GN1EX/z/rT5V8Kr6Dsc9+zZPfdbyno8Z\n" +
+"J2/sabWdFpSVB4v+NDPn8tim\n" +
+"-----END PRIVATE KEY-----\n";
+
+    const publicKey = 
+"-----BEGIN PUBLIC KEY-----\n" +
+"MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3Jeh44S3m6F4Uofg2WtS\n" +
+"YXj3+cFGMS3RYm3ei+W4iqc47j29UImCjVmyHTVbjNeo9M8y8HdOhhcOzg6/11bk\n" +
+"EBSXnS829ki2y3w7Og9hSMi2LAxamMF87ApVJl6c6quFfZA7aMLgJemFvFmyesU7\n" +
+"389/YnkTd69NHrY3RfO6tsE9ZjunhYxEfCi1ORuhiETbcwsGd9pPRqavesf+QT66\n" +
+"kZuCLxs6t4xh5sQBnj/vf/S5niG6EJlzPL2wluYJmT1rCWx9H184qD5Nxuj2pddS\n" +
+"OF7Yt+NipeQioQxXdyysO1itGUh63HeettqIl4EFhbV4sPmE2FHuTt+ehBJ02lPx\n" +
+"SwIDAQAB\n" +
+"-----END PUBLIC KEY-----\n";
 
 describeProxy('[ENC] Ciphers', () => {
     test('[ENC01] chacha20 self test', () => {
@@ -32,56 +76,16 @@ describeProxy('[ENC] Ciphers', () => {
 
     test('[ENC03] RSA self test', async () => {
 
-        let privateKey = 
-    "-----BEGIN RSA PRIVATE KEY-----\n" +
-    "MIIEogIBAAKCAQB52EypOvlrF6ou80w6qDshC7+8/8mEAzVJXk1NTZamn9WRu9QV\n" +
-    "4P34/4pdZ6y2CplHmpUeUpjvXE/I1P8tr+NAR7zE/7XugQBJTWreN69he3jephMT\n" +
-    "sBaK2WVvuR/El6JWricvrFqXb9LeeZZ//R87vlCxj1OjkRQJ01zahUqtutuhcvZk\n" +
-    "WtT7L2bjlGlziGQ+TkZeUqqLEcf8n0/jivcZWjVspxcTRaa5FZ+4jPnNhQrx+lgX\n" +
-    "jgp7nj1SCCx0arNGQUp1jlfblqEeEtYjJNoSFgXJuWhNEMa63Uk0WoHIRJ8L3ZaA\n" +
-    "UDolHDF8oOFSXHk0fc9LR1cUCiTMB8hU3q1vAgMBAAECggEASoEyz0Bah1ufGrp2\n" +
-    "4F9CWMCga+dUx75WdRiO2DgbaKPPqh9aXk6Hvhwz9U2R1HbCp4Aksrf7AFJIDxv/\n" +
-    "NWaZ5RJ4oVVjYAXNsQT/1gXi3g7sJ+kRPTatchXg6uIeRM4b3Dj9iS8w7ezY2mUq\n" +
-    "2/Rhhtym5wwnLptlz2RJIO3kbjo7R8KnK193qidC7MrFfV1zpiQs4HIZK/RenSwV\n" +
-    "Q7OYfazk6v0r9gSUDNuzVU1tX4IWI8UJpeCGpCgK9GMVempoMy4eHM0Y1RRl2st1\n" +
-    "m4RfS+Mac/OmtbhLIOO9OJekDunE0CWpbqvTMe24g91C95+A9myrZTZcTR4nJlus\n" +
-    "xYukIQKBgQDQ/HHe/uN3AtUn8wWnakBArDmZeH7/Hr6+0yKPzZA8IXxu7slNbKdk\n" +
-    "Mi9P8QXXZ4H923RuOJ4nzXN4WHhWS/s99++q5onJEsJOrV1slp3f7oiLYQVuTSOD\n" +
-    "83NSjoadG0qNh9U7Fuk1ViXWapdoCcSGWYPbYN5JEzQp6fSodkq+pwKBgQCVQV/m\n" +
-    "Gt+xNeczWeaUtHDTP4vsZ7SCsRb1K4Oo2NbKCUWKi7PcxPvy0Z4PYU/l2GbzprJk\n" +
-    "TQelbRR0bg52xddGaBLvJkg/0ApIjngb1jv2PYzMgM+1ts0fdSDrmBZtrFBFtS4m\n" +
-    "+bQS6kW4PQSjlJjdZDw2UK/M78OENoVtagd7+QKBgCdl4AW9IZ63Dv44B3HXSwOm\n" +
-    "NDmliLOJ1UXeQd7ATxe27GFxbMvG1wvBlj/I3WQNZGk6LQn2bIJubf1bGFyUeGnn\n" +
-    "Sux6B7G7cpwofLtS7bJgoqc8BC0WJ8Lha3U930zQ704dNGquWAqxEfMJJz/6z2zQ\n" +
-    "hVYfPeii0Suxqmjz3AVzAoGAH04xASCN3quBrOGkXXhjWcuwW4t87xSZzh6sZNPm\n" +
-    "aUX8kgyvUxT2C34v+uXcTkdPgLdsH2GQwv/YFHupCPyCJMBbiFGtQcUvAvzu8FfF\n" +
-    "B+btC0/RQTnwWDLHDuM9gQ9tXtGbto0VWgpNSVFzEaRvU7BceL//v6pihe6xmbtt\n" +
-    "inECgYEAs4N+p+kxs/tNJAvxOqsBHbPUldEsmXht+uagxaUArJP/GLznN+734Ryw\n" +
-    "L/8wfTF3JOudCCV0lYoqYj/0YNj3QeKtUL8I9Myg3ZEV9r312hlpY1dHybqbAWvs\n" +
-    "9bjGylKvu7UzCcQNuSGPFnpPOR28jSppYVSC5npgo6Yup0kNpv8=\n" +
-    "-----END RSA PRIVATE KEY-----\n";
-
-        let publicKey = 
-    "-----BEGIN PUBLIC KEY-----\n" +
-    "MIIBITANBgkqhkiG9w0BAQEFAAOCAQ4AMIIBCQKCAQB52EypOvlrF6ou80w6qDsh\n" +
-    "C7+8/8mEAzVJXk1NTZamn9WRu9QV4P34/4pdZ6y2CplHmpUeUpjvXE/I1P8tr+NA\n" +
-    "R7zE/7XugQBJTWreN69he3jephMTsBaK2WVvuR/El6JWricvrFqXb9LeeZZ//R87\n" +
-    "vlCxj1OjkRQJ01zahUqtutuhcvZkWtT7L2bjlGlziGQ+TkZeUqqLEcf8n0/jivcZ\n" +
-    "WjVspxcTRaa5FZ+4jPnNhQrx+lgXjgp7nj1SCCx0arNGQUp1jlfblqEeEtYjJNoS\n" +
-    "FgXJuWhNEMa63Uk0WoHIRJ8L3ZaAUDolHDF8oOFSXHk0fc9LR1cUCiTMB8hU3q1v\n" +
-    "AgMBAAE=\n" +
-    "-----END PUBLIC KEY-----";
-
-
-        let rsa = new RSAImpl() as RSA;
+        let rsa = new RSADefaults.impl() as RSA;
         await rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
 
-        let rsaPublic = new RSAImpl() as RSA;
+        let rsaPublic = new RSADefaults.impl() as RSA;
         await rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
 
-        let message = 'this is a small text message';
+        let message = '₿₿₿ this is a small text message 😱';
 
         let ciphertext = await rsaPublic.encrypt(message);
+
         expect(await rsa.decrypt(ciphertext)).toEqual(message);
 
         let signature = await rsa.sign(message);
@@ -91,59 +95,74 @@ describeProxy('[ENC] Ciphers', () => {
         expect(await rsaPublic.verify(message, wrongSignature)).toEqual(false);
     });
 
-    test('[ENC04] RSA encrpyt test', () => {
+    test('[ENC04] RSA self test - force WebCrypto', async () => {
 
-        // UNFINISHED
+        let rsa = new WebCryptoRSA() as RSA;
+        await rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
 
-        let private_key = 
-"-----BEGIN OPENSSH PRIVATE KEY-----\n" +
-"b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcn\n" +
-"NhAAAAAwEAAQAAAQEAxd1a3bbNy4B22fXBhUXayVxWIf8HH7hjbQmlUAo/GA+eFDuIT+Bl\n" +
-"q/XehjpZJsgbk2k3QLM3yP0ckqDdIEe7BdX8QU2vuh3q4KoZOZ5bg5Qf6d4YR7wq0M1l+Z\n" +
-"G6zgIckzRfWQxDGy8CkNAbWSgxOAvjvNBb2iKJOkwCTOaPGn+iJ4L4xELqDKTGH3p/YyLs\n" +
-"j4abNasGNFX2UNxNKJ9zixZ3Sy17Ft0rvGze7PEv3kUjdYpi+r3aPsZA+KIywd8skf101M\n" +
-"OMXBFuT/2gh5HMG4n2OgozIRN/FCJeT05BnSVAl62wCmIM/Yso6giKxXziN2TYd6MzynwH\n" +
-"mrRST8xRpwAAA9gywmqUMsJqlAAAAAdzc2gtcnNhAAABAQDF3Vrdts3LgHbZ9cGFRdrJXF\n" +
-"Yh/wcfuGNtCaVQCj8YD54UO4hP4GWr9d6GOlkmyBuTaTdAszfI/RySoN0gR7sF1fxBTa+6\n" +
-"Hergqhk5nluDlB/p3hhHvCrQzWX5kbrOAhyTNF9ZDEMbLwKQ0BtZKDE4C+O80FvaIok6TA\n" +
-"JM5o8af6IngvjEQuoMpMYfen9jIuyPhps1qwY0VfZQ3E0on3OLFndLLXsW3Su8bN7s8S/e\n" +
-"RSN1imL6vdo+xkD4ojLB3yyR/XTUw4xcEW5P/aCHkcwbifY6CjMhE38UIl5PTkGdJUCXrb\n" +
-"AKYgz9iyjqCIrFfOI3ZNh3ozPKfAeatFJPzFGnAAAAAwEAAQAAAQAY2PFeQmSZl6pVOL1y\n" +
-"pRESlFvkrQgR/a/Os5Vk9cRymxN46vj1PvLFo3ysUot7iUmdO2tK3ra0sMRzzWu3cAqWcw\n" +
-"bYlI7qynMCf5nnWHGZlnJjhhZ6e7DMw954dsqEsFMyUTNgFWAf+8lQsjGdAqUbqrKQtYGz\n" +
-"ZP7iqUTor1NtOj02RfMJ5ooHdwyRCDwGJyAS7nC9H/AxlpTLkz8T6so6aQ/Hkox29GNaWB\n" +
-"tVmD9hpYTbkQ5GjDhwLOUYeO0Cnj4NSGMqaU1gCR/tVOztWhsfTN6u2/sCOk0E6lZm6GGF\n" +
-"UlMQUZEVDKMsL5ClIuTFbRxvgBeLzGyppPonfTt2iHuhAAAAgQDmdp/DMeCJTB7qRRjvf6\n" +
-"oH+QzQH0ABEz+YgoHbcn51CVci5jUkM09+aTt9rAh5OYPcsRQluzDniZ4KdDAzlS1lg7CA\n" +
-"hBmnXrmRjDqv6VWTwBaKHvyknFddu2OhufdXXv3Va907H7oA9sDjlJkaC4sOR6b/XZbW+/\n" +
-"2GTofmeyuR9AAAAIEA9y9hMfO4p8yCRDGS7803G/RvUddpH3gxEs9CULvFdFUuseXRyMmm\n" +
-"XLMU+niwwPdKkbomMLcbEEb9aSaP5Es9XNHD5rueU0npe7MtLdgBxj6uPaYJ7NyI7v5n1X\n" +
-"qw4FRFhd/Ovapo4fZ3dN8yZLZ5uSv6nIxroAF1WUnvxxf0QUkAAACBAMzrtzrX9NRCttGO\n" +
-"sjZ8oKgKzoJt+dHIz6Wpye5EWySvzLQE65chc/P3oT/qB+o1Zj3WVOWxvBQMpWe8PBEDQM\n" +
-"2Wl3r5dxmM4jW5d5oehABYKVyDfpFZtvFobXnMgL/a84AoRG6ndoRmXKbE/MjrDsxUnxTK\n" +
-"jpjCkTtlgNQDRutvAAAAIGd1Y2hAU2FudGlhZ29zLU1hY0Jvb2stUHJvLmxvY2FsAQI=\n" +
-"-----END OPENSSH PRIVATE KEY-----";
+        let rsaPublic = new WebCryptoRSA() as RSA;
+        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
 
-        let public_key = "-----BEGIN PUBLIC KEY-----\n" + 
-        "AAAAB3NzaC1yc2EAAAADAQABAAABAQDF3Vrdts3LgHbZ9cGFRdrJXFYh/wcfuGNtCaVQCj8YD54UO4hP4GWr9d6GOlkmyBuTaTdAszfI/RySoN0gR7sF1fxBTa+6Hergqhk5nluDlB/p3hhHvCrQzWX5kbrOAhyTNF9ZDEMbLwKQ0BtZKDE4C+O80FvaIok6TAJM5o8af6IngvjEQuoMpMYfen9jIuyPhps1qwY0VfZQ3E0on3OLFndLLXsW3Su8bN7s8S/eRSN1imL6vdo+xkD4ojLB3yyR/XTUw4xcEW5P/aCHkcwbifY6CjMhE38UIl5PTkGdJUCXrbAKYgz9iyjqCIrFfOI3ZNh3ozPKfAeatFJPzFGn\n" +
-        "-----END PUBLIC KEY-----";
-        
-        public_key;
-        private_key;
+        let message = '₿₿₿ this is a small text message 😱';
 
-        
-        //let rsa = new RSAImpl() as RSA;
+        let ciphertext = await rsaPublic.encrypt(message);
 
-        //rsa.generateKey(2048);
+        expect(await rsa.decrypt(ciphertext)).toEqual(message);
 
-        //rsa.loadKeyPair('pkcs8', public_key, private_key);
+        let signature = await rsa.sign(message);
+        expect(await rsaPublic.verify(message, signature)).toEqual(true);
 
-        //console.log(rsa.getPrivateKey());
-        //console.log(rsa.getPublicKey());
+        let wrongSignature = "NU6k7ilRspYc6O7fUvGOnPdS7VkW3e1nYsrz6MflCUSNffTCpH/tS3J+2fvICWqN9dkCYXE/La969Gsod5nIPbonxvzNHpJKW/7Dnn2q62AN+k3ZFOGJ17qLrAu1mg9bcu4B0m3cbwrNLdUV1MBWp4poQI5bn8uM+A1IkdOLOFyyeWSgrlWstc2RvTnZlKR5Dk4F/kZMh4tzfC3sbktlirk7IbT0HvlU4V2hpu6lx3uw2wRbvH8CGTavToQeBI/StPh98JDZcdaB7nfWYZ2MIBwt9NpXQvcoaUuee4T7UkynIgYngmnmZnD/X9/WP0kO7tWa89I6uOVsiWowOBYsew==";
+        expect(await rsaPublic.verify(message, wrongSignature)).toEqual(false);
+    });
 
-        //let rsa2 = new RSAImpl() as RSA;
+    test('[ENC05] RSA self test - force NodeRSA', async () => {
 
-        //rsa2.loadKeyPair('pkcs8', rsa.getPrivateKey() as string, rsa.getPrivateKey());
+        let rsa = new NodeRSA() as RSA;
+        await rsa.loadKeyPair(RSAImpl.PKCS8, publicKey, privateKey);
+
+        let rsaPublic = new NodeRSA() as RSA;
+        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, publicKey);
+
+        let message = '₿₿₿ this is a small text message 😱';
+
+        let ciphertext = await rsaPublic.encrypt(message);
+
+        expect(await rsa.decrypt(ciphertext)).toEqual(message);
+
+        let signature = await rsa.sign(message);
+        expect(await rsaPublic.verify(message, signature)).toEqual(true);
+
+        let wrongSignature = "NU6k7ilRspYc6O7fUvGOnPdS7VkW3e1nYsrz6MflCUSNffTCpH/tS3J+2fvICWqN9dkCYXE/La969Gsod5nIPbonxvzNHpJKW/7Dnn2q62AN+k3ZFOGJ17qLrAu1mg9bcu4B0m3cbwrNLdUV1MBWp4poQI5bn8uM+A1IkdOLOFyyeWSgrlWstc2RvTnZlKR5Dk4F/kZMh4tzfC3sbktlirk7IbT0HvlU4V2hpu6lx3uw2wRbvH8CGTavToQeBI/StPh98JDZcdaB7nfWYZ2MIBwt9NpXQvcoaUuee4T7UkynIgYngmnmZnD/X9/WP0kO7tWa89I6uOVsiWowOBYsew==";
+        expect(await rsaPublic.verify(message, wrongSignature)).toEqual(false);
+    });
+
+    test('[ENC06] RSA check interop NodeRSA <--> WebCryptoRSA', async () => {
+
+        let rsa = new NodeRSA() as RSA;
+        await rsa.generateKey(2048);
+        let rsaPublic = new NodeRSA() as RSA;
+        await rsaPublic.loadKeyPair(RSAImpl.PKCS8, rsa.getPublicKey());
+
+        let rsa2 = new WebCryptoRSA() as RSA;
+        await rsa2.loadKeyPair(RSAImpl.PKCS8, rsa.getPublicKey(), rsa.getPrivateKey());
+
+        let rsaPublic2 = new WebCryptoRSA() as RSA;
+        await rsaPublic2.loadKeyPair(RSAImpl.PKCS8, rsa2.getPublicKey());
+
+        let message = '₿₿₿ this is a small text message 😱';
+
+        let ciphertext = await rsaPublic.encrypt(message);
+        expect(await rsa2.decrypt(ciphertext)).toEqual(message);
+
+        let signature = await rsa2.sign(message);
+        expect(await rsaPublic.verify(message, signature)).toEqual(true);
+
+        let ciphertext2 = await rsaPublic2.encrypt(message);
+        expect(await rsa.decrypt(ciphertext2)).toEqual(message);
+
+        let signature2 = await rsa.sign(message);
+        expect(await rsaPublic2.verify(message, signature2)).toEqual(true);
 
     });
 });

@@ -1,13 +1,13 @@
-import NodeRSA from 'node-rsa';
-import { Strings } from 'util/strings';
 import { EncodingKeyPair } from './EncodingKeyPair';
+
+const NodeRSA = require('node-rsa');
 
 class NodeRSAEncKP implements EncodingKeyPair {
 
     publicKeyPEM?: string;
     privateKeyPEM?: string;
 
-    keyPair?: NodeRSA;
+    keyPair?: any;
 
     encoder = new TextEncoder();
     decoder = new TextDecoder();
@@ -98,7 +98,7 @@ class NodeRSAEncKP implements EncodingKeyPair {
             throw new Error('Attempted to encrypt, but NodeRSA keypair is uninitialized.');
         }
 
-        return this.keyPair.encrypt(Buffer.from(this.encoder.encode(plainText)), 'base64', 'utf8');
+        return this.keyPair.encrypt(Buffer.from(plainText), 'base64', 'utf8');
     }
 
     async decrypt(cypherText: string): Promise<string> {
@@ -106,7 +106,8 @@ class NodeRSAEncKP implements EncodingKeyPair {
             throw new Error('Attempted to decrypt, but NodeRSA keypair is uninitialized.');
         }
 
-        return this.decoder.decode(this.keyPair.decrypt(cypherText));
+        return this.keyPair.decrypt(cypherText, 'utf8');
+
     }
     
 }

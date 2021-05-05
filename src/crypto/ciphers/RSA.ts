@@ -1,5 +1,9 @@
+import { NodeRSA } from "./NodeRSA";
+import { WebCryptoRSA } from "./WebCryptoRSA";
 
 interface RSA {
+
+
 
     generateKey(bits: number) : Promise<void>;
     loadKeyPair(format: string, publicKey: string, privateKey?: string) : Promise<void>;
@@ -15,4 +19,8 @@ interface RSA {
 
 }
 
-export { RSA };
+class RSADefaults {
+    static impl: new () => RSA = globalThis?.crypto?.subtle !== undefined? WebCryptoRSA : NodeRSA;
+}
+
+export { RSA, RSADefaults };
