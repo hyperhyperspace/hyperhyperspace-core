@@ -118,7 +118,7 @@ class Resources {
     }
 
     static dummy(): Resources {
-        return Object();
+        return {} as any;
     }
 
 
