@@ -311,7 +311,7 @@ class WebRTCConnection implements Connection {
 
     private handleReceiveIceCandidate(candidate: RTCIceCandidateInit) {
         this.connection?.addIceCandidate(candidate).catch((reason: any) => {
-            WebRTCConnection.logger.warning('Failed to set ICE candidate, reason: ' + JSON.stringify(reason));
+            WebRTCConnection.logger.debug('Failed to set ICE candidate, reason: ' + JSON.stringify(reason));
         });
     }
 
