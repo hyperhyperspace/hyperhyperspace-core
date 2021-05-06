@@ -117,11 +117,6 @@ class Resources {
         return new Resources({store: init?.store, mesh: init?.mesh, config: config, aliasing: init?.aliasing});
     }
 
-    static dummy(): Resources {
-        return {} as any;
-    }
-
-
 }
 
 export { Resources, ResourceInit, Config };
