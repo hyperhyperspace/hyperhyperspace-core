@@ -18,7 +18,7 @@ import { RequestMsg, ResponseMsg, CancelRequestMsg } from './CausalHistoryProvid
 const MaxRequestsPerRemote = 2;
 const MaxPendingOps = 1024;
 
-const RequestTimeout = 20;
+const RequestTimeout = 25;
 const LiteralArrivalTimeout = 10;
 
 type RequestInfo = {
@@ -79,6 +79,8 @@ class CausalHistorySynchronizer {
     newRequestsLock: Lock;
     needToRetryNewRequests: boolean;
 
+    checkRequestTimeoutsInterval?: any;
+
     readonly logPrefix: Hash;
     controlLog : Logger;
     sourcesLog : Logger;
@@ -109,6 +111,8 @@ class CausalHistorySynchronizer {
 
         this.newRequestsLock = new Lock();
         this.needToRetryNewRequests = false;
+
+        this.checkRequestTimeouts = this.checkRequestTimeouts.bind(this);
 
         this.logPrefix = 'On peer ' + this.syncAgent.peerGroupAgent.localPeer.identity?.hash() as Hash + ':';
 
@@ -142,6 +146,19 @@ class CausalHistorySynchronizer {
         }
 
         this.attemptNewRequests();
+    }
+
+    checkRequestTimeouts() {
+
+        let cancelled = false;
+
+        for (const reqInfo of this.requests.values()) {
+            cancelled = cancelled || this.checkRequestRemoval(reqInfo);
+        }
+
+        if (cancelled) {
+            this.attemptNewRequests();
+        }
     }
 
     private async attemptNewRequests() {
@@ -211,8 +228,6 @@ class CausalHistorySynchronizer {
 
         const opHistoryFromGossip = Array.from(this.endpointsForUnknownHistory.keys());
 
-
-
         for (const hash of opHistoryFromGossip) {
             
             const isUnrequested  = this.opHistoryIsUnrequested(hash); 
@@ -245,6 +260,8 @@ class CausalHistorySynchronizer {
 
             const isUnrequested = this.opHistoryIsUnrequested(hash);
             const isMissingFromStore = isUnrequested && await this.opHistoryIsMissingFromStore(hash);
+            // (*) the above is short circuited like that only for performance: if it is not unrequested
+            // it doesn't matter wheter it is in the store or not, we will not ask for it again.
 
             if (isUnrequested && isMissingFromStore) {
 
@@ -284,8 +301,6 @@ class CausalHistorySynchronizer {
 
         sortedOpHistorySources.sort((s1:[Endpoint, Set<Hash>], s2:[Endpoint, Set<Hash>]) => s2[1].size - s1[1].size);
 
-        
-
         const opHistoriesToRequest = new Array<[Endpoint, Set<Hash>]>();
 
         this.controlLog.trace('\n'+this.logPrefix+'\nWill check ' + sortedOpHistorySources.length + ' remote sources');
@@ -321,10 +336,12 @@ class CausalHistorySynchronizer {
             }
         }
 
+        const startingOpHistories = this.computeStartingOpHistories();
+
         for (const [remote, opHistories] of opHistoriesToRequest) {
 
-            const startingOpHistories = this.computeStartingOpHistories();
-            const startingOps         = this.computeStartingOps(remote);
+            
+            const startingOps = this.computeStartingOps(remote);
 
             const ops = this.findOpsToRequest(remote, startingOps);
 
@@ -449,11 +466,26 @@ class CausalHistorySynchronizer {
 
         let sent = this.sendRequest(reqInfo);
         
-        if (!sent) {
+        if (sent) {
+            this.checkRequestTimeoutsTimer();    
+        } else {
             this.cleanupRequest(reqInfo);
         }
 
         return sent;
+    }
+
+    private checkRequestTimeoutsTimer() {
+        if (this.requests.size > 0) {
+            if (this.checkRequestTimeoutsInterval === undefined) {
+                this.checkRequestTimeoutsInterval = setInterval(this.checkRequestTimeouts, 5000);
+            }
+        } else {
+            if (this.checkRequestTimeoutsInterval !== undefined) {
+                clearInterval(this.checkRequestTimeoutsInterval);
+                this.checkRequestTimeoutsInterval = undefined;
+            }
+        }
     }
 
     // Do some intelligence over which ops can be requested from an endpoint
@@ -852,8 +884,6 @@ class CausalHistorySynchronizer {
                     await this.syncAgent.store.save(op);
 
                     this.opXferLog.debug('\n'+this.logPrefix+'\nReceived op ' + literal.hash + ' from request ' + reqInfo.request.requestId);
-                    
-                    this.checkRequestRemoval(reqInfo);
 
                     const removed = this.checkRequestRemoval(reqInfo);
         
@@ -1399,6 +1429,9 @@ class CausalHistorySynchronizer {
         // remove request info
 
         this.requests.delete(reqInfo.request.requestId);
+
+        // see if we can shut down the timer checking for timeouts
+        this.checkRequestTimeoutsTimer();
 
     }
 

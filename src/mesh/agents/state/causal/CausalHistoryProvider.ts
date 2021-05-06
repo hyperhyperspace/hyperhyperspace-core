@@ -606,7 +606,7 @@ class CausalHistoryProvider {
     private startStreamingResponse(respInfo: ResponseInfo) {
         this.streamingResponses = this.streamingResponses + 1;
 
-        if (this.streamingResponses === 1 && this.streamingResponsesInterval === undefined) {
+        if (this.streamingResponsesInterval === undefined) {
             this.streamingResponsesInterval = setInterval(this.continueStreamingResponses, 100);
         }
 
