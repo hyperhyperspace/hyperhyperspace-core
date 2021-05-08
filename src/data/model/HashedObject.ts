@@ -375,7 +375,7 @@ abstract class HashedObject {
         let value;
         let dependencies = new Set<Dependency>();
 
-        if (typ === 'boolean' || typ === 'number' || typ === 'string' || typ === 'bigint') {
+        if (typ === 'boolean' || typ === 'number' || typ === 'string') {
             value = something;
         } else if (typ === 'object') {
             if (Array.isArray(something)) {
@@ -619,7 +619,7 @@ abstract class HashedObject {
 
         let typ = typeof(value);
 
-        if (typ === 'boolean' || typ === 'number' || typ === 'string' || typ === 'bigint') {
+        if (typ === 'boolean' || typ === 'number' || typ === 'string') {
             something = value;
         } else if (typ === 'object') {
             if (Array.isArray(value)) {
