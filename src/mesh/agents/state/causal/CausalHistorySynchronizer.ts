@@ -150,13 +150,20 @@ class CausalHistorySynchronizer {
 
     checkRequestTimeouts() {
 
-        let cancelled = false;
+        let cancelledSome = false;
 
         for (const reqInfo of this.requests.values()) {
-            cancelled = cancelled || this.checkRequestRemoval(reqInfo);
+
+            const cancelled = this.checkRequestRemoval(reqInfo);
+
+            if (cancelled) {
+                console.log('CANCELLED ' + reqInfo.request.requestId + ' in timeout loop')
+            }
+
+            cancelledSome = cancelledSome || cancelled;
         }
 
-        if (cancelled) {
+        if (cancelledSome) {
             this.attemptNewRequests();
         }
     }
@@ -1277,6 +1284,7 @@ class CausalHistorySynchronizer {
     private sendRequest(reqInfo: RequestInfo) {
         
         reqInfo.status = 'sent';
+        reqInfo.requestSendingTimestamp = Date.now();
 
         const reqId = reqInfo.request.requestId;
         this.requests.set(reqId, reqInfo);

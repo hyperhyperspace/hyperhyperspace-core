@@ -14,6 +14,7 @@ import { Identity } from 'data/identity';
 import { describeProxy } from 'config';
 import { CausalHistorySyncAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
 import { Logger, LogLevel } from 'util/logging';
+import { SlowyString } from '../types/SlowyString';
 
 describeProxy('[SYN] State sync', () => {
     test('[SYN01] Gossip agent in small peer group (wrtc)', async (done) => {
@@ -71,6 +72,12 @@ describeProxy('[SYN] State sync', () => {
     test('[SYN10] Causal history agent-based set diamond-shaped sync in small peer group (wrtc)', async (done) => {
 
         await diamondSyncInSmallPeerGroup(done, 'wrtc');
+
+    }, 300000);
+
+    test('[SYN11] Causal history agent-based set deep sync in small peer group (wrtc)', async (done) => {
+
+        await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined, true);
 
     }, 300000);
 
@@ -435,7 +442,7 @@ async function stagedSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'
     done();
 }
 
-async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number, useRemoting?: boolean) {
+async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number, useRemoting?: boolean, useSlowOps?: boolean) {
 
     const size = 3;
         
@@ -457,14 +464,22 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
     let id = await TestIdentity.getFirstTestIdentity();
     let kp = await TestIdentity.getFistTestKeyPair();
     
-    let s = new MutableSet<HashedObject>();
+    let s = new MutableSet();
     
     s.setAuthor(id);
     
+   
+
+
     await stores[0].save(kp);
     await stores[0].save(s);
 
-    await s.add(new HashedLiteral('hello'));
+    if (useSlowOps === true) {
+        await s.add(new SlowyString('hello'));
+    } else {
+        await s.add(new HashedLiteral('hello'));
+    }
+    
 
     await stores[0].save(s);
 
@@ -517,16 +532,28 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         }
     }
     
+    if (useSlowOps === true) {
+        await s.add(new SlowyString('my'));
+        await s.add(new SlowyString('dear'));
+        await s.add(new SlowyString('friends'));
+        await s.add(new SlowyString('I'));
+        await s.add(new SlowyString('have'));
+        await s.add(new SlowyString('very'));
+        await s.add(new SlowyString('dearly'));
+        await s.add(new SlowyString('missed'));
+        await s.add(new SlowyString('you'));        
+    } else {
+        await s.add(new HashedLiteral('my'));
+        await s.add(new HashedLiteral('dear'));
+        await s.add(new HashedLiteral('friends'));
+        await s.add(new HashedLiteral('I'));
+        await s.add(new HashedLiteral('have'));
+        await s.add(new HashedLiteral('very'));
+        await s.add(new HashedLiteral('dearly'));
+        await s.add(new HashedLiteral('missed'));
+        await s.add(new HashedLiteral('you'));
     
-    await s.add(new HashedLiteral('my'));
-    await s.add(new HashedLiteral('dear'));
-    await s.add(new HashedLiteral('friends'));
-    await s.add(new HashedLiteral('I'));
-    await s.add(new HashedLiteral('have'));
-    await s.add(new HashedLiteral('very'));
-    await s.add(new HashedLiteral('dearly'));
-    await s.add(new HashedLiteral('missed'));
-    await s.add(new HashedLiteral('you'));
+    }
 
     await stores[0].save(s);    
 

@@ -5,7 +5,7 @@ import { LinkupAddress } from './LinkupAddress';
 
 class SignallingServerConnection implements LinkupServer {
 
-    static logger = new Logger(SignallingServerConnection.name, LogLevel.INFO);
+    static logger = new Logger(SignallingServerConnection.name, LogLevel.ERROR);
 
     static WRTC_URL_PREFIX = 'wrtc+';
 
@@ -256,7 +256,7 @@ class SignallingServerConnection implements LinkupServer {
                                 }
     
                                 if (!found) {
-                                    SignallingServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId);
+                                    SignallingServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId, message);
                                 }
                             }
                         } else if (raw !== undefined && raw === 'true') {

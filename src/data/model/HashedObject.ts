@@ -500,18 +500,18 @@ abstract class HashedObject {
             if (obj.author !== undefined) {
                 if (literal.signature === undefined) {
                     context.objects.delete(hash);
-                    throw new Error('Missing signature for ' + hash);
+                    throw new Error('Missing signature for ' + hash + ' of type ' + obj.getClassName());
                 }
 
                 if (!await obj.author.verifySignature(hash, literal.signature)) {
                     context.objects.delete(hash);
-                    throw new Error('Invalid signature for ' + hash);
+                    throw new Error('Invalid signature for ' + hash + ' of type ' + obj.getClassName());
                 }
             }
 
             if (!await obj.validate(context.objects)) {
                 context.objects.delete(hash);
-                throw new Error('Validation failed for ' + hash);
+                throw new Error('Validation failed for ' + hash + ' of type ' + obj.getClassName());
             }
 
             return obj;

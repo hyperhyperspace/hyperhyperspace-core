@@ -8,8 +8,8 @@ class WebCryptoConfig {
     static overrideImpl: SubtleCrypto | undefined;
 
     static getSubtle(): SubtleCrypto {
-        if (WebCryptoConfig.overrideImpl !== undefined) {
-            return WebCryptoConfig.overrideImpl;
+        if ((globalThis as any)?.webCryptoOverrideImpl !== undefined) {
+            return (globalThis as any)?.webCryptoOverrideImpl as SubtleCrypto;
         } else {
             return globalThis.crypto.subtle;
         }
