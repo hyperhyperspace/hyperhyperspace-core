@@ -1,9 +1,10 @@
 import { WordCode } from 'crypto/wordcoding';
-import { Hash, HashedObject, Hashing } from 'data/model';
-import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
+import { Hash, HashedLiteral, HashedObject, Hashing } from 'data/model';
+import { ObjectBroadcastAgent, ObjectDiscoveryReply } from 'mesh/agents/discovery';
 import { AsyncStream } from 'util/streams';
 import { SpaceEntryPoint } from './SpaceEntryPoint';
 import { Resources } from './Resources';
+import { SpaceInfo } from './SpaceInfo';
 
 type SpaceInit = {entryPoint?: HashedObject & SpaceEntryPoint, hash?: Hash, wordCode?: string[], wordCodeLang?: string };
 
@@ -34,7 +35,10 @@ class Space {
         this.resources = resources;
 
         if (init.entryPoint !== undefined) {
-            this.entryPoint = Promise.resolve(init.entryPoint);
+            this.entryPoint = this.saveSpaceInfo(init.entryPoint).then(() => {
+                 return Promise.resolve(init.entryPoint as (HashedObject & SpaceEntryPoint));
+            })
+            
         } else if (init.hash !== undefined) {
 
             this.entryPoint = this.resources.store.load(init.hash).then((obj: HashedObject | undefined) => {
@@ -85,24 +89,41 @@ class Space {
                 throw new Error('Could not decode wordCode ' + init.wordCode.join(' ') + ', last error: ' + lastError);
             }
 
-            if (resources.config.peersForDiscovery === undefined) {
-                throw new Error('Trying to open space for missing object ' + init.hash + ', but config.peersForDiscovery is undefined.');
-            }
-
-            const linkupServers = resources.config.linkupServers;
-            const discoveryEndpoint = resources.config.peersForDiscovery[0].endpoint;
-
-
-            const discovery =
-                this.resources.mesh.findObjectByHashSuffix(suffix, linkupServers, discoveryEndpoint);
-
-            this.entryPoint = this.processDiscoveryReply(discovery);
+            this.entryPoint = this.lookupOrDiscover(suffix);
         } else {
             throw new Error('Created new space, but no initialization was provided (entry object nor hash no word code).');
         }
+
+    }
+
+    private async lookupOrDiscover(suffix: string): Promise<HashedObject & SpaceEntryPoint> {
+        
+        const results = await this.resources.store.loadByReference('hashSuffixes', new HashedLiteral(suffix).hash());
+
+        for (const obj of results.objects) {
+            if (obj instanceof SpaceInfo && obj.getClassName() === SpaceInfo.className) {
+                if (ObjectBroadcastAgent.hexSuffixFromHash(obj.getLastHash(), suffix.length * 4)) {
+                    return Promise.resolve(obj.entryPoint as HashedObject & SpaceEntryPoint);
+                }
+            }
+        }
+
+        if (this.resources.config.peersForDiscovery === undefined) {
+            throw new Error('Trying to open space for missing object with suffix ' + suffix + ', but config.peersForDiscovery is undefined.');
+        }
+
+        const linkupServers = this.resources.config.linkupServers;
+        const discoveryEndpoint = this.resources.config.peersForDiscovery[0].endpoint;
+
+
+        const discovery =
+            this.resources.mesh.findObjectByHashSuffix(suffix, linkupServers, discoveryEndpoint);
+
+        return this.processDiscoveryReply(discovery);
     }
 
     private processDiscoveryReply(discoveryStream: AsyncStream<ObjectDiscoveryReply>): Promise<HashedObject & SpaceEntryPoint> {
+        this.entryPoint.then((entryPoint: (HashedObject & SpaceEntryPoint)) => { this.saveSpaceInfo(entryPoint) });
         return new Promise((resolve: (value: (HashedObject & SpaceEntryPoint)) => void, reject: (reason: 'timeout'|'end') => void) => {
 
             discoveryStream.next(30000).then((reply: ObjectDiscoveryReply) => {
@@ -112,6 +133,13 @@ class Space {
             });
         
         });
+    }
+
+    private async saveSpaceInfo(entryPoint: (HashedObject & SpaceEntryPoint)) {
+
+        const spaceInfo = new SpaceInfo(entryPoint);
+
+        await this.resources.store.save(spaceInfo);
     }
 
     async getEntryPoint(): Promise<HashedObject & SpaceEntryPoint> {
@@ -124,18 +152,7 @@ class Space {
     }
 
     async getWordCoding(words=3, lang='en'): Promise<string[]> {
-        let hash = await this.getHash();
-        let coder = WordCode.lang.get(lang);
-
-        if (coder === undefined) {
-            throw new Error('Could not find word coder for language ' + lang + '.');
-        }
-
-        const nibbles = coder.bitsPerWord * words / 4;
-
-        const suffix = Hashing.toHex(hash).slice(-nibbles);
-
-        return coder.encode(suffix)
+        return Space.getWordCodingFor(await this.entryPoint, words, lang);
     }
 
     startBroadcast() {
@@ -160,6 +177,23 @@ class Space {
 
     getResources() {
         return this.resources;
+    }
+
+    static getWordCodingFor(entryPoint: HashedObject & SpaceEntryPoint, words=3, lang='en') {
+
+        const hash = entryPoint.hash();
+
+        let coder = WordCode.lang.get(lang);
+
+        if (coder === undefined) {
+            throw new Error('Could not find word coder for language ' + lang + '.');
+        }
+
+        const nibbles = coder.bitsPerWord * words / 4;
+
+        const suffix = Hashing.toHex(hash).slice(-nibbles);
+
+        return coder.encode(suffix)
     }
 
 }
