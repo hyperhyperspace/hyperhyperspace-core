@@ -1,5 +1,5 @@
 import { PeerGroupAgentConfig, PeerInfo, PeerSource } from '../../agents/peer';
-import { Mesh, SyncMode } from '../../service/Mesh';
+import { Mesh, SyncMode, UsageToken } from '../../service/Mesh';
 import { Context, HashedObject, LiteralContext } from 'data/model';
 import { Hash } from 'data/model';
 import { Endpoint } from 'mesh/agents/network';
@@ -9,7 +9,7 @@ import { RNGImpl } from 'crypto/random';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { Store } from 'storage/store';
 
-type MeshCommand = JoinPeerGroup | CheckPeerGroupUsage | LeavePeerGroup |
+type MeshCommand = JoinPeerGroup | LeavePeerGroup |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
                    StartObjectBroadcast | StopObjectBroadcast |
                    FindObjectByHash | FindObjectByHashSuffix | 
@@ -25,71 +25,65 @@ type JoinPeerGroup = {
     localPeerIdentityKeyPair?: LiteralContext | undefined,
     //localPeer: PeerInfo,
     config?: PeerGroupAgentConfig;
+    usageToken?: UsageToken
 };
 
-type CheckPeerGroupUsage = {
-    type: 'check-peer-group-usage';
-    peerGroupId: string;
-    gossipId?: string;
-}
-
 type LeavePeerGroup = {
-    type: 'leave-peer-group';
-    peerGroupId: string;
+    type: 'leave-peer-group',
+    usageToken: UsageToken
 }
 
 type SyncObjectsWithPeerGroup = {
-    type: 'sync-objects-with-peer-group';
-    peerGroupId: string;
-    objContext: LiteralContext;
+    type: 'sync-objects-with-peer-group',
+    peerGroupId: string,
+    objContext: LiteralContext,
     stores: any,
-    mode: SyncMode;
-    gossipId?: string;
+    mode: SyncMode,
+    gossipId?: string,
+    usageTokens?: any
 }
 
 type StopSyncObjectsWithPeerGroup = {
-    type: 'stop-sync-objects-with-peer-group';
-    peerGroupId: string;
-    hashes: Array<Hash>;
-    gossipId?: string;
+    type: 'stop-sync-objects-with-peer-group',
+    usageTokens: Array<UsageToken>
 }
 
 type StartObjectBroadcast = {
-    type: 'start-object-broadcast';
-    objContext: LiteralContext;
-    linkupServers: Array<string>;
-    replyEndpoints: Array<Endpoint>;
-    broadcastedSuffixBits?: number;
+    type: 'start-object-broadcast',
+    objContext: LiteralContext,
+    linkupServers: Array<string>,
+    replyEndpoints: Array<Endpoint>,
+    broadcastedSuffixBits?: number,
+    usageToken?: UsageToken
 }
 
 type StopObjectBroadcast = {
-    type: 'stop-object-broadcast';
-    hash: Hash;
-    broadcastedSuffixBits?: number;
+    type: 'stop-object-broadcast',
+    usageToken: UsageToken
 }
 
 type FindObjectByHash = {
-    type: 'find-object-by-hash';
-    hash: Hash;
-    linkupServers: Array<string>;
-    replyEndpoint: Endpoint;
-    count?: number;
-    maxAge?: number;
-    strictEndpoints?: boolean;
-    retry: boolean;
-    streamId?: string; // used when retry is false
+    type: 'find-object-by-hash',
+    hash: Hash,
+    linkupServers: Array<string>,
+    replyEndpoint: Endpoint,
+    count?: number,
+    maxAge?: number,
+    strictEndpoints?: boolean,
+    retry: boolean,
+    streamId?: string // used when retry is false
 }
 
 type FindObjectByHashSuffix = {
-    type: 'find-object-by-hash-suffix';
-    hashSuffix: string;
-    linkupServers: Array<string>;
-    replyEndpoint: Endpoint;
-    count?: number;
-    maxAge?: number;
-    strictEndpoints?: boolean;
-    retry: boolean;
-    streamId?: string; // used when retry is false
+    type: 'find-object-by-hash-suffix',
+    hashSuffix: string,
+    linkupServers: Array<string>,
+    replyEndpoint: Endpoint,
+    count?: number,
+    maxAge?: number,
+    strictEndpoints?: boolean,
+    retry: boolean,
+    streamId?: string // used when retry is false
 }
 
 type ForwardGetPeersReply = {
@@ -215,20 +209,19 @@ class MeshHost {
                 identity: identity
             }
 
-            this.mesh.joinPeerGroup({id: join.peerGroupId, localPeer: localPeer, peerSource: peerSource}, join.config);
-        } else if (command.type === 'check-peer-group-usage') {
-            const check = command as CheckPeerGroupUsage;
-            this.mesh.isPeerGroupInUse(check.peerGroupId, check.gossipId);
-            
-            // TODO: send reply somehow :*(
-
+            this.mesh.joinPeerGroup({id: join.peerGroupId, localPeer: localPeer, peerSource: peerSource}, join.config, join.usageToken);
         } else if (command.type === 'leave-peer-group') {
             const leave = command as LeavePeerGroup;
-            this.mesh.leavePeerGroup(leave.peerGroupId);
+            this.mesh.leavePeerGroup(leave.usageToken);
         } else if (command.type === 'sync-objects-with-peer-group') {
             const syncObjs = command as SyncObjectsWithPeerGroup;
 
             let objs: Array<HashedObject> = [];
+            let tokens: Map<Hash, UsageToken> | undefined = undefined;
+
+            if (syncObjs.usageTokens !== undefined) {
+                tokens = new Map();
+            }
 
             let context = new Context();
             context.fromLiteralContext(syncObjs.objContext);
@@ -236,6 +229,9 @@ class MeshHost {
             for (const hash of syncObjs.objContext.rootHashes) {
                 const obj = HashedObject.fromContext(context, hash);
                 objs.push(obj);
+                if (tokens !== undefined) {
+                    tokens.set(hash, syncObjs.usageTokens[hash])
+                }
             }
 
             for (const [hash, obj] of context.objects.entries()) {
@@ -265,13 +261,13 @@ class MeshHost {
             }
             
             this.mesh.syncManyObjectsWithPeerGroup(
-                syncObjs.peerGroupId, objs.values(), syncObjs.mode, syncObjs.gossipId
+                syncObjs.peerGroupId, objs.values(), syncObjs.mode, syncObjs.gossipId, tokens
             );
         } else if (command.type === 'stop-sync-objects-with-peer-group') {
             const stopSyncObjs = command as StopSyncObjectsWithPeerGroup;
 
             this.mesh.stopSyncManyObjectsWithPeerGroup(
-                stopSyncObjs.peerGroupId, stopSyncObjs.hashes.values(), stopSyncObjs.gossipId
+                stopSyncObjs.usageTokens.values()
             );
         } else if (command.type === 'start-object-broadcast') {
             const startBcast = command as StartObjectBroadcast;
@@ -279,12 +275,12 @@ class MeshHost {
             let obj = HashedObject.fromLiteralContext(startBcast.objContext);
 
             this.mesh.startObjectBroadcast(
-                obj, startBcast.linkupServers, startBcast.replyEndpoints, startBcast.broadcastedSuffixBits
+                obj, startBcast.linkupServers, startBcast.replyEndpoints, startBcast.broadcastedSuffixBits, startBcast.usageToken
             );
 
         } else if (command.type === 'stop-object-broadcast') {
             const stopBcast = command as StopObjectBroadcast;
-            this.mesh.stopObjectBroadcast(stopBcast.hash, stopBcast.broadcastedSuffixBits);
+            this.mesh.stopObjectBroadcast(stopBcast.usageToken);
         } else if (command.type === 'find-object-by-hash' ||
                    command.type === 'find-object-by-hash-suffix') {
             const find = command as FindObjectByHash | FindObjectByHashSuffix;
@@ -437,7 +433,7 @@ class PeerSourceProxy implements PeerSource {
 }
 
 export { MeshHost, MeshCommand,
-         JoinPeerGroup, CheckPeerGroupUsage, LeavePeerGroup,
+         JoinPeerGroup, LeavePeerGroup,
          SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
          StartObjectBroadcast, StopObjectBroadcast,
          FindObjectByHash, FindObjectByHashSuffix,

@@ -2,15 +2,31 @@
 import { HashedObject } from 'data/model';
 import { ObjectDiscoveryPeerSource, PeerInfo } from 'mesh/agents/peer';
 import { Resources } from 'spaces/spaces';
-import { PeerGroupInfo, SyncMode } from './Mesh';
+import { MultiMap } from 'util/multimap';
+import { PeerGroupInfo, SyncMode, UsageToken } from './Mesh';
 
+type Key = string;
 
 class PeerNode {
 
     resources: Resources;
 
+    peerGroupTokens: Map<Key, UsageToken>;
+    syncTokens:      Map<Key, UsageToken>;
+    broadcastTokens: Map<Key, UsageToken>;
+
+    syncPerPeerGroup: MultiMap<UsageToken, UsageToken>;
+    
+
     constructor(resources: Resources) {
         this.resources = resources;
+
+        this.peerGroupTokens = new Map();
+        this.syncTokens      = new Map();
+        this.broadcastTokens = new Map();
+        
+        this.syncPerPeerGroup = new MultiMap();
+
     }
 
     async broadcast(obj: HashedObject, linkupServers?: Array<string>, localEndpoints?: Array<string>): Promise<void> {
@@ -23,33 +39,72 @@ class PeerNode {
             localEndpoints = this.resources.getPeersForDiscovery().map((pi:PeerInfo) => pi.endpoint);
         }
 
-        this.resources.mesh.startObjectBroadcast(obj, linkupServers, localEndpoints);
+        const token = this.resources.mesh.startObjectBroadcast(obj, linkupServers, localEndpoints);
+
+        this.broadcastTokens.set(obj.getLastHash(), token);
     }
 
-    async sync(obj: HashedObject, mode:SyncMode = SyncMode.full, peerGroup?: PeerGroupInfo, gossipId?: string): Promise<void> {
+    async stopBroadcast(obj: HashedObject) {
+
+        const token = this.broadcastTokens.get(obj.hash());
+
+        if (token !== undefined) {
+            this.resources.mesh.stopObjectBroadcast(token);
+            this.broadcastTokens.delete(obj.getLastHash());
+        }
+        
+    }
+
+    async sync(obj: HashedObject, mode :SyncMode = SyncMode.full, peerGroup?: PeerGroupInfo, gossipId?: string): Promise<void> {
 
         if (peerGroup === undefined) {
             peerGroup = await this.discoveryPeerGroupInfo(obj);
         }
 
-        this.resources.mesh.joinPeerGroup(peerGroup);
-        this.resources.mesh.syncObjectWithPeerGroup(peerGroup.id, obj, mode, gossipId);
+        const peerGroupKey = PeerNode.generateKey([peerGroup.id]);
+
+        let peerGroupToken = this.peerGroupTokens.get(peerGroupKey);
+        
+        if (peerGroupToken === undefined) {
+            peerGroupToken = this.resources.mesh.joinPeerGroup(peerGroup);
+            this.peerGroupTokens.set(peerGroupKey, peerGroupToken);
+        }
+
+        const syncKey = PeerNode.generateKey([obj.hash(), peerGroup.id, gossipId]);
+
+        let syncToken = this.syncTokens.get(syncKey);
+
+        if (syncToken === undefined) {
+            syncToken = this.resources.mesh.syncObjectWithPeerGroup(peerGroup.id, obj, mode, gossipId);
+            this.syncTokens.set(syncKey, syncToken);
+            this.syncPerPeerGroup.add(peerGroupToken, syncToken);
+        }
     }
 
     async stopSync(obj: HashedObject, peerGroupId?: string, gossipId?: string) : Promise<void> {
         if (peerGroupId === undefined) {
             peerGroupId = PeerNode.discoveryPeerGroupInfoId(obj);
         }
-        this.resources.mesh.stopSyncObjectWithPeerGroup(peerGroupId, obj.hash(), gossipId);        
 
-        if (!this.resources.mesh.isPeerGroupInUse(peerGroupId, gossipId)) {
-            this.resources.mesh.leavePeerGroup(peerGroupId);
+        const syncKey   = PeerNode.generateKey([obj.hash(), peerGroupId, gossipId]);
+        const syncToken = this.syncTokens.get(syncKey);
+
+        if (syncToken !== undefined) {
+
+            this.resources.mesh.stopSyncObjectWithPeerGroup(syncToken);
+            this.syncTokens.delete(syncKey);
+
+            const peerGroupKey   = PeerNode.generateKey([peerGroupId]);
+            const peerGroupToken = this.peerGroupTokens.get(peerGroupKey)
+
+            if (peerGroupToken !== undefined) {
+                this.syncPerPeerGroup.delete(peerGroupToken, syncToken);
+                if (this.syncPerPeerGroup.get(peerGroupToken).size === 0) {
+                    this.resources.mesh.leavePeerGroup(peerGroupToken);
+                    this.peerGroupTokens.delete(peerGroupKey);
+                }
+            }
         }
-
-    }
-
-    async stopBroadcast(obj: HashedObject) {
-        this.resources.mesh.stopObjectBroadcast(obj.hash());
     }
 
     private async discoveryPeerGroupInfo(obj: HashedObject) : Promise<PeerGroupInfo> {
@@ -66,6 +121,23 @@ class PeerNode {
 
     private static discoveryPeerGroupInfoId(obj: HashedObject) {
         return  'sync-for-' + obj.hash();
+    }
+
+    private static generateKey(parts: (string|undefined)[]): string {
+
+        let result = '';
+
+        for (const part of parts) {
+            if (part !== undefined) {
+                if (result.length > 0) {
+                    result = result + '-';
+                }
+                result = result + part.replace(/[-]/g, '--');
+            }
+        }
+
+        return result;
+
     }
 
 }

@@ -1,5 +1,5 @@
 import { PeerGroupAgentConfig, PeerInfo, PeerSource } from 'mesh/agents/peer';
-import { PeerGroupInfo, SyncMode } from 'mesh/service/Mesh';
+import { Mesh, PeerGroupInfo, SyncMode, UsageToken } from 'mesh/service/Mesh';
 import { MeshCommand,
     JoinPeerGroup, LeavePeerGroup,
     SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
@@ -114,11 +114,13 @@ class MeshProxy {
         return this.commandStreamedReplyIngestFn;
     }
 
-    joinPeerGroup(pg: PeerGroupInfo, config?: PeerGroupAgentConfig) {
+    joinPeerGroup(pg: PeerGroupInfo, config?: PeerGroupAgentConfig, usageToken?: UsageToken): UsageToken {
 
         if (!this.peerSources.has(pg.id)) {
             this.peerSources.set(pg.id, pg.peerSource);
         }
+
+        const token = usageToken || Mesh.createUsageToken();
 
         const cmd: JoinPeerGroup = {
             type: 'join-peer-group',
@@ -127,26 +129,25 @@ class MeshProxy {
             localPeerIdentityHash: pg.localPeer.identityHash,
             localPeerIdentity: pg.localPeer.identity === undefined? undefined : pg.localPeer.identity.toLiteralContext(),
             localPeerIdentityKeyPair: pg.localPeer.identity?._keyPair === undefined? undefined: pg.localPeer.identity._keyPair.toLiteralContext(),
-            config: config
+            config: config,
+            usageToken: token
         };
 
         this.commandForwardingFn(cmd);
+
+        return token;
     }
 
-    isPeerGroupInUse(_peerGroupId: string, _gossipId?: string): boolean {
-        throw new Error('MeshProxy does not support isPeerGroupInUse() yet.');
-    }
-
-    leavePeerGroup(peerGroupId: string) {
+    leavePeerGroup(usageToken: UsageToken) {
         const cmd: LeavePeerGroup = {
             type: 'leave-peer-group',
-            peerGroupId: peerGroupId
+            usageToken: usageToken
         };
 
         this.commandForwardingFn(cmd);
     }
 
-    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string) {
+    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string, usageToken?: UsageToken): UsageToken {
         
         const ctx = obj.toContext();
 
@@ -158,6 +159,12 @@ class MeshProxy {
                 stores[hash] = {backendName: store.getBackendName(), dbName: store.getName()};
             }
         }
+
+        let tokens: any = {}
+
+        const token = usageToken || Mesh.createUsageToken();
+        tokens[ctx.rootHashes[0]] = token;
+
         
         const cmd: SyncObjectsWithPeerGroup = {
             type:'sync-objects-with-peer-group',
@@ -165,18 +172,26 @@ class MeshProxy {
             objContext: obj.toLiteralContext(),
             stores: stores,
             mode: mode,
-            gossipId: gossipId
+            gossipId: gossipId,
+            usageTokens: tokens
         };
         
         this.commandForwardingFn(cmd);
+
+        return token;
     }
 
-    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, gossipId?: string) {
+    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, gossipId?: string, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken> {
 
         const objContext = new Context();
+        let tokens: any = {}
+        let resultTokens: Map<Hash, UsageToken> = new Map();
 
         for (const obj of objs) {
             objContext.merge(obj.toContext());
+            const token = usageTokens?.get(obj.getLastHash()) || Mesh.createUsageToken();
+            tokens[obj.getLastHash()] = token;
+            resultTokens.set(obj.getLastHash(), token);
         }
 
         let stores: any = {};
@@ -194,51 +209,57 @@ class MeshProxy {
             objContext: objContext.toLiteralContext(),
             stores: stores,
             mode: mode,
-            gossipId: gossipId
+            gossipId: gossipId,
+            usageTokens: tokens
         };
 
         this.commandForwardingFn(cmd);
+
+        return resultTokens;
     }
 
-    stopSyncObjectWithPeerGroup(peerGroupId: string, hash: Hash, gossipId?: string) {
+    stopSyncObjectWithPeerGroup(usageToken: UsageToken) {
         const cmd: StopSyncObjectsWithPeerGroup = {
             type: 'stop-sync-objects-with-peer-group',
-            peerGroupId: peerGroupId,
-            hashes: [hash],
-            gossipId: gossipId
+            usageTokens: [usageToken]
         };
 
         this.commandForwardingFn(cmd);
     }
 
-    stopSyncManyObjectsWithPeerGroup(peerGroupId: string, hashes: IterableIterator<Hash>, gossipId?: string) {
+    stopSyncManyObjectsWithPeerGroup(usageTokens: IterableIterator<UsageToken>) {
         const cmd: StopSyncObjectsWithPeerGroup = {
             type: 'stop-sync-objects-with-peer-group',
-            peerGroupId: peerGroupId,
-            hashes: Array.from(hashes),
-            gossipId: gossipId
+            usageTokens: Array.from(usageTokens)
         };
 
         this.commandForwardingFn(cmd);
     }
 
-    startObjectBroadcast(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number) {
+    startObjectBroadcast(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number, usageToken?: UsageToken): UsageToken {
+        
+        if (usageToken === undefined) {
+            usageToken = Mesh.createUsageToken();
+        }
+
         const cmd: StartObjectBroadcast = {
             type: 'start-object-broadcast',
             objContext: object.toLiteralContext(),
             linkupServers: linkupServers,
             replyEndpoints: replyEndpoints,
-            broadcastedSuffixBits: broadcastedSuffixBits
+            broadcastedSuffixBits: broadcastedSuffixBits,
+            usageToken: usageToken
         }
 
         this.commandForwardingFn(cmd);
+
+        return usageToken;
     }
 
-    stopObjectBroadcast(hash: Hash, broadcastedSuffixBits?: number) {
+    stopObjectBroadcast(usageToken: UsageToken) {
         const cmd: StopObjectBroadcast = {
             type: 'stop-object-broadcast',
-            hash: hash,
-            broadcastedSuffixBits: broadcastedSuffixBits
+            usageToken: usageToken
         }
 
         this.commandForwardingFn(cmd);

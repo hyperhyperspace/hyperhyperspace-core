@@ -11,6 +11,7 @@ import { ObjectBroadcastAgent, ObjectDiscoveryAgent, ObjectDiscoveryReply, Objec
 import { AgentPod } from './AgentPod';
 import { AsyncStream } from 'util/streams';
 import { LinkupManager } from 'net/linkup';
+import { RNGImpl } from 'crypto/random';
 
 
 
@@ -64,6 +65,16 @@ import { LinkupManager } from 'net/linkup';
  *  - Mesh.findObjectByHash(), Mesh.findObjectByHashRetry()
  *  - Mesh.findObjectByHashSuffix(), Mesh.findObjectByHashSuffixRetry()
  * 
+ * 
+ * Usage tokens
+ * ============
+ * 
+ * Since several modules or applications may share a Mesh instance, in response to each 
+ * acquired resource (a peer group being joined, an object synchronized or broadcasted)
+ * the Mesh will return a UsageToken. The token needs to be produced to leave the peer 
+ * group or to stop the sync/broadcasting of the object. The resource is effectively 
+ * released when all the returned usage tokens are released.
+ * 
  */ 
 
 
@@ -71,6 +82,15 @@ import { LinkupManager } from 'net/linkup';
 type GossipId  = string;
 type PeerGroupId = string;
 type PeerGroupInfo = { id: string, localPeer: PeerInfo, peerSource: PeerSource };
+
+type UsageToken = string;
+
+type PeerGroupUsageInfo       = { type: 'peer-group', peerGroupId: PeerGroupId };
+type ObjectSyncUsageInfo      = { type: 'object-sync', peerGroupId: PeerGroupId, objHash: Hash, gossipId: GossipId };
+type ObjectBroadcastUsageInfo = { type: 'object-broadcast', objHash: Hash, broadcastedSuffixBits: number }
+type UsageInfo = PeerGroupUsageInfo | ObjectSyncUsageInfo | ObjectBroadcastUsageInfo;
+
+type UsageKey = string;
 
 enum SyncMode {
     single    = 'single',     // just sync one object
@@ -84,6 +104,9 @@ class Mesh {
 
     network: NetworkAgent;
     secured: SecureNetworkAgent;
+
+    usage: MultiMap<UsageKey, UsageToken>;
+    usageTokens: Map<UsageToken, UsageInfo>;
 
 
     // for each peer group, all the gossip ids we have created.
@@ -118,6 +141,9 @@ class Mesh {
         this.secured = new SecureNetworkAgent();
         this.pod.registerAgent(this.secured);
 
+        this.usage = new MultiMap();
+        this.usageTokens = new Map();
+
         this.gossipIdsPerPeerGroup = new MultiMap();
 
         this.syncAgents         = new Map();
@@ -135,7 +161,9 @@ class Mesh {
 
     // PeerGroups: join, leave
 
-    joinPeerGroup(pg: PeerGroupInfo, config?: PeerGroupAgentConfig) {
+    joinPeerGroup(pg: PeerGroupInfo, config?: PeerGroupAgentConfig, usageToken?: UsageToken): UsageToken {
+
+        let token = this.registerUsage({type: 'peer-group', peerGroupId: pg.id}, usageToken);
 
         let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(pg.id));
 
@@ -144,48 +172,34 @@ class Mesh {
             this.pod.registerAgent(agent);
         }
 
+        return token;
     }
 
-    // FIXME: that would fail if the same peer group is used with
-    //        more than one gossip ids.
-    isPeerGroupInUse(peerGroupId: string, gossipId?: string) {
+    leavePeerGroup(token: UsageToken) {
 
-        if (gossipId === undefined) {
-            gossipId = peerGroupId;
-        }
+        const usageInfo = this.deregisterUsage(token, 'peer-group') as (PeerGroupUsageInfo | undefined);
 
-        let roots = this.rootObjects.get(gossipId);
+        if (usageInfo !== undefined) {
+            const usageKey  = Mesh.createUsageKey(usageInfo);
 
-        return (roots !== undefined && roots.size > 0);
+            if (this.usage.get(usageKey).size === 0) {
 
-    }
-
-    leavePeerGroup(peerGroupId: string) {
-
-        const gossipIds = this.gossipIdsPerPeerGroup.get(peerGroupId);
-
-        if (gossipIds !== undefined) {
-            for (const gossipId of gossipIds) {
-                const roots = this.rootObjects.get(gossipId);
-                if (roots !== undefined) {
-                    for (const hash of roots.keys()) {
-                        this.stopSyncObjectWithPeerGroup(peerGroupId, hash, gossipId);
-                    }
-                }
+                const agentId = PeerGroupAgent.agentIdForPeerGroup(usageInfo.peerGroupId);
                 
+                let agent = this.pod.getAgent(agentId);
+
+                if (agent !== undefined) {
+                    this.pod.deregisterAgent(agent);
+                }
             }
+
         }
 
-        let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId));
-
-        if (agent !== undefined) {
-            this.pod.deregisterAgent(agent);
-        }
     }
         
     // Object synchronization
 
-    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string) {
+    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string, usageToken?: UsageToken): UsageToken {
         
         let peerGroup = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId)) as PeerGroupAgent | undefined;
         if (peerGroup === undefined) {
@@ -207,49 +221,72 @@ class Mesh {
         this.addRootSync(gossip, obj, mode);
 
         this.gossipIdsPerPeerGroup.add(peerGroupId, gossipId);
+
+        return this.registerUsage({type: 'object-sync', objHash: obj.getLastHash(), peerGroupId: peerGroupId, gossipId: gossipId}, usageToken);
     }
         
-    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, gossipId?: string) {
+    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, gossipId?: string, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken>{
         
+        const tokens = new Map<Hash, UsageToken>();
+
         for (const obj of objs) {
-            this.syncObjectWithPeerGroup(peerGroupId, obj, mode, gossipId);
+            const usageToken = this.syncObjectWithPeerGroup(peerGroupId, obj, mode, gossipId, usageTokens?.get(obj.getLastHash()));
+            tokens.set(obj.getLastHash(), usageToken);
         }
 
+        return tokens;
     }
 
-    stopSyncObjectWithPeerGroup(peerGroupId: string, hash: Hash, gossipId?: string) {
+    stopSyncObjectWithPeerGroup(usageToken: UsageToken) {
 
-        if (gossipId === undefined) {
-            gossipId = peerGroupId;
-        }
+        const usageInfo = this.deregisterUsage(usageToken, 'object-sync') as (ObjectSyncUsageInfo | undefined);
 
-        let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
+        if (usageInfo !== undefined) {
 
-        if (gossip !== undefined) {
-            this.removeRootSync(gossip, hash);
+            const usageKey = Mesh.createUsageKey(usageInfo);
 
-            let roots = this.rootObjects.get(gossipId);
-
-            if (roots === undefined || roots.size === 0) {
-                this.pod.deregisterAgent(gossip);
-                this.gossipIdsPerPeerGroup.delete(peerGroupId, gossipId);
-            }
-        }
-
-
-    }
-
-    stopSyncManyObjectsWithPeerGroup(peerGroupId: string, hashes: IterableIterator<Hash>, gossipId?: string) {
+            if (this.usage.get(usageKey).size === 0) {
+                
+                const peerGroupId = usageInfo.peerGroupId;
+                const hash        = usageInfo.objHash;
+                const gossipId    = usageInfo.gossipId;
         
-        for (const hash of hashes) {
-            this.stopSyncObjectWithPeerGroup(peerGroupId, hash, gossipId);
+                let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
+        
+                if (gossip !== undefined) {
+                    this.removeRootSync(gossip, hash);
+        
+                    let roots = this.rootObjects.get(gossipId);
+        
+                    if (roots === undefined || roots.size === 0) {
+                        this.pod.deregisterAgent(gossip);
+                        this.gossipIdsPerPeerGroup.delete(peerGroupId, gossipId);
+                    }
+                }
+            }
+
+ 
+        }
+        
+
+
+    }
+
+    stopSyncManyObjectsWithPeerGroup(tokens: IterableIterator<UsageToken>) {
+        
+        for (const token of tokens) {
+            this.stopSyncObjectWithPeerGroup(token);
         }
 
     }
 
     // Object discovery
 
-    startObjectBroadcast(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number) {
+    startObjectBroadcast(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number, usageToken?: UsageToken): UsageToken {
+
+        if (broadcastedSuffixBits === undefined) {
+            broadcastedSuffixBits = ObjectBroadcastAgent.defaultBroadcastedSuffixBits;
+        }
 
         const agentId = ObjectBroadcastAgent.agentIdForHash(object.hash(), broadcastedSuffixBits);
         let broadcastAgent = this.pod.getAgent(agentId) as ObjectBroadcastAgent;
@@ -260,12 +297,27 @@ class Mesh {
 
         broadcastAgent.listenOn(linkupServers, replyEndpoints);
 
+        return this.registerUsage({type: 'object-broadcast', objHash: object.getLastHash(), broadcastedSuffixBits: broadcastedSuffixBits}, usageToken);
     }
 
-    stopObjectBroadcast(hash: Hash, broadcastedSuffixBits?: number) {
-        const agentId = ObjectBroadcastAgent.agentIdForHash(hash, broadcastedSuffixBits);
-        let broadcastAgent = this.pod.getAgent(agentId);
-        broadcastAgent?.shutdown();
+    stopObjectBroadcast(token: UsageToken) {
+
+        const usageInfo = this.deregisterUsage(token, 'object-broadcast') as (ObjectBroadcastUsageInfo | undefined);
+
+        if (usageInfo !== undefined) {
+            const usageKey = Mesh.createUsageKey(usageInfo);
+
+            if (this.usage.get(usageKey).size === 0) {
+
+                const hash = usageInfo.objHash;
+                const broadcastedSuffixBits = usageInfo.broadcastedSuffixBits;
+
+                const agentId = ObjectBroadcastAgent.agentIdForHash(hash, broadcastedSuffixBits);
+                let broadcastAgent = this.pod.getAgent(agentId);
+                broadcastAgent?.shutdown();
+            }
+        }
+        
     }
 
     findObjectByHash(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
@@ -519,8 +571,6 @@ class Mesh {
         const peerGroup = gossip.peerGroupAgent;
         const peerGroupId = peerGroup.peerGroupId;
 
-
-        
         let peerGroupSyncAgents = this.syncAgents.get(peerGroupId);
         
         if (peerGroupSyncAgents === undefined) {
@@ -624,6 +674,55 @@ class Mesh {
         }   
     }
 
+
+    private registerUsage(usageInfo: UsageInfo, usageToken?: UsageToken): UsageToken {
+        
+        const token = usageToken || Mesh.createUsageToken();
+
+        this.usageTokens.set(token, usageInfo);
+
+        const usageKey = Mesh.createUsageKey(usageInfo);
+
+        this.usage.add(usageKey, token);
+
+        return token;
+    }
+
+    private deregisterUsage(token: UsageToken, expectedType: string): UsageInfo | undefined {
+        
+        const usageInfo = this.usageTokens.get(token);
+
+        if (usageInfo !== undefined) {
+            if (usageInfo.type !== expectedType) {
+                throw new Error('Refusing to deregister usage token ' + token + ': it is being used as for ' + expectedType + ', but originally was for ' + usageInfo.type);
+            }
+
+            const usageKey = Mesh.createUsageKey(usageInfo);
+
+            this.usage.delete(usageKey, token);
+            this.usageTokens.delete(token);
+            return usageInfo;
+        } else {
+            return undefined;
+        }
+    }
+
+    public static createUsageToken(): UsageToken {
+        return new RNGImpl().randomHexString(128);
+    }
+    
+    private static createUsageKey(usageInfo: UsageInfo): UsageKey {
+
+        if (usageInfo.type === 'peer-group') {
+            return usageInfo.type + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--');
+        } else if (usageInfo.type === 'object-sync') {
+            return usageInfo.type + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--') + '-' + usageInfo.gossipId.replace(/[-]/g, '--');
+        } else {
+            return usageInfo.type + '-' + usageInfo.objHash + '-' + usageInfo.broadcastedSuffixBits;
+        }
+
+    }
+
 }
 
-export { Mesh, PeerGroupInfo, SyncMode }
+export { Mesh, PeerGroupInfo, SyncMode, UsageToken }
