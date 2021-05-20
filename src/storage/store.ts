@@ -1,1 +1,1 @@
-export { Store } from './store/Store';
+export { Store, LoadResults } from './store/Store';

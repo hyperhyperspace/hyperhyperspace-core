@@ -17,6 +17,8 @@ import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHi
 type StoredOpCausalHistory = { literal: OpCausalHistoryLiteral, computed: { height: number, size: number} };
 type LoadParams = BackendSearchParams;
 
+type LoadResults = { objects: Array<HashedObject>, start?: string, end?: string };
+
 class Store {
 
     static operationLog = new Logger(MutableObject.name, LogLevel.INFO);
@@ -348,7 +350,7 @@ class Store {
         return obj;
     }
 
-    async loadByClass(className: string, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+    async loadByClass(className: string, params?: LoadParams) : Promise<LoadResults> {
 
         let searchResults = await this.backend.searchByClass(className, params);
 
@@ -356,14 +358,14 @@ class Store {
 
     }
 
-    async loadByReference(referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+    async loadByReference(referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<LoadResults> {
 
         let searchResults = await this.backend.searchByReference(referringPath, referencedHash, params);
 
         return this.loadSearchResults(searchResults);
     }
 
-    async loadByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
+    async loadByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<LoadResults> {
 
         let searchResults = await this.backend.searchByReferencingClass(referringClassName, referringPath, referencedHash, params);
 
@@ -542,4 +544,4 @@ class Store {
     }
 }
 
-export { Store, StoredOpCausalHistory };
+export { Store, StoredOpCausalHistory, LoadResults };
