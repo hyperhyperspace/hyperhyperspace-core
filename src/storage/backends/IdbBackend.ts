@@ -334,6 +334,11 @@ class IdbBackend implements Backend {
     private static addSequenceToValue(value: string, sequence: number) {
         return value + '_' + sequence.toString(16).padStart(16, '0');
     }
+
+    async ready(): Promise<void> {
+        await this.idbPromise;
+    }
+
 }
 
 Store.registerBackend(IdbBackend.backendName, (dbName: string) => new IdbBackend(dbName));

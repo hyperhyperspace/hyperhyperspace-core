@@ -31,6 +31,8 @@ interface Backend {
 
     setStoredObjectCallback(objectStoreCallback: (literal: Literal) => Promise<void>): void;
 
+    ready(): Promise<void>;
+
     //processExternalStore(literal: Literal): Promise<void>;
 }
 

@@ -254,6 +254,10 @@ class MemoryBackend implements Backend {
         }
 
     }
+
+    async ready(): Promise<void> {
+        
+    }
 } 
 
 Store.registerBackend(MemoryBackend.backendName, (dbName: string) => {
