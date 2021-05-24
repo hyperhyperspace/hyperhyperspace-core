@@ -482,7 +482,7 @@ class StateGossipAgent extends PeeringAgentBase {
                     receivedOldState = ! (await this.notifyAgentOfStateArrival(sender, agentId, state, stateObj));
                 } catch (e) {
                     // maybe cache erroneous states so we don't process them over and over?
-                    StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender);
+                    StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender, e);
                 }
 
             }
