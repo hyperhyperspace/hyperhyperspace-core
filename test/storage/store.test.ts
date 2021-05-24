@@ -304,8 +304,8 @@ async function testHistoryGeneration(store: Store) {
     expect(bangHistoryByHash?.causalHistoryHash).toEqual(bangHistory.causalHistoryHash);
     expect(bangHistoryByHash?.opHash).toEqual(bangHistory.opHash);
 
-    expect(bangHistory._computedProps?.height).toEqual(3);
-    expect(bangHistory._computedProps?.size).toEqual(3);
+    expect(bangHistory.computedProps?.height).toEqual(3);
+    expect(bangHistory.computedProps?.size).toEqual(3);
 
     frag.add(bangHistory);
 
@@ -318,8 +318,8 @@ async function testHistoryGeneration(store: Store) {
 
 
 
-    expect(bangbangHistory._computedProps?.height).toEqual(3);
-    expect(bangbangHistory._computedProps?.size).toEqual(3);
+    expect(bangbangHistory.computedProps?.height).toEqual(3);
+    expect(bangbangHistory.computedProps?.size).toEqual(3);
 
     frag.add(bangbangHistory);
 
@@ -332,8 +332,8 @@ async function testHistoryGeneration(store: Store) {
 
 
 
-    expect(worldHistory._computedProps?.height).toEqual(2);
-    expect(worldHistory._computedProps?.size).toEqual(2);
+    expect(worldHistory.computedProps?.height).toEqual(2);
+    expect(worldHistory.computedProps?.size).toEqual(2);
 
     frag.add(worldHistory);
     
@@ -345,8 +345,8 @@ async function testHistoryGeneration(store: Store) {
     expect(frag.getTerminalOps().has(bangbang?.hash() as Hash));
 
 
-    expect(helloHistory._computedProps?.height).toEqual(1);
-    expect(helloHistory._computedProps?.size).toEqual(1);
+    expect(helloHistory.computedProps?.height).toEqual(1);
+    expect(helloHistory.computedProps?.size).toEqual(1);
 
     frag.add(helloHistory);
     

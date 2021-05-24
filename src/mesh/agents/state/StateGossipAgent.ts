@@ -467,28 +467,32 @@ class StateGossipAgent extends PeeringAgentBase {
 
     private async receiveStateObject(sender: Endpoint, agentId: AgentId, stateObj: HashedObject, _timestamp: number) {
 
-        const state = stateObj.hash();
+        if (stateObj.validate(new Map())) {
+            const state = stateObj.hash();
 
-        this.setRemoteState(sender, agentId, state, stateObj)
-        
-        const cacheHit = this.stateHashIsInPreviousCache(agentId, state);
-
-        let receivedOldState = cacheHit;
-
-        if (!receivedOldState) {
+            this.setRemoteState(sender, agentId, state, stateObj)
             
-            try {
-                receivedOldState = ! (await this.notifyAgentOfStateArrival(sender, agentId, state, stateObj));
-            } catch (e) {
-                // maybe cache erroneous states so we don't process them over and over?
-                StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender);
+            const cacheHit = this.stateHashIsInPreviousCache(agentId, state);
+
+            let receivedOldState = cacheHit;
+
+            if (!receivedOldState) {
+                
+                try {
+                    receivedOldState = ! (await this.notifyAgentOfStateArrival(sender, agentId, state, stateObj));
+                } catch (e) {
+                    // maybe cache erroneous states so we don't process them over and over?
+                    StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender);
+                }
+
             }
 
-        }
-
-        if (receivedOldState && this.localState.get(agentId) !== state) {
-            this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
-            this.sendStateObject(sender, agentId);
+            if (receivedOldState && this.localState.get(agentId) !== state) {
+                this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
+                this.sendStateObject(sender, agentId);
+            }
+        } else {
+            this.peerMessageLog.trace('Received invalid state for ' + agentId + ' from ' + sender + ', ignoring.');
         }
 
     }

@@ -13,6 +13,8 @@ import { CausalHistorySynchronizer } from './causal/CausalHistorySynchronizer';
 import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHistoryProvider';
 import { OpCausalHistory } from 'data/history/OpCausalHistory';
 
+type StateFilter = (state: CausalHistoryState, store: Store) => Promise<CausalHistoryState>;
+
 class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
@@ -26,6 +28,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
     mutableObj: Hash;
     acceptedMutationOpClasses: string[];
+    stateOpFilter?: StateFilter;
 
     store: Store;
 
@@ -39,15 +42,15 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     synchronizer : CausalHistorySynchronizer;
     provider     : CausalHistoryProvider;
 
-
     controlLog: Logger;
     messageLog: Logger;
 
-    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: Hash, store: Store, acceptedMutationOpClasses : string[]) {
+    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: Hash, store: Store, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
         super(peerGroupAgent);
 
         this.mutableObj = mutableObj;
         this.acceptedMutationOpClasses = acceptedMutationOpClasses;
+        this.stateOpFilter = stateOpFilter;
 
         this.store = store;
 
@@ -100,26 +103,27 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
         if (state instanceof CausalHistoryState && state.mutableObj === this.mutableObj) {
 
-            if (state.terminalOpHistories !== undefined) {
 
-                this.remoteStates.set(sender, new HashedSet<Hash>(state.terminalOpHistories?.values()))
 
-                if (this.stateHash !== stateHash) {
+            this.remoteStates.set(sender, new HashedSet<Hash>(state.terminalOpHistoryHashes?.values()))
 
-                    const unknown = new Set<Hash>();
+            if (this.stateHash !== stateHash) {
 
-                    for (const opHistory of state.terminalOpHistories.values()) {
-                        if ((await this.store.loadOpCausalHistoryByHash(opHistory)) === undefined) {
-                            unknown.add(opHistory);
-                        }
+
+                const filteredState = this.stateOpFilter === undefined? state : await this.stateOpFilter(state, this.store);
+
+                const unknown = new Set<Hash>();
+
+                for (const opHistory of (filteredState.terminalOpHistoryHashes as HashedSet<Hash>).values()) {
+                    if ((await this.store.loadOpCausalHistoryByHash(opHistory)) === undefined) {
+                        unknown.add(opHistory);
                     }
+                }
 
-                    isNew = unknown.size > 0;
+                isNew = unknown.size > 0;
 
-                    if (isNew) {
-                        this.synchronizer.onNewHistory(sender, unknown);
-                    }
-
+                if (isNew) {
+                    this.synchronizer.onNewHistory(sender, unknown);
                 }
 
             }
@@ -210,7 +214,13 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
             terminalOpsInfo = {terminalOps: []};
         }
 
-        return CausalHistoryState.createFromTerminalOps(this.mutableObj, terminalOpsInfo.terminalOps, this.store);
+        const state = await CausalHistoryState.createFromTerminalOps(this.mutableObj, terminalOpsInfo.terminalOps, this.store);
+
+        if (this.stateOpFilter === undefined) {
+            return state;
+        } else {
+            return this.stateOpFilter(state, this.store);
+        }
     }
 
     private updateState(state: CausalHistoryState): void {
@@ -218,7 +228,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
             CausalHistorySyncAgent.controlLog.trace('Found new state ' + stateHash + ' for ' + this.mutableObj + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
-            this.state = state.terminalOpHistories;
+            this.state = state.terminalOpHistoryHashes;
             this.stateHash = stateHash;
             let stateUpdate: AgentStateUpdateEvent = {
                 type: GossipEventTypes.AgentStateUpdate,
@@ -255,4 +265,4 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
 }
 
-export { SyncMsg as HistoryMsg, CausalHistorySyncAgent }
+export { SyncMsg as HistoryMsg, CausalHistorySyncAgent, StateFilter }

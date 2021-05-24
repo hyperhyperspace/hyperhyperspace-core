@@ -54,8 +54,8 @@ class CausalHistoryDelta {
             for (const hash of this.fragment.getStartingOpHistories()) {
 
                 const op = this.fragment.contents.get(hash) as OpCausalHistory;
-                if (h === undefined || op._computedProps?.height as number < h) {
-                    h = op._computedProps?.height;
+                if (h === undefined || op.computedProps?.height as number < h) {
+                    h = op.computedProps?.height;
                 }
             }
 
@@ -66,7 +66,7 @@ class CausalHistoryDelta {
                 }
 
                 const op = await this.store.loadOpCausalHistoryByHash(hash);
-                if (op !== undefined && (op._computedProps?.height as number) > (h as number)) {
+                if (op !== undefined && (op.computedProps?.height as number) > (h as number)) {
                     this.start.add(op);
                     this.fragment.remove(hash);
                 }

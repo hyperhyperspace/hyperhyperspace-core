@@ -890,6 +890,9 @@ class CausalHistorySynchronizer {
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     await this.syncAgent.store.save(op);
 
+                    // FIXME: there's no validation of the op matching the actual causal history op
+                    // TODO:  validate, remove op and all history following if op does not match
+
                     this.opXferLog.debug('\n'+this.logPrefix+'\nReceived op ' + literal.hash + ' from request ' + reqInfo.request.requestId);
 
                     const removed = this.checkRequestRemoval(reqInfo);

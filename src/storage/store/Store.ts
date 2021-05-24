@@ -14,7 +14,7 @@ import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHi
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
 //                       dependencies: Array<Dependency>, flags: Array<PackedFlag> };
 
-type StoredOpCausalHistory = { literal: OpCausalHistoryLiteral, computed: { height: number, size: number} };
+type StoredOpCausalHistory = { literal: OpCausalHistoryLiteral };
 type LoadParams = BackendSearchParams;
 
 type LoadResults = { objects: Array<HashedObject>, start?: string, end?: string };
@@ -124,11 +124,9 @@ class Store {
             }
 
             const opHistory = new OpCausalHistory(object, prevOpCausalHistories);
-            const opComputedProps = OpCausalHistory.computeProps(prevOpCausalHistories) as {height: number, size: number};
 
             history = {
-                literal: opHistory.literalize(),
-                computed: opComputedProps
+                literal: opHistory.literalize()
             };
         }
 
@@ -379,7 +377,6 @@ class Store {
             return undefined;
         } else {
             const opCausalHistory = new OpCausalHistory(stored.literal);
-            opCausalHistory._computedProps = stored.computed;
     
             return opCausalHistory;
         }
@@ -393,7 +390,6 @@ class Store {
             return undefined;
         } else {
             const opCausalHistory = new OpCausalHistory(stored.literal);
-            opCausalHistory._computedProps = stored.computed;
     
             return opCausalHistory;
         }

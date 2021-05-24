@@ -179,6 +179,7 @@ class CausalHistoryFragment {
         return filtered;
     }
 
+    /*
     computeProps(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): void {
 
         const done = new Set<Hash>();
@@ -231,6 +232,7 @@ class CausalHistoryFragment {
         }
 
     }
+    */
 
     addAllPredecessors(origin: Hash | Set<Hash>, fragment: CausalHistoryFragment) {
         for (const opHistory of fragment.iterateFrom(origin, 'backward', 'bfs')) {

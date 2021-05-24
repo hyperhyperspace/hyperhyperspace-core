@@ -465,7 +465,7 @@ abstract class HashedObject {
 
     }
 
-    // IMPORTANT: this method is NOT thread safe!
+    // IMPORTANT: this method is NOT reentrant / thread safe!
 
     static async fromContextWithValidation(context: Context, hash?: Hash): Promise<HashedObject> {
         if (hash === undefined) {
@@ -484,7 +484,6 @@ abstract class HashedObject {
             const literal = context.literals.get(hash);
 
             if (literal === undefined) {
-                console.log('NO LITERAL')
                 throw new Error('Literal for ' + hash + ' missing from context');
             }
 
@@ -496,6 +495,11 @@ abstract class HashedObject {
             }
 
             const obj = HashedObject.fromContext(context, hash);
+
+            if (obj.hash() !== hash) {
+                context.objects.delete(hash);
+                throw new Error('Wrong hash for ' + hash + ' of type ' + obj.getClassName() + ', hashed to ' + obj.getLastHash() + ' instead');
+            }
 
             if (obj.author !== undefined) {
                 if (literal.signature === undefined) {
