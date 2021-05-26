@@ -179,60 +179,15 @@ class CausalHistoryFragment {
         return filtered;
     }
 
-    /*
-    computeProps(missingOpHistories: Map<Hash, Hash|OpCausalHistory>): void {
+    removeNonTerminalOps() {
+        const terminal = new Set<Hash>(this.terminalOpHistories);
 
-        const done = new Set<Hash>();
-        const computing = new Set<Hash>();
-
-        for (const hash of this.terminalOpHistories) {
-            computing.add(hash);
-        }
-
-        while (computing.size > 0) {
-
-            const currentHistoryHash = computing.values().next().value as Hash;
-
-            computing.delete(currentHistoryHash);
-
-            const currentHistory = this.contents.get(currentHistoryHash) as OpCausalHistory;
-
-            const prevOpHistories = new Map<Hash, Hash|OpCausalHistory>();
-
-            for (const prevHistoryHash of currentHistory.prevOpHistories) {
-
-                const missing = missingOpHistories.get(prevHistoryHash);
-                if (missing !== undefined) {
-                    prevOpHistories.set(prevHistoryHash, missing);
-                } else {
-                    const history = this.contents.get(prevHistoryHash);
-
-                    if (history === undefined) {
-                        throw new Error('Missing prevOp history: cannot compute props');
-                    }
-
-                    prevOpHistories.set(prevHistoryHash, history);
-
-                    if (!done.has(prevHistoryHash)) {
-                        computing.add(prevHistoryHash);
-                    }
-                }
+        for (const hash of Array.from(this.contents.keys())) {
+            if (!terminal.has(hash)) {
+                this.remove(hash);
             }
-
-            const computed = OpCausalHistory.computeProps(prevOpHistories);
-
-            if (computed !== undefined) {
-                if (currentHistory._computedProps === undefined) {
-                    currentHistory._computedProps = computed;
-                }
-            }
-            
-            done.add(currentHistoryHash)
-            computing.delete(currentHistoryHash);
         }
-
     }
-    */
 
     addAllPredecessors(origin: Hash | Set<Hash>, fragment: CausalHistoryFragment) {
         for (const opHistory of fragment.iterateFrom(origin, 'backward', 'bfs')) {

@@ -11,7 +11,7 @@ import { StateSyncAgent } from './StateSyncAgent';
 
 import { CausalHistorySynchronizer } from './causal/CausalHistorySynchronizer';
 import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHistoryProvider';
-import { OpCausalHistory } from 'data/history/OpCausalHistory';
+import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
 
 type StateFilter = (state: CausalHistoryState, store: Store) => Promise<CausalHistoryState>;
 
@@ -112,11 +112,11 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
                 const filteredState = this.stateOpFilter === undefined? state : await this.stateOpFilter(state, this.store);
 
-                const unknown = new Set<Hash>();
+                const unknown = new Set<OpCausalHistory>();
 
-                for (const opHistory of (filteredState.terminalOpHistoryHashes as HashedSet<Hash>).values()) {
-                    if ((await this.store.loadOpCausalHistoryByHash(opHistory)) === undefined) {
-                        unknown.add(opHistory);
+                for (const opHistoryLiteral of (filteredState.terminalOpHistories as HashedSet<OpCausalHistoryLiteral>).values()) {
+                    if ((await this.store.loadOpCausalHistoryByHash(opHistoryLiteral.causalHistoryHash)) === undefined) {
+                        unknown.add(new OpCausalHistory(opHistoryLiteral));
                     }
                 }
 
