@@ -851,6 +851,7 @@ class CausalHistorySynchronizer {
     private async processLiteral(reqInfo: RequestInfo, literal: Literal): Promise<boolean> {
         
 
+        // FIXME: but what about custom hashes?
         if (!LiteralUtils.validateHash(literal)) {
             const detail = 'Wrong hash found when receiving literal ' + literal.hash + ' in response to request ' + reqInfo.request.requestId;
             this.cancelRequest(reqInfo, 'invalid-literal', detail);

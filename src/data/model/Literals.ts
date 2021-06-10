@@ -21,6 +21,8 @@ class LiteralUtils {
         return literal.value['_flags'];
     }
 
+    // FIXME: I think this break custom hashes!!!!
+    // I think you cannot check the hash without deliteralizing the object.
     static validateHash(literal: Literal): boolean {
         return literal.hash === Hashing.forValue(literal.value);
     }

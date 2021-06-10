@@ -262,7 +262,6 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-
     async saveQueuedOps(store?: Store) : Promise<boolean> {
 
         if (store === undefined) {
@@ -279,7 +278,7 @@ abstract class MutableObject extends HashedObject {
                 let op = this._unsavedOps.shift() as MutationOp;
                 
                 try {
-                    await store.save(op);
+                    await store.save(op, false);
                 } catch (e) {
                     this._unsavedOps.unshift(op);
                     MutableObject.controlLog.debug(() => 'Error trying to save op for ' + this.hash() + ' (class: ' + this.getClassName() + ').');

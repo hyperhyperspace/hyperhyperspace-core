@@ -105,8 +105,9 @@ class Context {
         let result = true;
 
         for (const [hash, literal] of this.literals.entries()) {
+            
             if (hash !== literal.hash || !LiteralUtils.validateHash(literal)) {
-                result = false;
+                result = false;        // but what about custom hashes??
                 break;
             }
         }

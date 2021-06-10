@@ -62,10 +62,12 @@ class Store {
         this.classReferencesCallbacks = new MultiMap();
     }
 
-    // save & saveWithContext: the saving of operations is not recursive, you can't save all
-    //                         operations in a mutable object that was referenced in one of
-    //       (* note 1)        this object's dependencies. You need to call save explicitly
-    //                         on the mutable object whose operations you want saved.
+    // save: The saving of operations is not recursive.
+    //
+    //                         If an operation is itself mutable, you need to call save() again
+    //       (* note 1)        on the operation if you want its mutations flushed to the database
+    //                         as well. (All mutable dependencies are flushed if required - this
+    //                         applies only to their mutation ops)
 
     setResources(resources: Resources) {
         this.resources = resources;
@@ -75,28 +77,9 @@ class Store {
         return this.resources;
     }
 
-    async save(object: HashedObject) : Promise<void>{
+    async save(object: HashedObject, flushMutations=true) : Promise<void> {
         let context = object.toContext();
         let hash    = context.rootHashes[0] as Hash;
-
-        for (const [hash, obj] of context.objects.entries()) {
-
-            const author = obj.getAuthor();
-
-            if (author !== undefined) {
-
-                if (obj.shouldSignOnSave()) {
-
-                    obj.setLastSignature(await author.sign(hash));
-                    (context.literals.get(hash) as Literal).signature = obj.getLastSignature();
-                }
-
-                if (!obj.hasLastSignature()) {
-                    throw new Error('Cannot save ' + hash + ', its signature is missing');
-                }
-
-            }
-        }
 
         let missing = await this.findMissingReferencesWithContext(hash, context);
 
@@ -105,39 +88,34 @@ class Store {
             throw new Error('Cannot save object ' + hash + ' because the following references are missing: ' + Array.from(missing).join(', ') + '.');
         }
 
-        let history: StoredOpCausalHistory | undefined = undefined; 
+        Store.operationLog.debug(() => 'Saving object with hash ' + hash + ' .');
+        await this.saveWithContext(hash, context);
 
-        if (object instanceof MutationOp) {
+        if (flushMutations) {
 
-            const prevOpCausalHistories = new Map<Hash, OpCausalHistory>();
-
-            if (object.prevOps !== undefined) {
-                for (const hashRef of object.prevOps.values()) {
-                    const prevOpHistory = await this.loadOpCausalHistory(hashRef.hash);
-                    
-                    if (prevOpHistory === undefined) {
-                        throw new Error('Causal history of prevOp ' + hashRef.hash + ' of op ' + hash + ' is missing from store, cannot save');
-                    }
-
-                    prevOpCausalHistories.set(hashRef.hash, prevOpHistory);
+            if (object instanceof MutableObject) {
+                let queuedOps = await object.saveQueuedOps(); // see (* note 1) above
+                if (queuedOps) {
+                    Store.operationLog.debug(() => 'Saved queued ops for object with hash ' + hash + ' .');
                 }
             }
 
-            const opHistory = new OpCausalHistory(object, prevOpCausalHistories);
+            const literal = context.literals.get(hash);
 
-            history = {
-                literal: opHistory.literalize()
-            };
-        }
-
-        Store.operationLog.debug(() => 'Saving object with hash ' + hash + ' .');
-        await this.saveWithContext(hash, context, history);
-
-        if (object instanceof MutableObject) {
-            let queuedOps = await object.saveQueuedOps(); // see (* note 1) above
-            if (queuedOps) {
-                Store.operationLog.debug(() => 'Saved queued ops for object with hash ' + hash + ' .');
+            if (literal !== undefined) {
+                for (let dependency of literal.dependencies) {
+                    if (dependency.type === 'literal') {
+                        const depObject = context.objects.get(dependency.hash);
+                        if (depObject !== undefined && depObject instanceof MutableObject) {
+                            let queuedOps = await depObject.saveQueuedOps(); // see (* note 1) above
+                            if (queuedOps) {
+                                Store.operationLog.debug(() => 'Saved queued ops for object with hash ' + hash + ' .');
+                            }
+                        }
+                    }
+                }    
             }
+
         }
 
     }
@@ -185,41 +163,78 @@ class Store {
 
     }
 
-    private async saveWithContext(hash: Hash, context: Context, history?: StoredOpCausalHistory) : Promise<void> {
+    private async saveWithContext(hash: Hash, context: Context) : Promise<void> {
 
-        // TODO: we could keep a set of hashes already saved by previous calls to
-        //       saveWithContext in this same recursion, and skip them without
-        //       having to call this.load(hash).
-
-        let loaded = await this.load(hash);
         
-        if (loaded === undefined) {        
+        const object = context.objects.get(hash);
+        const literal = context.literals.get(hash);
 
-            let object = context.objects.get(hash) as HashedObject;
-        
+        if (object !== undefined) {
+
             object.setStore(this);
             object.setLastHash(hash);
-            let literal = context.literals.get(hash);
 
-            if (literal === undefined) {
-                throw new Error('Hash ' + hash + ' is missing from context received for saving');
+            const author = object.getAuthor();
+
+            if (author !== undefined) {
+
+                if (object.shouldSignOnSave()) {
+
+                    object.setLastSignature(await author.sign(hash));
+                    (context.literals.get(hash) as Literal).signature = object.getLastSignature();
+                }
+
+                if (!object.hasLastSignature()) {
+                    throw new Error('Cannot save ' + hash + ', its signature is missing');
+                }
+
+            }
+        }
+        
+        let loaded = await this.load(hash);
+
+        if (loaded === undefined) { 
+
+            if (literal !== undefined) {
+                for (let dependency of literal.dependencies) {
+                    if (dependency.type === 'literal') {
+                        await this.saveWithContext(dependency.hash, context);
+                    }
+                }    
             }
 
-            for (let dependency of literal.dependencies) {
-                if (dependency.type === 'literal') {
-                    await this.saveWithContext(dependency.hash, context);
+            let history: StoredOpCausalHistory | undefined = undefined;
+
+            if (object instanceof MutationOp) {
+
+                const prevOpCausalHistories = new Map<Hash, OpCausalHistory>();
+
+                if (object.prevOps !== undefined) {
+                    for (const hashRef of object.prevOps.values()) {
+                        const prevOpHistory = await this.loadOpCausalHistory(hashRef.hash);
+                        
+                        if (prevOpHistory === undefined) {
+                            throw new Error('Causal history of prevOp ' + hashRef.hash + ' of op ' + hash + ' is missing from store, cannot save');
+                        }
+
+                        prevOpCausalHistories.set(hashRef.hash, prevOpHistory);
+                    }
                 }
+
+                const opHistory = new OpCausalHistory(object, prevOpCausalHistories);
+
+                history = {
+                    literal: opHistory.literalize()
+                };
+            }
+            
+            if (literal === undefined) {
+                throw new Error('Trying to save ' + hash + ', but its literal is missing from the received context.')
             }
 
             await this.backend.store(literal, history);
 
-        } else {
-            for (const [hash, obj] of context.objects.entries()) {
-                obj.setStore(this);
-                obj.setLastHash(hash);
-            }
         }
-
     }
     
 

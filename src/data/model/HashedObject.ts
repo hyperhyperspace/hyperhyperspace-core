@@ -325,17 +325,6 @@ abstract class HashedObject {
             literal.signature = this.getLastSignature();
         }
 
-
-// MEGA FIXME: do this in some other place:
-        /*
-        if (this._signOnLiteraliz) {
-            literal.signature = this.author?.sign(hash);
-        } else {
-        }
-        */
-
-        
-
         if (context.resources?.aliasing?.get(hash) !== undefined) {
             context.objects.set(hash, context.resources.aliasing.get(hash) as HashedObject);
         } else {
