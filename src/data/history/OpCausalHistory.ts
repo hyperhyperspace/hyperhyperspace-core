@@ -46,7 +46,7 @@ class OpCausalHistory {
                 this.prevOpHistories.add(prevOpHistory);
             } 
 
-            this.opProps = op.getCausalHistoryProps();
+            this.opProps = op.getCausalHistoryProps(prevOpCausalHistories);
 
             if (prevOpCausalHistories === undefined) {
                 throw new Error('Cannot create OpCausalHistory for op, prevOpCausalHistories is missing.');
@@ -90,7 +90,7 @@ class OpCausalHistory {
         }
 
         const receivedProps = new HashedMap<string, string|number|bigint>();
-        for (const [propName, propVal] of op.getCausalHistoryProps().entries()) {
+        for (const [propName, propVal] of op.getCausalHistoryProps(prevOpCausalHistories).entries()) {
             receivedProps.set(propName, propVal);
         }
 

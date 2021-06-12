@@ -83,7 +83,8 @@ abstract class MutationOp extends HashedObject {
         return new OpCausalHistory(this, prevOpCausalHistories);
     }
 
-    getCausalHistoryProps(): OpCausalHistoryProps {
+    getCausalHistoryProps(prevOpCausalHistories: Map<Hash, OpCausalHistory>): OpCausalHistoryProps {
+        prevOpCausalHistories;
         return new Map();
     }
 
