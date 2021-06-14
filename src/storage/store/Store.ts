@@ -167,7 +167,6 @@ class Store {
 
         
         const object = context.objects.get(hash);
-        const literal = context.literals.get(hash);
 
         if (object !== undefined) {
 
@@ -190,18 +189,20 @@ class Store {
 
             }
         }
+
+        const literal = context.literals.get(hash);
+
+        if (literal !== undefined) {
+            for (let dependency of literal.dependencies) {
+                if (dependency.type === 'literal') {
+                    await this.saveWithContext(dependency.hash, context);
+                }
+            }    
+        }
         
-        let loaded = await this.load(hash);
+        const loaded = await this.load(hash);
 
         if (loaded === undefined) { 
-
-            if (literal !== undefined) {
-                for (let dependency of literal.dependencies) {
-                    if (dependency.type === 'literal') {
-                        await this.saveWithContext(dependency.hash, context);
-                    }
-                }    
-            }
 
             let history: StoredOpCausalHistory | undefined = undefined;
 
