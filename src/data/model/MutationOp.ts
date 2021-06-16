@@ -22,7 +22,15 @@ abstract class MutationOp extends HashedObject {
             return false;
         }
 
+        if (!(this.target instanceof MutableObject)) {
+            return false;
+        }
+
         if (this.prevOps === undefined) {
+            return false;
+        }
+
+        if (!(this.prevOps instanceof HashedSet)) {
             return false;
         }
 
