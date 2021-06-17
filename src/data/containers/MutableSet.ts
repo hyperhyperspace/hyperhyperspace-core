@@ -279,7 +279,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         return this._elements.values();
     }
 
-    async mutate(op: MutationOp, isNew: boolean): Promise<boolean> {
+    mutate(op: MutationOp, isNew: boolean): Promise<boolean> {
 
         let mutated = false;
 
@@ -363,7 +363,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
             throw new Error("Method not implemented.");
         }
 
-        return mutated;
+        return Promise.resolve(mutated);
     }
 
     onAddition(callback: (elem: T) => void) {

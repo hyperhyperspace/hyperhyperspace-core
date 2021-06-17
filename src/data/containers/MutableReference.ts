@@ -30,7 +30,7 @@ class MutableReference<T> extends MutableObject {
         await this.applyNewOp(op);
     }
 
-    async mutate(op: MutationOp, _isNew: boolean): Promise<boolean> {
+    mutate(op: MutationOp, _isNew: boolean): Promise<boolean> {
         let refUpdateOp = op as RefUpdateOp<T>;
 
         let mutated = false;
@@ -48,7 +48,7 @@ class MutableReference<T> extends MutableObject {
             }
         }
 
-        return mutated;
+        return Promise.resolve(mutated);
     }
     
     getClassName(): string {
