@@ -188,7 +188,17 @@ async function testMutationOpAutoLoad(store: Store) {
     let h = hs.toArrays().hashes;
     let h2 = hs2.toArrays().hashes;
 
-    expect(h.length).toEqual(h2.length);
+    let checks = 0;
+    while(h.length !== h2.length && checks < 20) {
+        await new Promise(r => setTimeout(r, 100));
+        checks = checks + 1;
+        hs = new HashedSet(sm._operations.keys());
+        hs2 = new HashedSet(sm2._operations.keys());
+        h = hs.toArrays().hashes;
+        h2 = hs2.toArrays().hashes;
+    }
+
+    expect(h2.length).toEqual(h.length);
     
 
     for (let i=0; i<h.length; i++) {
@@ -206,6 +216,9 @@ async function testPrevOpGeneration(store: Store) {
     await sm2.testOperation('another');
     await store.save(sm2);
     
+    await sm.loadAllChanges(); // 2021.6.16: Added after removing peeking from store for
+                               //            prevOp generation.
+
     await sm.testOperation('world');
     await sm.testOperation('!');
     await store.save(sm);

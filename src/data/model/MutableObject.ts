@@ -7,6 +7,9 @@ import { Hash } from './Hashing';
 import { Logger, LogLevel } from 'util/logging';
 import { CausalHistorySyncAgent, StateSyncAgent, StateFilter } from 'mesh/agents/state';
 import { PeerGroupAgent } from 'mesh/agents/peer';
+import { HashedSet } from './HashedSet';
+import { HashReference } from './HashReference';
+import { Lock } from 'util/concurrency';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
@@ -20,9 +23,16 @@ abstract class MutableObject extends HashedObject {
     readonly _acceptedMutationOpClasses : Array<string>;
     readonly _loadStrategy              : LoadStrategy;
 
-    _boundToStore  : boolean;
-    _unsavedOps    : Array<MutationOp>;
-    _prevOpsForUnsavedOps : Set<Hash>;
+    _boundToStore : boolean;
+
+    _allAppliedOps : Set<Hash>;
+    _terminalOps  : Map<Hash, HashReference<MutationOp>>;
+
+
+    _unsavedOps      : Array<MutationOp>;
+    _unappliedOps    : Map<Hash, MutationOp>;
+
+    _applyOpsLock : Lock;
 
     _opCallback : (hash: Hash) => Promise<void>;
 
@@ -36,8 +46,14 @@ abstract class MutableObject extends HashedObject {
         this._acceptedMutationOpClasses = acceptedOpClasses;
         this._loadStrategy = load;
         this._boundToStore = false;
-        this._unsavedOps  = [];
-        this._prevOpsForUnsavedOps = new Set();
+
+        this._allAppliedOps = new Set();
+        this._terminalOps = new Map();
+
+        this._unsavedOps      = [];
+        this._unappliedOps    = new Map();
+        
+        this._applyOpsLock = new Lock();
 
         this._opCallback = async (hash: Hash) => {
             await this.applyOpFromStore(hash);
@@ -168,12 +184,54 @@ abstract class MutableObject extends HashedObject {
     async applyOpFromStore(hash: Hash) : Promise<void> {
         let op: MutationOp;
 
-        op = await this.getStore().load(hash) as MutationOp;
-        
-        await this.apply(op, false);
+        if (!this._allAppliedOps.has(hash) && !this._unappliedOps.has(hash)) {
+            op = await this.getStore().load(hash) as MutationOp;
+
+            this._unappliedOps.set(hash, op);
+            
+            this.applyPendingOpsFromStore();
+        }
+
     }
 
-    async applyNewOp(op: MutationOp) : Promise<void> {
+    private async applyPendingOpsFromStore() {
+
+        let go = true;
+
+        while (go) {
+
+            if (this._applyOpsLock.acquire()) {
+
+                const pending = Array.from(this._unappliedOps.entries());
+                
+                go = false;
+
+                const toRemove = new Array<Hash>();
+                
+                for (const [hash, op] of pending) {
+                    if (this.canApplyOp(op)) {
+                        console.log('applied an op')
+                        await this.apply(op, false);
+                        toRemove.push(hash);
+                        go = true;
+                    }
+                }
+
+                go = go || this._unappliedOps.size > pending.length;
+
+                for (const hash of toRemove) {
+                    this._unappliedOps.delete(hash);
+                }
+
+                this._applyOpsLock.release();
+    
+            }
+
+        }
+
+    }
+
+    applyNewOp(op: MutationOp) : Promise<void> {
 
         if (!this.shouldAcceptMutationOp(op)) {
             throw new Error ('Invalid op ' + op.hash() + ' attempted for ' + this.hash());
@@ -183,83 +241,55 @@ abstract class MutableObject extends HashedObject {
 
             let prevOps = op.getPrevOpsIfPresent();
 
-            let terminalOpHashes = new Set<Hash>();
-
             if (prevOps === undefined) {
+                op.prevOps = new HashedSet<HashReference<MutationOp>>();
 
-
-                MutableObject.prevOpsComputationLog.debug(
-                    () => 'automatically generating prev ops, target is ' + op.getTarget().hash()
-                );
-
-                // If prevOps is missing in the received object, we'll autogenerate a set of known
-                // operations as follows: take all the terminal operations in the store (if there is
-                // an attached store), of those remove any operations that are prevOps for all the
-                // operations that are queued for storage (they are kept in this._prevOpsForUnsavedOps)
-                // and add the last operation that is queued for storage (if there were any).
-
-                // The invariant is: this._prevOpsForUnsavedOps holds all the operations that are terminal
-                // in the store (*), but already have a successor in the chain of ops queued for saving.
-
-                // (*) At the time this function was last called.
-
-                if (this.hasStore()) {
-                    const terminalOpsInfo = await this.getStore().loadTerminalOpsForMutable(op.getTarget().hash());
-                    if (terminalOpsInfo !== undefined) {
-                        for (const opHash of terminalOpsInfo.terminalOps) {
-                            terminalOpHashes.add(opHash);
-                        }    
-                    }    
+                for (const ref of this._terminalOps.values()) {
+                    op.prevOps.add(ref);
                 }
-
-                MutableObject.prevOpsComputationLog.trace('fetched ops from attached store (if any): ' + Array.from(terminalOpHashes));
-                MutableObject.prevOpsComputationLog.trace('prev ops covered by unsaved ops (if any): ' + Array.from(this._prevOpsForUnsavedOps));
-                
-                for (const opHash of this._prevOpsForUnsavedOps) {
-                    terminalOpHashes.delete(opHash);
-                }
-
-                MutableObject.prevOpsComputationLog.trace('remaining ops from attached store:        ' + Array.from(terminalOpHashes))
-
-                let terminalOps = new Set<MutationOp>();
-
-                for (const opHash of terminalOpHashes) {
-                    let terminalOp = await this.getStore().load(opHash) as MutationOp;
-                    terminalOps.add(terminalOp);
-                }
-
-                if (this._unsavedOps.length > 0) {
-
-                    let last = this._unsavedOps[this._unsavedOps.length - 1];
-                    MutableObject.prevOpsComputationLog.trace(() => 'adding last unsaved op:                    ' + last.hash());
-                    
-                    terminalOps.add(last);
-                }
-                
-                MutableObject.prevOpsComputationLog.trace(() => 'resulting generated prev ops:              ' + Array.from(terminalOps).map((mut:MutationOp) => mut.hash()));
-                op.setPrevOps(terminalOps.values());
-
-                MutableObject.prevOpsComputationLog.debug(() => 'op ' + op.hash() + ' generated prev ops: ' + Array.from(terminalOps).map((mut:MutationOp) => mut.hash()))
-            }            
-
-            await this.apply(op, true);
-
-            for (let opHash of terminalOpHashes) {
-                this._prevOpsForUnsavedOps.add(opHash);
             }
+            
+            const done = this.apply(op, true);
 
             this.enqueueOpToSave(op);
+
+             return done;
         }
     }
 
-    protected async apply(op: MutationOp, isNew: boolean) : Promise<void> {
-        const mutated = await this.mutate(op, isNew);
+    protected apply(op: MutationOp, isNew: boolean) : Promise<void> {
 
-        if (mutated) {
-            for (const cb of this._externalMutationCallbacks) {
-                cb(op);
+        for (const prevOpRef of op.getPrevOps()) {
+            this._terminalOps.delete(prevOpRef.hash);
+        }
+
+        this._terminalOps.set(op.hash(), op.createReference());
+
+        this._allAppliedOps.add(op.getLastHash());
+
+        const done = this.mutate(op, isNew).then((mutated: boolean) => {
+            if (mutated) {
+                for (const cb of this._externalMutationCallbacks) {
+                    cb(op);
+                }
+            }        
+        });
+
+        return done;
+
+    }
+
+    private canApplyOp(op: MutationOp): boolean {
+
+        let ok = true;
+        for (const prevOp of op.getPrevOps()) {
+            if (!this._allAppliedOps.has(prevOp.hash)) {
+                ok = false;
+                break
             }
         }
+
+        return ok;
     }
 
     async saveQueuedOps(store?: Store) : Promise<boolean> {
@@ -283,13 +313,6 @@ abstract class MutableObject extends HashedObject {
                     this._unsavedOps.unshift(op);
                     MutableObject.controlLog.debug(() => 'Error trying to save op for ' + this.hash() + ' (class: ' + this.getClassName() + ').');
                     throw e;
-                }
-                
-                let prevOps = op.getPrevOpsIfPresent();
-                if (prevOps !== undefined) {
-                    for (const prevOp of prevOps) {
-                        this._prevOpsForUnsavedOps.delete(prevOp.hash);
-                    }
                 }
             }
 
