@@ -210,7 +210,6 @@ abstract class MutableObject extends HashedObject {
                 
                 for (const [hash, op] of pending) {
                     if (this.canApplyOp(op)) {
-                        console.log('applied an op')
                         await this.apply(op, false);
                         toRemove.push(hash);
                         go = true;
