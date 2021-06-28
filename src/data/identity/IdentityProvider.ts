@@ -1,5 +1,5 @@
 import { Identity } from './Identity';
-import { Literal } from '../model/HashedObject';
+import { Literal } from '../model/Literals';
 import { LiteralContext, Context } from '../model/Context';
 
 interface IdentityProvider {
