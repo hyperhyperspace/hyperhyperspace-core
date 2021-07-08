@@ -10,10 +10,12 @@ import { PeerGroupAgent } from 'mesh/agents/peer';
 import { HashedSet } from './HashedSet';
 import { HashReference } from './HashReference';
 import { Lock } from 'util/concurrency';
+import { UndoOp } from './UndoOp';
+import { RedoOp } from './RedoOp';
+import { MultiMap } from 'util/multimap';
+import { Resources } from 'spaces/Resources';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
-
-type LoadStrategy = 'none'|'full'|'lazy';
 
 abstract class MutableObject extends HashedObject {
 
@@ -21,12 +23,13 @@ abstract class MutableObject extends HashedObject {
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     readonly _acceptedMutationOpClasses : Array<string>;
-    readonly _loadStrategy              : LoadStrategy;
+    readonly _supportsUndo: boolean;
 
     _boundToStore : boolean;
 
     _allAppliedOps : Set<Hash>;
-    _terminalOps  : Map<Hash, HashReference<MutationOp>>;
+    _terminalOps   : Map<Hash, HashReference<MutationOp>>;
+    _undoOpsPerOp       : MultiMap<Hash, Hash>;
 
 
     _unsavedOps      : Array<MutationOp>;
@@ -40,15 +43,26 @@ abstract class MutableObject extends HashedObject {
     // an external mutation callback should be registered below.
     _externalMutationCallbacks : Set<(mut: MutationOp) => void>;
 
-    constructor(acceptedOpClasses : Array<string>, load: LoadStrategy = 'full') {
+    constructor(acceptedOpClasses : Array<string>, supportsUndo=false) {
         super();
+
+        this._supportsUndo = supportsUndo;
+
+        if (supportsUndo) {
+            if (acceptedOpClasses.indexOf(UndoOp.className) < 0) {
+                acceptedOpClasses.push(UndoOp.className);
+            }
+            if (acceptedOpClasses.indexOf(RedoOp.className) < 0) {
+                acceptedOpClasses.push(RedoOp.className);
+            }
+        }
         
         this._acceptedMutationOpClasses = acceptedOpClasses;
-        this._loadStrategy = load;
         this._boundToStore = false;
 
         this._allAppliedOps = new Set();
-        this._terminalOps = new Map();
+        this._terminalOps   = new Map();
+        this._undoOpsPerOp  = new MultiMap();
 
         this._unsavedOps      = [];
         this._unappliedOps    = new Map();
@@ -63,6 +77,12 @@ abstract class MutableObject extends HashedObject {
     }
 
     abstract mutate(op: MutationOp, isNew: boolean): Promise<boolean>;
+
+    async undo(op: MutationOp, isNew: boolean): Promise<boolean> {
+        op; isNew;
+
+        throw new Error('Class "' + this.getClassName() + '" does not support operation undo, yet one was received.');
+    }
 
     addMutationCallback(cb: (mut: MutationOp) => void) {
         this._externalMutationCallbacks.add(cb);
@@ -96,7 +116,7 @@ abstract class MutableObject extends HashedObject {
     // TODO: if this object is bound to the store while the load takes place, we could take measures
     //       to try to avoid loading objects twice if they arrive while the load takes place.
     //       As it is now, the implementation should prepare for the event of an op being loaded twice.
-
+    /*
     async loadOperations(limit?: number, start?: string) : Promise<void> {
         if (this._loadStrategy === 'none') {
             throw new Error("Trying to load operations from store, but load strategy was set to 'none'");
@@ -116,6 +136,7 @@ abstract class MutableObject extends HashedObject {
         }
 
     }
+    */
 
     async loadAllChanges() {
         
@@ -246,6 +267,12 @@ abstract class MutableObject extends HashedObject {
                 for (const ref of this._terminalOps.values()) {
                     op.prevOps.add(ref);
                 }
+            } else {
+                for (const prevOpRef of op.getPrevOps()) {
+                    if (!this._allAppliedOps.has(prevOpRef.hash)) {
+                        throw new Error('Cannot apply new op ' + op.hash() + ': it has prevOp ' + prevOpRef.hash + ' that has not been applied yet.');
+                    }
+                }
             }
             
             const done = this.apply(op, true);
@@ -258,24 +285,83 @@ abstract class MutableObject extends HashedObject {
 
     protected apply(op: MutationOp, isNew: boolean) : Promise<void> {
 
+        const opHash = op.hash();
+
         for (const prevOpRef of op.getPrevOps()) {
             this._terminalOps.delete(prevOpRef.hash);
         }
 
-        this._terminalOps.set(op.hash(), op.createReference());
+        this._terminalOps.set(opHash, op.createReference());
 
-        this._allAppliedOps.add(op.getLastHash());
+        if (this._allAppliedOps.has(opHash)) {
+            return Promise.resolve();
+        }
 
-        const done = this.mutate(op, isNew).then((mutated: boolean) => {
-            if (mutated) {
-                for (const cb of this._externalMutationCallbacks) {
-                    cb(op);
-                }
-            }        
-        });
+        this._allAppliedOps.add(opHash);
 
-        return done;
+        
+        if (op instanceof UndoOp) {
 
+            const targetOp     = op.targetOp as MutationOp;
+            const targetOpHash = targetOp.hash();
+
+            const alreadyUndone = this._undoOpsPerOp.get(targetOpHash).size > 0;
+
+            this._undoOpsPerOp.add(targetOpHash, opHash);
+
+            if (!alreadyUndone) {
+                const done = this.undo(targetOp, isNew).then((mutated: boolean) => {
+                    if (mutated) {
+                        for (const cb of this._externalMutationCallbacks) {
+                            cb(op);
+                        }
+                    }
+                });
+    
+                return done;    
+            } else {
+                return Promise.resolve();
+            }
+
+        } else {
+
+            let targetOp = op;
+            let needToApply = true;
+
+            if (op instanceof RedoOp) {
+
+                const targetUndoOp     = op.targetUndoOp as UndoOp;
+                const targetUndoOpHash = targetUndoOp.hash();
+
+                targetOp = targetUndoOp.targetOp as MutationOp;
+
+                const targetOpHash = targetOp.hash();
+
+                const wasUndone = this._undoOpsPerOp.get(targetOpHash).size > 0;
+                
+                this._undoOpsPerOp.delete(targetOpHash, targetUndoOpHash);
+
+                const shouldRedo = wasUndone && this._undoOpsPerOp.get(targetOpHash).size === 0;
+
+                needToApply = shouldRedo;
+
+            }
+
+            if (needToApply) {
+                const done = this.mutate(targetOp, isNew).then((mutated: boolean) => {
+                    if (mutated) {
+                        for (const cb of this._externalMutationCallbacks) {
+                            cb(targetOp);
+                        }
+                    }        
+                });
+        
+                return done;
+            } else {
+                return Promise.resolve();
+            }
+            
+        }
     }
 
     private canApplyOp(op: MutationOp): boolean {
@@ -332,16 +418,20 @@ abstract class MutableObject extends HashedObject {
 
         flags.push('mutable');
 
+        if (this._supportsUndo) {
+            flags.push('supports_undo')
+        }
+
         return super.literalizeInContext(context, path, flags);
 
     }
 
     shouldAcceptMutationOp(op: MutationOp) {
-        return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
+        return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0 && op.getTarget().equals(this);
     }
 
     createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {
-        return new CausalHistorySyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
+        return new CausalHistorySyncAgent(peerGroupAgent, this.getLastHash(), this.getResources() as Resources, this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
         //return new TerminalOpsSyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 

@@ -45,7 +45,6 @@ abstract class HashedObject {
 
     private id?     : string;
     private author? : Identity;
-
     
     private _signOnSave  : boolean;
     private _lastHash?        : Hash;
@@ -502,6 +501,10 @@ abstract class HashedObject {
                 }
             }
 
+            if (context.resources !== undefined) {
+                obj.setResources(context.resources);
+            }
+            
             if (!await obj.validate(context.objects)) {
                 context.objects.delete(hash);
                 throw new Error('Validation failed for ' + hash + ' of type ' + obj.getClassName());

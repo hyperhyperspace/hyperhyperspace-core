@@ -12,6 +12,7 @@ import { StateSyncAgent } from './StateSyncAgent';
 import { CausalHistorySynchronizer } from './causal/CausalHistorySynchronizer';
 import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHistoryProvider';
 import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
+import { Resources } from 'spaces/Resources';
 
 type StateFilter = (state: CausalHistoryState, store: Store) => Promise<CausalHistoryState>;
 
@@ -30,6 +31,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     acceptedMutationOpClasses: string[];
     stateOpFilter?: StateFilter;
 
+    resources: Resources;
     store: Store;
 
     pod?: AgentPod;
@@ -45,14 +47,15 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     controlLog: Logger;
     messageLog: Logger;
 
-    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: Hash, store: Store, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
+    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: Hash, resources: Resources, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
         super(peerGroupAgent);
 
         this.mutableObj = mutableObj;
         this.acceptedMutationOpClasses = acceptedMutationOpClasses;
         this.stateOpFilter = stateOpFilter;
 
-        this.store = store;
+        this.resources = resources;
+        this.store     = resources.store;
 
         this.remoteStates = new Map();
 

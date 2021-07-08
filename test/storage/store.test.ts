@@ -150,7 +150,7 @@ async function testMutationOps(store: Store) {
 
     let sm2 = await store.load(hash) as SomethingMutable;
 
-    await sm2.loadOperations();
+    await sm2.loadAllChanges();
 
     let hs = new HashedSet(sm._operations.keys());
     let hs2 = new HashedSet(sm2._operations.keys());
@@ -225,7 +225,7 @@ async function testPrevOpGeneration(store: Store) {
     
 
     let sm3 = await store.load(hash) as SomethingMutable;
-    await sm3.loadOperations();
+    await sm3.loadAllChanges();
 
     let world: SomeMutation|undefined = undefined;
 

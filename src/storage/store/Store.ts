@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
-import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp } from 'data/model';
+import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp, HashedSet } from 'data/model';
 import { Hash } from 'data/model/Hashing';
 
 import { MultiMap } from 'util/multimap';
@@ -40,6 +40,8 @@ class Store {
         }
 
     }
+
+    static extractPrevOps: (obj: HashedObject) => Set<Hash> = (obj: HashedObject) => new Set(Array.from((obj as MutationOp).getPrevOps()).map((ref: HashReference<MutationOp>) => ref.hash))
 
     private backend : Backend;
 
@@ -462,6 +464,12 @@ class Store {
         let info = await this.backend.loadTerminalOpsForMutable(hash);
 
         return info;
+    }
+
+    async loadPrevOpsClosure(init: HashedSet<HashReference<MutationOp>>) {
+        const initHashes = new Set<Hash>(Array.from(init.values()).map((ref: HashReference<MutationOp>) => ref.hash));
+
+        return this.loadClosure(initHashes, Store.extractPrevOps);
     }
 
     async loadClosure(init: Set<Hash>, next: (obj: HashedObject) => Set<Hash>) : Promise<Set<Hash>> {

@@ -773,6 +773,7 @@ class CausalHistorySynchronizer {
 
             if (resp.sendingOps !== undefined && resp.sendingOps.length > 0) {
                 reqInfo.receivedObjects = new Context();
+                reqInfo.receivedObjects.resources = this.syncAgent.resources;
             }
 
             if (resp.omittedObjsOwnershipProofs !== undefined &&

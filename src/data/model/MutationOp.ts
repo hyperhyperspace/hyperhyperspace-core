@@ -5,18 +5,27 @@ import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { OpCausalHistory, OpCausalHistoryProps } from 'data/history/OpCausalHistory';
+import { InvalidateAfterOp } from './InvalidateAfterOp';
 
 abstract class MutationOp extends HashedObject {
 
     target?  : MutableObject;
     prevOps? : HashedSet<HashReference<MutationOp>>;
 
-    constructor(target?: MutableObject) {
+    consequenceOf?: HashedSet<HashReference<MutationOp>>;
+
+    constructor(target?: MutableObject, consequenceOf?: IterableIterator<MutationOp>) {
         super();
-        this.target  = target;
+
+        if (target !== undefined) {
+            this.target = target;
+            if (consequenceOf !== undefined) {
+                this.consequenceOf = new HashedSet(Array.from(consequenceOf).map((op: MutationOp) => op.createReference()).values());
+            }
+        }
     }
 
-    async validate(references: Map<Hash, HashedObject>) {
+    async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
 
         if (this.target === undefined) {
             return false;
@@ -45,9 +54,18 @@ abstract class MutationOp extends HashedObject {
                 return false;
             }
         }
+
+        if (!this.target.shouldAcceptMutationOp(this)) {
+            return false;
+        }
         
         return true;
 
+    }
+
+    shouldAcceptInvalidateAfterOp(op: InvalidateAfterOp): boolean {
+        op;
+        return false;
     }
 
     getTarget() : MutableObject {
@@ -94,6 +112,10 @@ abstract class MutationOp extends HashedObject {
     getCausalHistoryProps(prevOpCausalHistories: Map<Hash, OpCausalHistory>): OpCausalHistoryProps {
         prevOpCausalHistories;
         return new Map();
+    }
+
+    isConsequence() {
+        return this.consequenceOf !== undefined;
     }
 
 }

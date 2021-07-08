@@ -28,7 +28,7 @@ class Logger {
   warning(msg: string | Object  | (() => string), obj?: any)         { this.log(msg, LogLevel.WARNING, obj); }
   error(msg: string | Error | Object  | (() => string), obj?: any)   { this.log(msg, LogLevel.ERROR, obj); }
 
-  log(msg: string | Object | (() => string), level: LogLevel, obj?: any) {
+  log(msg: string | Error | Object | (() => string), level: LogLevel, obj?: any) {
     if (level >= this.level) {
       let className = 'Not within class';
       if (this.className) className = this.className;
