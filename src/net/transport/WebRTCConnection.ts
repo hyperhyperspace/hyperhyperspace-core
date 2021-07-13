@@ -179,6 +179,7 @@ class WebRTCConnection implements Connection {
     }
 
     close() {
+        WebRTCConnection.logger.debug('Closing connection ' + this.callId);
         if (this.connection !== undefined) {
             this.connection.close();
         }
