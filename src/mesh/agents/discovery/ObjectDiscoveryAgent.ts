@@ -88,6 +88,7 @@ class ObjectDiscoveryAgent implements Agent {
         }
 
         if (!this.localEndpoints.has(localEndpoint)) {
+            ObjectDiscoveryAgent.log.trace('listening on ' + localEndpoint);
             this.getNetworkAgent().listenForLinkupMessages(localEndpoint);
             this.localEndpoints.add(localEndpoint);
         }
