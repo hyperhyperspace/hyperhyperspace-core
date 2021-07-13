@@ -302,9 +302,13 @@ class NetworkAgent implements Agent {
                 if (info.status === ConnectionStatus.Received || info.status === ConnectionStatus.Establishing) {
                     if (Date.now() > info.timestamp + (1000 * ConnectionEstablishmentTimeout)) {
                         toCleanUp.push(callId);
+
+                        NetworkAgent.connLogger.trace(() => 'Cleaning up connection (establishment timeout reached): ' + info.connId + ', remote ep is ' + info.remoteEndpoint);
                     } 
                 } else if (!conn.channelIsOperational()) {
                     toCleanUp.push(callId);
+
+                    NetworkAgent.connLogger.trace(() => 'Cleaning up connection (channel is not operational): ' + info.connId + ', remote ep is ' + info.remoteEndpoint);
                 }
 
             }
