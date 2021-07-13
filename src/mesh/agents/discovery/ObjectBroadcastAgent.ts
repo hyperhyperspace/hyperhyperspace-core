@@ -81,13 +81,15 @@ class ObjectBroadcastAgent implements Agent {
             this.createListener(linkupServer);    
         }   
 
-        ObjectBroadcastAgent.log.debug('Started ObjectBroadcastAgent for ' + this.literalContext.rootHashes[0]);
+        ObjectBroadcastAgent.log.debug('Started ObjectBroadcastAgent for ' + this.literalContext.rootHashes[0] + ', broadcasted bits: ' + this.broadcastedSuffixBits);
     }
 
     listenOn(linkupServers: string[], replyEndpoints: Endpoint[]) {
+
         for (const linkupServer of linkupServers) {
             for (const replyEndpoint of replyEndpoints) {
                 this.listening.add(linkupServer, replyEndpoint);
+                ObjectBroadcastAgent.log.trace('Listening on ' + linkupServer + ' with replyEndpoint=' + replyEndpoint);
             }
 
             if (this.pod !== undefined) {
@@ -103,7 +105,7 @@ class ObjectBroadcastAgent implements Agent {
         const broadcastLinkupId = ObjectBroadcastAgent.linkupIdForHexHashSuffix(ObjectBroadcastAgent.hexSuffixFromHash(this.literalContext.rootHashes[0], this.broadcastedSuffixBits));
         let address = new LinkupAddress(linkupServer, broadcastLinkupId);
         networkAgent.listenForLinkupMessages(address.url());
-        ObjectBroadcastAgent.log.trace(() => 'Listening for linkup messages on ' + address.url());
+        ObjectBroadcastAgent.log.trace(() => 'Listening for linkup messages on ' + address.url()) + ' for ' + this.literalContext.rootHashes[0];
 
     }
 
