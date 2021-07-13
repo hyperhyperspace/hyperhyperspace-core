@@ -56,8 +56,7 @@ class TestConnectionAgent implements Agent {
                 
             }   
         }
-
-        console.log('HERE HERE');
+        
         console.log((this.established.get(local) as MultiMap<Endpoint, ConnectionId>).get(remote));
 
 
