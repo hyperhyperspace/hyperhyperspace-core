@@ -644,7 +644,7 @@ class Mesh {
                 if (op !== undefined && 
                     mut.getAcceptedMutationOpClasses().indexOf(op.getClassName()) >= 0) {
                         let mutOp = op as MutationOp;
-                        const roots = this.allRootAncestors.get(gossip.gossipId)?.get(mutOp.getTarget().hash())
+                        const roots = this.allRootAncestors.get(gossip.gossipId)?.get(mutOp.getTargetObject().hash())
 
                         if (roots !== undefined) {
                             for (const rootHash of roots) {

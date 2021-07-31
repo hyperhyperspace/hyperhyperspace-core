@@ -11,8 +11,8 @@ class RedoOp extends MutationOp {
 
     static className = 'hhs/v0/RedoOp';
 
-    targetUndoOp? : UndoOp; // the undo op that will be reversed
-    targetOp?     : HashReference<MutationOp>; // the targetOp of the targetUndoOp
+    targetOp? : UndoOp; // the undo op that will be reversed
+    
     // (we need an explicit reference because we need it for validation)
     
     reason?: HashReference<UndoOp|RedoOp>;
@@ -26,11 +26,11 @@ class RedoOp extends MutationOp {
     // this.targetUndoOp.
 
     constructor(targetUndoOp?: UndoOp, reason?: UndoOp|RedoOp) {
-        super(targetUndoOp?.target);
+        super(targetUndoOp?.targetObject);
 
         if (targetUndoOp !== undefined) {
-            this.targetUndoOp = targetUndoOp;
-            this.targetOp     = targetUndoOp.getTarget().createReference();
+            this.targetOp = targetUndoOp;
+            
 
             if (reason === undefined) {
                 throw new Error('Creating redo op, but no reason was provided.');
@@ -43,11 +43,11 @@ class RedoOp extends MutationOp {
             if (reason instanceof UndoOp) {
 
                 // check that targetUndoOp is caused by an InvalidateAfterOp.
-                if (targetUndoOp.reason?.className !== InvalidateAfterOp.className) {
+                if (targetUndoOp.reasonOp?.className !== InvalidateAfterOp.className) {
                     throw new Error('Trying to create a RedoOp using an UndoOp as reason, but then the undo must point to an InvalidateAfterOp!');
                 }
 
-                const targetUndoOpReason = targetUndoOp.reason as HashReference<InvalidateAfterOp>;
+                const targetUndoOpReason = targetUndoOp.reasonOp as HashReference<InvalidateAfterOp>;
 
                 // check that said InvalidateAfterOp is being undone by reason
                 if (targetUndoOpReason.hash !== reason.targetOp?.hash()) {
@@ -60,14 +60,14 @@ class RedoOp extends MutationOp {
             } else if (reason instanceof RedoOp) {
 
                 // check that targetUndoOp is caused by another UndoOp.
-                if (targetUndoOp.reason?.className !== UndoOp.className) {
+                if (targetUndoOp.reasonOp?.className !== UndoOp.className) {
                     throw new Error('Trying to create a RedoOp using another RedoOp as reason, but the targetUndoOp must have an UndoOp as reason.');
                 }
 
-                const targetUndoOpReason = targetUndoOp.reason as HashReference<UndoOp>;
+                const targetUndoOpReason = targetUndoOp.reasonOp as HashReference<UndoOp>;
 
                 // check that the RedoOp received as reason is redoing the undo that targetUndoOp has as reason
-                if (targetUndoOpReason.hash !== reason.targetUndoOp?.hash()) {
+                if (targetUndoOpReason.hash !== reason.targetOp?.hash()) {
                     throw new Error('Trying to create a RedoOp by cascading another RedoOp, but targets do not match.');
                 }
 
@@ -95,15 +95,15 @@ class RedoOp extends MutationOp {
             return false;
         }
 
-        if (this.isConsequence()) {
+        if (this.hasCausalOps()) {
             return false;
         }
 
-        if (this.targetUndoOp === undefined) {
+        if (this.targetOp === undefined) {
             return false;
         }
 
-        if (!(this.targetUndoOp instanceof UndoOp)) {
+        if (!(this.targetOp instanceof UndoOp)) {
             return false;
         }
 
@@ -120,11 +120,11 @@ class RedoOp extends MutationOp {
         if (reason instanceof UndoOp) {
 
             // check that targetUndoOp is caused by an InvalidateAfterOp.
-            if (this.targetUndoOp.reason?.className !== InvalidateAfterOp.className) {
+            if (this.targetOp.reasonOp?.className !== InvalidateAfterOp.className) {
                 throw new Error('Trying to create a RedoOp using an UndoOp as reason, but then the undo must point to an InvalidateAfterOp!');
             }
 
-            const targetUndoOpReason = this.targetUndoOp.reason as HashReference<InvalidateAfterOp>;
+            const targetUndoOpReason = this.targetOp.reasonOp as HashReference<InvalidateAfterOp>;
 
             // check that said InvalidateAfterOp is being undone by reason
             if (targetUndoOpReason.hash !== reason.targetOp?.hash()) {
@@ -137,14 +137,14 @@ class RedoOp extends MutationOp {
         } else if (reason instanceof RedoOp) {
 
             // check that targetUndoOp is caused by another UndoOp.
-            if (this.targetUndoOp.reason?.className !== UndoOp.className) {
+            if (this.targetOp.reasonOp?.className !== UndoOp.className) {
                 throw new Error('Trying to create a RedoOp using another RedoOp as reason, but the targetUndoOp must have an UndoOp as reason.');
             }
 
-            const targetUndoOpReason = this.targetUndoOp.reason as HashReference<UndoOp>;
+            const targetUndoOpReason = this.targetOp.reasonOp as HashReference<UndoOp>;
 
             // check that the RedoOp received as reason is redoing the undo that targetUndoOp has as reason
-            if (targetUndoOpReason.hash !== reason.targetUndoOp?.hash()) {
+            if (targetUndoOpReason.hash !== reason.targetOp?.hash()) {
                 throw new Error('Trying to create a RedoOp by cascading another RedoOp, but targets do not match.');
             }
 
@@ -156,7 +156,7 @@ class RedoOp extends MutationOp {
     }
 
     getTargetUndoOp() : UndoOp {
-        return this.targetUndoOp as UndoOp;
+        return this.targetOp as UndoOp;
     }
 
     literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {

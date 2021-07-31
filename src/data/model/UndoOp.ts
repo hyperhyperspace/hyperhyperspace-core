@@ -6,20 +6,56 @@ import { InvalidateAfterOp } from './InvalidateAfterOp';
 import { HashReference } from './HashReference';
 import { RedoOp } from './RedoOp';
 
+ /*                             causal
+  *     InvAfterOp    Op1 <------------------ Op2
+  *         ^    \     ^                       ^
+  *  target |   c.\    | target                | target
+  *         |      \   |        causal         | 
+  *       UndoOp    UndoOp(1) <-------------- UndoOp(2)
+  *         ^    \     ^                       ^
+  *  target |   c.\    | target                | target
+  *         |      \   |        causal         |
+  *       RedoOp     RedoOp <---------------- RedoOp
+  *         ^    \     ^                       ^
+  *  target |   c.\    | target                | target
+  *         |      \   |        causal         |
+  *       UndoOp    UndoOp(3) <-------------- UndoOp(4)
+  * 
+  */
+
+  /* The diagram above shows the situations where an UndoOp may be necessary. Here
+   * InvAfterOp on the top left is invalidating Op1, and transitively Op2 that is
+   * causally dependant on Op1. However, InvAfterOp is itself being undone, then
+   * redone, then undone again, and those are also cascaded to Op1 and Op2.
+   * 
+   * There are 4 possible cases, marked above:
+   * 
+   *  (1) is the direct case, where Op1 is being undone because it is outside of the
+   *  terminalOps defined in InvAfterOp.
+   * 
+   *  (2) is a cascade of (1) to Op2, that is dependent on Op1.
+   * 
+   *  (3) is a cascade of a RedoOp on the original InvAfterOp, that triggers a new
+   *  undo for Op1. Notice in this case that te RedoOp is cascaded as an undo.
+   * 
+   *  (4) is similar to (2), but is undoing a RedoOp for Op2 instead of Op2 itself.
+   * 
+   * It is important to notice that in all cases but (1),
+   * 
+   *          undo.target.causal == undo.causal.target
+   * 
+   * i.e. the squares in the diagram above commute.
+   * 
+   */
+
 class UndoOp extends MutationOp {
 
     static className = 'hhs/v0/UndoOp';
 
     targetOp?: MutationOp; // the op that will be undone
 
-    reason?: HashReference<InvalidateAfterOp|UndoOp|RedoOp>;
-    // Either targetOp will be invalidated because it is an
-    // untimely consequence of an op that was invalidated by an
-    // InvalidateAfterOp op, or it is a consequence that an op
-    // that was undone by an UndoOp that we are cascading here.
-
     constructor(targetOp?: MutationOp, reason?: InvalidateAfterOp|UndoOp|RedoOp) {
-        super(targetOp?.target);
+        super(targetOp?.targetObject);
 
         if (targetOp !== undefined) {
             this.targetOp = targetOp;
@@ -28,53 +64,85 @@ class UndoOp extends MutationOp {
                 throw new Error("An undo op can't be undone this way, please see RedoOp.");
             }
 
-            if (targetOp instanceof RedoOp) {
-                throw new Error("An redo op can't be undone this way, please create a new UndoOp instead.");
-            }
+            const targetOpCausalOps = this.targetOp.causalOps;
 
-            const targetOpDeps = this.targetOp.consequenceOf;
-
-            if (targetOpDeps === undefined) {
-                throw new Error("Can't undo an op that is not a consequence of any other ones.");
+            if (targetOpCausalOps === undefined) {
+                throw new Error("Can't undo an op that has no causal assumptions.");
             }
 
             if (reason === undefined) {
-                throw new Error('Creating undo op, but no reason was provided.');
+                throw new Error('Creating an undo op, but no reason was provided.');
             }
 
-            this.reason = reason.createReference();
+            this.reasonOp = reason.createReference();
 
             if (reason instanceof InvalidateAfterOp) {
                 
                 const invalidateAfterOp = reason as InvalidateAfterOp;
 
-                const invalidatedDepOp = invalidateAfterOp.getTarget();
+                const targetOp = invalidateAfterOp.getTargetOp();
 
-                if (!targetOpDeps.has(invalidatedDepOp.createReference())) {
+                if (!targetOpCausalOps.has(targetOp.createReference())) {
                     throw new Error('Wrong undo: the target op is not a consequence of the invalidated op.');
                 }
 
-                if (!this.getTarget().equals(invalidateAfterOp.getTarget())) {
+                // here we could check that targetOp is really outside of invalidateAfterOp.terminalOps,
+                // but that's costly, and constructor checks aim only to aid debugging, so we'll not.
+
+                if (!this.getTargetObject().equals(invalidateAfterOp.getTargetObject())) {
                     throw new Error('Trying to undo an op in a different mutable object than the invalidation op.');
                 }
 
 
-            } else if (reason instanceof RedoOp) { 
+            } else {
+
+                // the op that is being undone (this.targetOp) has the op
+                // that was undone/redone by reason (this.reasonOp.targetOp)
+                // in its causalOps (i.e. this.reasonOp.targetOp \in this.targetOp.causalOps)
+
+                // this diagram commutes:
+
+                /*  this.reasonOp.targetOp
+                 *       ===                < --------- this.targetOp
+                 *  this.targetOp.reasonOp                 ^
+                 *    ^                                    |
+                 *    | targetOp                           | targetOp
+                 *    |                   reasonOp         |
+                 *  this.reasonOp <--------------------- this
+                 */ 
 
                 
 
-            } else if (reason instanceof UndoOp) {
 
-                const cascadedUndoOp = reason as UndoOp;
 
-                const undoneDepOp = cascadedUndoOp.getTargetOp();
-    
-                if (!targetOpDeps.has(undoneDepOp.createReference())) {
-                    throw new Error('Trying to create UndoOp as cascading of another UndoOp, but the latter is not undoing any op the former is a consequence of.');
+                if (this.targetOp.causalOps === undefined) {
+                    throw new Error('The targetOp of an UndoOp must have a non-empty causalOps set.');
                 }
 
-            } else {
-                throw new Error('Trying to create an UndoOp, but received reason object is neither an instance of InvalidateAfterOp or UndoOp.');
+                if (!this.targetOp.causalOps.has((reason.targetOp as HashedObject).createReference())) {
+                    throw new Error('The targetOp of an UndoOp must have a non-empty causalOps set.');
+                }
+
+                if (reason instanceof RedoOp) { 
+
+                    if (! (this.targetOp instanceof RedoOp)) {
+                        throw new Error('If the reason for an UndoOp is a RedoOp, its target must be a RedoOp too.');
+                    }
+    
+                } else if (reason instanceof UndoOp) {
+    
+                    const cascadedUndoOp = reason as UndoOp;
+    
+                    const undoneDepOp = cascadedUndoOp.getTargetOp();
+        
+                    if (!targetOpCausalOps.has(undoneDepOp.createReference())) {
+                        throw new Error('Trying to create UndoOp as cascading of another UndoOp, but the latter is not undoing any op the former is a consequence of.');
+                    }
+    
+                } else {
+                    throw new Error('Trying to create an UndoOp, but received reason object is neither an instance of InvalidateAfterOp or UndoOp.');
+                }
+
             }
 
         }
@@ -95,7 +163,7 @@ class UndoOp extends MutationOp {
             return false;
         }
 
-        if (this.isConsequence()) {
+        if (this.hasCausalOps()) {
             return false;
         }
 
@@ -107,25 +175,25 @@ class UndoOp extends MutationOp {
             return false;
         }
 
-        if (!this.getTarget().equals(this.targetOp.getTarget())) {
+        if (!this.getTargetObject().equals(this.targetOp.getTargetObject())) {
             return false;
         }
 
-        const targetOpDeps = this.targetOp.consequenceOf;
+        const targetOpDeps = this.targetOp.causalOps;
 
         if (targetOpDeps === undefined) {
             return false;
         }
 
-        if (this.reason === undefined) {
+        if (this.reasonOp === undefined) {
             return false;
         }
 
-        if (!(this.reason instanceof HashReference)) {
+        if (!(this.reasonOp instanceof HashReference)) {
             return false;
         }
 
-        const reason = references.get(this.reason.hash);
+        const reason = references.get(this.reasonOp.hash);
 
         if (reason instanceof InvalidateAfterOp) {
             
@@ -137,7 +205,7 @@ class UndoOp extends MutationOp {
                 return false;
             }
 
-            if (!this.getTarget().equals(invalidateAfterOp.getTarget())) {
+            if (!this.getTargetObject().equals(invalidateAfterOp.getTargetObject())) {
                 return false;
             }
 

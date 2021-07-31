@@ -244,7 +244,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
     private shouldAcceptMutationOp(op: MutationOp): boolean {
 
-        return this.mutableObj === op.target?.hash() &&
+        return this.mutableObj === op.targetObject?.hash() &&
                this.acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 

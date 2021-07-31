@@ -34,12 +34,12 @@ abstract class MutableSetOp<T extends HashedObject> extends MutationOp {
             return false;
         }
 
-        if (! (this.getTarget() instanceof MutableSet)) {
+        if (! (this.getTargetObject() instanceof MutableSet)) {
             return false;
             //throw new Error('MutableSetOp.target must be a MutableSet, got a ' + this.getTarget().getClassName() + ' instead.');
         }
 
-        if (this.getTarget().getAuthor() !== undefined && !(this.getTarget().getAuthor()?.equals(this.getAuthor()))) {
+        if (this.getTargetObject().getAuthor() !== undefined && !(this.getTargetObject().getAuthor()?.equals(this.getAuthor()))) {
             return false;
             //throw new Error('MutableSetOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTarget().getAuthor()?.hash() + '.');
         }
@@ -78,7 +78,7 @@ class MutableSetAddOp<T extends HashedObject> extends MutableSetOp<T> {
             return false;
         }
 
-        const constraints = (this.getTarget() as MutableSet<T>).typeConstraints;
+        const constraints = (this.getTargetObject() as MutableSet<T>).typeConstraints;
 
         if (!Types.satisfies(this.element, constraints)) {
             return false;
@@ -171,7 +171,7 @@ class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
                 return false;
             }
 
-            if (!op.target?.equals(this.target)) {
+            if (!op.targetObject?.equals(this.targetObject)) {
                 MutableSet.logger.warning('Addition op referenced in MutableSet deletion op points to a different set.');
                 return false;
             }

@@ -10,18 +10,22 @@ class InvalidateAfterOp extends MutationOp {
     static className = 'hhs/v0/InvalidateAfterOp';
 
     targetOp?: MutationOp;
-    lastValidOps?: HashedSet<HashReference<MutationOp>>;
+    terminalOps?: HashedSet<HashReference<MutationOp>>;
 
-    constructor(targetOp?: MutationOp, after?: IterableIterator<MutationOp>) {
-        super(targetOp?.target);
+    // Meaning: invalidate targetOp after terminalOps, i.e. undo any ops that
+    // have targetOp as causalOp but are not contained in the set of ops that
+    // come up to {terminalOps}.
+
+    constructor(targetOp?: MutationOp, terminalOps?: IterableIterator<MutationOp>) {
+        super(targetOp?.targetObject);
         
         if (targetOp !== undefined) {
             this.targetOp = targetOp;
 
-            if (after === undefined) {
+            if (terminalOps === undefined) {
                 throw new Error('InvalidateAfterOp cannot be created: "after" parameter is missing.');
             } else {
-                this.lastValidOps = new HashedSet(Array.from(after).map((op: MutationOp) => op.createReference()).values());
+                this.terminalOps = new HashedSet(Array.from(terminalOps).map((op: MutationOp) => op.createReference()).values());
             }
         }
 
@@ -37,21 +41,21 @@ class InvalidateAfterOp extends MutationOp {
             return false;
         }
         
-        for (const lastValidOpRef of (this.lastValidOps as HashedSet<HashReference<MutationOp>>).values()) {
+        for (const terminalOpRef of (this.terminalOps as HashedSet<HashReference<MutationOp>>).values()) {
             
-            const lastValidOp = references.get(lastValidOpRef.hash) as MutationOp;
+            const terminalOp = references.get(terminalOpRef.hash) as MutationOp;
 
-            if (lastValidOp === undefined) {
+            if (terminalOp === undefined) {
                 return false;
             }
 
-            if (!lastValidOp.getTarget().equals(this.target)) {
+            if (!terminalOp.getTargetObject().equals(this.targetObject)) {
                 return false;
             }
             
         }
         
-        if (!(this.targetOp as MutationOp).shouldAcceptInvalidateAfterOp(this)) {
+        if (!(this.targetOp as MutationOp).shouldAcceptNoMoreConsequencesOp(this)) {
             return false;
         }
 
@@ -65,7 +69,7 @@ class InvalidateAfterOp extends MutationOp {
 
     getTargetOp(): MutationOp {
         if (this.targetOp === undefined) {
-            throw new Error('Tryingto get targetOp for InvalidateAfterOp ' + this.hash() + ', but it is not present.');
+            throw new Error('Trying to get targetOp for InvalidateAfterOp ' + this.hash() + ', but it is not present.');
         }
 
         return this.targetOp;

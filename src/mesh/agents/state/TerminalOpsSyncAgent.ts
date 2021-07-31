@@ -825,7 +825,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     private shouldAcceptMutationOp(op: MutationOp): boolean {
 
-        return this.objHash === op.target?.hash() &&
+        return this.objHash === op.targetObject?.hash() &&
                this.acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 

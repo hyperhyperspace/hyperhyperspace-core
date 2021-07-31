@@ -9,29 +9,28 @@ import { InvalidateAfterOp } from './InvalidateAfterOp';
 
 abstract class MutationOp extends HashedObject {
 
-    target?  : MutableObject;
+    targetObject?  : MutableObject;
     prevOps? : HashedSet<HashReference<MutationOp>>;
+    causalOps?: HashedSet<HashReference<MutationOp>>;
 
-    consequenceOf?: HashedSet<HashReference<MutationOp>>;
-
-    constructor(target?: MutableObject, consequenceOf?: IterableIterator<MutationOp>) {
+    constructor(target?: MutableObject, causalOps?: IterableIterator<MutationOp>) {
         super();
 
         if (target !== undefined) {
-            this.target = target;
-            if (consequenceOf !== undefined) {
-                this.consequenceOf = new HashedSet(Array.from(consequenceOf).map((op: MutationOp) => op.createReference()).values());
+            this.targetObject = target;
+            if (causalOps !== undefined) {
+                this.causalOps = new HashedSet(Array.from(causalOps).map((op: MutationOp) => op.createReference()).values());
             }
         }
     }
 
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
 
-        if (this.target === undefined) {
+        if (this.targetObject === undefined) {
             return false;
         }
 
-        if (!(this.target instanceof MutableObject)) {
+        if (!(this.targetObject instanceof MutableObject)) {
             return false;
         }
 
@@ -44,18 +43,39 @@ abstract class MutationOp extends HashedObject {
         }
 
         for (const prevOpRef of this.prevOps.values()) {
-            let prevOp = references.get(prevOpRef.hash);
+            const prevOp = references.get(prevOpRef.hash);
 
             if (prevOp === undefined) {
                 return false;
             } else if (! (prevOp instanceof MutationOp)) {
                 return false
-            } else if (! ((prevOp as MutationOp).target as MutableObject).equals(this.target)) { 
+            } else if (! ((prevOp as MutationOp).targetObject as MutableObject).equals(this.targetObject)) { 
                 return false;
             }
         }
 
-        if (!this.target.shouldAcceptMutationOp(this)) {
+        if (this.causalOps !== undefined) {
+
+            if (! (this.causalOps instanceof HashedSet)) {
+                return false;
+            }
+
+            for (const causalOpRef of this.causalOps.values()) {
+                const causalOp = references.get(causalOpRef.hash);
+
+                if (causalOp === undefined) {
+                    return false;
+                } else if (! (causalOp instanceof MutationOp)) {
+                    return false;
+                }
+            }
+        }
+
+        if (!this.targetObject.shouldAcceptMutationOp(this)) {
+            return false;
+        }
+
+        if (!(await this.validateCausalOps(references))) {
             return false;
         }
         
@@ -63,17 +83,24 @@ abstract class MutationOp extends HashedObject {
 
     }
 
-    shouldAcceptInvalidateAfterOp(op: InvalidateAfterOp): boolean {
+    // By default, reject any causal ops. Override if necessary.
+    async validateCausalOps(references: Map<Hash, HashedObject>): Promise<boolean> {
+        references;
+
+        return this.causalOps === undefined;
+    }
+
+    shouldAcceptNoMoreConsequencesOp(op: InvalidateAfterOp): boolean {
         op;
         return false;
     }
 
-    getTarget() : MutableObject {
-        return this.target as MutableObject;
+    getTargetObject() : MutableObject {
+        return this.targetObject as MutableObject;
     }
 
-    setTarget(target: MutableObject) {
-        this.target = target;
+    setTargetObject(target: MutableObject) {
+        this.targetObject = target;
     }
 
     getPrevOps() : IterableIterator<HashReference<MutationOp>> {
@@ -105,17 +132,19 @@ abstract class MutationOp extends HashedObject {
 
     }
 
+    // RENAME
     getCausalHistory(prevOpCausalHistories: Map<Hash, OpCausalHistory> ): OpCausalHistory {
         return new OpCausalHistory(this, prevOpCausalHistories);
     }
 
+    // RENAME
     getCausalHistoryProps(prevOpCausalHistories: Map<Hash, OpCausalHistory>): OpCausalHistoryProps {
         prevOpCausalHistories;
         return new Map();
     }
 
-    isConsequence() {
-        return this.consequenceOf !== undefined;
+    hasCausalOps() {
+        return this.causalOps !== undefined;
     }
 
 }

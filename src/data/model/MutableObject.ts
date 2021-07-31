@@ -257,7 +257,7 @@ abstract class MutableObject extends HashedObject {
             throw new Error ('Invalid op ' + op.hash() + ' attempted for ' + this.hash());
         } else {
 
-            op.setTarget(this);
+            op.setTargetObject(this);
 
             let prevOps = op.getPrevOpsIfPresent();
 
@@ -330,7 +330,7 @@ abstract class MutableObject extends HashedObject {
 
             if (op instanceof RedoOp) {
 
-                const targetUndoOp     = op.targetUndoOp as UndoOp;
+                const targetUndoOp     = op.targetOp as UndoOp;
                 const targetUndoOpHash = targetUndoOp.hash();
 
                 targetOp = targetUndoOp.targetOp as MutationOp;
@@ -427,7 +427,7 @@ abstract class MutableObject extends HashedObject {
     }
 
     shouldAcceptMutationOp(op: MutationOp) {
-        return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0 && op.getTarget().equals(this);
+        return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0 && op.getTargetObject().equals(this);
     }
 
     createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {

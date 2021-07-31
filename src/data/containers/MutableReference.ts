@@ -34,7 +34,7 @@ class MutableReference<T> extends MutableObject {
         let refUpdateOp = op as RefUpdateOp<T>;
 
         let mutated = false;
-        if (refUpdateOp.getTarget().equals(this)) {
+        if (refUpdateOp.getTargetObject().equals(this)) {
             if (this._sequence === undefined || 
                 this._sequence < refUpdateOp.getSequence() ||
                 (this._sequence === refUpdateOp.getSequence() && 
@@ -101,7 +101,7 @@ class RefUpdateOp<T> extends MutationOp {
             return false;
         }
 
-        if (this.getTarget().getAuthor() !== undefined && !(this.getTarget().getAuthor()?.equals(this.getAuthor()))) {
+        if (this.getTargetObject().getAuthor() !== undefined && !(this.getTargetObject().getAuthor()?.equals(this.getAuthor()))) {
             return false;
             //throw new Error('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTarget().getAuthor()?.hash() + '.');
         }
@@ -131,13 +131,13 @@ class RefUpdateOp<T> extends MutationOp {
             //throw new Error('The field value is mandatory in class REfUpdateop');
         }
 
-        if (this.target === undefined || 
-            this.target.getClassName() !== MutableReference.className ) {
+        if (this.targetObject === undefined || 
+            this.targetObject.getClassName() !== MutableReference.className ) {
                 return false;
                 //throw new Error('A RefUpdateOp can only have a MutableReference as its target.');
         }
 
-        let constraints = (this.target as MutableReference<T>).typeConstraints;
+        let constraints = (this.targetObject as MutableReference<T>).typeConstraints;
 
         if (!Types.satisfies(this.value, constraints)) {
             return false;
