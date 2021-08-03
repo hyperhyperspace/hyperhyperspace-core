@@ -6,6 +6,7 @@ import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { OpCausalHistory, OpCausalHistoryProps } from 'data/history/OpCausalHistory';
 import { InvalidateAfterOp } from './InvalidateAfterOp';
+import { CascadedInvalidateOp } from './CascadedInvalidateOp';
 
 abstract class MutationOp extends HashedObject {
 
@@ -68,6 +69,14 @@ abstract class MutationOp extends HashedObject {
                 } else if (! (causalOp instanceof MutationOp)) {
                     return false;
                 }
+
+                const thisIsACascade = this instanceof CascadedInvalidateOp;
+
+                if (causalOp instanceof CascadedInvalidateOp) {
+                    if (!thisIsACascade) {
+                        return false;
+                    }
+                }
             }
         }
 
@@ -83,6 +92,14 @@ abstract class MutationOp extends HashedObject {
 
     }
 
+    getCausalOps() {
+        if (this.causalOps === undefined) {
+            throw new Error('Called getCausalOps, but this.causalOps is undefined.');
+        }
+
+        return this.causalOps as HashedSet<HashReference<MutationOp>>;
+    }
+
     // By default, reject any causal ops. Override if necessary.
     async validateCausalOps(references: Map<Hash, HashedObject>): Promise<boolean> {
         references;
@@ -90,7 +107,7 @@ abstract class MutationOp extends HashedObject {
         return this.causalOps === undefined;
     }
 
-    shouldAcceptNoMoreConsequencesOp(op: InvalidateAfterOp): boolean {
+    shouldAcceptInvalidateAfterOp(op: InvalidateAfterOp): boolean {
         op;
         return false;
     }

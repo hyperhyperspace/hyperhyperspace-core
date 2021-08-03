@@ -1,3 +1,4 @@
+import { CascadedInvalidateOp } from './CascadedInvalidateOp';
 import { HashedObject } from './HashedObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
@@ -13,7 +14,7 @@ class InvalidateAfterOp extends MutationOp {
     terminalOps?: HashedSet<HashReference<MutationOp>>;
 
     // Meaning: invalidate targetOp after terminalOps, i.e. undo any ops that
-    // have targetOp as causalOp but are not contained in the set of ops that
+    // have targetOp in causalOps but are not contained in the set of ops that
     // come up to {terminalOps}.
 
     constructor(targetOp?: MutationOp, terminalOps?: IterableIterator<MutationOp>) {
@@ -23,9 +24,17 @@ class InvalidateAfterOp extends MutationOp {
             this.targetOp = targetOp;
 
             if (terminalOps === undefined) {
-                throw new Error('InvalidateAfterOp cannot be created: "after" parameter is missing.');
+                throw new Error('InvalidateAfterOp cannot be created: terminalOps parameter is missing.');
             } else {
                 this.terminalOps = new HashedSet(Array.from(terminalOps).map((op: MutationOp) => op.createReference()).values());
+            }
+
+            if (targetOp instanceof CascadedInvalidateOp) {
+                throw new Error('An InvalidateAfterOp cannot target an undo / redo op directly.');
+            }
+
+            if (targetOp instanceof InvalidateAfterOp) {
+                throw new Error('An InvalidateAfterOp cannot target another InvalidateAfterOp directly.');
             }
         }
 
@@ -41,6 +50,7 @@ class InvalidateAfterOp extends MutationOp {
             return false;
         }
         
+        // check that the terminalOps and the InvAfterOp itself all point to the same MutableObject.
         for (const terminalOpRef of (this.terminalOps as HashedSet<HashReference<MutationOp>>).values()) {
             
             const terminalOp = references.get(terminalOpRef.hash) as MutationOp;
@@ -54,8 +64,16 @@ class InvalidateAfterOp extends MutationOp {
             }
             
         }
+
+        if (this.targetOp instanceof CascadedInvalidateOp) {
+            return false;
+        }
+
+        if (this.targetOp instanceof InvalidateAfterOp) {
+            return false;
+        }
         
-        if (!(this.targetOp as MutationOp).shouldAcceptNoMoreConsequencesOp(this)) {
+        if (!(this.targetOp as MutationOp).shouldAcceptInvalidateAfterOp(this)) {
             return false;
         }
 
