@@ -5,6 +5,8 @@ import { Hash } from "./Hashing";
 import { HashReference } from "./HashReference";
 import { InvalidateAfterOp } from "./InvalidateAfterOp";
 import { MutationOp } from "./MutationOp";
+import { RedoOp } from "./RedoOp";
+import { UndoOp } from "./UndoOp";
 
  /*
   *        Op0 <-
@@ -249,7 +251,7 @@ abstract class CascadedInvalidateOp extends MutationOp {
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -276,6 +278,14 @@ abstract class CascadedInvalidateOp extends MutationOp {
 
         return super.literalizeInContext(context, path, flags);
 
+    }
+
+    static createFromBoolean(undo: boolean, causalOp: InvalidateAfterOp|CascadedInvalidateOp, targetOp: MutationOp): CascadedInvalidateOp {
+        if (undo) {
+            return new UndoOp(causalOp, targetOp);
+        } else {
+            return new RedoOp(causalOp, targetOp);
+        }
     }
 
 }
