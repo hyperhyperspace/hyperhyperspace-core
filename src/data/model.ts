@@ -17,6 +17,7 @@ export { Hashing, Hash } from './model/Hashing';
 // see @oleersoy's hypothesis here:
 // https://github.com/Microsoft/TypeScript/issues/28314
 
-export { UndoOp } from './model/UndoOp';
+export { CascadedInvalidateOp } from './model/CascadedInvalidateOp';
+export { InvalidateAfterOp } from './model/InvalidateAfterOp';
 export { Serialization } from './model/Serialization';
 export { Namespace } from './model/Namespace';

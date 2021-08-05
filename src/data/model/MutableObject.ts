@@ -10,8 +10,6 @@ import { PeerGroupAgent } from 'mesh/agents/peer';
 import { HashedSet } from './HashedSet';
 import { HashReference } from './HashReference';
 import { Lock } from 'util/concurrency';
-import { UndoOp } from './UndoOp';
-import { RedoOp } from './RedoOp';
 import { MultiMap } from 'util/multimap';
 import { Resources } from 'spaces/Resources';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
