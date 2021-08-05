@@ -616,7 +616,7 @@ class Mesh {
     private async trackOps(gossip: StateGossipAgent, mut: MutableObject, root: Hash) {
         
         let validOpClasses = mut.getAcceptedMutationOpClasses();
-        let refs = await mut.getStore().loadByReference('target', mut.hash());
+        let refs = await mut.getStore().loadByReference('targetObject', mut.hash());
 
 
         for (let obj of refs.objects) {
@@ -659,7 +659,7 @@ class Mesh {
 
             newOpCallbacks.set(hash, callback);
 
-            mut.getStore().watchReferences('target', mut.hash(), callback);
+            mut.getStore().watchReferences('targetObject', mut.hash(), callback);
         }
     }
 
@@ -669,7 +669,7 @@ class Mesh {
         const callback = newOpCallbacks?.get(mutHash);
         
         if (callback !== undefined) {
-            store.removeReferencesWatch('target', mutHash, callback);
+            store.removeReferencesWatch('targetObject', mutHash, callback);
             newOpCallbacks?.delete(mutHash);
         }   
     }

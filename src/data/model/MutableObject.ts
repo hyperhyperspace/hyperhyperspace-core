@@ -104,12 +104,12 @@ abstract class MutableObject extends HashedObject {
 
     private bindToStore() {
         // NOTE: watchReferences is idempotent
-        this.getStore().watchReferences('target', this.getLastHash(), this._opCallback);
+        this.getStore().watchReferences('targetObject', this.getLastHash(), this._opCallback);
         this._boundToStore = true;
     }
 
     private unbindFromStore() {
-        this.getStore().removeReferencesWatch('target', this.getLastHash(), this._opCallback);
+        this.getStore().removeReferencesWatch('targetObject', this.getLastHash(), this._opCallback);
         this._boundToStore = false;
     }
 
@@ -144,7 +144,7 @@ abstract class MutableObject extends HashedObject {
 
         let results = await this.getStore()
                                 .loadByReference(
-                                    'target', 
+                                    'targetObject', 
                                     this.getLastHash(), 
                                     {
                                         order: 'asc',
@@ -154,13 +154,14 @@ abstract class MutableObject extends HashedObject {
         while (results.objects.length > 0) {
 
             for (const obj of results.objects) {
-                const op = obj as MutationOp;
-                await this.apply(op, false);
+                if (obj instanceof MutationOp) {
+                    await this.apply(obj, false);
+                }
             }
 
             results = await this.getStore()
                                 .loadByReference(
-                                    'target', 
+                                    'targetObject', 
                                     this.getLastHash(), 
                                     {
                                         order: 'asc',
@@ -185,7 +186,7 @@ abstract class MutableObject extends HashedObject {
 
         let results = await this.getStore()
                                 .loadByReference(
-                                    'target', 
+                                    'targetObject', 
                                     this.getLastHash(), 
                                     params);
         

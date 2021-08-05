@@ -408,11 +408,11 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }
 
     watchStoreForOps() {
-        this.store.watchReferences('target', this.objHash, this.opCallback);
+        this.store.watchReferences('targetObject', this.objHash, this.opCallback);
     }
 
     unwatchStoreForOps() {
-        this.store.removeReferencesWatch('target', this.objHash, this.opCallback);
+        this.store.removeReferencesWatch('targetObject', this.objHash, this.opCallback);
     }
 
     getObjectHash(): string {
@@ -830,7 +830,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }
 
     private shouldAcceptMutationOpLiteral(op: Literal): boolean {
-        return this.objHash === LiteralUtils.getFields(op)['target']._hash &&
+        return this.objHash === LiteralUtils.getFields(op)['targetObject']._hash &&
                this.acceptedMutationOpClasses.indexOf(op.value._class) >= 0;
     }
 

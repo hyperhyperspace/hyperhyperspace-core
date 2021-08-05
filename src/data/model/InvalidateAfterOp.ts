@@ -1,14 +1,13 @@
+import { MutationOp } from './MutationOp';
 import { CascadedInvalidateOp } from './CascadedInvalidateOp';
 import { HashedObject } from './HashedObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
-import { MutationOp } from './MutationOp';
 
 
-class InvalidateAfterOp extends MutationOp {
 
-    static className = 'hhs/v0/InvalidateAfterOp';
+abstract class InvalidateAfterOp extends MutationOp {
 
     targetOp?: MutationOp;
     terminalOps?: HashedSet<HashReference<MutationOp>>;
@@ -17,8 +16,8 @@ class InvalidateAfterOp extends MutationOp {
     // have targetOp in causalOps but are not contained in the set of ops that
     // come up to {terminalOps}.
 
-    constructor(targetOp?: MutationOp, terminalOps?: IterableIterator<MutationOp>) {
-        super(targetOp?.targetObject);
+    constructor(targetOp?: MutationOp, terminalOps?: IterableIterator<MutationOp>, causalOps?: IterableIterator<MutationOp>) {
+        super(targetOp?.targetObject, causalOps);
         
         if (targetOp !== undefined) {
             this.targetOp = targetOp;
@@ -81,10 +80,6 @@ class InvalidateAfterOp extends MutationOp {
     
     }
 
-    getClassName(): string {
-        return InvalidateAfterOp.className;
-    }
-
     getTargetOp(): MutationOp {
         if (this.targetOp === undefined) {
             throw new Error('Trying to get targetOp for InvalidateAfterOp ' + this.hash() + ', but it is not present.');
@@ -93,8 +88,15 @@ class InvalidateAfterOp extends MutationOp {
         return this.targetOp;
     }
 
+    getTerminalOps() {
+        if (this.terminalOps === undefined) {
+            throw new Error('Trying to get terminalOps for InvalidateAfterOp ' + this.hash() + ', but it is not present.');
+        }
+
+        return this.terminalOps;
+    }
+
 }
 
-HashedObject.registerClass(InvalidateAfterOp.className, InvalidateAfterOp);
 
 export { InvalidateAfterOp };

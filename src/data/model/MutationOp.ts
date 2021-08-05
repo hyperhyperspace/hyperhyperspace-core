@@ -5,8 +5,6 @@ import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { OpCausalHistory, OpCausalHistoryProps } from 'data/history/OpCausalHistory';
-import { InvalidateAfterOp } from './InvalidateAfterOp';
-import { CascadedInvalidateOp } from './CascadedInvalidateOp';
 
 abstract class MutationOp extends HashedObject {
 
@@ -14,11 +12,11 @@ abstract class MutationOp extends HashedObject {
     prevOps? : HashedSet<HashReference<MutationOp>>;
     causalOps?: HashedSet<HashReference<MutationOp>>;
 
-    constructor(target?: MutableObject, causalOps?: IterableIterator<MutationOp>) {
+    constructor(targetObject?: MutableObject, causalOps?: IterableIterator<MutationOp>) {
         super();
 
-        if (target !== undefined) {
-            this.targetObject = target;
+        if (targetObject !== undefined) {
+            this.targetObject = targetObject;
             if (causalOps !== undefined) {
                 this.causalOps = new HashedSet(Array.from(causalOps).map((op: MutationOp) => op.createReference()).values());
             }
@@ -70,13 +68,13 @@ abstract class MutationOp extends HashedObject {
                     return false;
                 }
 
-                const thisIsACascade = this instanceof CascadedInvalidateOp;
+                /*const thisIsACascade = this instanceof CascadedInvalidateOp;
 
                 if (causalOp instanceof CascadedInvalidateOp) {
                     if (!thisIsACascade) {
                         return false;
                     }
-                }
+                }*/
             }
         }
 
@@ -107,7 +105,7 @@ abstract class MutationOp extends HashedObject {
         return this.causalOps === undefined;
     }
 
-    shouldAcceptInvalidateAfterOp(op: InvalidateAfterOp): boolean {
+    shouldAcceptInvalidateAfterOp(op: MutationOp): boolean {
         op;
         return false;
     }

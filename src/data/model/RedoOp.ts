@@ -11,8 +11,8 @@ class RedoOp extends CascadedInvalidateOp {
 
     targetOp?: MutationOp; // the op that will be undone
 
-    constructor(causalOp?: InvalidateAfterOp|UndoOp|RedoOp, targetOp?: MutationOp) {
-        super(false, causalOp, targetOp);
+    constructor(targetOp?: MutationOp, causalOp?: InvalidateAfterOp|UndoOp|RedoOp) {
+        super(false, targetOp, causalOp);
     }
 
    

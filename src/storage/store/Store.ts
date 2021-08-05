@@ -9,6 +9,8 @@ import { Logger, LogLevel } from 'util/logging';
 
 import { Resources } from 'spaces/spaces';
 import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
+import { InvalidateAfterOp } from 'data/model/InvalidateAfterOp';
+import { CascadedInvalidateOp } from 'data/model/CascadedInvalidateOp';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
@@ -167,44 +169,49 @@ class Store {
 
     private async saveWithContext(hash: Hash, context: Context) : Promise<void> {
 
-        
         const object = context.objects.get(hash);
 
-        if (object !== undefined) {
-
-            object.setStore(this);
-            object.setLastHash(hash);
-
-            const author = object.getAuthor();
-
-            if (author !== undefined) {
-
-                if (object.shouldSignOnSave()) {
-
-                    object.setLastSignature(await author.sign(hash));
-                    (context.literals.get(hash) as Literal).signature = object.getLastSignature();
-                }
-
-                if (!object.hasLastSignature()) {
-                    throw new Error('Cannot save ' + hash + ', its signature is missing');
-                }
-
-            }
+        if (object === undefined) {
+            throw new Error('Object with hash ' + hash + ' is missing from context, cannot save it.');
         }
 
-        const literal = context.literals.get(hash);
 
-        if (literal !== undefined) {
-            for (let dependency of literal.dependencies) {
-                if (dependency.type === 'literal') {
-                    await this.saveWithContext(dependency.hash, context);
-                }
-            }    
+        object.setStore(this);
+        object.setLastHash(hash);
+
+        const author = object.getAuthor();
+
+        if (author !== undefined) {
+
+            if (object.shouldSignOnSave()) {
+
+                object.setLastSignature(await author.sign(hash));
+                (context.literals.get(hash) as Literal).signature = object.getLastSignature();
+            }
+
+            if (!object.hasLastSignature()) {
+                throw new Error('Cannot save ' + hash + ', its signature is missing');
+            }
+
         }
         
         const loaded = await this.load(hash);
 
         if (loaded === undefined) { 
+
+            const literal = context.literals.get(hash);
+
+            if (literal === undefined) {
+                throw new Error('Trying to save ' + hash + ', but its literal is missing from the received context.')
+            }
+
+            if (literal !== undefined) {
+                for (let dependency of literal.dependencies) {
+                    if (dependency.type === 'literal') {
+                        await this.saveWithContext(dependency.hash, context);
+                    }
+                }    
+            }
 
             let history: StoredOpCausalHistory | undefined = undefined;
 
@@ -231,11 +238,66 @@ class Store {
                 };
             }
             
-            if (literal === undefined) {
-                throw new Error('Trying to save ' + hash + ', but its literal is missing from the received context.')
+            await this.backend.store(literal, history);
+
+            if (object instanceof MutationOp) {
+
+                if (object.causalOps !== undefined) {
+
+                    // If any of the causal ops has been invalidated, check if we should cascade
+                    
+                    for (const causalOp of object.causalOps.values()) {
+                        const invalidations = await this.loadAllInvalidations(causalOp.hash);
+                        
+                        for (const inv of invalidations) {
+                            // Note1: Since the invAfterOp was already saved and this op was not (loaded === undefined above)
+                            //        we can be sure that object is outside of invAfterOp.terminalOps.
+                            // Note2: invAfterOp only affects causal relationships within the same MutableObject (otherwise 
+                            //        terminalOps is meaningless).
+                            const shouldInv  = inv instanceof InvalidateAfterOp && inv.getTargetObject().equals(object.getTargetObject());
+                            const shouldCasc = inv instanceof CascadedInvalidateOp;
+                            if (shouldInv || shouldCasc) {
+                                const casc = CascadedInvalidateOp.create(object, inv);
+                                casc.toContext(context);
+                                await this.saveWithContext(casc.getLastHash(), context);
+                            } 
+                        }
+                    }
+
+                }
+
             }
 
-            await this.backend.store(literal, history);
+
+
+            if (object instanceof InvalidateAfterOp || object instanceof CascadedInvalidateOp) {
+                const consequences = await this.loadAllConsequences(object.getTargetOp().hash());
+                
+                if (object instanceof InvalidateAfterOp) {
+
+                    const validConsequences = await this.loadPrevOpsClosure(object.getTerminalOps());
+
+                    for (const conseqOp of consequences.values()) {
+                        if (!validConsequences.has(conseqOp.getLastHash())) {
+                            const casc = CascadedInvalidateOp.create(conseqOp, object);
+                            casc.toContext(context);
+                            await this.saveWithContext(casc.getLastHash(), context);
+                        }
+                    }
+                
+                } else if (object instanceof CascadedInvalidateOp) {
+    
+                    for (const conseqOp of consequences.values()) {
+                        const casc = CascadedInvalidateOp.create(conseqOp, object);
+                        casc.toContext(context);
+                        await this.saveWithContext(casc.getLastHash(), context);
+                    }
+
+                }
+
+            }
+            
+            
 
         }
     }
@@ -562,6 +624,112 @@ class Store {
 
         return result as {className: string, path: string, hash: Hash};
     }
+
+    async loadAllOps(targetObject: Hash) {
+        
+        const ops = new Array<MutationOp>();
+
+        let batchSize = 50;
+
+        let results = await this.loadByReference(
+                                    'targetObject', 
+                                    targetObject, 
+                                    {
+                                        order: 'asc',
+                                        limit: batchSize
+                                    });
+
+        while (results.objects.length > 0) {
+
+            for (const obj of results.objects) {
+                if (obj instanceof MutationOp) {
+                    ops.push(obj);
+                }
+            }
+
+            results = await this.loadByReference(
+                                            'targetObject', 
+                                            targetObject, 
+                                            {
+                                                order: 'asc',
+                                                limit: batchSize,
+                                                start: results.end
+                                            });
+        }
+
+        return ops;
+    }
+
+    async loadAllInvalidations(targetOp: Hash) {
+        
+        const invalidations = new Array<InvalidateAfterOp|CascadedInvalidateOp>();
+
+        let batchSize = 50;
+
+        let results = await this.loadByReference(
+                                    'targetOp', 
+                                    targetOp, 
+                                    {
+                                        order: 'asc',
+                                        limit: batchSize
+                                    });
+
+        while (results.objects.length > 0) {
+
+            for (const obj of results.objects) {
+                if (obj instanceof InvalidateAfterOp || obj instanceof CascadedInvalidateOp) {
+                    invalidations.push(obj);
+                }
+            }
+
+            results = await this.loadByReference(
+                                            'targetOp', 
+                                            targetOp, 
+                                            {
+                                                order: 'asc',
+                                                limit: batchSize,
+                                                start: results.end
+                                            });
+        }
+
+        return invalidations;
+    }
+
+    async loadAllConsequences(op: Hash) {
+        
+        const consequences = new Array<MutationOp>();
+
+        let batchSize = 50;
+
+        let results = await this.loadByReference(
+                                    'causalOps', 
+                                    op, 
+                                    {
+                                        order: 'asc',
+                                        limit: batchSize
+                                    });
+
+        while (results.objects.length > 0) {
+
+            for (const obj of results.objects) {
+                if (obj instanceof InvalidateAfterOp || obj instanceof CascadedInvalidateOp) {
+                    consequences.push(obj);
+                }
+            }
+
+            results = await this.loadByReference(
+                                            'causalOps', 
+                                            op, 
+                                            {
+                                                order: 'asc',
+                                                limit: batchSize,
+                                                start: results.end
+                                            });
+        }
+
+        return consequences;
+    }
+    
 }
 
 export { Store, StoredOpCausalHistory, LoadResults };

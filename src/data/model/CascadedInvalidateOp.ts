@@ -1,12 +1,9 @@
 import { HashedObject } from "data/model";
-import { Context } from "./Context";
 import { HashedSet } from "./HashedSet";
 import { Hash } from "./Hashing";
 import { HashReference } from "./HashReference";
 import { InvalidateAfterOp } from "./InvalidateAfterOp";
 import { MutationOp } from "./MutationOp";
-import { RedoOp } from "./RedoOp";
-import { UndoOp } from "./UndoOp";
 
  /*
   *        Op0 <-
@@ -85,13 +82,15 @@ import { UndoOp } from "./UndoOp";
    * 
    */
 
-abstract class CascadedInvalidateOp extends MutationOp {
+class CascadedInvalidateOp extends MutationOp {
+
+    static className = 'hhs/v0/CascadedInvalidateOp';
 
     undo?: boolean;
     targetOp?: MutationOp;
     
 
-    constructor(undo?: boolean, causalOp?: InvalidateAfterOp|CascadedInvalidateOp, targetOp?: MutationOp) {
+    constructor(undo?: boolean, targetOp?: MutationOp, causalOp?: InvalidateAfterOp|CascadedInvalidateOp) {
         super(targetOp?.targetObject, causalOp === undefined? undefined : [causalOp].values());
 
         if (undo !== undefined) {
@@ -263,7 +262,7 @@ abstract class CascadedInvalidateOp extends MutationOp {
         return this.targetOp;
     }
 
-    literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
+    /*literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
         if (flags === undefined) {
             flags = [];
@@ -278,16 +277,29 @@ abstract class CascadedInvalidateOp extends MutationOp {
 
         return super.literalizeInContext(context, path, flags);
 
+    }*/
+
+    getClassName(): string {
+        return CascadedInvalidateOp.className;
     }
 
-    static createFromBoolean(undo: boolean, causalOp: InvalidateAfterOp|CascadedInvalidateOp, targetOp: MutationOp): CascadedInvalidateOp {
+    init(): void {
+        
+    }
+
+    static create(targetOp: MutationOp, causalOp: InvalidateAfterOp|CascadedInvalidateOp) {
+        
+        const undo = (targetOp instanceof CascadedInvalidateOp)? !targetOp.undo : true;
+
         if (undo) {
-            return new UndoOp(causalOp, targetOp);
+            return new CascadedInvalidateOp(true, targetOp, causalOp);
         } else {
-            return new RedoOp(causalOp, targetOp);
+            return new CascadedInvalidateOp(false, targetOp, causalOp);
         }
     }
 
 }
+
+HashedObject.registerClass(CascadedInvalidateOp.className, CascadedInvalidateOp);
 
 export { CascadedInvalidateOp };

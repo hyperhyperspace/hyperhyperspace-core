@@ -164,7 +164,7 @@ class IdbBackend implements Backend {
 
             await tx.objectStore(IdbBackend.OP_CAUSAL_HISTORY_STORE).put(history);
             
-            const mutableHash = LiteralUtils.getFields(storable.literal)['target']['_hash'];
+            const mutableHash = LiteralUtils.getFields(storable.literal)['targetObject']['_hash'];
 
             const prevOpHashes = HashedSet.elementsFromLiteral(LiteralUtils.getFields(storable.literal)['prevOps']).map(HashReference.hashFromLiteral);
 

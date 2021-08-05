@@ -165,11 +165,11 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     // Monitoring local state for changes: 
 
     watchStoreForOps() {
-        this.store.watchReferences('target', this.mutableObj, this.opCallback);
+        this.store.watchReferences('targetObject', this.mutableObj, this.opCallback);
     }
 
     unwatchStoreForOps() {
-        this.store.removeReferencesWatch('target', this.mutableObj, this.opCallback);
+        this.store.removeReferencesWatch('targetObject', this.mutableObj, this.opCallback);
     }
 
     async opCallback(opHash: Hash): Promise<void> {
@@ -191,7 +191,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
             const fields    = LiteralUtils.getFields(literal);
             const className = LiteralUtils.getClassName(literal);
 
-            if (fields['target'] !== undefined && fields['target']._hash === this.mutableObj &&
+            if (fields['targetObject'] !== undefined && fields['targetObject']._hash === this.mutableObj &&
                 this.acceptedMutationOpClasses.indexOf(className) >= 0) {
 
                 valid = true;
@@ -250,7 +250,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
     async lastStoredOpsDescription(limit=25) {
 
-        const load = await this.store.loadByReference('target', this.mutableObj, { order: 'desc', limit: limit});
+        const load = await this.store.loadByReference('targetObject', this.mutableObj, { order: 'desc', limit: limit});
 
         const last = load.objects.length === limit? 'last ' : '';
 

@@ -151,7 +151,7 @@ class MemoryBackend implements Backend {
             this.repr.opCausalHistories.set(literal.hash, historyCopy);
             this.repr.opCausalHistoriesByHash.set(history.literal.causalHistoryHash, historyCopy);
 
-            const mutableHash = LiteralUtils.getFields(storable.literal)['target']['_hash'];
+            const mutableHash = LiteralUtils.getFields(storable.literal)['targetObject']['_hash'];
 
             const prevOpHashes = HashedSet.elementsFromLiteral(LiteralUtils.getFields(storable.literal)['prevOps']).map(HashReference.hashFromLiteral);
 
