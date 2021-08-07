@@ -11,7 +11,7 @@ import { StateSyncAgent } from './StateSyncAgent';
 
 import { CausalHistorySynchronizer } from './causal/CausalHistorySynchronizer';
 import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHistoryProvider';
-import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
+import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { Resources } from 'spaces/Resources';
 
 type StateFilter = (state: CausalHistoryState, store: Store) => Promise<CausalHistoryState>;
@@ -81,7 +81,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         this.updateStateFromStore().then(async () => {
                 if (this.state !== undefined) {
                     for (const hash of this.state.values()) {
-                        const opHistory = await this.store.loadOpCausalHistoryByHash(hash) as OpCausalHistory;
+                        const opHistory = await this.store.loadOpHeaderByHeaderHash(hash) as OpHeader;
                         const op = await this.store.load(opHistory?.opHash) as MutationOp;
                         await this.synchronizer.onNewLocalOp(op);
                     }
@@ -115,11 +115,11 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
                 const filteredState = this.stateOpFilter === undefined? state : await this.stateOpFilter(state, this.store);
 
-                const unknown = new Set<OpCausalHistory>();
+                const unknown = new Set<OpHeader>();
 
-                for (const opHistoryLiteral of (filteredState.terminalOpHistories as HashedSet<OpCausalHistoryLiteral>).values()) {
-                    if ((await this.store.loadOpCausalHistoryByHash(opHistoryLiteral.causalHistoryHash)) === undefined) {
-                        unknown.add(new OpCausalHistory(opHistoryLiteral));
+                for (const opHistoryLiteral of (filteredState.terminalOpHistories as HashedSet<OpHeaderLiteral>).values()) {
+                    if ((await this.store.loadOpHeaderByHeaderHash(opHistoryLiteral.headerHash)) === undefined) {
+                        unknown.add(new OpHeader(opHistoryLiteral));
                     }
                 }
 
@@ -258,8 +258,8 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
         let idx=0;
         for (const op of load.objects) {
-            const opHistory = await this.store.loadOpCausalHistory(op.getLastHash()) as OpCausalHistory;
-            contents = contents + idx + ': ' + opHistory.opHash + ' causal: ' + opHistory.causalHistoryHash + ' -> [' + Array.from(opHistory.prevOpHistories) + ']\n';
+            const opHistory = await this.store.loadOpHeader(op.getLastHash()) as OpHeader;
+            contents = contents + idx + ': ' + opHistory.opHash + ' causal: ' + opHistory.headerHash + ' -> [' + Array.from(opHistory.prevOpHeaders) + ']\n';
             idx=idx+1;
         }
 

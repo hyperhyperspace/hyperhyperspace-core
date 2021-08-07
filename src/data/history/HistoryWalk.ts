@@ -1,6 +1,6 @@
 import { Hash } from 'data/model/Hashing';
-import { CausalHistoryFragment } from './CausalHistoryFragment';
-import { OpCausalHistory } from './OpCausalHistory';
+import { HistoryFragment } from './HistoryFragment';
+import { OpHeader } from './OpHeader';
 
 type Config = {
     direction: 'forward'|'backward'
@@ -9,16 +9,16 @@ type Config = {
 abstract class HistoryWalk {
     direction: 'forward'|'backward';
 
-    fragment : CausalHistoryFragment;
+    fragment : HistoryFragment;
 
     visited : Set<Hash>;
 
     queue         : Array<Hash>;
     queueContents : Set<Hash>;
 
-    filter? : (opHistory: Hash) => boolean;
+    filter? : (opHeader: Hash) => boolean;
 
-    constructor(direction: 'forward'|'backward', initial: Set<Hash>, fragment: CausalHistoryFragment, filter?: (opHistory: Hash) => boolean) {
+    constructor(direction: 'forward'|'backward', initial: Set<Hash>, fragment: HistoryFragment, filter?: (opHistory: Hash) => boolean) {
 
         this.direction = direction;
         
@@ -40,7 +40,7 @@ abstract class HistoryWalk {
     }
 
 
-    abstract next(): IteratorResult<OpCausalHistory, any>;
+    abstract next(): IteratorResult<OpHeader, any>;
 
 
     [Symbol.iterator]() {
@@ -67,14 +67,14 @@ abstract class HistoryWalk {
         return result;
     }
 
-    protected goFrom(opHistoryHash: Hash) {
+    protected goFrom(opHeaderHash: Hash) {
 
         let unfiltered: Set<Hash>;
 
         if (this.direction === 'forward') {
-            unfiltered = this.goForwardFrom(opHistoryHash);
+            unfiltered = this.goForwardFrom(opHeaderHash);
         } else {
-            unfiltered = this.goBackwardFrom(opHistoryHash);
+            unfiltered = this.goBackwardFrom(opHeaderHash);
         }
 
         if (this.filter === undefined) {
@@ -91,15 +91,15 @@ abstract class HistoryWalk {
         
     }
 
-    private goForwardFrom(opHistoryHash: Hash): Set<Hash> {
-        return this.fragment.nextOpHistories.get(opHistoryHash);
+    private goForwardFrom(opHeaderHash: Hash): Set<Hash> {
+        return this.fragment.nextOpHeaders.get(opHeaderHash);
     }
 
-    private goBackwardFrom(opHistoryHash: Hash): Set<Hash> {
-        const history = this.fragment.contents.get(opHistoryHash);
+    private goBackwardFrom(opHeaderHash: Hash): Set<Hash> {
+        const history = this.fragment.contents.get(opHeaderHash);
 
         if (history !== undefined) {
-            return history.prevOpHistories;
+            return history.prevOpHeaders;
         } else {
             return new Set();
         }

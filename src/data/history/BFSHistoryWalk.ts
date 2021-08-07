@@ -1,11 +1,11 @@
 import { HistoryWalk } from './HistoryWalk';
-import { OpCausalHistory } from './OpCausalHistory';
+import { OpHeader } from './OpHeader';
 
 
 
-class BFSHistoryWalk extends HistoryWalk implements IterableIterator<OpCausalHistory> {
+class BFSHistoryWalk extends HistoryWalk implements IterableIterator<OpHeader> {
 
-    next(): IteratorResult<OpCausalHistory, any> {
+    next(): IteratorResult<OpHeader, any> {
         if (this.queue.length > 0) {
             const hash = this.dequeue();
             for (const succ of this.goFrom(hash)) {

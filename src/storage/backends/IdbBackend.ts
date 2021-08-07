@@ -6,7 +6,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { Literal, Hash, HashedSet, HashReference } from 'data/model';
 
 import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
-import { Store, StoredOpCausalHistory } from 'storage/store/Store';
+import { Store, StoredOpHeader } from 'storage/store/Store';
 import { MultiMap } from 'util/multimap';
 import { LiteralUtils } from 'data/model/Literals';
 
@@ -59,13 +59,13 @@ class IdbBackend implements Backend {
     static readonly META_STORE = 'meta_store';
     static readonly OBJ_STORE  = 'object_store';
     static readonly TERMINAL_OPS_STORE = 'terminal_ops_store';
-    static readonly OP_CAUSAL_HISTORY_STORE = 'op_causal_history_store';
+    static readonly OP_HEADERS_STORE = 'op_headers_store';
 
     static readonly CLASS_SEQUENCE_IDX_KEY = 'class_sequence';
     static readonly REFERENCES_SEQUENCE_IDX_KEY = 'references_sequence';
     static readonly REFERENCING_CLASS_SEQUENCE_IDX_KEY = 'referencing_class_sequence';
 
-    static readonly OP_CAUSAL_HISTORY_HASH_IDX_KEY = 'op_causal_history_hash';
+    static readonly OP_HEADER_HASH_IDX_KEY = 'op_header_hash';
 
     name: string;
     idbPromise: Promise<IDBPDatabase>;
@@ -85,8 +85,8 @@ class IdbBackend implements Backend {
                 objectStore.createIndex(IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY + '_idx', 'indexes.' + IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY, {multiEntry: true});
 
                 db.createObjectStore(IdbBackend.TERMINAL_OPS_STORE, {keyPath: 'mutableHash'});
-                let causalHistoryStore = db.createObjectStore(IdbBackend.OP_CAUSAL_HISTORY_STORE, {keyPath: 'literal.opHash'});
-                causalHistoryStore.createIndex(IdbBackend.OP_CAUSAL_HISTORY_HASH_IDX_KEY + '_idx', 'literal.causalHistoryHash' );
+                let opHeadersStore = db.createObjectStore(IdbBackend.OP_HEADERS_STORE, {keyPath: 'literal.opHash'});
+                opHeadersStore.createIndex(IdbBackend.OP_HEADER_HASH_IDX_KEY + '_idx', 'literal.headerHash' );
                 db.createObjectStore(IdbBackend.META_STORE, { keyPath: 'name'});
             },
             blocked() {
@@ -116,7 +116,7 @@ class IdbBackend implements Backend {
         return this.name;
     }
 
-    async store(literal: Literal, history?: StoredOpCausalHistory): Promise<void> {
+    async store(literal: Literal, history?: StoredOpHeader): Promise<void> {
 
         let idb = await this.idbPromise;
 
@@ -134,7 +134,7 @@ class IdbBackend implements Backend {
 
         if (isOp) {
             stores.push(IdbBackend.TERMINAL_OPS_STORE);
-            stores.push(IdbBackend.OP_CAUSAL_HISTORY_STORE);
+            stores.push(IdbBackend.OP_HEADERS_STORE);
         }
 
         let tx = idb.transaction(stores, 'readwrite');
@@ -162,7 +162,7 @@ class IdbBackend implements Backend {
                 throw new Error('Missing causal history received by backend while trying to store op ' + literal.hash);
             }
 
-            await tx.objectStore(IdbBackend.OP_CAUSAL_HISTORY_STORE).put(history);
+            await tx.objectStore(IdbBackend.OP_HEADERS_STORE).put(history);
             
             const mutableHash = LiteralUtils.getFields(storable.literal)['targetObject']['_hash'];
 
@@ -239,15 +239,15 @@ class IdbBackend implements Backend {
                                   referringClassName + '.' + referringPath + '#' + referencedHash, params);
     }
     
-    async loadOpCausalHistory(opHash: string): Promise<StoredOpCausalHistory | undefined> {
+    async loadOpHeader(opHash: string): Promise<StoredOpHeader | undefined> {
         let idb = await this.idbPromise;
-        return await (idb.get(IdbBackend.OP_CAUSAL_HISTORY_STORE, opHash) as Promise<StoredOpCausalHistory|undefined>);
+        return await (idb.get(IdbBackend.OP_HEADERS_STORE, opHash) as Promise<StoredOpHeader|undefined>);
     }
 
-    async loadOpCausalHistoryByHash(causalHistoryHash: Hash) : Promise<StoredOpCausalHistory | undefined> {
+    async loadOpHeaderByHeaderHash(causalHistoryHash: Hash) : Promise<StoredOpHeader | undefined> {
         let idb = await this.idbPromise;
 
-        const stored = await idb.transaction([IdbBackend.OP_CAUSAL_HISTORY_STORE], 'readonly').objectStore(IdbBackend.OP_CAUSAL_HISTORY_STORE).index(IdbBackend.OP_CAUSAL_HISTORY_HASH_IDX_KEY + '_idx').get(causalHistoryHash);
+        const stored = await idb.transaction([IdbBackend.OP_HEADERS_STORE], 'readonly').objectStore(IdbBackend.OP_HEADERS_STORE).index(IdbBackend.OP_HEADER_HASH_IDX_KEY + '_idx').get(causalHistoryHash);
 
         if (stored) {
             return stored;

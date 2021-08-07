@@ -1,4 +1,4 @@
-import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
+import { HistoryFragment } from 'data/history/HistoryFragment';
 import { HashedSet } from 'data/model/HashedSet';
 import { Hash } from 'data/model/Hashing';
 import { HashReference } from 'data/model/HashReference';
@@ -138,7 +138,7 @@ class ObjectPacker {
 
     // If successful, return true. If there are more ops to send, return
     // false.
-    async addForwardOps(initHistoryHashes: Set<Hash>, causalHistory: CausalHistoryFragment): Promise<boolean> {
+    async addForwardOps(initHistoryHashes: Set<Hash>, causalHistory: HistoryFragment): Promise<boolean> {
 
         for (const opHistory of causalHistory.iterateFrom(initHistoryHashes, 'forward')) {
             if (!await this.addObject(opHistory.opHash)) {

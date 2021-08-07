@@ -1,7 +1,7 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from './Backend';
 import { Literal, Hash, HashReference, HashedSet } from 'data/model';
 import { MultiMap } from 'util/multimap';
-import { Store, StoredOpCausalHistory } from 'storage/store/Store';
+import { Store, StoredOpHeader } from 'storage/store/Store';
 import { LiteralUtils } from 'data/model/Literals';
 import { Logger, LogLevel } from 'util/logging';
 
@@ -11,7 +11,7 @@ type MemStorageFormat = {
     sequence: number
 }
 
-type MemOpCausalHistoryFormat = StoredOpCausalHistory;
+type MemOpCausalHistoryFormat = StoredOpHeader;
 
 type MemoryRepr = {
     objects: Map<Hash, MemStorageFormat>,
@@ -99,7 +99,7 @@ class MemoryBackend implements Backend {
         return this.name;
     }
 
-    async store(literal: Literal, history?: StoredOpCausalHistory): Promise<void> {
+    async store(literal: Literal, history?: StoredOpHeader): Promise<void> {
         
         // store object
         let storable = {} as MemStorageFormat;
@@ -149,7 +149,7 @@ class MemoryBackend implements Backend {
 
             const historyCopy = Object.assign({}, history);
             this.repr.opCausalHistories.set(literal.hash, historyCopy);
-            this.repr.opCausalHistoriesByHash.set(history.literal.causalHistoryHash, historyCopy);
+            this.repr.opCausalHistoriesByHash.set(history.literal.headerHash, historyCopy);
 
             const mutableHash = LiteralUtils.getFields(storable.literal)['targetObject']['_hash'];
 
@@ -205,11 +205,11 @@ class MemoryBackend implements Backend {
         return this.searchByIndex(key, this.repr.sortedReferencingClassIndex, params);
     }
 
-    async loadOpCausalHistory(opHash: string): Promise<StoredOpCausalHistory | undefined> {
+    async loadOpHeader(opHash: string): Promise<StoredOpHeader | undefined> {
         return this.repr.opCausalHistories.get(opHash);
     }
 
-    async loadOpCausalHistoryByHash(causalHistoryHash: string): Promise<StoredOpCausalHistory | undefined> {
+    async loadOpHeaderByHeaderHash(causalHistoryHash: string): Promise<StoredOpHeader | undefined> {
         return this.repr.opCausalHistoriesByHash.get(causalHistoryHash);
     }
 

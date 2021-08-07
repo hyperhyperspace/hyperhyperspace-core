@@ -5,8 +5,8 @@ import { Hash, HashedObject, HashedSet, HashReference, MutationOp } from 'data/m
 import { SomethingHashed, createHashedObjects } from '../data/types/SomethingHashed';
 import { SomethingMutable, SomeMutation } from '../data//types/SomethingMutable';
 import { describeProxy } from 'config';
-import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
-import { OpCausalHistory } from 'data/history/OpCausalHistory';
+import { HistoryFragment } from 'data/history/HistoryFragment';
+import { OpHeader } from 'data/history/OpHeader';
 
 
 describeProxy('[STR] Storage', () => {
@@ -305,16 +305,16 @@ async function testHistoryGeneration(store: Store) {
         }
     }
 
-    let frag = new CausalHistoryFragment(sm.getLastHash());
+    let frag = new HistoryFragment(sm.getLastHash());
 
-    const bangHistory = await store.loadOpCausalHistory(bang?.hash() as Hash) as OpCausalHistory;
-    const bangbangHistory = await store.loadOpCausalHistory(bangbang?.hash() as Hash) as OpCausalHistory;
-    const worldHistory = await store.loadOpCausalHistory(world?.hash() as Hash) as OpCausalHistory;
-    const helloHistory = await store.loadOpCausalHistory(hello?.hash() as Hash) as OpCausalHistory
+    const bangHistory = await store.loadOpHeader(bang?.hash() as Hash) as OpHeader;
+    const bangbangHistory = await store.loadOpHeader(bangbang?.hash() as Hash) as OpHeader;
+    const worldHistory = await store.loadOpHeader(world?.hash() as Hash) as OpHeader;
+    const helloHistory = await store.loadOpHeader(hello?.hash() as Hash) as OpHeader
 
-    const bangHistoryByHash = await store.loadOpCausalHistoryByHash(bangHistory.causalHistoryHash);
+    const bangHistoryByHash = await store.loadOpHeaderByHeaderHash(bangHistory.headerHash);
 
-    expect(bangHistoryByHash?.causalHistoryHash).toEqual(bangHistory.causalHistoryHash);
+    expect(bangHistoryByHash?.headerHash).toEqual(bangHistory.headerHash);
     expect(bangHistoryByHash?.opHash).toEqual(bangHistory.opHash);
 
     expect(bangHistory.computedProps?.height).toEqual(3);
@@ -322,11 +322,11 @@ async function testHistoryGeneration(store: Store) {
 
     frag.add(bangHistory);
 
-    expect(frag.missingPrevOpHistories.size).toEqual(1);
+    expect(frag.missingPrevOpHeaders.size).toEqual(1);
     
-    expect(frag.missingPrevOpHistories.has(worldHistory?.hash() as Hash)).toBeTruthy();
+    expect(frag.missingPrevOpHeaders.has(worldHistory?.hash() as Hash)).toBeTruthy();
 
-    expect(frag.terminalOpHistories.size).toEqual(1);
+    expect(frag.terminalOpHeaders.size).toEqual(1);
     expect(frag.getTerminalOps().has(bang?.hash() as Hash));
 
 
@@ -336,10 +336,10 @@ async function testHistoryGeneration(store: Store) {
 
     frag.add(bangbangHistory);
 
-    expect(frag.missingPrevOpHistories.size).toEqual(1);
-    expect(frag.missingPrevOpHistories.has(worldHistory?.hash() as Hash)).toBeTruthy();
+    expect(frag.missingPrevOpHeaders.size).toEqual(1);
+    expect(frag.missingPrevOpHeaders.has(worldHistory?.hash() as Hash)).toBeTruthy();
 
-    expect(frag.terminalOpHistories.size).toEqual(2);
+    expect(frag.terminalOpHeaders.size).toEqual(2);
     expect(frag.getTerminalOps().has(bang?.hash() as Hash));
     expect(frag.getTerminalOps().has(bangbang?.hash() as Hash));
 
@@ -350,10 +350,10 @@ async function testHistoryGeneration(store: Store) {
 
     frag.add(worldHistory);
     
-    expect(frag.missingPrevOpHistories.size).toEqual(1);
-    expect(frag.missingPrevOpHistories.has(helloHistory?.hash() as Hash)).toBeTruthy();
+    expect(frag.missingPrevOpHeaders.size).toEqual(1);
+    expect(frag.missingPrevOpHeaders.has(helloHistory?.hash() as Hash)).toBeTruthy();
 
-    expect(frag.terminalOpHistories.size).toEqual(2);
+    expect(frag.terminalOpHeaders.size).toEqual(2);
     expect(frag.getTerminalOps().has(bang?.hash() as Hash));
     expect(frag.getTerminalOps().has(bangbang?.hash() as Hash));
 
@@ -363,8 +363,8 @@ async function testHistoryGeneration(store: Store) {
 
     frag.add(helloHistory);
     
-    expect(frag.terminalOpHistories.size).toEqual(2);
-    expect(frag.missingPrevOpHistories.size).toEqual(0);
+    expect(frag.terminalOpHeaders.size).toEqual(2);
+    expect(frag.missingPrevOpHeaders.size).toEqual(0);
 
     //expect(frag.checkAndComputeProps(new Map())).toBeTruthy();
 }

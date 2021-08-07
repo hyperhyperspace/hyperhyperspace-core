@@ -1,6 +1,6 @@
 import { Literal } from 'data/model/Literals';
 import { Hash } from 'data/model/Hashing';
-import { StoredOpCausalHistory } from '../store/Store';
+import { StoredOpHeader } from '../store/Store';
 
 type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, limit?: number};
 type BackendSearchResults = {items : Array<Literal>, start?: string, end?: string };
@@ -15,11 +15,11 @@ interface Backend {
     getBackendName() : string;
     getName() : string;
 
-    store(literal : Literal, history?: StoredOpCausalHistory) : Promise<void>;
+    store(literal : Literal, history?: StoredOpHeader) : Promise<void>;
     load(hash: Hash) : Promise<Literal | undefined>;
 
-    loadOpCausalHistory(opHash: Hash) : Promise<StoredOpCausalHistory | undefined>;
-    loadOpCausalHistoryByHash(causalHistoryHash: Hash) : Promise<StoredOpCausalHistory | undefined>;
+    loadOpHeader(opHash: Hash) : Promise<StoredOpHeader | undefined>;
+    loadOpHeaderByHeaderHash(causalHistoryHash: Hash) : Promise<StoredOpHeader | undefined>;
 
     loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined>;
 

@@ -1,17 +1,17 @@
 import { Hash } from 'data/model/Hashing';
 import { Store } from 'storage/store';
-import { CausalHistoryFragment } from './CausalHistoryFragment';
-import { OpCausalHistory } from './OpCausalHistory';
+import { HistoryFragment } from './HistoryFragment';
+import { OpHeader } from './OpHeader';
 
 
-class CausalHistoryDelta {
+class HistoryDelta {
 
     mutableObj: Hash;
 
     store: Store;
 
-    fragment: CausalHistoryFragment;
-    start: CausalHistoryFragment;
+    fragment: HistoryFragment;
+    start: HistoryFragment;
 
     gap: Set<Hash>;
 
@@ -20,27 +20,27 @@ class CausalHistoryDelta {
         this.mutableObj = mutableObj;
         this.store = store;
 
-        this.fragment = new CausalHistoryFragment(mutableObj);
-        this.start = new CausalHistoryFragment(mutableObj);
+        this.fragment = new HistoryFragment(mutableObj);
+        this.start = new HistoryFragment(mutableObj);
 
         this.gap = new Set<Hash>();
     }
 
-    async compute(targetOpHistories: Array<Hash>, startingOpHistories: Array<Hash>, maxDeltaSize: number, maxBacktrackSize: number) {
+    async compute(targetOpHeaders: Array<Hash>, startingOpHeaders: Array<Hash>, maxDeltaSize: number, maxBacktrackSize: number) {
 
-        for (const hash of startingOpHistories) {
-            const opHistory = await this.store.loadOpCausalHistoryByHash(hash);
-            if (opHistory !== undefined) {
-                this.start.add(opHistory);
-                this.fragment.remove(opHistory.causalHistoryHash);
+        for (const hash of startingOpHeaders) {
+            const opHeader = await this.store.loadOpHeaderByHeaderHash(hash);
+            if (opHeader !== undefined) {
+                this.start.add(opHeader);
+                this.fragment.remove(opHeader.headerHash);
             }
         }
 
-        for (const hash of targetOpHistories) {
+        for (const hash of targetOpHeaders) {
             if (!this.start.contents.has(hash)) {
-                const opHistory = await this.store.loadOpCausalHistoryByHash(hash);
-                if (opHistory !== undefined) {
-                    this.fragment.add(opHistory)
+                const opHeader = await this.store.loadOpHeaderByHeaderHash(hash);
+                if (opHeader !== undefined) {
+                    this.fragment.add(opHeader)
                 }
             }
         }
@@ -51,35 +51,35 @@ class CausalHistoryDelta {
 
             let h: number | undefined = undefined;
 
-            for (const hash of this.fragment.getStartingOpHistories()) {
+            for (const hash of this.fragment.getStartingOpHeaders()) {
 
-                const op = this.fragment.contents.get(hash) as OpCausalHistory;
+                const op = this.fragment.contents.get(hash) as OpHeader;
                 if (h === undefined || op.computedProps?.height as number < h) {
                     h = op.computedProps?.height;
                 }
             }
 
-            for (const hash of Array.from(this.start.missingPrevOpHistories)) {
+            for (const hash of Array.from(this.start.missingPrevOpHeaders)) {
 
                 if (this.start.contents.size >= maxBacktrackSize) {
                     break;
                 }
 
-                const op = await this.store.loadOpCausalHistoryByHash(hash);
+                const op = await this.store.loadOpHeaderByHeaderHash(hash);
                 if (op !== undefined && (op.computedProps?.height as number) > (h as number)) {
                     this.start.add(op);
                     this.fragment.remove(hash);
                 }
             }
 
-            for (const hash of Array.from(this.fragment.missingPrevOpHistories)) {
+            for (const hash of Array.from(this.fragment.missingPrevOpHeaders)) {
 
                 if (this.fragment.contents.size >= maxDeltaSize) {
                     break;
                 }
 
                 if (!this.start.contents.has(hash)) {
-                    const op = await this.store.loadOpCausalHistoryByHash(hash);
+                    const op = await this.store.loadOpHeaderByHeaderHash(hash);
 
                     if (op !== undefined) {
                         this.fragment.add(op);
@@ -93,7 +93,7 @@ class CausalHistoryDelta {
 
     }
 
-    opHistoriesFollowingFromStart(maxOps?: number): Hash[] {
+    opHeadersFollowingFromStart(maxOps?: number): Hash[] {
 
         const start = new Set<Hash>(this.start.contents.keys());
 
@@ -104,7 +104,7 @@ class CausalHistoryDelta {
 
         const gap = new Set<Hash>();
 
-        for (const hash of this.fragment.missingPrevOpHistories) {
+        for (const hash of this.fragment.missingPrevOpHeaders) {
             if (!this.start.contents.has(hash)) {
                 gap.add(hash);
             }
@@ -116,4 +116,4 @@ class CausalHistoryDelta {
 
 }
 
-export { CausalHistoryDelta };
+export { HistoryDelta };

@@ -8,7 +8,7 @@ import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Logger, LogLevel } from 'util/logging';
 
 import { Resources } from 'spaces/spaces';
-import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
+import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { InvalidateAfterOp } from 'data/model/InvalidateAfterOp';
 import { CascadedInvalidateOp } from 'data/model/CascadedInvalidateOp';
 
@@ -16,7 +16,7 @@ import { CascadedInvalidateOp } from 'data/model/CascadedInvalidateOp';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
 //                       dependencies: Array<Dependency>, flags: Array<PackedFlag> };
 
-type StoredOpCausalHistory = { literal: OpCausalHistoryLiteral };
+type StoredOpHeader = { literal: OpHeaderLiteral };
 type LoadParams = BackendSearchParams;
 
 type LoadResults = { objects: Array<HashedObject>, start?: string, end?: string };
@@ -213,25 +213,25 @@ class Store {
                 }    
             }
 
-            let history: StoredOpCausalHistory | undefined = undefined;
+            let history: StoredOpHeader | undefined = undefined;
 
             if (object instanceof MutationOp) {
 
-                const prevOpCausalHistories = new Map<Hash, OpCausalHistory>();
+                const prevOpHeaders = new Map<Hash, OpHeader>();
 
                 if (object.prevOps !== undefined) {
                     for (const hashRef of object.prevOps.values()) {
-                        const prevOpHistory = await this.loadOpCausalHistory(hashRef.hash);
+                        const prevOpHistory = await this.loadOpHeader(hashRef.hash);
                         
                         if (prevOpHistory === undefined) {
-                            throw new Error('Causal history of prevOp ' + hashRef.hash + ' of op ' + hash + ' is missing from store, cannot save');
+                            throw new Error('Header of prevOp ' + hashRef.hash + ' of op ' + hash + ' is missing from store, cannot save');
                         }
 
-                        prevOpCausalHistories.set(hashRef.hash, prevOpHistory);
+                        prevOpHeaders.set(hashRef.hash, prevOpHistory);
                     }
                 }
 
-                const opHistory = new OpCausalHistory(object, prevOpCausalHistories);
+                const opHistory = new OpHeader(object, prevOpHeaders);
 
                 history = {
                     literal: opHistory.literalize()
@@ -450,28 +450,24 @@ class Store {
         return this.loadSearchResults(searchResults);
     }
 
-    async loadOpCausalHistory(opHash: Hash): Promise<OpCausalHistory | undefined> {
-        const stored = await this.backend.loadOpCausalHistory(opHash);
+    async loadOpHeader(opHash: Hash): Promise<OpHeader | undefined> {
+        const stored = await this.backend.loadOpHeader(opHash);
 
         if (stored === undefined) {
             return undefined;
         } else {
-            const opCausalHistory = new OpCausalHistory(stored.literal);
-    
-            return opCausalHistory;
+            return new OpHeader(stored.literal);
         }
 
     }
 
-    async loadOpCausalHistoryByHash(causalHistoryHash: Hash): Promise<OpCausalHistory | undefined> {
-        const stored = await this.backend.loadOpCausalHistoryByHash(causalHistoryHash);
+    async loadOpHeaderByHeaderHash(headerHash: Hash): Promise<OpHeader | undefined> {
+        const stored = await this.backend.loadOpHeaderByHeaderHash(headerHash);
 
         if (stored === undefined) {
             return undefined;
         } else {
-            const opCausalHistory = new OpCausalHistory(stored.literal);
-    
-            return opCausalHistory;
+            return new OpHeader(stored.literal);
         }
 
     }
@@ -732,4 +728,4 @@ class Store {
     
 }
 
-export { Store, StoredOpCausalHistory, LoadResults };
+export { Store, StoredOpHeader, LoadResults };

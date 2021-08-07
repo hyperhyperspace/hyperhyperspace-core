@@ -1,4 +1,4 @@
-import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
+import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { Hash, HashedObject, HashedSet } from 'data/model';
 import { Store } from 'storage/store';
 
@@ -10,35 +10,35 @@ class CausalHistoryState extends HashedObject {
 
     mutableObj?  : Hash;
     terminalOpHistoryHashes? : HashedSet<Hash>;
-    terminalOpHistories? : HashedSet<OpCausalHistoryLiteral>;
+    terminalOpHistories? : HashedSet<OpHeaderLiteral>;
 
     static async createFromTerminalOps(mutableObj: Hash, terminalOps: Array<Hash>, store: Store): Promise<CausalHistoryState> {
 
-        const terminalOpHistories: Array<OpCausalHistory> = [];
+        const terminalOpHistories: Array<OpHeader> = [];
 
         for (const opHash of terminalOps) {
-            const history = await store.loadOpCausalHistory(opHash);
-            terminalOpHistories.push(history as OpCausalHistory);
+            const history = await store.loadOpHeader(opHash);
+            terminalOpHistories.push(history as OpHeader);
             
         }
 
         return CausalHistoryState.create(mutableObj, terminalOpHistories);
     }
 
-    static create(target: Hash, terminalOpHistories: Array<OpCausalHistory>) {
+    static create(target: Hash, terminalOpHistories: Array<OpHeader>) {
         return new CausalHistoryState(target, terminalOpHistories);
     }
 
-    constructor(mutableObj?: Hash, terminalOpHistories?: Array<OpCausalHistory>) {
+    constructor(mutableObj?: Hash, terminalOpHistories?: Array<OpHeader>) {
         super();
 
         this.mutableObj = mutableObj;
         if (terminalOpHistories !== undefined) { 
-            this.terminalOpHistoryHashes = new HashedSet<Hash>(new Set(terminalOpHistories.map((h: OpCausalHistory) => h.causalHistoryHash)).values());
-            this.terminalOpHistories     = new HashedSet<OpCausalHistoryLiteral>(new Set(terminalOpHistories.map((h: OpCausalHistory) => h.literalize())).values());
+            this.terminalOpHistoryHashes = new HashedSet<Hash>(new Set(terminalOpHistories.map((h: OpHeader) => h.headerHash)).values());
+            this.terminalOpHistories     = new HashedSet<OpHeaderLiteral>(new Set(terminalOpHistories.map((h: OpHeader) => h.literalize())).values());
         } else {
             this.terminalOpHistoryHashes = new HashedSet<Hash>();
-            this.terminalOpHistories     = new HashedSet<OpCausalHistoryLiteral>();
+            this.terminalOpHistories     = new HashedSet<OpHeaderLiteral>();
         }
     }
 
@@ -74,13 +74,13 @@ class CausalHistoryState extends HashedObject {
             }
 
             try {
-                const h = new OpCausalHistory(hashedLit);
+                const h = new OpHeader(hashedLit);
 
                 if (h.opHash != this.mutableObj) {
                     return false;
                 }
 
-                checkHashes.add(h.causalHistoryHash);
+                checkHashes.add(h.headerHash);
 
             } catch (e) {
                 return false;

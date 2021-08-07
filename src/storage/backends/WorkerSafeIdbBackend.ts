@@ -1,6 +1,6 @@
 import { RNGImpl } from 'crypto/random';
 import { Literal } from 'data/model';
-import { Store, StoredOpCausalHistory } from 'storage/store/Store';
+import { Store, StoredOpHeader } from 'storage/store/Store';
 import { Backend } from './Backend';
 import { IdbBackend } from './IdbBackend';
 import { SafeBroadcastChannel } from 'util/broadcastchannel';
@@ -42,7 +42,7 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
         return WorkerSafeIdbBackend.backendName;
     }
 
-    async store(literal: Literal, history?: StoredOpCausalHistory): Promise<void> {
+    async store(literal: Literal, history?: StoredOpHeader): Promise<void> {
         await super.store(literal, history);
 
         WorkerSafeIdbBackend.broadcastChannel.postMessage({

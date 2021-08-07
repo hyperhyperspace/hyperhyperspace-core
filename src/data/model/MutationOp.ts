@@ -4,7 +4,7 @@ import { MutableObject } from './MutableObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
-import { OpCausalHistory, OpCausalHistoryProps } from 'data/history/OpCausalHistory';
+import { OpHeader, OpHeaderProps } from 'data/history/OpHeader';
 
 abstract class MutationOp extends HashedObject {
 
@@ -148,12 +148,12 @@ abstract class MutationOp extends HashedObject {
     }
 
     // RENAME
-    getCausalHistory(prevOpCausalHistories: Map<Hash, OpCausalHistory> ): OpCausalHistory {
-        return new OpCausalHistory(this, prevOpCausalHistories);
+    getCausalHistory(prevOpCausalHistories: Map<Hash, OpHeader> ): OpHeader {
+        return new OpHeader(this, prevOpCausalHistories);
     }
 
     // RENAME
-    getCausalHistoryProps(prevOpCausalHistories: Map<Hash, OpCausalHistory>): OpCausalHistoryProps {
+    getCausalHistoryProps(prevOpCausalHistories: Map<Hash, OpHeader>): OpHeaderProps {
         prevOpCausalHistories;
         return new Map();
     }

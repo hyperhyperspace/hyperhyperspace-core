@@ -1,7 +1,7 @@
 import { RNGImpl } from 'crypto/random';
 
-import { CausalHistoryFragment } from 'data/history/CausalHistoryFragment';
-import { OpCausalHistory, OpCausalHistoryLiteral } from 'data/history/OpCausalHistory';
+import { HistoryFragment } from 'data/history/HistoryFragment';
+import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { Context, Hash, HashedObject, Literal, LiteralUtils, MutationOp } from 'data/model';
 
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
@@ -32,8 +32,8 @@ type RequestInfo = {
     requestSendingTimestamp?  : number,
     responseArrivalTimestamp? : number,
 
-    receivedHistory?          : CausalHistoryFragment,
-    receivedOps?              : CausalHistoryFragment,
+    receivedHistory?          : HistoryFragment,
+    receivedOps?              : HistoryFragment,
 
     lastLiteralTimestamp?     : number,
     receivedLiteralsCount     : number,
@@ -60,15 +60,15 @@ class CausalHistorySynchronizer {
 
     //endpointsForUnknownHistory : MultiMap<Hash, Endpoint>;
 
-    localState       : CausalHistoryFragment;
+    localState       : HistoryFragment;
 
-    discoveredHistory      : CausalHistoryFragment;
-    remoteStates : Map<Endpoint, CausalHistoryFragment>;
+    discoveredHistory      : HistoryFragment;
+    remoteStates : Map<Endpoint, HistoryFragment>;
     //remoteHistories    : Map<Hash, CausalHistoryFragment>;
 
     requests     : Map<RequestId, RequestInfo>;
 
-    requestedOps : CausalHistoryFragment;
+    requestedOps : HistoryFragment;
 
     requestsForOpHistory : MultiMap<Hash, RequestId>;
     requestsForOp        : MultiMap<Hash, RequestId>;
@@ -93,12 +93,12 @@ class CausalHistorySynchronizer {
 
         this.syncAgent = syncAgent;
 
-        this.localState   = new CausalHistoryFragment(this.syncAgent.mutableObj);
+        this.localState   = new HistoryFragment(this.syncAgent.mutableObj);
         this.remoteStates = new Map();
 
-        this.discoveredHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
+        this.discoveredHistory = new HistoryFragment(this.syncAgent.mutableObj);
         
-        this.requestedOps      = new CausalHistoryFragment(this.syncAgent.mutableObj);
+        this.requestedOps      = new HistoryFragment(this.syncAgent.mutableObj);
 
         this.requests = new Map();
 
@@ -122,14 +122,14 @@ class CausalHistorySynchronizer {
         this.storeLog   = CausalHistorySynchronizer.storeLog;
     }
 
-    async onNewHistory(remote: Endpoint, receivedOpHistories: Set<OpCausalHistory>) {
+    async onNewHistory(remote: Endpoint, receivedOpHistories: Set<OpHeader>) {
 
 
         this.controlLog.debug('\n'+this.logPrefix+'\nReceived new state from ' + remote);
 
         for (const opHistory of receivedOpHistories) {
-            if (await this.opHistoryIsMissingFromStore(opHistory.causalHistoryHash)) {
-                if (!this.discoveredHistory.contents.has(opHistory.causalHistoryHash)) {
+            if (await this.opHistoryIsMissingFromStore(opHistory.headerHash)) {
+                if (!this.discoveredHistory.contents.has(opHistory.headerHash)) {
                     this.discoveredHistory.add(opHistory);
                 }
 
@@ -199,7 +199,7 @@ class CausalHistorySynchronizer {
             let debugInfo = '\n'+this.logPrefix+'\nState info before attempt:\n';
 
             debugInfo = debugInfo + '\nDiscovered op histories:   [' + Array.from(this.discoveredHistory.contents.keys()) + ']';    
-            debugInfo = debugInfo + '\nMissing prev op histories: [' + Array.from(this.discoveredHistory.missingPrevOpHistories) + ']';
+            debugInfo = debugInfo + '\nMissing prev op histories: [' + Array.from(this.discoveredHistory.missingPrevOpHeaders) + ']';
             debugInfo = debugInfo + '\nPending op histories:      [' + Array.from(this.requestsForOpHistory.keys()) + ']';
             debugInfo = debugInfo + '\nPending ops:               [' + Array.from(this.requestsForOp.keys()) + ']';
             debugInfo = debugInfo + '\nLocal state:               [' + Array.from(this.localState.contents.keys()) + ']';
@@ -223,7 +223,7 @@ class CausalHistorySynchronizer {
 
         // By capturing unknown histories at the edge of the discovered history fragment
 
-        const opHistoryFromPrevOps = Array.from(this.discoveredHistory.missingPrevOpHistories);
+        const opHistoryFromPrevOps = Array.from(this.discoveredHistory.missingPrevOpHeaders);
         for (const hash of opHistoryFromPrevOps) {
 
             const isUnrequested = this.opHistoryIsUnrequested(hash);
@@ -240,7 +240,7 @@ class CausalHistorySynchronizer {
 
                     if (history !== undefined) {
 
-                        if (history.missingPrevOpHistories.has(hash)) {
+                        if (history.missingPrevOpHeaders.has(hash)) {
                             if (this.canSendNewRequestTo(ep)) {
                                 missingOpHistories.add(hash); // this way we only add it if there is at least one source
                                 missingOpHistorySources.add(ep, hash);
@@ -310,7 +310,7 @@ class CausalHistorySynchronizer {
         for (const [remote, opHistories] of opHistoriesToRequest) {
 
             
-            const remoteHistory = remoteHistories.get(remote) as CausalHistoryFragment;
+            const remoteHistory = remoteHistories.get(remote) as HistoryFragment;
             const startingOps = this.computeStartingOps(remoteHistory);
 
             const ops = await this.findOpsToRequest(remoteHistory);
@@ -457,7 +457,7 @@ class CausalHistorySynchronizer {
 
     // Do some intelligence over which ops can be requested from an endpoint
 
-    private async findOpsToRequest(remoteHistory: CausalHistoryFragment) {
+    private async findOpsToRequest(remoteHistory: HistoryFragment) {
 
         let max = MaxPendingOps - this.requestedOps.contents.size;
         if (max > ProviderLimits.MaxOpsToRequest) {
@@ -467,16 +467,16 @@ class CausalHistorySynchronizer {
 
             const startingOps = new Set<Hash>();
 
-            for (const missingStartingOp of remoteHistory.missingPrevOpHistories) {
+            for (const missingStartingOp of remoteHistory.missingPrevOpHeaders) {
                 if (this.requestsForOp.hasKey(missingStartingOp) || 
                     !(await this.opHistoryIsMissingFromStore(missingStartingOp))) {
                         startingOps.add(missingStartingOp);
                     }
             }
 
-            const ops = remoteHistory.causalClosure(startingOps, max, undefined, (h: Hash) => !this.requestsForOp.hasKey((remoteHistory.contents.get(h) as OpCausalHistory).opHash))
+            const ops = remoteHistory.causalClosure(startingOps, max, undefined, (h: Hash) => !this.requestsForOp.hasKey((remoteHistory.contents.get(h) as OpHeader).opHash))
                                 .map( (opHistoryHash: Hash) => 
-                    (remoteHistory.contents.get(opHistoryHash) as OpCausalHistory).opHash );
+                    (remoteHistory.contents.get(opHistoryHash) as OpHeader).opHash );
 
 
             return ops;
@@ -520,14 +520,14 @@ class CausalHistorySynchronizer {
 
     public async onNewLocalOp(op: MutationOp) {
 
-        const prevOpCausalHistories: Map<Hash, OpCausalHistory> = new Map();
+        const prevOpCausalHistories: Map<Hash, OpHeader> = new Map();
 
         for (const prevOpRef of op.getPrevOps()) {
-            const prevOpHistory = await this.syncAgent.store.loadOpCausalHistory(prevOpRef.hash) as OpCausalHistory;
+            const prevOpHistory = await this.syncAgent.store.loadOpHeader(prevOpRef.hash) as OpHeader;
             prevOpCausalHistories.set(prevOpRef.hash, prevOpHistory);
         }
 
-        const opHistories = this.discoveredHistory.getAllOpHistoriesForOp(op.getLastHash());
+        const opHistories = this.discoveredHistory.getAllOpHeadersForOp(op.getLastHash());
 
         for (const opHistory of opHistories) {
 
@@ -545,7 +545,7 @@ class CausalHistorySynchronizer {
         if (this.stateLog.level <= LogLevel.TRACE) {
 
             let debugInfo = this.logPrefix;
-            debugInfo = debugInfo + '\nNew local op ' + op.hash() + ' causal: ' + opHistory.causalHistoryHash + ' -> [' + Array.from(opHistory.prevOpHistories) + ']' ;
+            debugInfo = debugInfo + '\nNew local op ' + op.hash() + ' causal: ' + opHistory.headerHash + ' -> [' + Array.from(opHistory.prevOpHeaders) + ']' ;
             debugInfo = debugInfo + '\nCurrent state now is: [' + Array.from(this.localState.contents.keys()) + ']';
 
             this.stateLog.trace(debugInfo);    
@@ -553,16 +553,16 @@ class CausalHistorySynchronizer {
 
     }
 
-    private addOpToCurrentState(opHistory: OpCausalHistory) {
+    private addOpToCurrentState(opHistory: OpHeader) {
         this.localState.add(opHistory);
         this.localState.removeNonTerminalOps();        
     }
 
-    private addOpToRemoteState(remote: Endpoint, opHistory: OpCausalHistory) {
+    private addOpToRemoteState(remote: Endpoint, opHistory: OpHeader) {
         let remoteState = this.remoteStates.get(remote);
 
         if (remoteState === undefined) {
-            remoteState = new CausalHistoryFragment(this.syncAgent.mutableObj);
+            remoteState = new HistoryFragment(this.syncAgent.mutableObj);
             this.remoteStates.set(remote, remoteState);
         }
 
@@ -570,12 +570,12 @@ class CausalHistorySynchronizer {
         remoteState.removeNonTerminalOps();
     }
 
-    private computeRemoteHistories(): Map<Endpoint, CausalHistoryFragment> {
+    private computeRemoteHistories(): Map<Endpoint, HistoryFragment> {
 
-        const remoteHistories = new Map<Endpoint, CausalHistoryFragment>();
+        const remoteHistories = new Map<Endpoint, HistoryFragment>();
 
         for (const [remote, state] of this.remoteStates.entries()) {
-            const history = this.discoveredHistory.filterByTerminalOpHistories(new Set<Hash>(state.contents.keys()));
+            const history = this.discoveredHistory.filterByTerminalOpHeaders(new Set<Hash>(state.contents.keys()));
             remoteHistories.set(remote, history);
         }
 
@@ -595,7 +595,7 @@ class CausalHistorySynchronizer {
 
             debugInfo = debugInfo + 'Received response for request ' + msg.requestId + ' from ' + remote + ' with ' + msg.history?.length + ' op histories, ' + msg.sendingOps?.length + ' ops and expecting ' + msg.literalCount + ' literals.\n';
             if (msg.history !== undefined) {
-                debugInfo = debugInfo + 'Histories: [' + msg.history.map((opHistory: OpCausalHistoryLiteral) => opHistory.causalHistoryHash) + ']\n';
+                debugInfo = debugInfo + 'Histories: [' + msg.history.map((opHistory: OpHeaderLiteral) => opHistory.headerHash) + ']\n';
             }
 
             if (msg.sendingOps !== undefined) {
@@ -737,9 +737,9 @@ class CausalHistorySynchronizer {
 
             if (reqInfo.receivedHistory !== undefined) {
                 const rcvdHistory = reqInfo.receivedHistory;
-                for (const opHistory of rcvdHistory.iterateFrom(rcvdHistory.terminalOpHistories, 'backward', 'bfs')) {
-                    this.requestsForOpHistory.delete(opHistory.causalHistoryHash, req.requestId)
-                    if (await this.opHistoryIsMissingFromStore(opHistory.causalHistoryHash) && this.opHistoryIsUndiscovered(opHistory.causalHistoryHash)) {
+                for (const opHistory of rcvdHistory.iterateFrom(rcvdHistory.terminalOpHeaders, 'backward', 'bfs')) {
+                    this.requestsForOpHistory.delete(opHistory.headerHash, req.requestId)
+                    if (await this.opHistoryIsMissingFromStore(opHistory.headerHash) && this.opHistoryIsUndiscovered(opHistory.headerHash)) {
                         this.discoveredHistory.add(opHistory);
                     }
                 }
@@ -752,8 +752,8 @@ class CausalHistorySynchronizer {
                     this.requestsForOp.delete(opHash, req.requestId);
 
                     if (this.requestsForOp.get(opHash).size === 0) {
-                        for (const opHistory of this.discoveredHistory.getAllOpHistoriesForOp(opHash)) {
-                            this.requestedOps.remove(opHistory.causalHistoryHash);
+                        for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
+                            this.requestedOps.remove(opHistory.headerHash);
                         }
                     }
                 }
@@ -762,7 +762,7 @@ class CausalHistorySynchronizer {
             if (resp.sendingOps !== undefined) {
                 for (const opHash of resp.sendingOps) {
                     this.requestsForOp.add(opHash, req.requestId);
-                    for (const opHistory of this.discoveredHistory.getAllOpHistoriesForOp(opHash)) {
+                    for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
                         this.requestedOps.add(opHistory);
                     }
                 }
@@ -903,11 +903,11 @@ class CausalHistorySynchronizer {
         return true;
     }
 
-    private markOpAsFetched(opCausalHistory: OpCausalHistory) {
+    private markOpAsFetched(opCausalHistory: OpHeader) {
 
-        this.opXferLog.debug('\n'+this.logPrefix+'\nMarking op ' + opCausalHistory.opHash + ' as fetched (op history is ' + opCausalHistory.causalHistoryHash + ').')
+        this.opXferLog.debug('\n'+this.logPrefix+'\nMarking op ' + opCausalHistory.opHash + ' as fetched (op history is ' + opCausalHistory.headerHash + ').')
 
-        const opHistoryHash = opCausalHistory.causalHistoryHash;
+        const opHistoryHash = opCausalHistory.headerHash;
         const opHash        = opCausalHistory.opHash;
 
 
@@ -919,8 +919,8 @@ class CausalHistorySynchronizer {
         this.requestedOps.remove(opHistoryHash);
         this.requestsForOp.deleteKey(opHash);
 
-        for (const opHistory of this.discoveredHistory.getAllOpHistoriesForOp(opHash)) {
-            this.requestedOps.remove(opHistory.causalHistoryHash);
+        for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
+            this.requestedOps.remove(opHistory.headerHash);
         }
 
         this.discoveredHistory.remove(opHistoryHash);
@@ -948,7 +948,7 @@ class CausalHistorySynchronizer {
     }
 
     // TODO: identify peer as bad !
-    private processBadOpHistory(opCausalHistory: OpCausalHistory) {
+    private processBadOpHistory(opCausalHistory: OpHeader) {
         this.markOpAsFetched(opCausalHistory);
     }
 
@@ -956,21 +956,21 @@ class CausalHistorySynchronizer {
         return new Set<Hash>(this.localState.contents.keys());//this.terminalOpHistoriesPlusCurrentState(this.discoveredHistory);
     }
 
-    private computeStartingOps(remoteHistory: CausalHistoryFragment) {
+    private computeStartingOps(remoteHistory: HistoryFragment) {
 
-        const requestedFragmentForRemote = new CausalHistoryFragment(remoteHistory.mutableObj);
+        const requestedFragmentForRemote = new HistoryFragment(remoteHistory.mutableObj);
 
         for (const opHistory of this.localState.contents.values()) {
             requestedFragmentForRemote.add(opHistory);
         }
 
         for (const opHistory of this.requestedOps.contents.values()) {
-            if (remoteHistory.contents.has(opHistory.causalHistoryHash)) {
+            if (remoteHistory.contents.has(opHistory.headerHash)) {
                 requestedFragmentForRemote.add(opHistory);
             }
         }
 
-        return new Set<Hash>(requestedFragmentForRemote.terminalOpHistories);
+        return new Set<Hash>(requestedFragmentForRemote.terminalOpHeaders);
 
 
         /*if (remoteHistory === undefined) {
@@ -1040,7 +1040,7 @@ class CausalHistorySynchronizer {
     }
 
     private async opHistoryIsMissingFromStore(opHistory: Hash): Promise<Boolean> {
-        return await this.syncAgent.store.loadOpCausalHistoryByHash(opHistory) === undefined;
+        return await this.syncAgent.store.loadOpHeaderByHeaderHash(opHistory) === undefined;
     }
 
     private async validateResponse(remote: Endpoint, msg: ResponseMsg): Promise<boolean> {
@@ -1056,7 +1056,7 @@ class CausalHistorySynchronizer {
             const req   = reqInfo.request;
             const resp = reqInfo.response;
 
-            let receivedHistory: CausalHistoryFragment | undefined = undefined;
+            let receivedHistory: HistoryFragment | undefined = undefined;
 
             // Make sets out of these arrays for easy membership check:
             const requestedOpHistories = new Set<Hash>(req.requestedTerminalOpHistory);
@@ -1066,14 +1066,14 @@ class CausalHistorySynchronizer {
             // Validate received history
 
             if (resp.history !== undefined) {
-                receivedHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
+                receivedHistory = new HistoryFragment(this.syncAgent.mutableObj);
 
                 // Verify all received op history literals and create a fragment from 'em:
                 for (const opHistoryLiteral of resp.history) {
                     try {
-                        receivedHistory.add(new OpCausalHistory(opHistoryLiteral));
+                        receivedHistory.add(new OpHeader(opHistoryLiteral));
                     } catch (e) {
-                        const detail = 'Error parsing op history literal ' + opHistoryLiteral.causalHistoryHash + ' received from ' + reqInfo.remote + ', cancelling request ' + reqInfo.request.requestId;
+                        const detail = 'Error parsing op history literal ' + opHistoryLiteral.headerHash + ' received from ' + reqInfo.remote + ', cancelling request ' + reqInfo.request.requestId;
                         this.cancelRequest(reqInfo, 'invalid-response', detail);
                         return false;
                     }
@@ -1088,7 +1088,7 @@ class CausalHistorySynchronizer {
                 }
 
                 // Check that the terminal op histories of the received fragment are amongst the requested histories
-                for (const opHistoryHash of receivedHistory.terminalOpHistories) {
+                for (const opHistoryHash of receivedHistory.terminalOpHeaders) {
                     if (!requestedOpHistories.has(opHistoryHash)) {
                         const detail = 'Received op history ' + opHistoryHash + ' is terminal in the reconstructed fragment, but was not requested.';
                         this.cancelRequest(reqInfo, 'invalid-response', detail);
@@ -1109,11 +1109,11 @@ class CausalHistorySynchronizer {
 
                 // Check that any received histories whose ops are already in the store are legit
                 for (const opHistory of receivedHistory.contents.values()) {
-                    const storedOpHistory = await this.syncAgent.store.loadOpCausalHistory(opHistory.opHash);
+                    const storedOpHistory = await this.syncAgent.store.loadOpHeader(opHistory.opHash);
 
                     if (storedOpHistory !== undefined) {
-                        if (storedOpHistory.causalHistoryHash !== opHistory.causalHistoryHash) {
-                            const detail = 'Received history for op ' + opHistory.opHash + ' has causal hash of ' + opHistory.causalHistoryHash + ', but it does not match the already stored causal hash of ' + storedOpHistory.causalHistoryHash + ', discarding response for ' + req.requestId;
+                        if (storedOpHistory.headerHash !== opHistory.headerHash) {
+                            const detail = 'Received history for op ' + opHistory.opHash + ' has causal hash of ' + opHistory.headerHash + ', but it does not match the already stored causal hash of ' + storedOpHistory.headerHash + ', discarding response for ' + req.requestId;
                             this.cancelRequest(reqInfo, 'invalid-response', detail);
                             return false;
                         }
@@ -1125,12 +1125,12 @@ class CausalHistorySynchronizer {
             
             // The reply MAY contain ops we didn't request, if they directly follow our stated current state.
             // Make a history fragment using this additional ops to check that is indeed the case.
-            const additionalOpsHistory = new CausalHistoryFragment(this.syncAgent.mutableObj);
+            const additionalOpsHistory = new HistoryFragment(this.syncAgent.mutableObj);
 
             if (resp.sendingOps !== undefined) {
                 for (const hash of resp.sendingOps) {
                     if (!requestedOps.has(hash)) {
-                        const opHistory = receivedHistory?.getOpHistoryForOp(hash);
+                        const opHistory = receivedHistory?.getOpHeaderForOp(hash);
                         if (opHistory === undefined) {
                             const detail = 'Received op hash ' + hash + ' cannot be justified, it is neither in requestedOps nor in the received history';
                             this.cancelRequest(reqInfo, 'invalid-response', detail);
@@ -1148,8 +1148,8 @@ class CausalHistorySynchronizer {
                         this.cancelRequest(reqInfo, 'invalid-response', detail);
                         return false;
                     } else {
-                        for (const opHistoryHash of additionalOpsHistory.missingPrevOpHistories) {
-                            if (await this.syncAgent.store.loadOpCausalHistoryByHash(opHistoryHash) === undefined) {
+                        for (const opHistoryHash of additionalOpsHistory.missingPrevOpHeaders) {
+                            if (await this.syncAgent.store.loadOpHeaderByHeaderHash(opHistoryHash) === undefined) {
                                 const detail = 'Request informs it will send an op depending upon another with history hash ' + opHistoryHash + ', but it was neither requested or follows directly from informed fetched op histories.';
                                 this.cancelRequest(reqInfo, 'invalid-response', detail);
                                 return false;
@@ -1305,7 +1305,7 @@ class CausalHistorySynchronizer {
         if (reqInfo.request?.requestedOps !== undefined) {
             for (const hash of reqInfo.request?.requestedOps) {
                 this.requestsForOp.add(hash, reqId);
-                for (const opHistory of this.discoveredHistory.getAllOpHistoriesForOp(hash)) {
+                for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(hash)) {
                     this.requestedOps.add(opHistory);
                 }
             }
@@ -1414,8 +1414,8 @@ class CausalHistorySynchronizer {
                 this.requestsForOp.delete(opHash, requestId);
 
                 if (this.requestsForOp.get(opHash).size === 0) {
-                    for (const opHistory of this.discoveredHistory.getAllOpHistoriesForOp(opHash)) {
-                        this.requestedOps.remove(opHistory.causalHistoryHash);
+                    for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
+                        this.requestedOps.remove(opHistory.headerHash);
                     }
                 }
             }
@@ -1427,8 +1427,8 @@ class CausalHistorySynchronizer {
                 this.requestsForOp.delete(opHash, requestId);
 
                 if (this.requestsForOp.get(opHash).size === 0) {
-                    for (const opHistory of this.discoveredHistory.getAllOpHistoriesForOp(opHash)) {
-                        this.requestedOps.remove(opHistory.causalHistoryHash);
+                    for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
+                        this.requestedOps.remove(opHistory.headerHash);
                     }
                 }
             }
