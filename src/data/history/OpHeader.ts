@@ -45,7 +45,7 @@ class OpHeader {
                 this.prevOpHeaders.add(opHeader.headerHash);
             } 
 
-            this.headerProps = op.getCausalHistoryProps(prevOpHeaders);
+            this.headerProps = op.getHeaderProps(prevOpHeaders);
 
             if (prevOpHeaders === undefined) {
                 throw new Error('Cannot create OpCausalHistory for op, prevOpCausalHistories is missing.');
@@ -89,7 +89,7 @@ class OpHeader {
         }
 
         const receivedProps = new HashedMap<string, string|number|bigint>();
-        for (const [propName, propVal] of op.getCausalHistoryProps(prevOpCausalHistories).entries()) {
+        for (const [propName, propVal] of op.getHeaderProps(prevOpCausalHistories).entries()) {
             receivedProps.set(propName, propVal);
         }
 

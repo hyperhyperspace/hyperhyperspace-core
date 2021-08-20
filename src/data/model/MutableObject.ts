@@ -5,7 +5,7 @@ import { Context } from './Context';
 import { MutationOp } from './MutationOp';
 import { Hash } from './Hashing';
 import { Logger, LogLevel } from 'util/logging';
-import { CausalHistorySyncAgent, StateSyncAgent, StateFilter } from 'mesh/agents/state';
+import { HeaderBasedSyncAgent, StateSyncAgent, StateFilter } from 'mesh/agents/state';
 import { PeerGroupAgent } from 'mesh/agents/peer';
 import { HashedSet } from './HashedSet';
 import { HashReference } from './HashReference';
@@ -396,7 +396,7 @@ abstract class MutableObject extends HashedObject {
     }
 
     createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {
-        return new CausalHistorySyncAgent(peerGroupAgent, this.getLastHash(), this.getResources() as Resources, this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
+        return new HeaderBasedSyncAgent(peerGroupAgent, this.getLastHash(), this.getResources() as Resources, this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
         //return new TerminalOpsSyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 

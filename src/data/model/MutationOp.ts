@@ -147,14 +147,12 @@ abstract class MutationOp extends HashedObject {
 
     }
 
-    // RENAME
-    getCausalHistory(prevOpCausalHistories: Map<Hash, OpHeader> ): OpHeader {
-        return new OpHeader(this, prevOpCausalHistories);
+    getHeader(prevOpHeaders: Map<Hash, OpHeader> ): OpHeader {
+        return new OpHeader(this, prevOpHeaders);
     }
-
-    // RENAME
-    getCausalHistoryProps(prevOpCausalHistories: Map<Hash, OpHeader>): OpHeaderProps {
-        prevOpCausalHistories;
+    
+    getHeaderProps(prevOpHeaders: Map<Hash, OpHeader>): OpHeaderProps {
+        prevOpHeaders;
         return new Map();
     }
 

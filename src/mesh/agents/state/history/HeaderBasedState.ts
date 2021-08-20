@@ -4,29 +4,29 @@ import { Store } from 'storage/store';
 
 
 
-class CausalHistoryState extends HashedObject {
+class HeaderBasedState extends HashedObject {
 
     static className = 'hhs/v0/CausalHistoryState';
 
     mutableObj?  : Hash;
-    terminalOpHistoryHashes? : HashedSet<Hash>;
-    terminalOpHistories? : HashedSet<OpHeaderLiteral>;
+    terminalOpHeaderHashes? : HashedSet<Hash>;
+    terminalOpHeaders? : HashedSet<OpHeaderLiteral>;
 
-    static async createFromTerminalOps(mutableObj: Hash, terminalOps: Array<Hash>, store: Store): Promise<CausalHistoryState> {
+    static async createFromTerminalOps(mutableObj: Hash, terminalOps: Array<Hash>, store: Store): Promise<HeaderBasedState> {
 
-        const terminalOpHistories: Array<OpHeader> = [];
+        const terminalOpHeaders: Array<OpHeader> = [];
 
         for (const opHash of terminalOps) {
             const history = await store.loadOpHeader(opHash);
-            terminalOpHistories.push(history as OpHeader);
+            terminalOpHeaders.push(history as OpHeader);
             
         }
 
-        return CausalHistoryState.create(mutableObj, terminalOpHistories);
+        return HeaderBasedState.create(mutableObj, terminalOpHeaders);
     }
 
     static create(target: Hash, terminalOpHistories: Array<OpHeader>) {
-        return new CausalHistoryState(target, terminalOpHistories);
+        return new HeaderBasedState(target, terminalOpHistories);
     }
 
     constructor(mutableObj?: Hash, terminalOpHistories?: Array<OpHeader>) {
@@ -34,16 +34,16 @@ class CausalHistoryState extends HashedObject {
 
         this.mutableObj = mutableObj;
         if (terminalOpHistories !== undefined) { 
-            this.terminalOpHistoryHashes = new HashedSet<Hash>(new Set(terminalOpHistories.map((h: OpHeader) => h.headerHash)).values());
-            this.terminalOpHistories     = new HashedSet<OpHeaderLiteral>(new Set(terminalOpHistories.map((h: OpHeader) => h.literalize())).values());
+            this.terminalOpHeaderHashes = new HashedSet<Hash>(new Set(terminalOpHistories.map((h: OpHeader) => h.headerHash)).values());
+            this.terminalOpHeaders     = new HashedSet<OpHeaderLiteral>(new Set(terminalOpHistories.map((h: OpHeader) => h.literalize())).values());
         } else {
-            this.terminalOpHistoryHashes = new HashedSet<Hash>();
-            this.terminalOpHistories     = new HashedSet<OpHeaderLiteral>();
+            this.terminalOpHeaderHashes = new HashedSet<Hash>();
+            this.terminalOpHeaders     = new HashedSet<OpHeaderLiteral>();
         }
     }
 
     getClassName() {
-        return CausalHistoryState.className;
+        return HeaderBasedState.className;
     }
 
     async validate(_references: Map<Hash, HashedObject>) {
@@ -52,22 +52,22 @@ class CausalHistoryState extends HashedObject {
             return false;
         }
 
-        if (this.terminalOpHistoryHashes === undefined || !(this.terminalOpHistoryHashes instanceof HashedSet)) {
+        if (this.terminalOpHeaderHashes === undefined || !(this.terminalOpHeaderHashes instanceof HashedSet)) {
             return false;
         }
 
-        if (this.terminalOpHistories == undefined || !(this.terminalOpHistories instanceof HashedSet)) {
+        if (this.terminalOpHeaders == undefined || !(this.terminalOpHeaders instanceof HashedSet)) {
             return false;
         }
 
-        for (const hash of this.terminalOpHistoryHashes.values()) {
+        for (const hash of this.terminalOpHeaderHashes.values()) {
             if (typeof(hash) !== 'string') {
                 return false;
             }
         }
 
         const checkHashes = new HashedSet<Hash>();
-        for (const hashedLit of this.terminalOpHistories?.values()) {
+        for (const hashedLit of this.terminalOpHeaders?.values()) {
 
             if (hashedLit === undefined) {
                 return false;
@@ -87,7 +87,7 @@ class CausalHistoryState extends HashedObject {
             }
         }
 
-        if (!this.terminalOpHistoryHashes.equals(checkHashes)) {
+        if (!this.terminalOpHeaderHashes.equals(checkHashes)) {
             return false;
         }
 
@@ -100,6 +100,6 @@ class CausalHistoryState extends HashedObject {
 
 }
 
-HashedObject.registerClass(CausalHistoryState.className, CausalHistoryState);
+HashedObject.registerClass(HeaderBasedState.className, HeaderBasedState);
 
-export { CausalHistoryState };
+export { HeaderBasedState };

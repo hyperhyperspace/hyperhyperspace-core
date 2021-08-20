@@ -5,21 +5,21 @@ import { Logger, LogLevel } from 'util/logging';
 import { Endpoint } from '../network/NetworkAgent';
 import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { PeeringAgentBase } from '../peer/PeeringAgentBase';
-import { CausalHistoryState } from './causal/CausalHistoryState';
+import { HeaderBasedState } from './history/HeaderBasedState';
 import { AgentStateUpdateEvent, GossipEventTypes } from './StateGossipAgent';
 import { StateSyncAgent } from './StateSyncAgent';
 
-import { CausalHistorySynchronizer } from './causal/CausalHistorySynchronizer';
-import { CausalHistoryProvider, MessageType, SyncMsg } from './causal/CausalHistoryProvider';
+import { HistorySynchronizer } from './history/HistorySynchronizer';
+import { HistoryProvider, MessageType, SyncMsg } from './history/HistoryProvider';
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { Resources } from 'spaces/Resources';
 
-type StateFilter = (state: CausalHistoryState, store: Store) => Promise<CausalHistoryState>;
+type StateFilter = (state: HeaderBasedState, store: Store) => Promise<HeaderBasedState>;
 
-class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent {
+class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
-    static controlLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
-    static messageLog = new Logger(CausalHistorySyncAgent.name, LogLevel.INFO);
+    static controlLog = new Logger(HeaderBasedSyncAgent.name, LogLevel.INFO);
+    static messageLog = new Logger(HeaderBasedSyncAgent.name, LogLevel.INFO);
 
     static syncAgentIdFor(objHash: Hash, peerGroupId: string) {
         return 'causal-sync-for-' + objHash + '-in-peer-group-' + peerGroupId;
@@ -41,8 +41,8 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
     
     remoteStates: Map<Endpoint, HashedSet<Hash>>;
 
-    synchronizer : CausalHistorySynchronizer;
-    provider     : CausalHistoryProvider;
+    synchronizer : HistorySynchronizer;
+    provider     : HistoryProvider;
 
     controlLog: Logger;
     messageLog: Logger;
@@ -59,20 +59,20 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
         this.remoteStates = new Map();
 
-        this.synchronizer = new CausalHistorySynchronizer(this);
-        this.provider     = new CausalHistoryProvider(this);
+        this.synchronizer = new HistorySynchronizer(this);
+        this.provider     = new HistoryProvider(this);
 
         this.opCallback = this.opCallback.bind(this);
 
-        this.controlLog = CausalHistorySyncAgent.controlLog;
-        this.messageLog = CausalHistorySyncAgent.messageLog;
+        this.controlLog = HeaderBasedSyncAgent.controlLog;
+        this.messageLog = HeaderBasedSyncAgent.messageLog;
     }
 
 
 
     
     getAgentId(): string {
-        return CausalHistorySyncAgent.syncAgentIdFor(this.mutableObj, this.peerGroupAgent.peerGroupId);
+        return HeaderBasedSyncAgent.syncAgentIdFor(this.mutableObj, this.peerGroupAgent.peerGroupId);
     }
 
     ready(pod: AgentPod): void {
@@ -104,11 +104,11 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         
         let isNew = false;
 
-        if (state instanceof CausalHistoryState && state.mutableObj === this.mutableObj) {
+        if (state instanceof HeaderBasedState && state.mutableObj === this.mutableObj) {
 
 
 
-            this.remoteStates.set(sender, new HashedSet<Hash>(state.terminalOpHistoryHashes?.values()))
+            this.remoteStates.set(sender, new HashedSet<Hash>(state.terminalOpHeaderHashes?.values()))
 
             if (this.stateHash !== stateHash) {
 
@@ -117,7 +117,7 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
                 const unknown = new Set<OpHeader>();
 
-                for (const opHistoryLiteral of (filteredState.terminalOpHistories as HashedSet<OpHeaderLiteral>).values()) {
+                for (const opHistoryLiteral of (filteredState.terminalOpHeaders as HashedSet<OpHeaderLiteral>).values()) {
                     if ((await this.store.loadOpHeaderByHeaderHash(opHistoryLiteral.headerHash)) === undefined) {
                         unknown.add(new OpHeader(opHistoryLiteral));
                     }
@@ -210,14 +210,14 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         this.updateState(state);
     }
 
-    private async loadStateFromStore(): Promise<CausalHistoryState> {
+    private async loadStateFromStore(): Promise<HeaderBasedState> {
         let terminalOpsInfo = await this.store.loadTerminalOpsForMutable(this.mutableObj);
 
         if (terminalOpsInfo === undefined) {
             terminalOpsInfo = {terminalOps: []};
         }
 
-        const state = await CausalHistoryState.createFromTerminalOps(this.mutableObj, terminalOpsInfo.terminalOps, this.store);
+        const state = await HeaderBasedState.createFromTerminalOps(this.mutableObj, terminalOpsInfo.terminalOps, this.store);
 
         if (this.stateOpFilter === undefined) {
             return state;
@@ -226,12 +226,12 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
         }
     }
 
-    private updateState(state: CausalHistoryState): void {
+    private updateState(state: HeaderBasedState): void {
         const stateHash = state.hash();
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
-            CausalHistorySyncAgent.controlLog.trace('Found new state ' + stateHash + ' for ' + this.mutableObj + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
-            this.state = state.terminalOpHistoryHashes;
+            HeaderBasedSyncAgent.controlLog.trace('Found new state ' + stateHash + ' for ' + this.mutableObj + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
+            this.state = state.terminalOpHeaderHashes;
             this.stateHash = stateHash;
             let stateUpdate: AgentStateUpdateEvent = {
                 type: GossipEventTypes.AgentStateUpdate,
@@ -268,4 +268,4 @@ class CausalHistorySyncAgent extends PeeringAgentBase implements StateSyncAgent 
 
 }
 
-export { SyncMsg as HistoryMsg, CausalHistorySyncAgent, StateFilter }
+export { SyncMsg as HistoryMsg, HeaderBasedSyncAgent, StateFilter }

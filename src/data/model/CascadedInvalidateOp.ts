@@ -1,9 +1,9 @@
-import { HashedObject } from "data/model";
-import { HashedSet } from "./HashedSet";
-import { Hash } from "./Hashing";
-import { HashReference } from "./HashReference";
-import { InvalidateAfterOp } from "./InvalidateAfterOp";
-import { MutationOp } from "./MutationOp";
+import { HashedObject } from './HashedObject';
+import { HashedSet } from './HashedSet';
+import { Hash } from './Hashing';
+import { HashReference } from './HashReference';
+import { InvalidateAfterOp } from './InvalidateAfterOp';
+import { MutationOp } from './MutationOp';
 
  /*
   *        Op0 <-

@@ -10,10 +10,10 @@ import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { Lock } from 'util/concurrency';
 
-import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
+import { HeaderBasedSyncAgent } from '../HeaderBasedSyncAgent';
 
-import { ProviderLimits, RequestId, MessageType, SendLiteralMsg, RejectRequestMsg } from './CausalHistoryProvider';
-import { RequestMsg, ResponseMsg, CancelRequestMsg } from './CausalHistoryProvider';
+import { ProviderLimits, RequestId, MessageType, SendLiteralMsg, RejectRequestMsg } from './HistoryProvider';
+import { RequestMsg, ResponseMsg, CancelRequestMsg } from './HistoryProvider';
 
 const MaxRequestsPerRemote = 2;
 const MaxPendingOps = 1024;
@@ -49,14 +49,14 @@ type RequestInfo = {
     receivedObjects? : Context
 };
 
-class CausalHistorySynchronizer {
-    static controlLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
-    static sourcesLog = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
-    static stateLog   = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
-    static opXferLog  = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
-    static storeLog   = new Logger(CausalHistorySynchronizer.name, LogLevel.INFO);
+class HistorySynchronizer {
+    static controlLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static sourcesLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static stateLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static opXferLog  = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static storeLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
 
-    syncAgent: CausalHistorySyncAgent;
+    syncAgent: HeaderBasedSyncAgent;
 
     //endpointsForUnknownHistory : MultiMap<Hash, Endpoint>;
 
@@ -89,7 +89,7 @@ class CausalHistorySynchronizer {
     opXferLog  : Logger;
     storeLog   : Logger;
 
-    constructor(syncAgent: CausalHistorySyncAgent) {
+    constructor(syncAgent: HeaderBasedSyncAgent) {
 
         this.syncAgent = syncAgent;
 
@@ -115,11 +115,11 @@ class CausalHistorySynchronizer {
 
         this.logPrefix = 'On peer ' + this.syncAgent.peerGroupAgent.localPeer.identity?.hash() as Hash + ':';
 
-        this.controlLog = CausalHistorySynchronizer.controlLog;
-        this.sourcesLog = CausalHistorySynchronizer.sourcesLog;
-        this.stateLog   = CausalHistorySynchronizer.stateLog;
-        this.opXferLog  = CausalHistorySynchronizer.opXferLog;
-        this.storeLog   = CausalHistorySynchronizer.storeLog;
+        this.controlLog = HistorySynchronizer.controlLog;
+        this.sourcesLog = HistorySynchronizer.sourcesLog;
+        this.stateLog   = HistorySynchronizer.stateLog;
+        this.opXferLog  = HistorySynchronizer.opXferLog;
+        this.storeLog   = HistorySynchronizer.storeLog;
     }
 
     async onNewHistory(remote: Endpoint, receivedOpHistories: Set<OpHeader>) {
@@ -149,7 +149,7 @@ class CausalHistorySynchronizer {
             const cancelled = this.checkRequestRemoval(reqInfo);
 
             if (cancelled) {
-                CausalHistorySynchronizer.controlLog.debug('Cancelled request ' + reqInfo.request.requestId + ' in timeout loop')
+                HistorySynchronizer.controlLog.debug('Cancelled request ' + reqInfo.request.requestId + ' in timeout loop')
             }
 
             cancelledSome = cancelledSome || cancelled;
@@ -538,7 +538,7 @@ class CausalHistorySynchronizer {
             }
         }
 
-        const opHistory = op.getCausalHistory(prevOpCausalHistories);
+        const opHistory = op.getHeader(prevOpCausalHistories);
         
         this.addOpToCurrentState(opHistory);
 
@@ -1322,7 +1322,7 @@ class CausalHistorySynchronizer {
 
     private cancelRequest(reqInfo: RequestInfo, reason: 'invalid-response'|'invalid-literal'|'out-of-order-literal'|'invalid-omitted-objs'|'slow-connection'|'other', detail: string) {
 
-        CausalHistorySyncAgent.controlLog.warning('\n'+this.logPrefix+'\n'+detail);
+        HeaderBasedSyncAgent.controlLog.warning('\n'+this.logPrefix+'\n'+detail);
 
         this.cleanupRequest(reqInfo);
 
@@ -1461,4 +1461,4 @@ class CausalHistorySynchronizer {
 
 }
 
-export { CausalHistorySynchronizer };
+export { HistorySynchronizer };

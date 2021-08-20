@@ -5,7 +5,7 @@ import { Hash, HashedObject, Literal } from 'data/model';
 import { ObjectPacker } from 'data/packing/ObjectPacker';
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
 import { Logger, LogLevel } from 'util/logging';
-import { CausalHistorySyncAgent } from '../CausalHistorySyncAgent';
+import { HeaderBasedSyncAgent } from '../HeaderBasedSyncAgent';
 
 
 enum MessageType {
@@ -108,13 +108,13 @@ type ResponseInfo = {
     nextLiteralIdx?: number
 }
 
-class CausalHistoryProvider {
+class HistoryProvider {
 
-    static controlLog = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
-    static storeLog   = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
-    static opXferLog  = new Logger(CausalHistoryProvider.name, LogLevel.INFO);
+    static controlLog = new Logger(HistoryProvider.name, LogLevel.INFO);
+    static storeLog   = new Logger(HistoryProvider.name, LogLevel.INFO);
+    static opXferLog  = new Logger(HistoryProvider.name, LogLevel.INFO);
 
-    syncAgent: CausalHistorySyncAgent;
+    syncAgent: HeaderBasedSyncAgent;
 
     responses  : Map<RequestId, ResponseInfo>;   
 
@@ -131,7 +131,7 @@ class CausalHistoryProvider {
     storeLog   : Logger;
     opXferLog  : Logger;
 
-    constructor(syncAgent: CausalHistorySyncAgent) {
+    constructor(syncAgent: HeaderBasedSyncAgent) {
         this.syncAgent = syncAgent;
 
         this.responses  = new Map();
@@ -145,9 +145,9 @@ class CausalHistoryProvider {
 
         this.continueStreamingResponses = this.continueStreamingResponses.bind(this);
 
-        this.controlLog = CausalHistoryProvider.controlLog; 
-        this.storeLog   = CausalHistoryProvider.storeLog;
-        this.opXferLog  = CausalHistoryProvider.opXferLog;
+        this.controlLog = HistoryProvider.controlLog; 
+        this.storeLog   = HistoryProvider.storeLog;
+        this.opXferLog  = HistoryProvider.opXferLog;
     }
 
 
@@ -477,7 +477,7 @@ class CausalHistoryProvider {
 
     private rejectRequest(respInfo: ResponseInfo, reason: 'too-busy'|'invalid-request', detail: string) {
 
-        CausalHistorySyncAgent.controlLog.warning(detail);
+        HeaderBasedSyncAgent.controlLog.warning(detail);
 
         this.removeResponse(respInfo);
 
@@ -621,4 +621,4 @@ class CausalHistoryProvider {
     }
 }
 
-export { CausalHistoryProvider, ProviderLimits, RequestId, MessageType, SyncMsg, RequestMsg, ResponseMsg, RejectRequestMsg, SendLiteralMsg, CancelRequestMsg };
+export { HistoryProvider, ProviderLimits, RequestId, MessageType, SyncMsg, RequestMsg, ResponseMsg, RejectRequestMsg, SendLiteralMsg, CancelRequestMsg };
