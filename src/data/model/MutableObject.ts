@@ -28,7 +28,7 @@ abstract class MutableObject extends HashedObject {
 
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, HashReference<MutationOp>>;
-    _activeUndosOpsPerOp       : MultiMap<Hash, Hash>;
+    _activeUndoOpsPerOp       : MultiMap<Hash, Hash>;
 
 
     _unsavedOps      : Array<MutationOp>;
@@ -58,7 +58,7 @@ abstract class MutableObject extends HashedObject {
 
         this._allAppliedOps = new Set();
         this._terminalOps   = new Map();
-        this._activeUndosOpsPerOp  = new MultiMap();
+        this._activeUndoOpsPerOp  = new MultiMap();
 
         this._unsavedOps      = [];
         this._unappliedOps    = new Map();
@@ -72,7 +72,21 @@ abstract class MutableObject extends HashedObject {
         this._externalMutationCallbacks = new Set();
     }
 
-    abstract mutate(op: MutationOp, isNew: boolean): Promise<boolean>;
+    abstract mutate(op: MutationOp): Promise<boolean>;
+
+    // override if appropiate
+    async undo(op: MutationOp): Promise<boolean> {
+        op; return true;
+    }
+
+    // override if appropiate
+    async redo(op: MutationOp): Promise<boolean> {
+        op; return true;
+    }
+
+    protected isUndone(opHash: Hash): boolean {
+        return this._activeUndoOpsPerOp.get(opHash).size > 0;
+    }
 
     addMutationCallback(cb: (mut: MutationOp) => void) {
         this._externalMutationCallbacks.add(cb);
@@ -214,28 +228,30 @@ abstract class MutableObject extends HashedObject {
 
             if (this._applyOpsLock.acquire()) {
 
-                const pending = Array.from(this._unappliedOps.entries());
+                try {
+                    const pending = Array.from(this._unappliedOps.entries());
                 
-                go = false;
-
-                const toRemove = new Array<Hash>();
-                
-                for (const [hash, op] of pending) {
-                    if (this.canApplyOp(op)) {
-                        await this.apply(op, false);
-                        toRemove.push(hash);
-                        go = true;
-                    }
-                }
-
-                go = go || this._unappliedOps.size > pending.length;
-
-                for (const hash of toRemove) {
-                    this._unappliedOps.delete(hash);
-                }
-
-                this._applyOpsLock.release();
+                    go = false;
     
+                    const toRemove = new Array<Hash>();
+                    
+                    for (const [hash, op] of pending) {
+                        if (this.canApplyOp(op)) {
+                            await this.apply(op, false);
+                            toRemove.push(hash);
+                            go = true;
+                        }
+                    }
+    
+                    go = go || this._unappliedOps.size > pending.length;
+    
+                    for (const hash of toRemove) {
+                        this._unappliedOps.delete(hash);
+                    }
+    
+                } finally {
+                    this._applyOpsLock.release();
+                }
             }
 
         }
@@ -265,12 +281,10 @@ abstract class MutableObject extends HashedObject {
                     }
                 }
             }
-            
+
             const done = this.apply(op, true);
-
-            this.enqueueOpToSave(op);
-
-             return done;
+            
+            return done;                
         }
     }
 
@@ -278,55 +292,58 @@ abstract class MutableObject extends HashedObject {
 
         const opHash = op.hash();
 
+        if (this._allAppliedOps.has(opHash)) {
+            return Promise.resolve();
+        }
+
         for (const prevOpRef of op.getPrevOps()) {
             this._terminalOps.delete(prevOpRef.hash);
         }
 
         this._terminalOps.set(opHash, op.createReference());
 
-        if (this._allAppliedOps.has(opHash)) {
-            return Promise.resolve();
-        }
-
         this._allAppliedOps.add(opHash);
 
-        let shouldMutate = true;
+        if (isNew) {
+            this.enqueueOpToSave(op);
+        }
+
+        let result = Promise.resolve(false);
 
         if (op instanceof CascadedInvalidateOp) {
 
-            let currentOp = op;
-            while (currentOp.getTargetOp() instanceof CascadedInvalidateOp) {
-                currentOp = currentOp.getTargetOp() as CascadedInvalidateOp;
-            }
-
-            const finalTargetOp     = currentOp.getTargetOp();
+            const finalTargetOp     = op.getFinalTargetOp();
             const finalTargetOpHash = finalTargetOp.hash();
-
             
-            const isUndone = this._activeUndosOpsPerOp.get(finalTargetOpHash).size > 0;
-
-            shouldMutate = isUndone !== op.undo;
+            const wasUndone = this._activeUndoOpsPerOp.get(finalTargetOpHash).size > 0;
 
             if (op.undo) {
-                this._activeUndosOpsPerOp.add(finalTargetOpHash, opHash);
+                this._activeUndoOpsPerOp.add(finalTargetOpHash, opHash);
             } else { // redo
-                this._activeUndosOpsPerOp.delete(finalTargetOpHash, op.getTargetOp().hash());
+                this._activeUndoOpsPerOp.delete(finalTargetOpHash, op.getTargetOp().hash());
             }
+
+            if (wasUndone !== op.undo) {
+                if (op.undo) {
+                    result = this.undo(op.getFinalTargetOp());
+                } else { // redo
+                    result = this.redo(op.getFinalTargetOp());
+                }
+            }
+
+        } else {
+            result = this.mutate(op);
         }
 
-        if (shouldMutate) {
-            const done = this.mutate(op, isNew).then((mutated: boolean) => {
-                if (mutated) {
-                    for (const cb of this._externalMutationCallbacks) {
-                        cb(op);
-                    }
-                }        
-            });
-    
-            return done;
-        } else {
-            return Promise.resolve();
-        }
+        const done = result.then((mutated: boolean) => {
+            if (mutated) {
+                for (const cb of this._externalMutationCallbacks) {
+                    cb(op);
+                }
+            }        
+        });
+
+        return done;
     }
 
     private canApplyOp(op: MutationOp): boolean {

@@ -262,6 +262,18 @@ class CascadedInvalidateOp extends MutationOp {
         return this.targetOp;
     }
 
+    getFinalTargetOp(): MutationOp {
+
+        let finalTargetOp = this.getTargetOp();
+
+        while (finalTargetOp instanceof CascadedInvalidateOp) {
+            finalTargetOp = finalTargetOp.getTargetOp();
+        }
+
+        return finalTargetOp;
+
+    }
+
     /*literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
         if (flags === undefined) {

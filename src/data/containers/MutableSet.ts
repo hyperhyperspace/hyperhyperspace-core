@@ -210,7 +210,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     _elements: Map<ElmtHash, T>;
     _currentAddOpRefs: Map<ElmtHash, HashedSet<HashReference<T>>>;
 
-    _unsavedAppliedOps: Set<Hash>;
+    //_unsavedAppliedOps: Set<Hash>;
 
     _addElementCallback?    : (element: T) => void;
     _deleteElementCallback? : (element: T) => void;
@@ -225,7 +225,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         this._elements = new Map();
         this._currentAddOpRefs = new Map();
 
-        this._unsavedAppliedOps = new Set();
+        //this._unsavedAppliedOps = new Set();
 
     }
 
@@ -279,7 +279,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
         return this._elements.values();
     }
 
-    mutate(op: MutationOp, isNew: boolean): Promise<boolean> {
+    mutate(op: MutationOp): Promise<boolean> {
 
         let mutated = false;
 
@@ -299,21 +299,11 @@ class MutableSet<T extends HashedObject> extends MutableObject {
                 this._currentAddOpRefs.set(hash, current);
             }
 
+            mutated = current.size() === 0;
+
             current.add(addOp.createReference());
 
             this._elements.set(hash, addOp.element as T)
-
-            if (isNew) {
-                this._unsavedAppliedOps.add(op.hash());
-                mutated = true;
-            } else {
-                const opHash = addOp.hash();
-                if (!this._unsavedAppliedOps.has(opHash)) {
-                    mutated = true;
-                } else {
-                    this._unsavedAppliedOps.delete(opHash);
-                }
-            }
 
             if (mutated) {
                 if (this._addElementCallback !== undefined) {
