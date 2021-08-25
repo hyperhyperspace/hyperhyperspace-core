@@ -243,7 +243,16 @@ class SignallingServerConnection implements LinkupServer {
             
                         if (message['action'] === 'ping') {
                             SignallingServerConnection.logger.trace('sending pong to ' + this.serverURL);
-                            ws.send(JSON.stringify({'action' : 'pong'}));
+                            if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
+                                try {
+                                    ws.send(JSON.stringify({'action' : 'pong'}));
+                                } catch (e) {
+                                    SignallingServerConnection.logger.warning('Error while sending pong to ' + this.serverURL, e);
+                                }
+                            } else {
+                                SignallingServerConnection.logger.debug('not sending pong to ' + this.serverURL + ': connection is not open');
+                            }
+
                         } else if (message['action'] === 'send') {
                             const linkupId = message['linkupId'];
                             const callId   = message['callId'];

@@ -165,26 +165,30 @@ class NetworkAgent implements Agent {
 
             const connectionId = conn.getConnectionId(); 
             const connInfo = this.connectionInfo.get(connectionId);
+            try {
+                const message = JSON.parse(data);
 
-            const message = JSON.parse(data);
-
-            if (connInfo !== undefined) {           
-                
-                if (connInfo.status !== ConnectionStatus.Ready) {
-                    this.connectionReadyCallback(conn);
-                }
-
-                if (message.connectionId !== undefined) {
+                if (connInfo !== undefined) {           
                     
-                    // plain message, not peer to peer yet.
-                    const msg = message as Message;
+                    if (connInfo.status !== ConnectionStatus.Ready) {
+                        this.connectionReadyCallback(conn);
+                    }
 
-                    if (msg.connectionId === connectionId &&
-                        msg.source       === connInfo.remoteEndpoint && 
-                        msg.destination  === connInfo.localEndpoint)
+                    if (message.connectionId !== undefined) {
+                        
+                        // plain message, not peer to peer yet.
+                        const msg = message as Message;
 
-                            this.receiveMessage(msg);
+                        if (msg.connectionId === connectionId &&
+                            msg.source       === connInfo.remoteEndpoint && 
+                            msg.destination  === connInfo.localEndpoint)
+
+                                this.receiveMessage(msg);
+                    }
                 }
+            } catch (e) {
+                this.messageLogger.warning(() => 'Endpoint ' + this.connectionInfo.get(conn.getConnectionId())?.localEndpoint + ' could not process received message from ' + this.connectionInfo.get(conn.getConnectionId())?.remoteEndpoint + ', error is:\n', e);
+                this.messageLogger.trace('full message content follows:', data);
             }
         };
 
