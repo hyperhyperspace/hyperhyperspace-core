@@ -1,3 +1,4 @@
+import { Identity } from 'data/identity';
 import { Hash, HashedObject, HashReference, InvalidateAfterOp, MutableObject, MutationOp } from 'data/model';
 import { MultiMap } from 'util/multimap';
 
@@ -5,7 +6,6 @@ type PermissionTestOp = GrantOp|RevokeAfterOp|UseOp;
 
 type PermissionUse = UseOp;
 
-type Grantee = string;
 type Capability = string;
 type Key = string;
 
@@ -14,10 +14,10 @@ class GrantOp extends MutationOp {
 
     static className = 'hhs-test/GrantOp';
 
-    grantee?    : Grantee;
+    grantee?    : Identity;
     capability? : Capability;
 
-    constructor(targetObject?: PermissionTest, grantee?: Grantee, capability?: Capability, causalOps?: IterableIterator<MutationOp>) {
+    constructor(targetObject?: PermissionTest, grantee?: Identity, capability?: Capability, causalOps?: IterableIterator<MutationOp>) {
         super(targetObject, causalOps);
 
         this.grantee = grantee;
@@ -100,6 +100,10 @@ class UseOp extends MutationOp {
             return false;
         }
 
+        if (!(causalOp.grantee !== undefined && causalOp.grantee.equals(this.getAuthor()))) {
+            return false;
+        }
+
         return true;
     }
 
@@ -133,6 +137,77 @@ class PermissionTest extends MutableObject {
         this._grantOps = new Map();
     }
 
+    getClassName(): string {
+        return PermissionTest.className;
+    }
+
+    init(): void {
+        
+    }
+
+    private isRootOp(op: MutationOp): boolean { 
+        const root = this.getAuthor();
+
+        return root !== undefined && root.equals(op.getAuthor()) && op.getCausalOps().size() === 0;
+    }
+
+    private isAdminOp(op: MutationOp): boolean {
+
+        const causalOps = op.getCausalOps();
+        if (causalOps.size() !== 1) {
+            return false;
+        }
+
+        const causalOp = causalOps.values().next().value as MutationOp;
+
+        if (!(causalOp instanceof GrantOp) || !this.isRootOp(causalOp)) {
+            return false;
+        }
+
+        if (!(causalOp.grantee !== undefined  && causalOp.grantee.equals(op.getAuthor()))) {
+            return false;
+        }
+
+        if (causalOp.capability !== 'admin') {
+            return false;
+        }
+
+        return true;
+
+    }
+
+    shouldAcceptMutationOp(op: MutationOp): boolean {
+
+        if (super.shouldAcceptMutationOp(op)) {
+
+            if (op instanceof GrantOp) {
+                if (op.capability === 'admin' && this.isRootOp(op)) {
+                    return true;
+                } else if (op.capability === 'user' && (this.isRootOp(op) || this.isAdminOp(op))) {
+                    return true;
+                } else {
+                    return false;
+                }
+            } else if (op instanceof RevokeAfterOp) {
+                if (op.getTargetOp().capability === 'admin' && this.isRootOp(op)) {
+                    return true;
+                } else if (op.getTargetOp().capability === 'user' && (this.isRootOp(op) || this.isAdminOp(op))) {
+                    return true;
+                } else {
+                    return false;
+                }
+            } else {
+                return true
+            }
+
+    
+        } else {
+            return false;
+        }
+
+
+    }
+
     async mutate(op: MutationOp): Promise<boolean> {
 
         let mutated = false;
@@ -148,14 +223,6 @@ class PermissionTest extends MutableObject {
         }
 
         return mutated;
-    }
-
-    getClassName(): string {
-        return PermissionTest.className;
-    }
-
-    init(): void {
-        
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
@@ -174,7 +241,7 @@ class PermissionTest extends MutableObject {
 
     }*/
 
-    hasCapability(grantee: Grantee, capability: Capability): boolean {
+    hasCapability(grantee: Identity, capability: Capability): boolean {
 
         let result = false;
 
@@ -197,7 +264,7 @@ class PermissionTest extends MutableObject {
         return result;
     }
 
-    useCapability(grantee: Grantee, capability: Capability): UseOp {
+    useCapability(grantee: Identity, capability: Capability): UseOp {
 
         let useOp = this.useCapabilityIfAvailable(grantee, capability);
 
@@ -209,7 +276,7 @@ class PermissionTest extends MutableObject {
 
     }
 
-    useCapabilityIfAvailable(grantee: Grantee, capability: Capability): UseOp|undefined {
+    useCapabilityIfAvailable(grantee: Identity, capability: Capability): UseOp|undefined {
         let useOp: UseOp|undefined = undefined;
 
         const grantOp = this.findValidGrant(grantee, capability);
@@ -222,7 +289,7 @@ class PermissionTest extends MutableObject {
         return useOp;
     }
 
-    private findValidGrant(grantee: Grantee, capability: Capability): GrantOp|undefined {
+    private findValidGrant(grantee: Identity, capability: Capability): GrantOp|undefined {
         
         let chosenGrantOp: GrantOp|undefined = undefined;
         let chosenGrantOpHash: Hash|undefined = undefined;
@@ -249,11 +316,11 @@ class PermissionTest extends MutableObject {
     }
 
     static getGranteeCapabilityKeyForGrantOp(op: GrantOp): Key {
-        return PermissionTest.getGranteeCapabilityKey(op.grantee as Grantee, op.capability as Capability);
+        return PermissionTest.getGranteeCapabilityKey(op.grantee as Identity, op.capability as Capability);
     }
 
-    static getGranteeCapabilityKey(grantee: Grantee, capability: Capability): Key {
-        return grantee.replace(/-/g, '--') + '-' + capability.replace(/-/g, '--');
+    static getGranteeCapabilityKey(grantee: Identity, capability: Capability): Key {
+        return grantee.hash().replace(/-/g, '--') + '-' + capability.replace(/-/g, '--');
     }
 
 }
