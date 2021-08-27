@@ -22,7 +22,6 @@ abstract class MutableObject extends HashedObject {
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     readonly _acceptedMutationOpClasses : Array<string>;
-    readonly _supportsUndo: boolean;
 
     _boundToStore : boolean;
 
@@ -44,8 +43,6 @@ abstract class MutableObject extends HashedObject {
 
     constructor(acceptedOpClasses : Array<string>, supportsUndo=false) {
         super();
-
-        this._supportsUndo = supportsUndo;
 
         if (supportsUndo) {
             if (acceptedOpClasses.indexOf(CascadedInvalidateOp.className) < 0) {
@@ -70,6 +67,10 @@ abstract class MutableObject extends HashedObject {
         };
 
         this._externalMutationCallbacks = new Set();
+    }
+
+    supportsUndo() {
+        return this._acceptedMutationOpClasses.indexOf(CascadedInvalidateOp.className) >= 0
     }
 
     abstract mutate(op: MutationOp): Promise<boolean>;
@@ -400,7 +401,7 @@ abstract class MutableObject extends HashedObject {
 
         flags.push('mutable');
 
-        if (this._supportsUndo) {
+        if (this.supportsUndo()) {
             flags.push('supports_undo')
         }
 
