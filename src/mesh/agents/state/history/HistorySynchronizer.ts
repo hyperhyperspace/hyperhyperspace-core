@@ -584,8 +584,16 @@ class HistorySynchronizer {
 
     async onReceivingResponse(remote: Endpoint, msg: ResponseMsg) {
 
-        if (this.requests.get(msg.requestId)?.status !== 'sent') {
-            this.controlLog.warning('\n'+this.logPrefix+'\nIgnoring response for request ' + msg.requestId + ": status is not 'sent'");
+        const req = this.requests.get(msg.requestId);
+
+        if (req === undefined) {
+            //TODO make this a debug message instead of a warning
+            this.controlLog.warning('\n'+this.logPrefix+'\nIgnoring response for unknown request ' + msg.requestId);
+            return
+        }
+
+        if (req?.status !== 'sent') {
+            this.controlLog.warning('\n'+this.logPrefix+'\nIgnoring response for request ' + msg.requestId + ": status is not 'sent', but " + this.requests.get(msg.requestId)?.status);
             return;
         }
 
