@@ -138,6 +138,7 @@ class NetworkAgent implements Agent {
     webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void;
     connProxies?: Map<string, WebRTCConnectionProxy>;
 
+    testingMode = false;
 
     getAgentId(): string {
         return NetworkAgent.AgentId; 
@@ -713,6 +714,26 @@ class NetworkAgent implements Agent {
             agentId: agentId,
             content: content
         };
+
+        if (this.testingMode) {
+            const dice = Math.random();
+
+            if (dice < 0.05) {
+                // drop
+            } else if (dice < 0.10) {
+                // delay
+                const delay = Math.random() * 15000;
+                new Promise(r => setTimeout(r, delay)).then(() => { conn.send(JSON.stringify(message)); })
+            } else if (dice < 0.15) {
+                // truncate
+                conn.send(JSON.stringify(message).substring(0, 100));
+            } else {
+                // send allright
+                conn.send(JSON.stringify(message));
+            }
+
+            return;
+        }
 
         conn.send(JSON.stringify(message));
 
