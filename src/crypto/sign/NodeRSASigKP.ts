@@ -1,7 +1,7 @@
 import { SignatureKeyPair } from './SignatureKeyPair';
 import { Strings } from 'util/strings';
 
-const NodeRSA = require('node-rsa');
+
 
 class NodeRSASigKP implements SignatureKeyPair {
 
@@ -11,6 +11,8 @@ class NodeRSASigKP implements SignatureKeyPair {
     keyPair?: any;
 
     async generateKey(params?: {b?: number}): Promise<void> {
+
+        const NodeRSA = require('node-rsa');
 
         this.keyPair = new NodeRSA();
 
@@ -26,6 +28,8 @@ class NodeRSASigKP implements SignatureKeyPair {
     }
 
     async loadKeyPair(publicKey?: string, privateKey?: string): Promise<void> {
+
+        const NodeRSA = require('node-rsa');
         
         if (privateKey !== undefined) {
 

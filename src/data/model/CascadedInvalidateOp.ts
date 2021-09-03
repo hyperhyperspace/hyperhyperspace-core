@@ -88,7 +88,6 @@ class CascadedInvalidateOp extends MutationOp {
 
     undo?: boolean;
     targetOp?: MutationOp;
-    
 
     constructor(undo?: boolean, targetOp?: MutationOp, causalOp?: InvalidateAfterOp|CascadedInvalidateOp) {
         super(targetOp?.targetObject, causalOp === undefined? undefined : [causalOp].values());
@@ -154,6 +153,8 @@ class CascadedInvalidateOp extends MutationOp {
             } else {
                 throw new Error('The cause of an undo/redo can only be another UndoOp/RedoOp, or an InvalidateAfterOp.');
             }
+
+            this.prevOps = new HashedSet([causalOp.createReference(), targetOp.createReference()].values());
 
         }
         
@@ -249,6 +250,13 @@ class CascadedInvalidateOp extends MutationOp {
             if (!this.undo) {
                 return false;
             }
+        }
+
+        const prevOps = new HashedSet([causalOp.createReference(), this.targetOp.createReference()].values());
+
+        // see that prevOps are correctly generated
+        if (this.prevOps === undefined || !this.prevOps.equals(prevOps)) {
+            return false;
         }
 
         return true;

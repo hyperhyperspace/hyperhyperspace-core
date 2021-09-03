@@ -18,7 +18,10 @@ abstract class MutationOp extends HashedObject {
         if (targetObject !== undefined) {
             this.targetObject = targetObject;
             if (causalOps !== undefined) {
-                this.causalOps = new HashedSet(Array.from(causalOps).map((op: MutationOp) => op.createReference()).values());
+                const causalOpArray = Array.from(causalOps).map((op: MutationOp) => op.createReference());
+                if (causalOpArray.length > 0) {
+                    this.causalOps = new HashedSet(causalOpArray.values()); 
+                }                
             }
         }
     }
@@ -53,6 +56,10 @@ abstract class MutationOp extends HashedObject {
             }
         }
 
+        if (!this.targetObject.supportsUndo() && this.causalOps !== undefined) {
+            return false;
+        }
+
         if (this.causalOps !== undefined) {
 
             if (! (this.causalOps instanceof HashedSet)) {
@@ -67,22 +74,10 @@ abstract class MutationOp extends HashedObject {
                 } else if (! (causalOp instanceof MutationOp)) {
                     return false;
                 }
-
-                /*const thisIsACascade = this instanceof CascadedInvalidateOp;
-
-                if (causalOp instanceof CascadedInvalidateOp) {
-                    if (!thisIsACascade) {
-                        return false;
-                    }
-                }*/
             }
         }
 
-        if (!this.targetObject.shouldAcceptMutationOp(this)) {
-            return false;
-        }
-
-        if (!(await this.validateCausalOps(references))) {
+        if (!this.targetObject.shouldAcceptMutationOp(this, references)) {
             return false;
         }
         
@@ -96,18 +91,6 @@ abstract class MutationOp extends HashedObject {
         }
 
         return this.causalOps as HashedSet<HashReference<MutationOp>>;
-    }
-
-    // By default, reject any causal ops. Override if necessary.
-    async validateCausalOps(references: Map<Hash, HashedObject>): Promise<boolean> {
-        references;
-
-        return this.causalOps === undefined;
-    }
-
-    shouldAcceptInvalidateAfterOp(op: MutationOp): boolean {
-        op;
-        return false;
     }
 
     getTargetObject() : MutableObject {

@@ -40,7 +40,7 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
 
         
 
-    }, 20000);
+    }, 40000);
 
     test('[LNK02] Call answering', (done) => {
         let linkupManager1 = new LinkupManager();
@@ -86,7 +86,7 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
 
         
 
-    }, 20000);
+    }, 40000);
 
     test('[LNK03] Raw messaging', (done) => {
         let linkupManager1 = new LinkupManager();
@@ -116,7 +116,7 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
         int = window.setInterval(() => {
             linkupManager2.sendRawMessage(address2, address1, message);
         }, 100);
-    }, 20000);
+    }, 40000);
 
 
     test('[LNK04] Call starting w/proxy', (done) => {
@@ -168,7 +168,7 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
     
             
     
-        }, 20000);
+        }, 40000);
 
         test('[LNK05] Call answering w/proxy', (done) => {
             let eventCallback1 = (ev: LinkupManagerEvent) =>  {
@@ -235,5 +235,5 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
     
             
     
-        }, 20000);
+        }, 40000);
 });

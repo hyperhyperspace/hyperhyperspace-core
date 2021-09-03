@@ -33,6 +33,10 @@ class OpHeader {
             if (prevOpHeaders === undefined) {
                 throw new Error('Parameter prevOpCausalHistories is mandatory to create an OpCausalHistory from a MutationOp');
             }
+
+            if (op.prevOps === undefined) {
+                throw new Error('Operation has no prevOps (they are undefined)');
+            }
             
             this.prevOpHeaders = new Set();
             for (const prevOpRef of op.prevOps?.values() as IterableIterator<HashReference<MutationOp>>) {

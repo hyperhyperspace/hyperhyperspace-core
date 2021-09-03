@@ -1,7 +1,5 @@
 import { EncodingKeyPair } from './EncodingKeyPair';
 
-const NodeRSA = require('node-rsa');
-
 class NodeRSAEncKP implements EncodingKeyPair {
 
     publicKeyPEM?: string;
@@ -13,6 +11,8 @@ class NodeRSAEncKP implements EncodingKeyPair {
     decoder = new TextDecoder();
 
     async generateKey(params?: {b?: number}): Promise<void> {
+
+        const NodeRSA = require('node-rsa');
         
         this.keyPair = new NodeRSA();
 
@@ -33,6 +33,8 @@ class NodeRSAEncKP implements EncodingKeyPair {
     }
 
     async loadKeyPair(publicKey?: string, privateKey?: string): Promise<void> {
+
+        const NodeRSA = require('node-rsa');
         
         if (privateKey !== undefined) {
 

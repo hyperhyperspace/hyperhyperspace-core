@@ -14,19 +14,19 @@ describeProxy('[NET] Basic networking', () => {
 
         await twoNodeNetworkTest(linkupServer, linkupServer, done);
 
-    }, 35000);
+    }, 45000);
 
     test('[NET02] 2-node network test (ws)', async (done) => {
 
         await twoNodeNetworkTest('ws://localhost:10110', 'ws://localhost:10111', done);
 
-    }, 35000);
+    }, 45000);
 
     test('[NET03] 2-node network test (mixed)', async (done) => {
 
         await twoNodeNetworkTest( 'ws://localhost:10112', linkupServer, done);
 
-    }, 35000);
+    }, 45000);
 });
 
 async function twoNodeNetworkTest(linkupHost1: string, linkupHost2: string, done: () => void) {
@@ -57,7 +57,7 @@ async function twoNodeNetworkTest(linkupHost1: string, linkupHost2: string, done
 
     let checks = 0;
     while (!(a1.isConnected(ep1, ep2) && a2.isConnected(ep2, ep1))) {
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, 100));
         if (checks>400) {
             break;
         }
@@ -70,7 +70,7 @@ async function twoNodeNetworkTest(linkupHost1: string, linkupHost2: string, done
 
     checks = 0;
     while (a2.getReceivedMessages(ep1, ep2).size === 0) {
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, 100));
         if (checks>400) {
             break;
         }
@@ -83,7 +83,7 @@ async function twoNodeNetworkTest(linkupHost1: string, linkupHost2: string, done
 
     checks = 0;
     while (a1.getReceivedMessages(ep2, ep1).size === 0) {
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, 100));
         if (checks>400) {
             break;
         }
@@ -92,6 +92,9 @@ async function twoNodeNetworkTest(linkupHost1: string, linkupHost2: string, done
 
     expect(a1.getReceivedMessages(ep2, ep1).has('hello a2')).toBeFalsy();
     expect(a1.getReceivedMessages(ep2, ep1).has('hello a1')).toBeTruthy();
+
+    n1.shutdown();
+    n2.shutdown();
 
     done();
 }

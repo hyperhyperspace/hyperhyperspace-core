@@ -22,6 +22,7 @@ interface RSA {
 
 class RSADefaults {
     static impl: new () => RSA = globalThis?.crypto?.subtle !== undefined ? WebCryptoRSA : NodeRSA;
+    //static impl: new () => RSA = WebCryptoRSA;
 }
 
 export { RSA, RSADefaults };

@@ -71,10 +71,6 @@ abstract class InvalidateAfterOp extends MutationOp {
         if (this.targetOp instanceof InvalidateAfterOp) {
             return false;
         }
-        
-        if (!(this.targetOp as MutationOp).shouldAcceptInvalidateAfterOp(this)) {
-            return false;
-        }
 
         return true;
     

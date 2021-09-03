@@ -26,7 +26,7 @@ abstract class MutableObject extends HashedObject {
     _boundToStore : boolean;
 
     _allAppliedOps : Set<Hash>;
-    _terminalOps   : Map<Hash, HashReference<MutationOp>>;
+    _terminalOps   : Map<Hash, MutationOp>;
     _activeUndoOpsPerOp       : MultiMap<Hash, Hash>;
 
 
@@ -159,7 +159,7 @@ abstract class MutableObject extends HashedObject {
         while (results.objects.length > 0) {
 
             for (const obj of results.objects) {
-                if (obj instanceof MutationOp) {
+                if (obj instanceof MutationOp && this.isAcceptedMutationOpClass(obj)) {
                     await this.apply(obj, false);
                 }
             }
@@ -198,7 +198,7 @@ abstract class MutableObject extends HashedObject {
         for (const obj of results.objects) {
             let op = obj as MutationOp;
 
-            if (this.shouldAcceptMutationOp(op)) {
+            if (this.isAcceptedMutationOpClass(op)) {
                 this.apply(op, false);
                 count = count + 1;
             }
@@ -261,7 +261,7 @@ abstract class MutableObject extends HashedObject {
 
     applyNewOp(op: MutationOp) : Promise<void> {
 
-        if (!this.shouldAcceptMutationOp(op)) {
+        if (!this.isAcceptedMutationOpClass(op)) {
             throw new Error ('Invalid op ' + op.hash() + ' attempted for ' + this.hash());
         } else {
 
@@ -272,8 +272,8 @@ abstract class MutableObject extends HashedObject {
             if (prevOps === undefined) {
                 op.prevOps = new HashedSet<HashReference<MutationOp>>();
 
-                for (const ref of this._terminalOps.values()) {
-                    op.prevOps.add(ref);
+                for (const termOp of this._terminalOps.values()) {
+                    op.prevOps.add(termOp.createReference());
                 }
             } else {
                 for (const prevOpRef of op.getPrevOps()) {
@@ -301,7 +301,7 @@ abstract class MutableObject extends HashedObject {
             this._terminalOps.delete(prevOpRef.hash);
         }
 
-        this._terminalOps.set(opHash, op.createReference());
+        this._terminalOps.set(opHash, op);
 
         this._allAppliedOps.add(opHash);
 
@@ -409,8 +409,14 @@ abstract class MutableObject extends HashedObject {
 
     }
 
-    shouldAcceptMutationOp(op: MutationOp) {
+    isAcceptedMutationOpClass(op: MutationOp): boolean {
         return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0 && op.getTargetObject().equals(this);
+    }
+
+    // Override if necessary
+    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
+        opReferences;
+        return this.isAcceptedMutationOpClass(op);
     }
 
     createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {

@@ -267,9 +267,7 @@ class Store {
                 }
 
             }
-
-
-
+            
             if (object instanceof InvalidateAfterOp || object instanceof CascadedInvalidateOp) {
                 const consequences = await this.loadAllConsequences(object.getTargetOp().hash());
                 
@@ -412,17 +410,19 @@ class Store {
                 if (!ctxObj.hasStore()) {
                     ctxObj.setStore(this);
                 }
-            }
 
-            if (obj instanceof Identity) {
-                const id = obj as Identity;
-                if (!id.hasKeyPair()) {
-                    let kp = await this.load(id.getKeyPairHash());
-                    if (kp !== undefined && kp instanceof RSAKeyPair) {
-                        id.addKeyPair(kp);
+                if (ctxObj instanceof Identity) {
+                    const id = ctxObj as Identity;
+                    if (!id.hasKeyPair()) {
+                        let kp = await this.load(id.getKeyPairHash());
+                        if (kp !== undefined && kp instanceof RSAKeyPair) {
+                            id.addKeyPair(kp);
+                        }
                     }
                 }
             }
+
+            
         }
 
         return obj;
@@ -708,7 +708,7 @@ class Store {
         while (results.objects.length > 0) {
 
             for (const obj of results.objects) {
-                if (obj instanceof InvalidateAfterOp || obj instanceof CascadedInvalidateOp) {
+                if (obj instanceof MutationOp) {
                     consequences.push(obj);
                 }
             }
