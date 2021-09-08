@@ -725,6 +725,10 @@ class Store {
 
         return consequences;
     }
+
+    close() {
+        this.backend.close();
+    }
     
 }
 

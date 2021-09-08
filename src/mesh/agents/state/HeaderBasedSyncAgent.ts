@@ -44,6 +44,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     synchronizer : HistorySynchronizer;
     provider     : HistoryProvider;
 
+    terminated = false;
+
     controlLog: Logger;
     messageLog: Logger;
 
@@ -92,6 +94,9 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }
 
     shutdown(): void {
+
+        this.terminated = true;
+        this.synchronizer.shutdown();
         
     }
 
@@ -102,6 +107,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     async receiveRemoteState(sender: string, stateHash: string, state: HashedObject): Promise<boolean> {
         
+        if (this.terminated) return false;
+
         let isNew = false;
 
         if (state instanceof HeaderBasedState && state.mutableObj === this.mutableObj) {
@@ -139,6 +146,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     receivePeerMessage(source: Endpoint, sender: Hash, recipient: Hash, content: any): void {
 
+        if (this.terminated) return;
+
         sender; recipient;
         
         const msg: SyncMsg = content as SyncMsg;
@@ -173,6 +182,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }
 
     async opCallback(opHash: Hash): Promise<void> {
+
+        if (this.terminated) return;
 
         this.controlLog.trace('Op ' + opHash + ' found for object ' + this.mutableObj + ' in peer ' + this.peerGroupAgent.getLocalPeer().endpoint);
 

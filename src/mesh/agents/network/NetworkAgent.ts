@@ -188,8 +188,10 @@ class NetworkAgent implements Agent {
                     }
                 }
             } catch (e) {
-                this.messageLogger.warning(() => 'Endpoint ' + this.connectionInfo.get(conn.getConnectionId())?.localEndpoint + ' could not process received message from ' + this.connectionInfo.get(conn.getConnectionId())?.remoteEndpoint + ', error is:\n', e);
-                this.messageLogger.trace('full message content follows:', data);
+                if (!this.testingMode) {
+                    this.messageLogger.warning(() => 'Endpoint ' + this.connectionInfo.get(conn.getConnectionId())?.localEndpoint + ' could not process received message from ' + this.connectionInfo.get(conn.getConnectionId())?.remoteEndpoint + ', error is:\n', e);
+                    this.messageLogger.trace('full message content follows:', data);    
+                }
             }
         };
 
@@ -718,13 +720,13 @@ class NetworkAgent implements Agent {
         if (this.testingMode) {
             const dice = Math.random();
 
-            if (dice < 0.05) {
+            if (dice < 0.01) {
                 // drop
-            } else if (dice < 0.10) {
+            } else if (dice < 0.02) {
                 // delay
-                const delay = Math.random() * 15000;
+                const delay = Math.random() * 5000;
                 new Promise(r => setTimeout(r, delay)).then(() => { conn.send(JSON.stringify(message)); })
-            } else if (dice < 0.15) {
+            } else if (dice < 0.03) {
                 // truncate
                 conn.send(JSON.stringify(message).substring(0, 100));
             } else {

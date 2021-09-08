@@ -8,76 +8,134 @@ import { describeProxy } from 'config';
 import { HistoryFragment } from 'data/history/HistoryFragment';
 import { OpHeader } from 'data/history/OpHeader';
 
+import { SQLiteBackend } from '@hyper-hyper-space/sqlite';
+
 
 describeProxy('[STR] Storage', () => {
     test('[STR01] Indexeddb-based load / store cycle', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testLoadStoreCycle(store);
+        store.close();
     });
 
     test('[STR02] Memory-based load / store cycle', async() => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testLoadStoreCycle(store);
+        store.close();
     });
 
-    test('[STR03] Indexeddb-based reference-based load hit', async () => {
+    test('[STR03] SQLite-based load / store cycle', async() => {
+        let store = new Store(new SQLiteBackend(':memory:'));
+        await testLoadStoreCycle(store);
+        store.close();
+    });
+
+    test('[STR04] Indexeddb-based reference-based load hit', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testReferenceBasedLoadHit(store);
+        store.close();
     });
 
-    test('[STR04] Memory-based reference-based load hit', async () => {
+    test('[STR05] Memory-based reference-based load hit', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testReferenceBasedLoadHit(store);
+        store.close();
     });
 
-    test('[STR05] Indexeddb-based reference-based load miss', async () => {
+    test('[STR06] SQLite-based reference-based load hit', async () => {
+        let store = new Store(new SQLiteBackend(':memory:'));
+        await testReferenceBasedLoadHit(store);
+        store.close();
+    });
+
+    test('[STR07] Indexeddb-based reference-based load miss', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testReferenceBasedLoadMiss(store);
+        store.close();
     });
 
-    test('[STR06] Memory-based reference-based load miss', async () => {
+    test('[STR08] Memory-based reference-based load miss', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testReferenceBasedLoadMiss(store);
+        store.close();
+    });
+
+    test('[STR09] SQLite-based reference-based load miss', async () => {
+        let store = new Store(new SQLiteBackend(':memory:'));
+        await testReferenceBasedLoadMiss(store);
+        store.close();
     });
     
     test('[STR07] Indexeddb-based mutation op saving and loading', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testMutationOps(store);
+        store.close();
     });
 
     test('[STR08] Memory-based mutation op saving and loading', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testMutationOps(store);
+        store.close();
+    });
+
+    test('[STR09] SQLite-based mutation op saving and loading', async () => {
+        let store = new Store(new SQLiteBackend(':memory:'));
+        await testMutationOps(store);
+        store.close();
     });
 
     test('[STR10] Indexeddb-based mutation op saving and auto-loading', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testMutationOpAutoLoad(store);
+        store.close();
     });
 
     test('[STR11] Memory-based mutation op saving and auto-loading', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testMutationOpAutoLoad(store);
+        store.close();
     });
 
-    test('[STR12] Indexeddb-based mutation op automatic prevOp generation', async () => {
+    test('[STR12] SQLite-based mutation op saving and auto-loading', async () => {
+        let store = new Store(new SQLiteBackend(':memory:'));
+        await testMutationOpAutoLoad(store);
+        store.close();
+    });
+
+    test('[STR13] Indexeddb-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testPrevOpGeneration(store);
+        store.close();
     });
 
-    test('[STR13] Memory-based mutation op automatic prevOp generation', async () => {
+    test('[STR14] Memory-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testPrevOpGeneration(store);
+        store.close();
     });
 
-    test('[STR14] Validate history retrieved from IDB store', async () => {
+    test('[STR15] SQLite-based mutation op automatic prevOp generation', async () => {
+        let store = new Store(new SQLiteBackend(':memory:'));
+        await testPrevOpGeneration(store);
+        store.close();
+    });
+
+    test('[STR16] Validate history retrieved from IDB store', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
         await testHistoryGeneration(store);
+        store.close();
     });
 
-    test('[STR15] Validate history retrieved from memory store', async () => {
+    test('[STR17] Validate history retrieved from memory store', async () => {
         let store = new Store(new MemoryBackend('test-storage-backend'));
         await testHistoryGeneration(store);
+        store.close();
+    });
+
+    test('[STR18] Validate history retrieved from SQLite store', async () => {
+        let store = new Store(new SQLiteBackend(':memory:'));
+        await testHistoryGeneration(store);
+        store.close();
     });
 
 });

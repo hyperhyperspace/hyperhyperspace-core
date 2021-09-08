@@ -194,9 +194,15 @@ class HistoryProvider {
 
 
 
-    //TODO
+    
     onReceivingRequestCancellation(remote: Endpoint, msg: CancelRequestMsg) {
-        remote; msg;
+
+        const cancelledResp = this.responses.get(msg.requestId);
+
+        if (cancelledResp !== undefined && cancelledResp.remote === remote) {
+            this.removeResponse(cancelledResp);
+            HistoryProvider.controlLog.debug('Received request cancellation for ' + msg.requestId);
+        }
     }
 
     private async createResponse(respInfo: ResponseInfo): Promise<boolean> {

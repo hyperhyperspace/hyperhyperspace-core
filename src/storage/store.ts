@@ -1,1 +1,1 @@
-export { Store, LoadResults } from './store/Store';
+export { Store, LoadResults, StoredOpHeader } from './store/Store';

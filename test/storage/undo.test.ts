@@ -8,6 +8,7 @@ import { TestPeerGroupPods } from 'mesh/mock/TestPeerGroupPods';
 import { Resources } from 'spaces/Resources';
 import { IdbBackend, MemoryBackend } from 'storage/backends';
 import { Store } from 'storage/store';
+import { SQLiteBackend } from '../../../sqlite/dist';
 
 describeProxy('[UND] Undo support', () => {
     test( '[UND01] Basic undo w/ IndexedDB backend', async (done) => {
@@ -15,6 +16,8 @@ describeProxy('[UND] Undo support', () => {
         let store = new Store(new IdbBackend('test-basic-undo'));
         
         await testBasicUndoCycle(store);
+
+        store.close();
 
         done();
     }, 30000);
@@ -25,25 +28,46 @@ describeProxy('[UND] Undo support', () => {
         
         await testBasicUndoCycle(store);
 
+        store.close();
+
         done();
     }, 30000);
 
-    test( '[UND03] Basic undo w/ IndexedDB backend over sync', async (done) => {
+    test( '[UND03] Basic undo w/ SQLite backend', async (done) => {
+
+        let store = new Store(new SQLiteBackend(':memory:'));
+        
+        await testBasicUndoCycle(store);
+
+        store.close();
+
+        done();
+    }, 30000);
+
+    test( '[UND04] Basic undo w/ IndexedDB backend over sync', async (done) => {
 
         let stores = [new Store(new IdbBackend('test-basic-undo-over-sync-1')),
                       new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
         
         await testBasicUndoCycleWithSync(stores);
 
+        for (const store of stores) {
+            store.close();
+        }
+
         done();
     }, 50000);
 
-    test( '[UND04] Basic undo w/ memory backend over sync', async (done) => {
+    test( '[UND05] Basic undo w/ memory backend over sync', async (done) => {
 
         let stores = [new Store(new MemoryBackend('test-basic-undo-over-sync-1')),
                       new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
         
         await testBasicUndoCycleWithSync(stores);
+
+        for (const store of stores) {
+            store.close();
+        }
 
         done();
     }, 50000);

@@ -15,10 +15,6 @@ type IdbStorageFormat = {
     indexes   : any,
     timestamp : string,
     sequence  : number,
-
-    opHeight?     : number,
-    prevOpCount? : number,
-    causalHistoryHash?: Hash
 }
 
 type IdbTerminalOpsFormat = {
@@ -116,7 +112,7 @@ class IdbBackend implements Backend {
         return this.name;
     }
 
-    async store(literal: Literal, history?: StoredOpHeader): Promise<void> {
+    async store(literal: Literal, opHeader?: StoredOpHeader): Promise<void> {
 
         let idb = await this.idbPromise;
 
@@ -158,11 +154,11 @@ class IdbBackend implements Backend {
 
         if (isOp) {
 
-            if (history === undefined) {
+            if (opHeader === undefined) {
                 throw new Error('Missing causal history received by backend while trying to store op ' + literal.hash);
             }
 
-            await tx.objectStore(IdbBackend.OP_HEADERS_STORE).put(history);
+            await tx.objectStore(IdbBackend.OP_HEADERS_STORE).put(opHeader);
             
             const mutableHash = LiteralUtils.getFields(storable.literal)['targetObject']['_hash'];
 
@@ -244,10 +240,10 @@ class IdbBackend implements Backend {
         return await (idb.get(IdbBackend.OP_HEADERS_STORE, opHash) as Promise<StoredOpHeader|undefined>);
     }
 
-    async loadOpHeaderByHeaderHash(causalHistoryHash: Hash) : Promise<StoredOpHeader | undefined> {
+    async loadOpHeaderByHeaderHash(headerHash: Hash) : Promise<StoredOpHeader | undefined> {
         let idb = await this.idbPromise;
 
-        const stored = await idb.transaction([IdbBackend.OP_HEADERS_STORE], 'readonly').objectStore(IdbBackend.OP_HEADERS_STORE).index(IdbBackend.OP_HEADER_HASH_IDX_KEY + '_idx').get(causalHistoryHash);
+        const stored = await idb.transaction([IdbBackend.OP_HEADERS_STORE], 'readonly').objectStore(IdbBackend.OP_HEADERS_STORE).index(IdbBackend.OP_HEADER_HASH_IDX_KEY + '_idx').get(headerHash);
 
         if (stored) {
             return stored;
@@ -263,6 +259,7 @@ class IdbBackend implements Backend {
 
     close() {
         IdbBackend.deregister(this);
+        //this.idbPromise.then((idb: IDBPDatabase) => { idb.close(); IdbBackend.deregister(this);});
     }
 
     private async searchByIndex(index: string, value: string, params?: BackendSearchParams) : Promise<BackendSearchResults> {

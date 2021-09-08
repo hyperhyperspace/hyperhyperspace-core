@@ -18,8 +18,10 @@ import { RequestMsg, ResponseMsg, CancelRequestMsg } from './HistoryProvider';
 const MaxRequestsPerRemote = 2;
 const MaxPendingOps = 1024;
 
-const RequestTimeout = 25;
-const LiteralArrivalTimeout = 10;
+const RequestTimeout = 16;
+const LiteralArrivalTimeout = 8;
+
+const MaxSavedCancelledRequests = 64;
 
 type RequestInfo = {
 
@@ -33,7 +35,7 @@ type RequestInfo = {
     responseArrivalTimestamp? : number,
 
     receivedHistory?          : HistoryFragment,
-    receivedOps?              : HistoryFragment,
+    //receivedOps?              : HistoryFragment,
 
     lastLiteralTimestamp?     : number,
     receivedLiteralsCount     : number,
@@ -55,6 +57,7 @@ class HistorySynchronizer {
     static stateLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
     static opXferLog  = new Logger(HistorySynchronizer.name, LogLevel.INFO);
     static storeLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static requestLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
 
     syncAgent: HeaderBasedSyncAgent;
 
@@ -75,12 +78,16 @@ class HistorySynchronizer {
 
     activeRequests       : MultiMap<Endpoint, RequestId>;
     
-    requestsBlockedByOpHistory : MultiMap<Hash, RequestId>;
+    requestsBlockedByOpHeader : MultiMap<Hash, RequestId>;
     
     newRequestsLock: Lock;
     needToRetryNewRequests: boolean;
 
     checkRequestTimeoutsInterval?: any;
+
+    lastCancelledRequests: Array<RequestId>;
+
+    terminated = false;
 
     readonly logPrefix: Hash;
     controlLog : Logger;
@@ -88,6 +95,7 @@ class HistorySynchronizer {
     stateLog   : Logger;
     opXferLog  : Logger;
     storeLog   : Logger;
+    requestLog : Logger;
 
     constructor(syncAgent: HeaderBasedSyncAgent) {
 
@@ -106,12 +114,14 @@ class HistorySynchronizer {
         this.requestsForOp        = new MultiMap();
 
         this.activeRequests      = new MultiMap();
-        this.requestsBlockedByOpHistory = new MultiMap();
+        this.requestsBlockedByOpHeader = new MultiMap();
 
         this.newRequestsLock = new Lock();
         this.needToRetryNewRequests = false;
 
         this.checkRequestTimeouts = this.checkRequestTimeouts.bind(this);
+
+        this.lastCancelledRequests = [];
 
         this.logPrefix = 'On peer ' + this.syncAgent.peerGroupAgent.localPeer.identity?.hash() as Hash + ':';
 
@@ -120,6 +130,7 @@ class HistorySynchronizer {
         this.stateLog   = HistorySynchronizer.stateLog;
         this.opXferLog  = HistorySynchronizer.opXferLog;
         this.storeLog   = HistorySynchronizer.storeLog;
+        this.requestLog = HistorySynchronizer.requestLog;
     }
 
     async onNewHistory(remote: Endpoint, receivedOpHistories: Set<OpHeader>) {
@@ -203,7 +214,8 @@ class HistorySynchronizer {
             debugInfo = debugInfo + '\nPending op histories:      [' + Array.from(this.requestsForOpHistory.keys()) + ']';
             debugInfo = debugInfo + '\nPending ops:               [' + Array.from(this.requestsForOp.keys()) + ']';
             debugInfo = debugInfo + '\nLocal state:               [' + Array.from(this.localState.contents.keys()) + ']';
-            
+            debugInfo = debugInfo + '\nRequests:                  [' + Array.from(this.requests.keys()).map((k: RequestId) => k + '(' + this.requests.get(k)?.status + ')') + ']';
+
             if (this.stateLog.level <= LogLevel.TRACE) {
                 debugInfo = debugInfo + '\n\nDiscovered states by remote:';
                 for (const [remote, history] of this.remoteStates.entries()) {
@@ -221,7 +233,7 @@ class HistorySynchronizer {
         const missingOpHistorySources = new MultiMap<Endpoint, Hash>();
         const missingOpHistories = new Set<Hash>();
 
-        // By capturing unknown histories at the edge of the discovered history fragment
+        // By capturing unknown op headers at the edge of the discovered history fragment
 
         const opHistoryFromPrevOps = Array.from(this.discoveredHistory.missingPrevOpHeaders);
         for (const hash of opHistoryFromPrevOps) {
@@ -264,8 +276,6 @@ class HistorySynchronizer {
             }
         }
 
-        
-
         const sortedOpHistorySources = Array.from(missingOpHistorySources.entries());
 
         sortedOpHistorySources.sort((s1:[Endpoint, Set<Hash>], s2:[Endpoint, Set<Hash>]) => s2[1].size - s1[1].size);
@@ -306,6 +316,8 @@ class HistorySynchronizer {
         }
 
         const startingOpHistories = this.computeStartingOpHistories();
+
+        let didSend = false;
 
         for (const [remote, opHistories] of opHistoriesToRequest) {
 
@@ -361,6 +373,7 @@ class HistorySynchronizer {
             const sent = this.request(remote, aim, current);
 
             if (sent/* && ops.length > 0*/ && this.requestedOps.contents.size < MaxPendingOps) {
+                didSend = true;
                 
                 // try to saturate the link: if there is room, make another request
                 if (this.canSendNewRequestTo(remote) ) {
@@ -377,6 +390,20 @@ class HistorySynchronizer {
                         this.request(remote, aim, current);
                     }
                 }
+            }
+        }
+
+        if (!didSend) {
+            let blocked = false;
+            for (const req of this.requests.values()) {
+                if (req.status === 'accepted-response-blocked') {
+                    blocked = true;
+                    break;
+                }
+            }
+
+            if (blocked) {
+                // FIXME: do we want to log this?
             }
         }
 
@@ -474,9 +501,13 @@ class HistorySynchronizer {
                     }
             }
 
-            const ops = remoteHistory.causalClosure(startingOps, max, undefined, (h: Hash) => !this.requestsForOp.hasKey((remoteHistory.contents.get(h) as OpHeader).opHash))
-                                .map( (opHistoryHash: Hash) => 
-                    (remoteHistory.contents.get(opHistoryHash) as OpHeader).opHash );
+            const opHeaders = remoteHistory.causalClosure(startingOps, max, undefined, (h: Hash) => !this.requestsForOp.hasKey((remoteHistory.contents.get(h) as OpHeader).opHash))
+            const ops = opHeaders.map( (opHeaderHash: Hash) => 
+                                       (remoteHistory.contents.get(opHeaderHash) as OpHeader).opHash);
+
+            this.controlLog.debug('starting ops: ' + Array.from(startingOps));
+            this.controlLog.debug('all remote ops: ' + Array.from(remoteHistory.contents.keys()));
+            this.controlLog.debug('to request: ' + opHeaders);
 
 
             return ops;
@@ -588,7 +619,10 @@ class HistorySynchronizer {
 
         if (req === undefined) {
             //TODO make this a debug message instead of a warning
-            this.controlLog.warning('\n'+this.logPrefix+'\nIgnoring response for unknown request ' + msg.requestId);
+            if (this.lastCancelledRequests.indexOf(msg.requestId) < 0) {
+                this.controlLog.warning('\n'+this.logPrefix+'\nIgnoring response for unknown request ' + msg.requestId);
+            }
+            
             return
         }
 
@@ -626,8 +660,8 @@ class HistorySynchronizer {
             if (req.currentState !== undefined) {
                 for (const opHistory of req.currentState.values()) {
                     if (await this.opHistoryIsMissingFromStore(opHistory)) {
-                        this.requestsBlockedByOpHistory.add(opHistory, req.requestId);
-                        this.controlLog.debug('\n'+this.logPrefix+'\nResuest ' + req.requestId + ' is blocked by missing op w/history ' + opHistory)
+                        this.requestsBlockedByOpHeader.add(opHistory, req.requestId);
+                        this.controlLog.debug('\n'+this.logPrefix+'\nRequest ' + req.requestId + ' is blocked by missing op w/history ' + opHistory)
                     } else {
                         reqInfo.missingCurrentState.delete(opHistory);
                     }
@@ -636,6 +670,9 @@ class HistorySynchronizer {
 
             await this.attemptToProcessResponse(reqInfo);
             
+            this.requestLog.debug('Received resp for ' + req.requestId);
+        } else {
+            this.requestLog.debug('Received INVALID resp for ' + msg.requestId);
         }
 
 
@@ -648,7 +685,11 @@ class HistorySynchronizer {
         if (reqInfo === undefined || reqInfo.remote !== remote) {
 
             if (reqInfo === undefined) {
-                this.opXferLog.warning('\n'+this.logPrefix+'\nReceived literal for unknown request ' + msg.requestId);
+                if (this.lastCancelledRequests.indexOf(msg.requestId) < 0) {
+                    this.opXferLog.warning('\n'+this.logPrefix+'\nReceived literal for unknown request ' + msg.requestId);
+                } else {
+                    this.opXferLog.debug('\n'+this.logPrefix+'\nReceived literal for cancelled request ' + msg.requestId);
+                }
             } else if (reqInfo.remote !== remote) {
                 this.opXferLog.warning('\n'+this.logPrefix+'\nReceived literal claiming to come from ' + reqInfo.remote + ', but it actually came from ' + msg.requestId);
             }
@@ -708,6 +749,7 @@ class HistorySynchronizer {
 
     // We're not rejecting anything for now, will implement when the retry logic is done.
     onReceivingRequestRejection(remote: Endpoint, msg: RejectRequestMsg) {
+
         remote; msg;
     }
 
@@ -730,6 +772,7 @@ class HistorySynchronizer {
         if (await this.validateOmissionProofs(reqInfo)) {
             const req = reqInfo.request;
             const resp = reqInfo.response as ResponseMsg;
+            reqInfo.responseArrivalTimestamp = Date.now();
 
             // Update the expected op history arrivals
 
@@ -858,7 +901,6 @@ class HistorySynchronizer {
     }
 
     private async processLiteral(reqInfo: RequestInfo, literal: Literal): Promise<boolean> {
-        
 
         // FIXME: but what about custom hashes?
         if (!LiteralUtils.validateHash(literal)) {
@@ -911,47 +953,47 @@ class HistorySynchronizer {
         return true;
     }
 
-    private markOpAsFetched(opCausalHistory: OpHeader) {
+    private markOpAsFetched(opHeader: OpHeader) {
 
-        this.opXferLog.debug('\n'+this.logPrefix+'\nMarking op ' + opCausalHistory.opHash + ' as fetched (op history is ' + opCausalHistory.headerHash + ').')
+        this.opXferLog.debug('\n'+this.logPrefix+'\nMarking op ' + opHeader.opHash + ' as fetched (op history is ' + opHeader.headerHash + ').')
 
-        const opHistoryHash = opCausalHistory.headerHash;
-        const opHash        = opCausalHistory.opHash;
+        const opHeaderHash = opHeader.headerHash;
+        const opHash        = opHeader.opHash;
 
 
 
         for (const state of this.remoteStates.values()) {
-            state.remove(opHistoryHash);
+            state.remove(opHeaderHash);
         }
 
-        this.requestedOps.remove(opHistoryHash);
+        this.requestedOps.remove(opHeaderHash);
         this.requestsForOp.deleteKey(opHash);
 
         for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
             this.requestedOps.remove(opHistory.headerHash);
         }
 
-        this.discoveredHistory.remove(opHistoryHash);
+        this.discoveredHistory.remove(opHeaderHash);
 
         // in case we were trying to fetch history for this op
-        this.markOpHistoryAsFetched(opHistoryHash);
+        this.markOpHeaderAsFetched(opHeaderHash);
 
-        for (const requestId of this.requestsBlockedByOpHistory.get(opHistoryHash)) {
+        for (const requestId of this.requestsBlockedByOpHeader.get(opHeaderHash)) {
             const reqInfo = this.requests.get(requestId);
 
             if (reqInfo !== undefined) {
                 this.opXferLog.debug('\n'+this.logPrefix+'\nAttempting to process blocked request ' + requestId);
-                reqInfo.missingCurrentState?.delete(opHistoryHash);
+                reqInfo.missingCurrentState?.delete(opHeaderHash);
                 this.attemptToProcessResponse(reqInfo);
             } else {
                 this.opXferLog.debug('\n'+this.logPrefix+'\nNot attempting to process blocked request ' + requestId + ': it is no longer there.');
             }
         }
 
-        this.requestsBlockedByOpHistory.deleteKey(opHistoryHash);
+        this.requestsBlockedByOpHeader.deleteKey(opHeaderHash);
     }
 
-    private markOpHistoryAsFetched(opHistoryHash: Hash) {
+    private markOpHeaderAsFetched(opHistoryHash: Hash) {
         this.requestsForOpHistory.deleteKey(opHistoryHash);
     }
 
@@ -968,76 +1010,18 @@ class HistorySynchronizer {
 
         const requestedFragmentForRemote = new HistoryFragment(remoteHistory.mutableObj);
 
-        for (const opHistory of this.localState.contents.values()) {
-            requestedFragmentForRemote.add(opHistory);
+        for (const opHeader of this.localState.contents.values()) {
+            requestedFragmentForRemote.add(opHeader);
         }
 
-        for (const opHistory of this.requestedOps.contents.values()) {
-            if (remoteHistory.contents.has(opHistory.headerHash)) {
-                requestedFragmentForRemote.add(opHistory);
+        for (const opHeader of this.requestedOps.contents.values()) {
+            if (remoteHistory.contents.has(opHeader.headerHash)) {
+                requestedFragmentForRemote.add(opHeader);
             }
         }
 
         return new Set<Hash>(requestedFragmentForRemote.terminalOpHeaders);
-
-
-        /*if (remoteHistory === undefined) {
-            const currentState = new Set(this.localState.contents.keys());
-            
-            const connectedRequestedOps = new CausalHistoryFragment(this.requestedOps.mutableObj);
-
-            for (const hash of this.requestedOps.causalClosure(currentState)) {
-                const opHistory = this.requestedOps.contents.get(hash) as OpCausalHistory;
-                connectedRequestedOps.add(opHistory);
-            }
-    
-            const startingOps = this.terminalOpHistoriesPlusCurrentState(connectedRequestedOps);
-
-            return startingOps;
-
-        } else {
-            
-            /
-            const unrequested = remoteHistory.clone();
-
-            for (const opHistory of this.requestedOps.contents.keys()) {
-                unrequested.remove(opHistory);
-            }
-
-            const startingOps = new Set<Hash>(this.currentState.contents.keys());
-
-            for (const missing of unrequested.missingPrevOpHistories) {
-                startingOps.add(missing);
-            }
-            /
-            
-
-
-            const startingOps = new Set<Hash>(this.localState.contents.keys());
-
-            for (const terminalOp of this.requestedOps.getTerminalOps()) {
-                startingOps.add(terminalOp);
-            }
-            
-
-            return startingOps;
-            
-        }
-
-        */
     }
-
-    /*private terminalOpHistoriesPlusCurrentState(fragment: CausalHistoryFragment) {
-        const startingOpHistories = new Set<Hash>(fragment.terminalOpHistories);
-
-        for (const opHistory of this.localState.contents.keys()) {
-            if (!fragment.missingPrevOpHistories.has(opHistory)) {
-                startingOpHistories.add(opHistory);
-            }
-        }
-
-        return startingOpHistories;
-    }*/
 
     private opHistoryIsUndiscovered(opHistory: Hash): boolean {
         return !this.discoveredHistory.contents.has(opHistory);
@@ -1325,12 +1309,30 @@ class HistorySynchronizer {
             }
         }
         
-        return this.syncAgent.sendMessageToPeer(reqInfo.remote, this.syncAgent.getAgentId(), reqInfo.request);
+        
+
+        let sent = this.syncAgent.sendMessageToPeer(reqInfo.remote, this.syncAgent.getAgentId(), reqInfo.request);
+
+        if (sent) {
+            this.requestLog.debug('Sent req ' + reqInfo.request.requestId + ' (' + reqInfo.request.requestedOps?.length + ' ops) to ' + reqInfo.remote);
+        } else {
+            this.requestLog.debug('Sent FAILURE for req ' + reqInfo.request.requestId + ' (' + reqInfo.request.requestedOps?.length + ' ops)');
+        }
+
+        return sent;
     }
 
     private cancelRequest(reqInfo: RequestInfo, reason: 'invalid-response'|'invalid-literal'|'out-of-order-literal'|'invalid-omitted-objs'|'slow-connection'|'other', detail: string) {
 
-        HeaderBasedSyncAgent.controlLog.warning('\n'+this.logPrefix+'\n'+detail);
+        if (this.lastCancelledRequests.indexOf(reqInfo.request.requestId) < 0) {
+            if (this.lastCancelledRequests.length >= MaxSavedCancelledRequests) {
+                this.lastCancelledRequests.shift();
+            }
+
+            this.lastCancelledRequests.push(reqInfo.request.requestId);
+        }
+
+        HeaderBasedSyncAgent.controlLog.debug('\n'+this.logPrefix+'\n'+detail);
 
         this.cleanupRequest(reqInfo);
 
@@ -1340,6 +1342,8 @@ class HistorySynchronizer {
             reason: reason,
             detail: detail
         }
+        
+        this.requestLog.debug('Cancelling request ' + reqInfo.request.requestId);
 
         this.syncAgent.sendMessageToPeer(reqInfo.remote, this.syncAgent.getAgentId(), msg);
     }
@@ -1352,7 +1356,6 @@ class HistorySynchronizer {
             // Remove due to timeout waiting for response.
 
             this.cancelRequest(reqInfo, 'slow-connection', 'Timeout waiting for response');
-            this.cleanupRequest(reqInfo);
             return true;
 
         } else if (reqInfo.response !== undefined) {
@@ -1388,7 +1391,6 @@ class HistorySynchronizer {
 
                 if (reqInfo.receivedLiteralsCount < reqInfo.response.literalCount && lastLiteralRequestTimestamp !== undefined && Date.now() > lastLiteralRequestTimestamp + LiteralArrivalTimeout * 1000) {
                     this.cancelRequest(reqInfo, 'slow-connection', 'Timeout waiting for a literal to arrive');
-                    this.cleanupRequest(reqInfo);
                     return true;
                 }
 
@@ -1409,27 +1411,13 @@ class HistorySynchronizer {
 
         if (reqInfo.request.currentState !== undefined) {
             for (const hash of reqInfo.request.currentState.values()) {
-                this.requestsBlockedByOpHistory.delete(hash, requestId);
+                this.requestsBlockedByOpHeader.delete(hash, requestId);
             }
         }
 
-        if (reqInfo.response?.sendingOps !== undefined) {
+        if (reqInfo.request.requestedOps !== undefined) {
 
-            // If the request has a response, then requestsForOp has been
-            // updated to expect what the response.sendingOps sepecifies
-
-            for (const opHash of reqInfo.response?.sendingOps) {
-                this.requestsForOp.delete(opHash, requestId);
-
-                if (this.requestsForOp.get(opHash).size === 0) {
-                    for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
-                        this.requestedOps.remove(opHistory.headerHash);
-                    }
-                }
-            }
-        } else if (reqInfo.request.requestedOps !== undefined) {
-
-            // Otherwise, remove according to request.requestedOps
+            // Remove the op requests
 
             for (const opHash of reqInfo.request?.requestedOps) {
                 this.requestsForOp.delete(opHash, requestId);
@@ -1442,6 +1430,23 @@ class HistorySynchronizer {
             }
         }
 
+        if (reqInfo.response?.sendingOps !== undefined) {
+
+            // If the request has a response, then requestsForOp may have been
+            // updated to expect what the response.sendingOps sepecifies, so remove
+            // thes op requests
+
+            for (const opHash of reqInfo.response?.sendingOps) {
+                this.requestsForOp.delete(opHash, requestId);
+
+                if (this.requestsForOp.get(opHash).size === 0) {
+                    for (const opHistory of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
+                        this.requestedOps.remove(opHistory.headerHash);
+                    }
+                }
+            }
+        }
+        
         // remove pending opHistories
 
         if (reqInfo.request.requestedTerminalOpHistory !== undefined) {
@@ -1461,10 +1466,58 @@ class HistorySynchronizer {
         // see if we can shut down the timer checking for timeouts
         this.checkRequestTimeoutsTimer();
 
+        this.requestLog.debug('Cleaned up request ' + reqInfo.request.requestId);
+
     }
 
     private async logStoreContents() {
         this.storeLog.debug('\n'+this.logPrefix+'\nStored state before request\n' + await this.syncAgent.lastStoredOpsDescription())            
+    }
+
+    selfDiagnostic(): string {
+
+        let diag = '\ncurrent requests:\n';
+
+        for (const [reqId, reqInfo] of this.requests.entries()) {
+
+            diag = diag + '\n[' + reqId + '] to peer ' + reqInfo.remote + '\n';
+            diag = diag + '\n    status:  ' + reqInfo.status;
+            if (reqInfo.requestSendingTimestamp !== undefined) {
+                diag = diag + '\n    sent:    ' + ((Date.now() - reqInfo.requestSendingTimestamp)/1000) + ' seconds ago';
+            }
+            if (reqInfo.responseArrivalTimestamp !== undefined) {
+                diag = diag + '\n    replied: ' + ((Date.now() - reqInfo.responseArrivalTimestamp)/1000) + ' seconds ago';
+            }
+            diag = diag + '\n    req op history terminals: ' + reqInfo.request.requestedTerminalOpHistory
+            diag = diag + '\n    requested ops: ' + reqInfo.request.requestedOps;
+            diag = diag + '\n    response ops manifest: ' + reqInfo.response?.sendingOps;
+            diag = diag + '\n    expected literals:' + reqInfo.response?.literalCount;
+            diag = diag + '\n    received literal count: ' + reqInfo.receivedLiteralsCount;
+
+            const blockedBy = new Array<string>();
+
+            for (const [opHeaderHash, reqIds] of this.requestsBlockedByOpHeader.entries()) {
+                if (reqIds.has(reqId)) {
+                    blockedBy.push(this.discoveredHistory.contents.get(opHeaderHash)?.opHash || 'missing from disc');
+                }
+            }
+
+            if (blockedBy.length > 0) {
+                diag = diag + '\n    blocked by ops: ' + blockedBy;
+            }
+            diag = diag + '\n';
+        }
+
+        return diag;
+
+    }
+
+    shutdown() {
+        this.terminated = true;
+        if (this.checkRequestTimeoutsInterval !== undefined) {
+            clearInterval(this.checkRequestTimeoutsInterval);
+            this.checkRequestTimeoutsInterval = undefined;
+        }
     }
 
 }
