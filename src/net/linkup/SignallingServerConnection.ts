@@ -229,7 +229,7 @@ class SignallingServerConnection implements LinkupServer {
                 SignallingServerConnection.logger.debug('creating websocket to server ' + this.serverURL);
                 try {
                     this.ws = new WebSocket(SignallingServerConnection.getRealServerURL(this.serverURL));
-                } catch (e) {
+                } catch (e: any) {
                     this.ws = null;
                     SignallingServerConnection.logger.warning('Unexpected error while creating websocket to signalling server ' + this.serverURL);
                     SignallingServerConnection.logger.error(e);
@@ -246,7 +246,7 @@ class SignallingServerConnection implements LinkupServer {
                             if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
                                 try {
                                     ws.send(JSON.stringify({'action' : 'pong'}));
-                                } catch (e) {
+                                } catch (e: any) {
                                     SignallingServerConnection.logger.warning('Error while sending pong to ' + this.serverURL, e);
                                 }
                             } else {
@@ -359,7 +359,7 @@ class SignallingServerConnection implements LinkupServer {
             try {
                 SignallingServerConnection.logger.debug('sending listen command through websocket for linkupId ' + linkupId);    
                 this.ws.send(JSON.stringify({'action': 'listen', 'linkupId': linkupId}));
-            } catch (e) {
+            } catch (e: any) {
                 SignallingServerConnection.logger.warning('Error while trying to set up listener for ' + linkupId + ' for linkup server ' + this.serverURL);
                 SignallingServerConnection.logger.error(e);
                 // this.checkWebsocket(); // I'm afraid this may cause a loop
@@ -379,7 +379,7 @@ class SignallingServerConnection implements LinkupServer {
                 SignallingServerConnection.logger.trace(message);
                 try {
                     ws.send(message);
-                } catch (e) {
+                } catch (e: any) {
                     SignallingServerConnection.logger.warning('Could not send message to signalling server ' + this.serverURL + ' - will retry.');
                     SignallingServerConnection.logger.error(e);
                     this.messageQueue.unshift(message);
