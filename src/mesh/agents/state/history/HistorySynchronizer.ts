@@ -933,7 +933,7 @@ class HistorySynchronizer {
                         this.attemptNewRequests();
                     }
 
-                } catch (e) {
+                } catch (e: any) {
                     const detail = 'Error while deliteralizing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                     this.cancelRequest(reqInfo, 'invalid-literal', '\n'+this.logPrefix+'\n'+detail);
                     this.opXferLog.warning(e);

@@ -133,7 +133,7 @@ class Store {
         }
 
         if (expectedClassName !== undefined && literal.value['_class'] !== expectedClassName) {
-            throw new Error('Referenced depency ' + hash + ' was found in the store with type ' + literal.value['_class'] + ' but was declared as being ' + expectedClassName + '.')
+            throw new Error('Referenced dependency ' + hash + ' was found in the store with type ' + literal.value['_class'] + ' but was declared as being ' + expectedClassName + '.')
         }
 
         let missing = new Set<Hash>();
@@ -151,7 +151,7 @@ class Store {
                     missing.add(depHash);
                 } else {
                     if (storedDep.getClassName() !== dependency.className) {
-                        throw new Error('Referenced depency ' + dependency.hash + ' was found in the store with type ' + storedDep.getClassName() + ' but was declared as being ' + dependency.className + ' on path ' + dependency.path + '.');
+                        throw new Error('Referenced dependency ' + dependency.hash + ' was found in the store with type ' + storedDep.getClassName() + ' but was declared as being ' + dependency.className + ' on path ' + dependency.path + '.');
                     }
                 }
             } else {

@@ -1,4 +1,3 @@
-
 import { HashedObject, HashedSet, Hash } from 'data/model';
 import { MutationOp } from 'data/model';
 import { Context, Literal, LiteralContext, Dependency } from 'data/model';
@@ -736,7 +735,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                             //console.log('requesting objects from missing deps: ' + toRequest.map((req: ObjectRequest) => req.hash));
                         }
 
-                    } catch (e) {
+                    } catch (e: any) {
                         TerminalOpsSyncAgent.controlLog.warning(e);
                     }
 

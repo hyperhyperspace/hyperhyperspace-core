@@ -31,7 +31,7 @@ class WebCryptoRSASigKP implements SignatureKeyPair {
 
         this.privateKey = keyPair.privateKey;
 
-        const exportedPrivKey = await WebCryptoConfig.getSubtle().exportKey("pkcs8", keyPair.privateKey);
+        const exportedPrivKey = await WebCryptoConfig.getSubtle().exportKey("pkcs8", keyPair.privateKey as CryptoKey);
 
         this.privateKeyPEM = '-----BEGIN PRIVATE KEY-----\n' +  
                              (btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(exportedPrivKey)))).match(/.{1,64}/g) as string[]).join('\n') +
@@ -39,7 +39,7 @@ class WebCryptoRSASigKP implements SignatureKeyPair {
 
         this.publicKey = keyPair.publicKey;
 
-        const exportedPubKey = await WebCryptoConfig.getSubtle().exportKey("spki", keyPair.publicKey);
+        const exportedPubKey = await WebCryptoConfig.getSubtle().exportKey("spki", keyPair.publicKey as CryptoKey);
 
         this.publicKeyPEM = '-----BEGIN PUBLIC KEY-----\n' +  
                             (btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(exportedPubKey)))).match(/.{1,64}/g) as string[]).join('\n') +

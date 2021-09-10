@@ -467,7 +467,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
     private async receiveStateObject(sender: Endpoint, agentId: AgentId, stateObj: HashedObject, _timestamp: number) {
 
-        if (stateObj.validate(new Map())) {
+        if (await stateObj.validate(new Map())) {
             const state = stateObj.hash();
 
             this.setRemoteState(sender, agentId, state, stateObj)

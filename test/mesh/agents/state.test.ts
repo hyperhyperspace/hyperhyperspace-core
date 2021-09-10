@@ -74,7 +74,7 @@ describeProxy('[SYN] State sync', () => {
 
     }, 300000);
 
-    test('[SYN10] Causal history agent-based set deep sync in small peer group (wrtc)', async (done) => {
+    test('[SYN10] Causal history agent-based set deep sync in small peer group with faulty network (disabled) (wrtc)', async (done) => {
 
         await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined, false);
 
@@ -196,7 +196,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     
     for (let i=0; i<size; i++) {
         const peerNetwork = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
-        const store = new Store(useSQLite? new SQLiteBackend(':memory:') : new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
+        const store = new Store(useSQLite? new SQLiteBackend('test'+i) : new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
         stores.push(store);
         let gossip = new StateGossipAgent(peerNetworkId, peerNetwork);
         
@@ -301,7 +301,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     expect(replicated).toBeTruthy();
 
     for (let i=0; i<size; i++) {
-        stores[i].close();
+        //stores[i].close();
     }
 
     done();

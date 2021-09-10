@@ -253,6 +253,8 @@ abstract class MutableObject extends HashedObject {
                 } finally {
                     this._applyOpsLock.release();
                 }
+            } else {
+                go = false;
             }
 
         }

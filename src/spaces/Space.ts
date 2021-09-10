@@ -80,7 +80,7 @@ class Space {
                 try {
                     suffix = wordCoder.decode(init.wordCode);
                     break;
-                } catch (e) {
+                } catch (e: any) {
                     lastError = e;
                 }
             }
@@ -179,7 +179,7 @@ class Space {
         return this.resources;
     }
 
-    static getWordCodingFor(entryPoint: HashedObject & SpaceEntryPoint, words=3, lang='en') {
+    static getWordCodingFor(entryPoint: HashedObject, words=3, lang='en') {
 
         const hash = entryPoint.hash();
 

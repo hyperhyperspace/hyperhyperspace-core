@@ -735,7 +735,7 @@ class PeerGroupAgent implements Agent {
 
             this.controlLog.trace(() => this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
 
-            if (this.shouldAcceptPeerConnection(peer)) {
+            if (await this.shouldAcceptPeerConnection(peer)) {
                 this.controlLog.debug('Will accept requested connection ' + connId + '!');
                 this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.ReceivingConnection);
                 this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
@@ -781,7 +781,7 @@ class PeerGroupAgent implements Agent {
 
             this.controlLog.trace('Found no previous state');
 
-            if (this.shouldAcceptPeerConnection(peer)) {
+            if (await this.shouldAcceptPeerConnection(peer)) {
 
                 this.controlLog.debug('Will accept offer ' + connId + '!');
                 // Act as if we had just received the connection, process offer below.
