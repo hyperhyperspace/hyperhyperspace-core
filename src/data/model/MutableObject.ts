@@ -254,6 +254,9 @@ abstract class MutableObject extends HashedObject {
                     this._applyOpsLock.release();
                 }
             } else {
+                // If we fail to acquire the lock, then the loop above is already executing.
+                // Since the loop will not exit until there are no more ops to process, we
+                // can safely do nothing.
                 go = false;
             }
 

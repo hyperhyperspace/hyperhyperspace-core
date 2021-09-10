@@ -196,7 +196,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     
     for (let i=0; i<size; i++) {
         const peerNetwork = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
-        const store = new Store(useSQLite? new SQLiteBackend('test'+i) : new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
+        const store = new Store(useSQLite? new SQLiteBackend(':memory:') : new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
         stores.push(store);
         let gossip = new StateGossipAgent(peerNetworkId, peerNetwork);
         

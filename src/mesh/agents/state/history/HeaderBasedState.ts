@@ -6,7 +6,7 @@ import { Store } from 'storage/store';
 
 class HeaderBasedState extends HashedObject {
 
-    static className = 'hhs/v0/CausalHistoryState';
+    static className = 'hhs/v0/HeaderBasedState';
 
     mutableObj?  : Hash;
     terminalOpHeaderHashes? : HashedSet<Hash>;
@@ -76,9 +76,14 @@ class HeaderBasedState extends HashedObject {
             try {
                 const h = new OpHeader(hashedLit);
 
-                if (h.opHash != this.mutableObj) {
+                /*
+                // the following makes no sense, it is comparing an op hash with the mutable obj hash
+                // I'm commenting it out, can't see what the intent was
+
+                if (h.opHash !== this.mutableObj) {
                     return false;
                 }
+                */
 
                 checkHashes.add(h.headerHash);
 

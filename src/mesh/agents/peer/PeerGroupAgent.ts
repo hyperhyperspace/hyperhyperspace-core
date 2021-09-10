@@ -620,7 +620,7 @@ class PeerGroupAgent implements Agent {
 
     // Returns a peer corresponding to ep if we should accept the connection, undefined otherwise
     private async shouldAcceptPeerConnection(p?: PeerInfo) {
-
+        
         return (
             p !== undefined &&                                         // - p is actually a peer
             this.connectionsPerEndpoint.size < this.params.maxPeers && // - we're below maximum peers
