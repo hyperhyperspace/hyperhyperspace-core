@@ -323,7 +323,7 @@ class HistorySynchronizer {
 
             
             const remoteHistory = remoteHistories.get(remote) as HistoryFragment;
-            const startingOps = this.computeStartingOps(remoteHistory);
+            const startingOps = await this.computeStartingOps(remoteHistory);
 
             const ops = await this.findOpsToRequest(remoteHistory);
 
@@ -377,7 +377,7 @@ class HistorySynchronizer {
                 
                 // try to saturate the link: if there is room, make another request
                 if (this.canSendNewRequestTo(remote) ) {
-                    const startingOps = this.computeStartingOps(remoteHistory);
+                    const startingOps = await this.computeStartingOps(remoteHistory);
                     const ops = await this.findOpsToRequest(remoteHistory);
 
                     if (ops.length > 0) {
@@ -490,6 +490,9 @@ class HistorySynchronizer {
         if (max > ProviderLimits.MaxOpsToRequest) {
             max = ProviderLimits.MaxOpsToRequest;
         }
+
+        this.controlLog.debug('pending ops: ' + this.requestedOps.contents.size + ' can request ' + max + ' more');
+
         if (max > 0 && remoteHistory !== undefined) {
 
             const startingOps = new Set<Hash>();
@@ -508,7 +511,6 @@ class HistorySynchronizer {
             this.controlLog.debug('starting ops: ' + Array.from(startingOps));
             this.controlLog.debug('all remote ops: ' + Array.from(remoteHistory.contents.keys()));
             this.controlLog.debug('to request: ' + opHeaders);
-
 
             return ops;
         } else {
@@ -1006,8 +1008,39 @@ class HistorySynchronizer {
         return new Set<Hash>(this.localState.contents.keys());//this.terminalOpHistoriesPlusCurrentState(this.discoveredHistory);
     }
 
-    private computeStartingOps(remoteHistory: HistoryFragment) {
+    private async computeStartingOps(remoteHistory: HistoryFragment) : Promise<Set<Hash>>{
 
+        // find the missingPrevOpHeaders of the unrequested fragment of remoteHistory
+        // TODO: take into account which ops we want to actually request, and add the
+        //       ops in missingPrevOpHeaders necessary just for those
+
+        const unrequestedFragmentForRemote = remoteHistory.clone();
+
+        for (const opHeader of this.requestedOps.contents.values()) {
+            unrequestedFragmentForRemote.remove(opHeader.headerHash);
+        }
+
+        // TODO: make this method return an array, so we can give more priority to the
+        //       ops in missingPrevOpHeaders than to the ones added next
+
+        const start = new Set<Hash>();
+
+        for (const opHeaderHash of unrequestedFragmentForRemote.missingPrevOpHeaders) {
+            if (this.requestedOps.contents.has(opHeaderHash) || 
+                (await this.syncAgent.store.loadOpHeaderByHeaderHash(opHeaderHash)) !== undefined) {
+                
+                start.add(opHeaderHash);
+            }
+        }
+
+        // To enable speculative addition of ops to the reply, we add our current state too.
+
+        for (const opHeader of this.localState.contents.values()) {
+            start.add(opHeader.headerHash);
+        }
+
+        return start;
+        /*
         const requestedFragmentForRemote = new HistoryFragment(remoteHistory.mutableObj);
 
         for (const opHeader of this.localState.contents.values()) {
@@ -1021,6 +1054,7 @@ class HistorySynchronizer {
         }
 
         return new Set<Hash>(requestedFragmentForRemote.terminalOpHeaders);
+        */
     }
 
     private opHistoryIsUndiscovered(opHistory: Hash): boolean {
