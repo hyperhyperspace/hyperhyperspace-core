@@ -13,6 +13,7 @@ import { Lock } from 'util/concurrency';
 import { MultiMap } from 'util/multimap';
 import { Resources } from 'spaces/Resources';
 import { CascadedInvalidateOp } from './CascadedInvalidateOp';
+import { OpHeader } from '../history/OpHeader';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
@@ -105,6 +106,65 @@ abstract class MutableObject extends HashedObject {
         }
 
         return this._boundToStore;
+    }
+
+    // getOpHeader will correclty ge the headers for ops that are still unsaved too
+
+    async getOpHeader(opHash: Hash): Promise<OpHeader> {
+
+        const stack = new Array<Hash>();
+        const cache = new Map<Hash, OpHeader>();
+
+        const unsaved = new Map<Hash, MutationOp>();
+
+        for (const op of this._unsavedOps) {
+            unsaved.set(op.hash(), op);
+        }
+
+        stack.push(opHash);
+
+        while (stack.length > 0) {
+            const nextHash = stack[stack.length-1];
+
+            if (cache.has(nextHash)) {
+
+                // do nothing
+                stack.pop();
+
+            } else if (unsaved.has(nextHash)) {
+                const op = unsaved.get(nextHash) as MutationOp;
+
+                const prevOps= op.getPrevOpsIfPresent();
+                let missing=false;
+
+                if (prevOps !== undefined) {
+                    for (const prevOpHash of prevOps) {
+                        if (!cache.has(prevOpHash.hash)) {
+                            stack.push(prevOpHash.hash);
+                            missing = true;
+                        }
+                    }
+                }
+
+                if (!missing) {
+                    const opHeader = op.getHeader(cache);
+                    cache.set(stack.pop() as Hash, opHeader);
+                }
+
+
+            } else {
+                const op = await this.getStore().loadOpHeader(stack.pop() as Hash);
+
+                if (op === undefined) {
+                    throw new Error('Trying to get op header for op ' + opHash + ', but it depends on op ' + nextHash + ' that is neither in the store or an unapplied op in ' + this.hash() + ' (a ' + this.getClassName() + ')');
+                }
+
+                cache.set(nextHash, op);
+            }
+        }
+
+        return cache.get(opHash) as OpHeader;
+
     }
 
     private bindToStore() {

@@ -176,6 +176,7 @@ class ObjectPacker {
                 currentReferenceChain.pop();
             } else {
                 const nextHash = nextHashes.shift() as Hash;
+                
                 queued.push(nextHashes);
 
                 if (!this.contentHashes.has(nextHash) && !packedHashes.has(nextHash) && !omitted.has(nextHash)) {
@@ -183,6 +184,7 @@ class ObjectPacker {
                     if (this.allowedOmissions.has(nextHash)) {
                         omitted.set(nextHash, currentReferenceChain.slice());
                     } else {
+
                         const literal = await this.store.loadLiteral(nextHash) as Literal;
 
                         packed.push(literal);
