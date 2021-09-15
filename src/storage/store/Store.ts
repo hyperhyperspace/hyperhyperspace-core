@@ -113,7 +113,7 @@ class Store {
                         if (depObject !== undefined && depObject instanceof MutableObject) {
                             let queuedOps = await depObject.saveQueuedOps(); // see (* note 1) above
                             if (queuedOps) {
-                                Store.operationLog.debug(() => 'Saved queued ops for object with hash ' + hash + ' .');
+                                Store.operationLog.debug('Saved queued ops for object with hash ' + hash + ' .');
                             }
                         }
                     }
@@ -121,7 +121,6 @@ class Store {
             }
 
         }
-
     }
 
     async findMissingReferencesWithContext(hash: Hash, context: Context, expectedClassName? : string): Promise<Set<Hash>> {
