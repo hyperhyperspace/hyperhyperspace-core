@@ -654,25 +654,30 @@ class HistorySynchronizer {
         if (await this.validateResponse(remote, msg)) {
 
             const reqInfo = this.requests.get(msg.requestId) as RequestInfo;
-            const req  = reqInfo.request;
+            if (reqInfo !== undefined) {
+                const req = reqInfo.request;
 
-            reqInfo.status = 'accepted-response-blocked';
-            reqInfo.missingCurrentState = new Set<Hash>(req.currentState);
-
-            if (req.currentState !== undefined) {
-                for (const opHistory of req.currentState.values()) {
-                    if (await this.opHistoryIsMissingFromStore(opHistory)) {
-                        this.requestsBlockedByOpHeader.add(opHistory, req.requestId);
-                        this.controlLog.debug('\n'+this.logPrefix+'\nRequest ' + req.requestId + ' is blocked by missing op w/history ' + opHistory)
-                    } else {
-                        reqInfo.missingCurrentState.delete(opHistory);
+                reqInfo.status = 'accepted-response-blocked';
+                reqInfo.missingCurrentState = new Set<Hash>(req.currentState);
+    
+                if (req.currentState !== undefined) {
+                    for (const opHistory of req.currentState.values()) {
+                        if (await this.opHistoryIsMissingFromStore(opHistory)) {
+                            this.requestsBlockedByOpHeader.add(opHistory, req.requestId);
+                            this.controlLog.debug('\n'+this.logPrefix+'\nRequest ' + req.requestId + ' is blocked by missing op w/history ' + opHistory)
+                        } else {
+                            reqInfo.missingCurrentState.delete(opHistory);
+                        }
                     }
                 }
+    
+                await this.attemptToProcessResponse(reqInfo);
+                
+                this.requestLog.debug('Received resp for ' + req.requestId);
+            } else {
+                this.requestLog.debug('Ignoring resp for ' + msg.requestId + ': it is valid, but it vanished during validation.');
             }
 
-            await this.attemptToProcessResponse(reqInfo);
-            
-            this.requestLog.debug('Received resp for ' + req.requestId);
         } else {
             this.requestLog.debug('Received INVALID resp for ' + msg.requestId);
         }

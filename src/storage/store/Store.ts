@@ -95,6 +95,13 @@ class Store {
         Store.operationLog.debug(() => 'Saving object with hash ' + hash + ' .');
         await this.saveWithContext(hash, context);
 
+        // The following is necessary in case the object (or a subobject) was already in the store,
+        // and hence saveWithContext didn't visit all subobjects setting hashes and stores.
+        for (const [ctxHash, ctxObject] of context.objects.entries()) {
+            ctxObject.setLastHash(ctxHash);
+            ctxObject.setStore(this);
+        }
+
         if (flushMutations) {
 
             if (object instanceof MutableObject) {
@@ -173,7 +180,6 @@ class Store {
         if (object === undefined) {
             throw new Error('Object with hash ' + hash + ' is missing from context, cannot save it.');
         }
-
 
         object.setStore(this);
         object.setLastHash(hash);
