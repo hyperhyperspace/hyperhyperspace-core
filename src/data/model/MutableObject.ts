@@ -438,15 +438,16 @@ abstract class MutableObject extends HashedObject {
         } else {
             while (this._unsavedOps.length > 0) {
 
-                let op = this._unsavedOps.shift() as MutationOp;
+                let op = this._unsavedOps[0] as MutationOp;
                 
                 try {
                     await store.save(op, false);
                 } catch (e) {
-                    this._unsavedOps.unshift(op);
                     MutableObject.controlLog.debug(() => 'Error trying to save op for ' + this.hash() + ' (class: ' + this.getClassName() + ').');
                     throw e;
                 }
+                
+                this._unsavedOps.shift();
             }
 
             return true;
