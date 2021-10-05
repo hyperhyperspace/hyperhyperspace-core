@@ -454,6 +454,16 @@ abstract class MutableObject extends HashedObject {
 
     }
 
+    async loadOp(opHash: Hash): Promise<MutationOp|undefined> {
+        for (const op of this._unsavedOps) {
+            if (op.hash() === opHash) {
+                return op;
+            }
+        }
+
+        return this.getStore().load(opHash) as Promise<MutationOp|undefined>;
+    }
+
     protected enqueueOpToSave(op: MutationOp) : void {
         this._unsavedOps.push(op);
     }
