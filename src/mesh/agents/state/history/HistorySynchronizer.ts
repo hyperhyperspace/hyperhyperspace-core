@@ -23,6 +23,9 @@ const LiteralArrivalTimeout = 8;
 
 const MaxSavedCancelledRequests = 64;
 
+const MaxLiteralsPerRequest = 256;
+const MaxHistoryPerRequest = 256;
+
 type RequestInfo = {
 
     request   : RequestMsg,
@@ -419,7 +422,10 @@ class HistorySynchronizer {
             type: MessageType.Request,
             requestId: new RNGImpl().randomHexString(128),
             mutableObj: this.syncAgent.mutableObj,
-            mode: mode
+            mode: mode,
+            maxLiterals: MaxLiteralsPerRequest,
+            maxHistory: MaxHistoryPerRequest
+
         };
 
         this.controlLog.debug('\n'+this.logPrefix+'\nRequesting ' + aim.opHistories?.size + ' op histories and ' + aim.ops?.length + ' ops from remote ' + remote + ' with requestId ' + msg.requestId);
