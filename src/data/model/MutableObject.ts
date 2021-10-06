@@ -447,7 +447,12 @@ abstract class MutableObject extends HashedObject {
                     throw e;
                 }
                 
-                this._unsavedOps.shift();
+                // This same op may have been saved and unshifted concurrently, check before unshifting
+                // to avoid removing an unsaved op.
+                if (op === this._unsavedOps[0]) {
+                    this._unsavedOps.shift();
+                }
+                
             }
 
             return true;
