@@ -450,6 +450,14 @@ class SecureNetworkAgent implements Agent {
                 hmac: hmac
             };
 
+            if (payload.length > 60 * 1024) {
+                console.log('WARNING WARNING WARNING')
+                console.log('payload is too large!')
+                console.log('message content follows:')
+                console.log(content);
+                console.log('WARNING WARNING WARNING')
+            }
+
             this.getNetworkAgent().sendMessage(connId, SecureNetworkAgent.Id, secureMessage);
         } else {
             throw new Error('Connection ' + connId + ' still has not verified both sender ' + sender + ' and recipient ' + recipient + '.');

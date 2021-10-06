@@ -190,7 +190,7 @@ class NetworkAgent implements Agent {
             } catch (e) {
                 if (!this.testingMode) {
                     this.messageLogger.warning(() => 'Endpoint ' + this.connectionInfo.get(conn.getConnectionId())?.localEndpoint + ' could not process received message from ' + this.connectionInfo.get(conn.getConnectionId())?.remoteEndpoint + ', error is:\n', e);
-                    this.messageLogger.trace('full message content follows:', data);    
+                    this.messageLogger.warning('full message content follows:', data);    
                 }
             }
         };
