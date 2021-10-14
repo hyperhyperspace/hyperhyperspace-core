@@ -66,10 +66,10 @@ class HistorySynchronizer {
 
     //endpointsForUnknownHistory : MultiMap<Hash, Endpoint>;
 
-    localState       : HistoryFragment;
+    discoveredHistory     : HistoryFragment;
 
-    discoveredHistory      : HistoryFragment;
-    remoteStates : Map<Endpoint, HistoryFragment>;
+    localStateFragment   : HistoryFragment;
+    remoteStateFragments : Map<Endpoint, HistoryFragment>;
     //remoteHistories    : Map<Hash, CausalHistoryFragment>;
 
     requests     : Map<RequestId, RequestInfo>;
@@ -104,8 +104,8 @@ class HistorySynchronizer {
 
         this.syncAgent = syncAgent;
 
-        this.localState   = new HistoryFragment(this.syncAgent.mutableObj);
-        this.remoteStates = new Map();
+        this.localStateFragment   = new HistoryFragment(this.syncAgent.mutableObj);
+        this.remoteStateFragments = new Map();
 
         this.discoveredHistory = new HistoryFragment(this.syncAgent.mutableObj);
         
@@ -216,12 +216,12 @@ class HistorySynchronizer {
             debugInfo = debugInfo + '\nMissing prev op histories: [' + Array.from(this.discoveredHistory.missingPrevOpHeaders) + ']';
             debugInfo = debugInfo + '\nPending op histories:      [' + Array.from(this.requestsForOpHistory.keys()) + ']';
             debugInfo = debugInfo + '\nPending ops:               [' + Array.from(this.requestsForOp.keys()) + ']';
-            debugInfo = debugInfo + '\nLocal state:               [' + Array.from(this.localState.contents.keys()) + ']';
+            debugInfo = debugInfo + '\nLocal state:               [' + Array.from(this.localStateFragment.contents.keys()) + ']';
             debugInfo = debugInfo + '\nRequests:                  [' + Array.from(this.requests.keys()).map((k: RequestId) => k + '(' + this.requests.get(k)?.status + ')') + ']';
 
             if (this.stateLog.level <= LogLevel.TRACE) {
                 debugInfo = debugInfo + '\n\nDiscovered states by remote:';
-                for (const [remote, history] of this.remoteStates.entries()) {
+                for (const [remote, history] of this.remoteStateFragments.entries()) {
                     debugInfo = debugInfo + '\n' + remote + ': [' + Array.from(history.contents.keys()) + ']';
                 }
             }
@@ -449,7 +449,7 @@ class HistorySynchronizer {
             if (current?.startingOps !== undefined) {
                 msg.currentState = Array.from(current?.startingOps);
             } else {
-                msg.currentState = Array.from(this.localState.contents.keys());//this.computeStartingOps(remote);
+                msg.currentState = Array.from(this.localStateFragment.contents.keys());//this.computeStartingOps(remote);
             }
         }
 
@@ -585,7 +585,7 @@ class HistorySynchronizer {
 
             let debugInfo = this.logPrefix;
             debugInfo = debugInfo + '\nNew local op ' + op.hash() + ' causal: ' + opHistory.headerHash + ' -> [' + Array.from(opHistory.prevOpHeaders) + ']' ;
-            debugInfo = debugInfo + '\nCurrent state now is: [' + Array.from(this.localState.contents.keys()) + ']';
+            debugInfo = debugInfo + '\nCurrent state now is: [' + Array.from(this.localStateFragment.contents.keys()) + ']';
 
             this.stateLog.trace(debugInfo);    
         }
@@ -593,16 +593,16 @@ class HistorySynchronizer {
     }
 
     private addOpToCurrentState(opHistory: OpHeader) {
-        this.localState.add(opHistory);
-        this.localState.removeNonTerminalOps();        
+        this.localStateFragment.add(opHistory);
+        this.localStateFragment.removeNonTerminalOps();    
     }
 
     private addOpToRemoteState(remote: Endpoint, opHistory: OpHeader) {
-        let remoteState = this.remoteStates.get(remote);
+        let remoteState = this.remoteStateFragments.get(remote);
 
         if (remoteState === undefined) {
             remoteState = new HistoryFragment(this.syncAgent.mutableObj);
-            this.remoteStates.set(remote, remoteState);
+            this.remoteStateFragments.set(remote, remoteState);
         }
 
         remoteState.add(opHistory);
@@ -613,7 +613,7 @@ class HistorySynchronizer {
 
         const remoteHistories = new Map<Endpoint, HistoryFragment>();
 
-        for (const [remote, state] of this.remoteStates.entries()) {
+        for (const [remote, state] of this.remoteStateFragments.entries()) {
             const history = this.discoveredHistory.filterByTerminalOpHeaders(new Set<Hash>(state.contents.keys()));
             remoteHistories.set(remote, history);
         }
@@ -724,7 +724,7 @@ class HistorySynchronizer {
                     reqInfo.request.requestedTerminalOpHistory !== undefined &&
                     reqInfo.request.requestedTerminalOpHistory.length > 0)) {
 
-                        this.opXferLog.trace('\n'+this.logPrefix+'\nWill enqueue literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId);
+                        this.opXferLog.trace('\n'+this.logPrefix+'\nWill enqueue literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId + ' (status is ' + reqInfo.status + ')');
                         enqueue = true;
 
                 }
@@ -747,7 +747,7 @@ class HistorySynchronizer {
             }
 
             if (process) {
-                this.attemptToProcessLiterals(reqInfo);
+                await this.attemptToProcessLiterals(reqInfo);
             }
 
             if (!enqueue && !process) {
@@ -904,7 +904,9 @@ class HistorySynchronizer {
 
                 reqInfo.outOfOrderLiterals.delete(reqInfo.nextLiteralSequence);
                 reqInfo.nextLiteralPromise = this.processLiteral(reqInfo, literal);
-                if (!await reqInfo.nextLiteralPromise) {
+                const done = !await reqInfo.nextLiteralPromise;
+                
+                if (done) {
                     break;
                 }
             }
@@ -932,6 +934,7 @@ class HistorySynchronizer {
                 try {
 
                     const op = await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
+                    
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     await this.syncAgent.store.save(op);
 
@@ -941,7 +944,7 @@ class HistorySynchronizer {
                     this.opXferLog.debug('\n'+this.logPrefix+'\nReceived op ' + literal.hash + ' from request ' + reqInfo.request.requestId);
 
                     const removed = this.checkRequestRemoval(reqInfo);
-        
+
                     if (removed) {
                         this.attemptNewRequests();
                     }
@@ -975,7 +978,7 @@ class HistorySynchronizer {
 
 
 
-        for (const state of this.remoteStates.values()) {
+        for (const state of this.remoteStateFragments.values()) {
             state.remove(opHeaderHash);
         }
 
@@ -997,7 +1000,7 @@ class HistorySynchronizer {
             if (reqInfo !== undefined) {
                 this.opXferLog.debug('\n'+this.logPrefix+'\nAttempting to process blocked request ' + requestId);
                 reqInfo.missingCurrentState?.delete(opHeaderHash);
-                this.attemptToProcessResponse(reqInfo);
+                this.attemptToProcessResponse(reqInfo); // not awaiting this
             } else {
                 this.opXferLog.debug('\n'+this.logPrefix+'\nNot attempting to process blocked request ' + requestId + ': it is no longer there.');
             }
@@ -1016,7 +1019,7 @@ class HistorySynchronizer {
     }
 
     private computeStartingOpHistories() {
-        return new Set<Hash>(this.localState.contents.keys());//this.terminalOpHistoriesPlusCurrentState(this.discoveredHistory);
+        return new Set<Hash>(this.localStateFragment.contents.keys());//this.terminalOpHistoriesPlusCurrentState(this.discoveredHistory);
     }
 
     private async computeStartingOps(remoteHistory: HistoryFragment) : Promise<Set<Hash>>{
@@ -1046,9 +1049,15 @@ class HistorySynchronizer {
 
         // To enable speculative addition of ops to the reply, we add our current state too.
 
-        for (const opHeader of this.localState.contents.values()) {
-            start.add(opHeader.headerHash);
+        if (this.syncAgent.state?.terminalOpHeaderHashes !== undefined) {
+            for (const opHeaderHash of this.syncAgent.state?.terminalOpHeaderHashes.values()) {
+                start.add(opHeaderHash)
+            }
         }
+
+        //for (const opHeader of this.localStateFragment.contents.values()) {
+        //    start.add(opHeader.headerHash);
+        //}
 
         return start;
         /*

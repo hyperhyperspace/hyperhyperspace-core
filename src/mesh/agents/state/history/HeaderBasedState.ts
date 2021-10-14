@@ -15,8 +15,8 @@ class HeaderBasedState extends HashedObject {
     static async createFromTerminalOps(mutableObj: Hash, terminalOps: Array<Hash>, store: Store): Promise<HeaderBasedState> {
 
         const terminalOpHeaders: Array<OpHeader> = [];
-
-        for (const opHash of terminalOps) {
+        
+        for (const opHash of terminalOps) {            
             const history = await store.loadOpHeader(opHash);
             terminalOpHeaders.push(history as OpHeader);
             

@@ -14,7 +14,7 @@ import { HistoryProvider, MessageType, SyncMsg } from './history/HistoryProvider
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { Resources } from 'spaces/Resources';
 
-type StateFilter = (state: HeaderBasedState, store: Store) => Promise<HeaderBasedState>;
+type StateFilter = (state: HeaderBasedState, store: Store, isLocal: boolean, localState?: HeaderBasedState) => Promise<HeaderBasedState>;
 
 class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
@@ -36,8 +36,9 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     pod?: AgentPod;
 
-    state?: HashedSet<Hash>;
+    state?: HeaderBasedState;
     stateHash?: Hash;
+    stateOpHeadersByOpHash?: Map<Hash, OpHeader>;
     
     remoteStates: Map<Endpoint, HashedSet<Hash>>;
 
@@ -81,9 +82,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         
         this.pod = pod;
         this.updateStateFromStore().then(async () => {
-                if (this.state !== undefined) {
-                    for (const hash of this.state.values()) {
-                        const opHistory = await this.store.loadOpHeaderByHeaderHash(hash) as OpHeader;
+                if (this.stateOpHeadersByOpHash !== undefined) {
+                    for (const opHistory of this.stateOpHeadersByOpHash.values()) {
                         const op = await this.store.load(opHistory?.opHash) as MutationOp;
                         await this.synchronizer.onNewLocalOp(op);
                     }
@@ -120,7 +120,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             if (this.stateHash !== stateHash) {
 
 
-                const filteredState = this.stateOpFilter === undefined? state : await this.stateOpFilter(state, this.store);
+                const filteredState = this.stateOpFilter === undefined? state : await this.stateOpFilter(state, this.store, false, this.state);
 
                 const unknown = new Set<OpHeader>();
 
@@ -189,7 +189,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         let op = await this.store.load(opHash) as MutationOp;
         if (this.shouldAcceptMutationOp(op)) {
-            this.synchronizer.onNewLocalOp(op);
+            await this.synchronizer.onNewLocalOp(op);
             await this.updateStateFromStore();  
         }
     };
@@ -219,7 +219,14 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         const state = await this.loadStateFromStore();
         
         this.updateState(state);
+        
     }
+
+    /*private async loadSynchronizerState(): Promise<HeaderBasedState> {
+
+        this.synchronizer.localState.getTerminalOps();
+
+    }*/
 
     private async loadStateFromStore(): Promise<HeaderBasedState> {
         let terminalOpsInfo = await this.store.loadTerminalOpsForMutable(this.mutableObj);
@@ -228,12 +235,23 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             terminalOpsInfo = {terminalOps: []};
         }
 
-        const state = await HeaderBasedState.createFromTerminalOps(this.mutableObj, terminalOpsInfo.terminalOps, this.store);
+        const t = Date.now();
+        const terminalOpHeaders: Array<OpHeader> = [];
+        for (const terminalOpHash of terminalOpsInfo.terminalOps) {
+            let terminalOpHeader = this.stateOpHeadersByOpHash?.get(terminalOpHash);
+            if (terminalOpHeader === undefined) {
+                terminalOpHeader = await this.store.loadOpHeader(terminalOpHash);
+            }
+
+            terminalOpHeaders.push(terminalOpHeader as OpHeader)
+        }
+        const state = HeaderBasedState.create(this.mutableObj, terminalOpHeaders);
+        console.log('createFromTerminalOps ' + (Date.now() - t) + ' ms')
 
         if (this.stateOpFilter === undefined) {
             return state;
         } else {
-            return this.stateOpFilter(state, this.store);
+            return this.stateOpFilter(state, this.store, true);
         }
     }
 
@@ -242,8 +260,15 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
             HeaderBasedSyncAgent.controlLog.trace('Found new state ' + stateHash + ' for ' + this.mutableObj + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
-            this.state = state.terminalOpHeaderHashes;
+            this.state = state;
             this.stateHash = stateHash;
+            this.stateOpHeadersByOpHash = new Map();
+            if (this.state?.terminalOpHeaders !== undefined) {
+                for (const opHeader of this.state?.terminalOpHeaders?.values()) {
+                    this.stateOpHeadersByOpHash.set(opHeader.opHash, new OpHeader(opHeader));
+                }
+            }
+            
             let stateUpdate: AgentStateUpdateEvent = {
                 type: GossipEventTypes.AgentStateUpdate,
                 content: { agentId: this.getAgentId(), state }

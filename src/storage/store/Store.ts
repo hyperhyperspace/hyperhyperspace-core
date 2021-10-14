@@ -128,6 +128,7 @@ class Store {
             }
 
         }
+        
     }
 
     async findMissingReferencesWithContext(hash: Hash, context: Context, expectedClassName? : string): Promise<Set<Hash>> {
@@ -226,6 +227,7 @@ class Store {
 
                 if (object.prevOps !== undefined) {
                     for (const hashRef of object.prevOps.values()) {
+
                         const prevOpHistory = await this.loadOpHeader(hashRef.hash);
                         
                         if (prevOpHistory === undefined) {
@@ -242,7 +244,7 @@ class Store {
                     literal: opHistory.literalize()
                 };
             }
-            
+
             await this.backend.store(literal, history);
 
             if (object instanceof MutationOp) {
@@ -299,9 +301,6 @@ class Store {
                 }
 
             }
-            
-            
-
         }
     }
     
