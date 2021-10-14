@@ -234,8 +234,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         if (terminalOpsInfo === undefined) {
             terminalOpsInfo = {terminalOps: []};
         }
-
-        const t = Date.now();
+        
         const terminalOpHeaders: Array<OpHeader> = [];
         for (const terminalOpHash of terminalOpsInfo.terminalOps) {
             let terminalOpHeader = this.stateOpHeadersByOpHash?.get(terminalOpHash);
@@ -246,7 +245,6 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             terminalOpHeaders.push(terminalOpHeader as OpHeader)
         }
         const state = HeaderBasedState.create(this.mutableObj, terminalOpHeaders);
-        console.log('createFromTerminalOps ' + (Date.now() - t) + ' ms')
 
         if (this.stateOpFilter === undefined) {
             return state;
