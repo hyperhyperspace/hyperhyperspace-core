@@ -342,8 +342,8 @@ class SecureNetworkAgent implements Agent {
         const toRemove = new Array<string>();
 
         for (const [id, partialMsg] of this.messageFragments.entries()) {
-            const timeout = Math.max(3000, 100 * partialMsg.fragCount) + partialMsg.created;
-            const updateTimeout = 2000 + partialMsg.updated;
+            const timeout = Math.max(4000, 250 * partialMsg.fragCount) + partialMsg.created;
+            const updateTimeout = Math.max(timeout, 2000 + partialMsg.updated);
             const now = Date.now();
 
             if (now > timeout || now > updateTimeout) {
