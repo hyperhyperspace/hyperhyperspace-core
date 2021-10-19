@@ -132,6 +132,7 @@ type Stats = {
 class PeerGroupAgent implements Agent {
 
     static controlLog = new Logger(PeerGroupAgent.name, LogLevel.INFO);
+    static peersLog = new Logger(PeerGroupAgent.name, LogLevel.INFO);
 
     peerGroupId: string;
     localPeer: PeerInfo;
@@ -377,7 +378,7 @@ class PeerGroupAgent implements Agent {
 
     private async queryForOnlinePeers() {
 
-        PeerGroupAgent.controlLog.trace("Consdidering querying for peers on " + this.peerGroupId);
+        PeerGroupAgent.peersLog.trace("Considering querying for peers on " + this.peerGroupId);
 
         if (this.connectionsPerEndpoint.size < this.params.minPeers) {
             let candidates = await this.peerSource.getPeers(this.params.minPeers * 5);
@@ -385,7 +386,7 @@ class PeerGroupAgent implements Agent {
             let fallbackEndpoints = new Array<Endpoint>();
             const now = Date.now();
 
-            this.controlLog.debug(() => ('Looking for peers, got ' + candidates.length + ' candidates'));
+            PeerGroupAgent.peersLog.debug('Looking for peers, got ' + candidates.length + ' candidates');
 
             for (const candidate of candidates) {
 
@@ -434,7 +435,7 @@ class PeerGroupAgent implements Agent {
             }
 
             if (endpoints.length > 0) {
-                this.controlLog.debug(() => ('Querying for online endpoints: '  + endpoints));
+                PeerGroupAgent.peersLog.debug('Querying for online endpoints: '  + endpoints);
 
                 this.getNetworkAgent().queryForListeningAddresses(
                                     LinkupAddress.fromURL(this.localPeer.endpoint), 
@@ -443,7 +444,7 @@ class PeerGroupAgent implements Agent {
 
             
         } else {
-            PeerGroupAgent.controlLog.trace("Skipping querying for peers on " + this.peerGroupId);
+            PeerGroupAgent.peersLog.trace('Skipping querying for peers on ' + this.peerGroupId);
         }
     }
 
@@ -620,14 +621,17 @@ class PeerGroupAgent implements Agent {
 
     // Returns a peer corresponding to ep if we should accept the connection, undefined otherwise
     private async shouldAcceptPeerConnection(p?: PeerInfo) {
-        
-        return (
-            p !== undefined &&                                         // - p is actually a peer
-            this.connectionsPerEndpoint.size < this.params.maxPeers && // - we're below maximum peers
-            this.findWorkingConnectionId(p.endpoint) === undefined &&  // - there's not a working conn to ep
-            this.localPeer.endpoint !== p.endpoint                     // - ep is not us
-        );                                                             // ====> then accept conn. from ep
 
+        if (p===undefined) {
+            return false;
+        } else {
+            const conns = this.connectionsPerEndpoint.get(p.endpoint);
+            const alreadyConnected = conns !== undefined && conns.length > 0;
+
+            return (this.connectionsPerEndpoint.size + (alreadyConnected? 0 : 1) <= this.params.maxPeers && // - we're below maximum peers
+                    this.findWorkingConnectionId(p.endpoint) === undefined &&                               // - there's not a working conn to ep
+                    this.localPeer.endpoint !== p.endpoint);                                                // - ep is not us);
+        }
                                                                        
     }
 
@@ -687,6 +691,7 @@ class PeerGroupAgent implements Agent {
     // Ask SecureConnectionAgent to secure a connection, given local and remote identities
 
     private secureConnection(pc: PeerConnection) {
+
         const secureConnAgent = this.getSecureConnAgent();
 
         secureConnAgent.secureForReceiving(pc.connId, this.localPeer.identity as Identity);
@@ -733,7 +738,7 @@ class PeerGroupAgent implements Agent {
         if (this.localPeer.endpoint === local) {
             let peer = await this.peerSource.getPeerForEndpoint(remote);
 
-            this.controlLog.trace(() => this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
+            this.controlLog.trace(this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
 
             if (await this.shouldAcceptPeerConnection(peer)) {
                 this.controlLog.debug('Will accept requested connection ' + connId + '!');

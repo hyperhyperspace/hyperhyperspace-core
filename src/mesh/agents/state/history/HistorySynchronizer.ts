@@ -24,7 +24,7 @@ const LiteralArrivalTimeout = 8;
 const MaxSavedCancelledRequests = 64;
 
 const MaxLiteralsPerRequest = 512;
-const MaxHistoryPerRequest = 128;
+const MaxHistoryPerRequest = 1024;
 
 type RequestInfo = {
 

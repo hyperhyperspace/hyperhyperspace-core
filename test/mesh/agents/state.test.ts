@@ -74,9 +74,9 @@ describeProxy('[SYN] State sync', () => {
 
     }, 300000);
 
-    test('[SYN10] Causal history agent-based set deep sync in small peer group with faulty network (disabled) (wrtc)', async (done) => {
+    test('[SYN10] Causal history agent-based set deep sync in small peer group with faulty network (wrtc)', async (done) => {
 
-        await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined, false);
+        await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined, true);
 
     }, 300000);
 
@@ -89,6 +89,12 @@ describeProxy('[SYN] State sync', () => {
     test('[SYN12] Causal history agent-based set deep sync in small peer group (wrtc)', async (done) => {
 
         await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined);
+
+    }, 300000);
+
+    test('[SYN13] Causal history agent-based set sync in small peer group (wrtc) using big objects', async (done) => {
+
+        await syncInSmallPeerGroup(done, 'wrtc', undefined, undefined, undefined, true);
 
     }, 300000);
 
@@ -184,7 +190,7 @@ async function gossipInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mi
 
 }
 
-async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number, useRemoting?: boolean, useSQLite=false) {
+async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', basePort?: number, useRemoting?: boolean, useSQLite=false, bigElement=false) {
 
     const size = 3;
         
@@ -206,7 +212,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     let id = await TestIdentity.getFirstTestIdentity();
     let kp = await TestIdentity.getFistTestKeyPair();
     
-    let s = new MutableSet<Identity>();
+    let s = new MutableSet<HashedObject>();
     
     s.setAuthor(id);
     
@@ -234,6 +240,14 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     await s.delete(id);
     
     await s.add(id);
+
+    if (bigElement) {
+        let big = '';
+        for (let i=0; i<1024 * 32; i++) {
+            big = big + 'x';
+        }
+        s.add(new HashedLiteral(big));
+    }
     //stores[size-1].save(sclone);
 
     //sclone.bindToStore();
@@ -277,7 +291,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
                 
                 
                 await sr.loadAllChanges();
-                replicated = sr.size() === 1;
+                replicated = sr.size() === (1 + (bigElement? 1 : 0));
                 //for (const elmt of sr.values()) {
                     //console.log('FOUND ELMT:');
                     //console.log(elmt);
@@ -462,7 +476,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
     //PeerGroupAgent.controlLog.setLevel(LogLevel.DEBUG);
     //HistorySynchronizer.controlLog.setLevel(LogLevel.TRACE);
     //HistorySynchronizer.stateLog.setLevel(LogLevel.DEBUG);
-    //HistorySynchronizer.opXferLog.setLevel(LogLevel.TRACE);
+    //HistorySynchronizer.opXferLog.setLevel(LogLevel.);
 
     HistorySynchronizer.opXferLog;
 
@@ -486,8 +500,6 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         pods[i].registerAgent(gossip);
     }
 
-    console.log('STORES')
-
     let id = await TestIdentity.getFirstTestIdentity();
     let kp = await TestIdentity.getFistTestKeyPair();
     
@@ -508,7 +520,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
 
     await stores[0].save(s);
 
-    let syncAgent: HeaderBasedSyncAgent|undefined = undefined;
+    //let syncAgent: HeaderBasedSyncAgent|undefined = undefined;
 
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
@@ -516,10 +528,10 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         let agent = new HeaderBasedSyncAgent(meshAgent, s.hash(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
         if (i===0) {
 
-            syncAgent = agent;
+            //syncAgent = agent;
 
             agent.synchronizer.requestLog = new Logger('requests');
-            agent.synchronizer.requestLog.setLevel(LogLevel.DEBUG);
+            agent.synchronizer.requestLog.setLevel(LogLevel.INFO);
 
             /*agent.synchronizer.controlLog = new Logger('control');
             agent.synchronizer.stateLog = new Logger('state');
@@ -537,8 +549,6 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         pods[i].registerAgent(agent);
     }
 
-    console.log('AGENTS')
-
     let meshReady = false;
 
     let count = 0;
@@ -553,8 +563,6 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         
         count = count + 1;
     }
-
-    console.log('MESHES')
 
     let replicated = false;
 
@@ -627,10 +635,6 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
     await s.add(new HashedLiteral('you'));
     */
 
-    
-
-    console.log('ALL SAVED!')
-
     for (let i=0; i<size; i++) {
         const network = pods[i].getAgent(NetworkAgent.AgentId) as NetworkAgent;
         network.testingMode = useFaultyMessaging;
@@ -667,9 +671,6 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
                 if (sr[k] !== undefined) {
                     
                     replicated = replicated && (sr[k]?.size() === size * depth + 1);
-                    if (count % 100 === 0) {
-                        console.log((count/10) + 's ['+ k + ']: ' + sr[k]?.size() + ' elements' );
-                    }
                     //console.log(Array.from(sr.values()));
                     //for (const elmt of sr.values()) {
                         //console.log('FOUND ELMT:');
@@ -680,10 +681,10 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
                 }
             }
 
-            if (count % 200 === 0) {
+            /*if (count % 200 === 0) {
                 console.log('DIAGNOSTICS:');
                 console.log(syncAgent?.synchronizer.selfDiagnostic());
-            }
+            }*/
 
             count = count + 1;
         }

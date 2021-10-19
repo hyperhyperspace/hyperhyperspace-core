@@ -149,7 +149,9 @@ class WebRTCConnection implements Connection {
 
         this.connection?.createOffer().then(
             (description) => {
-                this.connection?.setLocalDescription(description);
+                if (this.connection?.signalingState !== 'closed') {
+                    this.connection?.setLocalDescription(description);
+                }
                 this.signalConnectionDescription(description);
             },
             (error) => {

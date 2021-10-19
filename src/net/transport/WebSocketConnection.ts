@@ -10,7 +10,7 @@ import { Logger, LogLevel } from 'util/logging';
 
 class WebSocketConnection implements Connection {
 
-    static logger = new Logger(WebSocketConnection.name, LogLevel.DEBUG);
+    static logger = new Logger(WebSocketConnection.name, LogLevel.INFO);
 
     linkupManager?: LinkupManager;
 

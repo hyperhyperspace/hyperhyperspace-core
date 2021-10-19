@@ -130,6 +130,9 @@ type SecureMessage = {
     payload: string,
     nonce: string,
     hmac: string,
+    id?: string,        // optional id, used for fragmenting large messages 
+    fragSeq?: number,   // sequence number on a large message fragment
+    fragCount?: number  // total number of fragments in a large message
 };
 
 type SecureMessagePayload = {
@@ -151,7 +154,16 @@ type SecureMessageReceivedEvent = {
         recipient: Hash,
         payload: any
     }
-}
+};
+
+type PartialMessage = {
+    created: number,
+    updated: number,
+    connId: ConnectionId,
+    recipient: Hash,
+    fragCount: number,
+    fragments: Map<number, string>
+};
 
 enum IdentityAuthStatus {
     Accepted = 'accepted',
@@ -293,6 +305,10 @@ class ConnectionSecuredForSending extends OneWaySecuredConnection {
 }
 
 const DEFAULT_TIMEOUT = 15;
+const MAX_PAYLOAD_SIZE = 32 * 1024;
+const MAX_MESSAGE_FRAGMENTS = 64;
+
+const FRAGMENT_ASSEMBLY_TIMEOUT_FREQ = 2;
 
 class SecureNetworkAgent implements Agent {
 
@@ -303,12 +319,57 @@ class SecureNetworkAgent implements Agent {
     remoteIdentities : Map<string, ConnectionSecuredForSending>;
     localIdentities  : Map<string, ConnectionSecuredForReceiving>;
 
+    messageFragments : Map<string, PartialMessage>;
+
+    fragmentAssemblyInterval?: number;
+
     pod?: AgentPod;
+
+    private checkFragmentAssemblyInterval() {
+        if (this.messageFragments.size === 0) {
+            if (this.fragmentAssemblyInterval !== undefined) {
+                clearInterval(this.fragmentAssemblyInterval)
+            }
+        } else {
+            if (this.fragmentAssemblyInterval === undefined) {
+                setInterval(this.fragmentAssemblyTimeouts, FRAGMENT_ASSEMBLY_TIMEOUT_FREQ * 1000);
+            }
+        }
+    }
+
+    fragmentAssemblyTimeouts() {
+
+        const toRemove = new Array<string>();
+
+        for (const [id, partialMsg] of this.messageFragments.entries()) {
+            const timeout = Math.max(3000, 100 * partialMsg.fragCount) + partialMsg.created;
+            const updateTimeout = 2000 + partialMsg.updated;
+            const now = Date.now();
+
+            if (now > timeout || now > updateTimeout) {
+                toRemove.push(id);
+                SecureNetworkAgent.logger.warning('Removed message ' + id + ' due to re-assembly timeout!');
+            }
+        }
+
+        for (const id of toRemove) {
+            this.messageFragments.delete(id);
+        }
+
+        if (toRemove.length > 0) {
+            this.checkFragmentAssemblyInterval();
+        }
+    }
 
     constructor() {
 
         this.remoteIdentities = new Map();
         this.localIdentities  = new Map();
+
+        this.messageFragments = new Map();
+        this.fragmentAssemblyInterval = undefined;
+
+        this.fragmentAssemblyTimeouts = this.fragmentAssemblyTimeouts.bind(this);
     }
 
     getAgentId(): string {
@@ -322,6 +383,7 @@ class SecureNetworkAgent implements Agent {
     receiveLocalEvent(ev: Event): void {
         if (ev.type === NetworkEventType.ConnectionStatusChange) {
             let connEv = ev as ConnectionStatusChangeEvent;
+            
             if (connEv.content.status === ConnectionStatus.Closed) {
                 this.removeIdentitiesForConnection(ev.content.connId);
             } else if (connEv.content.status === ConnectionStatus.Ready) {
@@ -330,10 +392,9 @@ class SecureNetworkAgent implements Agent {
                     if (secured.connId === connEv.content.localEndpoint && 
                         secured.status === IdChallengerStatus.WaitingToChallenge) {
                         
-                        this.sendChallengeMessage(secured)
+                        this.sendChallengeMessage(secured);
                     }
-                }
-                
+                }                
             }
         } else if (ev.type === NetworkEventType.MessageReceived) {
             let msgEv = ev as MessageReceivedEvent;
@@ -345,7 +406,7 @@ class SecureNetworkAgent implements Agent {
 
     secureForReceiving(connId: ConnectionId, localIdentity: Identity, timeout=DEFAULT_TIMEOUT) {
         
-        SecureNetworkAgent.logger.trace(() => 'Asked to verify ' + connId + ' for receiving with ' + localIdentity.hash());
+        SecureNetworkAgent.logger.trace('Asked to verify ' + connId + ' for receiving with ' + localIdentity.hash());
 
         const identityHash = localIdentity.hash();
 
@@ -402,7 +463,9 @@ class SecureNetworkAgent implements Agent {
         if (secured.identity === undefined) {
             this.sendIdentityRequest(secured.connId, secured.identityHash);
             secured.status  = IdChallengerStatus.SentIdentityRequest;
+            SecureNetworkAgent.logger.trace('Sent identity request for ' + secured.identityHash + ' through connection ' + secured.connId);
         } else {
+            SecureNetworkAgent.logger.trace('Sending identity challenge for ' + secured.identityHash + ' through connection ' + secured.connId);
             secured.generateSecret();
             //TODO: see if we have introduced a race condition by making encryptSecret async
             secured.encryptSecret().then(() => {
@@ -438,27 +501,53 @@ class SecureNetworkAgent implements Agent {
                 content: content
             };
 
-            let nonce = new RNGImpl().randomHexString(96);
+            
             let plaintext = JSON.stringify(secureMessagePayload);
+            let nonce = new RNGImpl().randomHexString(96);
             let payload = new ChaCha20Impl().encryptHex(plaintext, remote.secret as string, nonce);
             let hmac = new HMACImpl().hmacSHA256hex(payload, local.secret as string);
-            let secureMessage: SecureMessage = {
-                type: MessageType.SecureMessage,
-                identityHash: recipient,
-                nonce: nonce,
-                payload: payload,
-                hmac: hmac
-            };
 
-            if (payload.length > 60 * 1024) {
-                console.log('WARNING WARNING WARNING')
-                console.log('payload is too large!')
-                console.log('message content follows:')
-                console.log(content);
-                console.log('WARNING WARNING WARNING')
+            if (plaintext.length < MAX_PAYLOAD_SIZE) {
+                let secureMessage: SecureMessage = {
+                    type: MessageType.SecureMessage,
+                    identityHash: recipient,
+                    nonce: nonce,
+                    payload: payload,
+                    hmac: hmac
+                };
+    
+                this.getNetworkAgent().sendMessage(connId, SecureNetworkAgent.Id, secureMessage);
+            } else {
+                let chunks = Strings.chunk(payload, MAX_PAYLOAD_SIZE);
+                let msgId = new RNGImpl().randomHexString(128);
+
+                let seq = 0;
+
+                if (chunks.length <= MAX_MESSAGE_FRAGMENTS) {
+                    for (const chunk of chunks) {
+                        let secureMessage: SecureMessage = {
+                            type: MessageType.SecureMessage,
+                            identityHash: recipient,
+                            nonce: nonce,
+                            payload: chunk,
+                            hmac: hmac,
+                            id: msgId,
+                            fragSeq: seq,
+                            fragCount: chunks.length
+                        };
+            
+                        this.getNetworkAgent().sendMessage(connId, SecureNetworkAgent.Id, secureMessage);
+    
+                        seq = seq + 1;
+                    }
+                } else {
+                    SecureNetworkAgent.logger.error('Cannot send message! It needs ' + chunks.length + ' fragments and the max allowed is ' + MAX_MESSAGE_FRAGMENTS + '.');
+                }
+                
+
             }
 
-            this.getNetworkAgent().sendMessage(connId, SecureNetworkAgent.Id, secureMessage);
+            
         } else {
             throw new Error('Connection ' + connId + ' still has not verified both sender ' + sender + ' and recipient ' + recipient + '.');
         }
@@ -584,37 +673,95 @@ class SecureNetworkAgent implements Agent {
             let local = this.getConnectionSecuredForReceiving(connId, secureMessage.identityHash);
 
             if (local?.verified()) {
-                
-                let payload = new ChaCha20Impl().decryptHex(secureMessage.payload, local.secret as string, secureMessage.nonce);
-                
-                let secureMessagePayload = JSON.parse(payload) as SecureMessagePayload;
 
-                let remote = this.getConnectionSecuredForSending(connId, secureMessagePayload.senderIdentityHash);
-                if (remote?.verified()) {
-
-                    let hmac = new HMACImpl().hmacSHA256hex(secureMessage.payload, remote.secret as string)
-
-                    if (secureMessage.hmac === hmac) {
-                        
-                        let agent = this.pod?.getAgent(secureMessagePayload.agentId);
-                        if (agent !== undefined) {
-
-                            let event: SecureMessageReceivedEvent = { 
-                                type: SecureNetworkEventType.SecureMessageReceived,
-                                content: { 
-                                    connId: connId,
-                                    sender: secureMessagePayload.senderIdentityHash,
-                                    recipient: secureMessage.identityHash,
-                                    payload: secureMessagePayload.content
-                                } 
+                let cyphertext: string|undefined = undefined;
+                if (secureMessage.id === undefined) {
+                    cyphertext = secureMessage.payload;
+                } else {
+                    if (secureMessage.fragSeq !== undefined && secureMessage.fragCount !== undefined && 
+                        secureMessage.fragCount <= MAX_MESSAGE_FRAGMENTS &&  secureMessage.fragSeq % 1 === 0 &&
+                        0 <= secureMessage.fragSeq && secureMessage.fragSeq < secureMessage.fragCount) {
+                        let partialMsg = this.messageFragments.get(secureMessage.id);
+                        if (partialMsg === undefined) {
+                            partialMsg = {
+                                created: Date.now(),
+                                updated: Date.now(),
+                                connId: connId,
+                                recipient: secureMessage.identityHash,
+                                fragCount: secureMessage.fragCount,
+                                fragments: new Map()
                             };
+                            this.messageFragments.set(secureMessage.id, partialMsg);
+                            this.checkFragmentAssemblyInterval();
+                        } else {
+                            partialMsg.updated = Date.now();
+                        }
 
-                            agent.receiveLocalEvent(event);
+                        if (partialMsg.connId === connId &&
+                            partialMsg.recipient === secureMessage.identityHash &&
+                            partialMsg.fragCount === secureMessage.fragCount &&
+                            secureMessage.fragSeq < secureMessage.fragCount) {
+
+                            partialMsg.fragments.set(secureMessage.fragSeq, secureMessage.payload);
+
+                            if (partialMsg.fragments.size === partialMsg.fragCount) {
+                                const chunks = new Array<string>();
+                                for (let i=0; i<partialMsg.fragCount; i++) {
+                                    const chunk = partialMsg.fragments.get(i);
+                                    if (chunk !== undefined) {
+                                        chunks.push(chunk);
+                                    }
+                                }
+                                
+                                if (chunks.length === partialMsg.fragCount) {
+                                    cyphertext = Strings.unchunk(chunks);
+                                    this.messageFragments.delete(secureMessage.id);
+                                    this.checkFragmentAssemblyInterval();
+                                } else {
+                                    SecureNetworkAgent.logger.warning('Error reassembling msg ' + secureMessage.id);
+                                }
+                            }
+
                         }
                     } else {
-                        SecureNetworkAgent.logger.warning('HMAC mismatch on received message on connection ' + connId);
+                        SecureNetworkAgent.logger.warning('Incomplete message fragment: seq or fragments fields are missing or incorrect for ' + secureMessage.id + ': fragCount=' + secureMessage.fragCount + ', fragSeq=' + secureMessage.fragSeq + ' (sender is ' + source + ')');
                     }
                 }
+
+                if (cyphertext !== undefined) {
+                    let payload = new ChaCha20Impl().decryptHex(cyphertext, local.secret as string, secureMessage.nonce);
+                
+                    let secureMessagePayload = JSON.parse(payload) as SecureMessagePayload;
+    
+                    let remote = this.getConnectionSecuredForSending(connId, secureMessagePayload.senderIdentityHash);
+                    if (remote?.verified()) {
+    
+                        let hmac = new HMACImpl().hmacSHA256hex(cyphertext, remote.secret as string)
+    
+                        if (secureMessage.hmac === hmac) {
+                            
+                            let agent = this.pod?.getAgent(secureMessagePayload.agentId);
+                            if (agent !== undefined) {
+    
+                                let event: SecureMessageReceivedEvent = { 
+                                    type: SecureNetworkEventType.SecureMessageReceived,
+                                    content: { 
+                                        connId: connId,
+                                        sender: secureMessagePayload.senderIdentityHash,
+                                        recipient: secureMessage.identityHash,
+                                        payload: secureMessagePayload.content
+                                    } 
+                                };
+
+                                agent.receiveLocalEvent(event);
+                            }
+                        } else {
+                            SecureNetworkAgent.logger.warning('HMAC mismatch on received message on connection ' + connId);
+                        }
+                    }
+                }
+
+                
                 
             }
 
@@ -744,6 +891,7 @@ class SecureNetworkAgent implements Agent {
                 secured = new ConnectionSecuredForSending(connId, identityHash);
             }
             secured.setTimeout(DEFAULT_TIMEOUT);
+            
             map.set(key, secured);
         }
 

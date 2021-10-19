@@ -58,7 +58,7 @@ type Message = {
     source: Endpoint, 
     destination: Endpoint, 
     agentId: AgentId, 
-    content: any 
+    content: any
 };
 
 type LinkupMessageReceivedEvent = {

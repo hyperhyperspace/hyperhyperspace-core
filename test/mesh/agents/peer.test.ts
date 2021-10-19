@@ -13,13 +13,13 @@ describeProxy('[PGM] Peer group management', () => {
 
     test('[PGM02] 2-peer group set up (ws)', async (done) => {
 
-        await twoPeerGroupTest(done, 'ws', 'no-discovery', 5000);
+        await twoPeerGroupTest(done, 'ws', 'no-discovery', 6000);
 
     }, 300000);
 
     test('[PGM03] 2-peer group set up (mix)', async (done) => {
 
-        await twoPeerGroupTest(done, 'mix', 'no-discovery', 5010);
+        await twoPeerGroupTest(done, 'mix', 'no-discovery', 6100);
 
     }, 300000);
 
@@ -37,13 +37,13 @@ describeProxy('[PGM] Peer group management', () => {
 
     test('[PGM06] 4-peer group clique set up (ws)', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, 'ws', 'no-discovery', 5100);
+        await fourPeerCliqueGroupTest(done, 'ws', 'no-discovery', 7000);
 
     }, 300000);
 
     test('[PGM07] 4-peer group clique set up (mix)', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, 'mix', 'no-discovery', 5110);
+        await fourPeerCliqueGroupTest(done, 'mix', 'no-discovery', 6110);
 
     }, 300000);
 
