@@ -625,11 +625,9 @@ class Store {
         return result as {className: string, path: string, hash: Hash};
     }
 
-    async loadAllOps(targetObject: Hash) {
+    async loadAllOps(targetObject: Hash, batchSize=128) {
         
         const ops = new Array<MutationOp>();
-
-        let batchSize = 50;
 
         let results = await this.loadByReference(
                                     'targetObject', 

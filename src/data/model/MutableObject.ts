@@ -203,9 +203,7 @@ abstract class MutableObject extends HashedObject {
     }
     */
 
-    async loadAllChanges() {
-        
-        let batchSize = 50;
+    async loadAllChanges(batchSize=128) {
 
         let results = await this.getStore()
                                 .loadByReference(
@@ -236,9 +234,9 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    async loadAndWatchForChanges() {
+    async loadAndWatchForChanges(loadBatchSize=128) {
         this.watchForChanges(true);
-        await this.loadAllChanges();
+        await this.loadAllChanges(loadBatchSize);
     }
 
     async loadLastOpsFromStore(limit?: number, start?: string): Promise<{results: number, last?: string}> {
