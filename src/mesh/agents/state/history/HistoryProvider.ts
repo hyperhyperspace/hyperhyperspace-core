@@ -152,8 +152,8 @@ class HistoryProvider {
 
 
     continueStreamingResponses() {
-        for (const requesId of this.currentResponses.values()) {
-            const respInfo = this.responses.get(requesId);
+        for (const requestId of this.currentResponses.values()) {
+            const respInfo = this.responses.get(requestId);
             if (respInfo !== undefined) {
                 this.sendLiterals(respInfo.request.requestId, LiteralBatchSize);
             }
