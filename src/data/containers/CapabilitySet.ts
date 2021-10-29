@@ -45,7 +45,7 @@ class RevokeAfterOp extends InvalidateAfterOp {
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
-        return await super.validate(references) && this.getTargetOp() instanceof GrantOp && this.getTargetOp().getTargetObject().equals(this.getTargetObject());
+        return await super.validate(references) && this.getTargetOp() instanceof GrantOp;
     }
 
     getTargetOp(): GrantOp {

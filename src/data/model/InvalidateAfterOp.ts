@@ -72,6 +72,10 @@ abstract class InvalidateAfterOp extends MutationOp {
             return false;
         }
 
+        if (!this.getTargetOp().getTargetObject().equals(this.getTargetObject())) {
+            return false;
+        }
+
         return true;
     
     }
