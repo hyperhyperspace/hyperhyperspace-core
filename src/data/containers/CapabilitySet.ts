@@ -26,11 +26,6 @@ class GrantOp extends MutationOp {
         return await super.validate(references) && this.grantee !== undefined && this.capability !== undefined;
     }
 
-    async validateCausalOps(references: Map<Hash, HashedObject>): Promise<boolean> {
-        references; return true;
-    }
-
-
     getClassName(): string {
         return GrantOp.className;
     }
