@@ -154,6 +154,8 @@ class CapabilitySet extends MutableObject {
     constructor() {
         super(CapabilitySet.opClasses, true);
 
+        this.setRandomId();
+
         this._grants  = new MultiMap();
         this._revokes = new MultiMap();
 

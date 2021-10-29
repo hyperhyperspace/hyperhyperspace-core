@@ -190,8 +190,5 @@ class PermissionTest extends CapabilitySet {
 }
 
 HashedObject.registerClass(PermissionTest.className, PermissionTest);
-HashedObject.registerClass(GrantOp.className, GrantOp);
-HashedObject.registerClass(RevokeAfterOp.className, RevokeAfterOp);
-HashedObject.registerClass(UseOp.className, UseOp);
 
 export { PermissionTest, PermissionUse };

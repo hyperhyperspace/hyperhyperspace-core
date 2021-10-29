@@ -30,7 +30,6 @@ const BITS_FOR_ID = 128;
  this object and its subobjects. */
 
 abstract class HashedObject {
-
     
     static knownClasses = new Map<string, new () => HashedObject>();
 
