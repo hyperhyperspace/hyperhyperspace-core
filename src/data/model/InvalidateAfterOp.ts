@@ -16,8 +16,8 @@ abstract class InvalidateAfterOp extends MutationOp {
     // have targetOp in causalOps but are not contained in the set of ops that
     // come up to {terminalOps}.
 
-    constructor(targetOp?: MutationOp, terminalOps?: IterableIterator<MutationOp>, causalOps?: IterableIterator<MutationOp>) {
-        super(targetOp?.targetObject, causalOps);
+    constructor(targetOp?: MutationOp, terminalOps?: IterableIterator<MutationOp>) {
+        super(targetOp?.targetObject);
         
         if (targetOp !== undefined) {
             this.targetOp = targetOp;

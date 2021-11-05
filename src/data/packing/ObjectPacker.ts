@@ -110,7 +110,7 @@ class ObjectPacker {
                     this.content.push(literal);
                     this.contentHashes.add(literal.hash);
                 }
-    
+
                 for (const hash of result.omitted.keys()) {
 
                     // We're currently computing two different reference chains: attemptToAdd will return

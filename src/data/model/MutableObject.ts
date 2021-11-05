@@ -74,8 +74,9 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(CascadedInvalidateOp.className) >= 0
     }
 
-    abstract mutate(op: MutationOp): Promise<boolean>;
+    abstract mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean>;
 
+    /*
     // override if appropiate
     async undo(op: MutationOp): Promise<boolean> {
         op; return true;
@@ -84,10 +85,10 @@ abstract class MutableObject extends HashedObject {
     // override if appropiate
     async redo(op: MutationOp): Promise<boolean> {
         op; return true;
-    }
+    }*/
 
-    protected isUndone(opHash: Hash): boolean {
-        return this._activeUndoOpsPerOp.get(opHash).size > 0;
+    protected isValidOp(opHash: Hash): boolean {
+        return this._activeUndoOpsPerOp.get(opHash).size === 0;
     }
 
     addMutationCallback(cb: (mut: MutationOp) => void) {
@@ -389,14 +390,16 @@ abstract class MutableObject extends HashedObject {
 
             if (wasUndone !== op.undo) {
                 if (op.undo) {
-                    result = this.undo(op.getFinalTargetOp());
+                    //result = this.undo(op.getFinalTargetOp());
+                    result = this.mutate(op.getFinalTargetOp(), false, true);
                 } else { // redo
-                    result = this.redo(op.getFinalTargetOp());
+                    //result = this.redo(op.getFinalTargetOp());
+                    result = this.mutate(op.getFinalTargetOp(), true, true);
                 }
             }
 
         } else {
-            result = this.mutate(op);
+            result = this.mutate(op, true, false);
         }
 
         const done = result.then((mutated: boolean) => {

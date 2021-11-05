@@ -90,7 +90,7 @@ class CascadedInvalidateOp extends MutationOp {
     targetOp?: MutationOp;
 
     constructor(undo?: boolean, targetOp?: MutationOp, causalOp?: InvalidateAfterOp|CascadedInvalidateOp) {
-        super(targetOp?.targetObject, causalOp === undefined? undefined : [causalOp].values());
+        super(targetOp?.targetObject);
 
         if (undo !== undefined) {
             this.undo = undo;
@@ -106,6 +106,8 @@ class CascadedInvalidateOp extends MutationOp {
             if (causalOp === undefined) {
                 throw new Error('Cannot create ' + opType + ', causalOp not provided.');
             }
+
+            this.setCausalOps([causalOp].values());
             
             // this.causalOps is initialized by call to super() above
 

@@ -22,13 +22,13 @@ class PermissionTest extends CapabilitySet {
         
     }
 
-    private isRootOp(op: MutationOp): boolean { 
+    isRootOp(op: MutationOp): boolean { 
         const root = this.getAuthor();
 
         return root !== undefined && root.equals(op.getAuthor()) && (op.causalOps === undefined || op.causalOps.size() === 0);
     }
 
-    private isAdminOp(op: GrantOp|RevokeAfterOp, opReferences: Map<Hash, HashedObject>, admin?: Identity): boolean {
+    isAdminOp(op: MutationOp, opReferences: Map<Hash, HashedObject>, admin?: Identity): boolean {
 
         const causalUseOps = op.causalOps;
         if (causalUseOps === undefined || causalUseOps.size() !== 1) {
@@ -49,7 +49,7 @@ class PermissionTest extends CapabilitySet {
 
         const causalGrantOp = causalUseOp.grantOp as GrantOp;
 
-        if (causalUseOp.usageKey !== PermissionTest.getGranteeCapabilityKeyForOp(op)) {
+        if (!this.isCapabilityUseForOp(op, causalUseOp)) {
             return false;
         }
 
@@ -134,18 +134,20 @@ class PermissionTest extends CapabilitySet {
     }
 
     addUser(id: Identity, admin?: Identity): Promise<boolean> {
-        let userOp = this.findValidGrant(id, 'user');
+        const validGrantOp = this.findValidGrant(id, 'user');
 
-        if (userOp === undefined) {
+        if (validGrantOp === undefined) {
+            const grantOp = new GrantOp(this, id, 'user');
             if (admin === undefined) {
-                const grantOp = new GrantOp(this, id, 'user');
+                
                 grantOp.setAuthor(this.getAuthor() as Identity);
                 return this.applyNewOp(grantOp).then(() => true);
+
             } else {
-                const usageKey = PermissionTest.getGranteeCapabilityKey(id, 'user', false);
-                const useAdminOp = this.useCapability(admin, 'admin', usageKey);
-                const grantOp = new GrantOp(this, id, 'user', [useAdminOp].values());
-                grantOp.setAuthor(useAdminOp.getAuthor() as Identity);
+
+                grantOp.setAuthor(admin as Identity);
+                grantOp.setPrevOps(this._terminalOps.values());
+                const useAdminOp = this.useCapabilityForOp(admin, 'admin', grantOp);
                 
                 return this.applyNewOp(useAdminOp).then(() => this.applyNewOp(grantOp).then(() => true));
             }
@@ -156,21 +158,20 @@ class PermissionTest extends CapabilitySet {
     }
 
     removeUser(id: Identity, admin?: Identity): Promise<boolean> {
-        const applies: Array<Promise<void>> = []
+
+        const applies: Array<Promise<void>> = [];
 
         const allValidGrants = this.findAllValidGrants(id, 'user');
 
-        const causalOps = [];
-        if (admin !== undefined && allValidGrants.size > 0) {
-            const usageKey = PermissionTest.getGranteeCapabilityKey(id, 'user', true);
-            const useAdminOp = this.useCapability(admin, 'admin', usageKey);
-            causalOps.push(useAdminOp);
-            applies.push(this.applyNewOp(useAdminOp));
-        }
-
         for (const grantOp of allValidGrants.values()) {
-            const revokeOp = new RevokeAfterOp(grantOp, this._terminalOps.values(), causalOps.values());
-            if (admin === undefined) {
+
+            const revokeOp = new RevokeAfterOp(grantOp, this._terminalOps.values());
+            if (admin !== undefined) {
+                revokeOp.setAuthor(this.getAuthor() as Identity);
+                revokeOp.setPrevOps(this._terminalOps.values());
+                const useAdminOp = this.useCapabilityForOp(admin, 'admin', revokeOp);
+                applies.push(this.applyNewOp(useAdminOp));
+            } else {
                 revokeOp.setAuthor(this.getAuthor() as Identity);
             }
             

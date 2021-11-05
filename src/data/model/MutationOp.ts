@@ -12,17 +12,11 @@ abstract class MutationOp extends HashedObject {
     prevOps? : HashedSet<HashReference<MutationOp>>;
     causalOps?: HashedSet<HashReference<MutationOp>>;
 
-    constructor(targetObject?: MutableObject, causalOps?: IterableIterator<MutationOp>) {
+    constructor(targetObject?: MutableObject) {
         super();
 
         if (targetObject !== undefined) {
             this.targetObject = targetObject;
-            if (causalOps !== undefined) {
-                const causalOpArray = Array.from(causalOps).map((op: MutationOp) => op.createReference());
-                if (causalOpArray.length > 0) {
-                    this.causalOps = new HashedSet(causalOpArray.values()); 
-                }                
-            }
         }
     }
 
@@ -85,12 +79,29 @@ abstract class MutationOp extends HashedObject {
 
     }
 
+    setCausalOps(causalOps: IterableIterator<MutationOp>) {
+        const causalOpArray = Array.from(causalOps).map((op: MutationOp) => op.createReference());
+        if (causalOpArray.length > 0) {
+            this.causalOps = new HashedSet(causalOpArray.values()); 
+        } else {
+            this.causalOps = undefined;
+        }
+    }
+
     getCausalOps() {
         if (this.causalOps === undefined) {
             throw new Error('Called getCausalOps, but this.causalOps is undefined.');
         }
 
         return this.causalOps as HashedSet<HashReference<MutationOp>>;
+    }
+
+    addCausalOp(causalOp: MutationOp) {
+        if (this.causalOps === undefined) {
+            this.causalOps = new HashedSet([causalOp.createReference()].values());
+        } else {
+            this.causalOps.add(causalOp.createReference());
+        }
     }
 
     getTargetObject() : MutableObject {
@@ -141,6 +152,16 @@ abstract class MutationOp extends HashedObject {
 
     hasCausalOps() {
         return this.causalOps !== undefined;
+    }
+
+    nonCausalHash(): Hash {
+
+        const currentCausalOps = this.causalOps;
+        this.causalOps = undefined;
+        const nonCausalHash = this.hash();
+        this.causalOps = currentCausalOps;
+        return nonCausalHash;
+
     }
 
 }

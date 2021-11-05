@@ -88,8 +88,8 @@ class Store {
         let missing = await this.findMissingReferencesWithContext(hash, context);
 
         if (missing.size > 0) {
-            Store.operationLog.debug(() => 'Cannot save ' + hash + ' because the following references are missing: ' + Array.from(missing).join(', ') + '.');
-            throw new Error('Cannot save object ' + hash + ' because the following references are missing: ' + Array.from(missing).join(', ') + '.');
+            Store.operationLog.debug(() => 'Cannot save ' + hash + ' (a ' + object.getClassName() + ') because the following references are missing: ' + Array.from(missing).join(', ') + '.');
+            throw new Error('Cannot save object ' + hash + ' (a ' + object.getClassName() + ') because the following references are missing: ' + Array.from(missing).join(', ') + '.');
         }
 
         Store.operationLog.debug(() => 'Saving object with hash ' + hash + ' .');
@@ -174,7 +174,8 @@ class Store {
 
     }
 
-    private async saveWithContext(hash: Hash, context: Context) : Promise<void> {
+    // low level save: no mutation flush, no hash/store setting in objects
+    async saveWithContext(hash: Hash, context: Context) : Promise<void> {
 
         const object = context.objects.get(hash);
 

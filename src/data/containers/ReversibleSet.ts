@@ -17,12 +17,16 @@ type DeleteOpHash = Hash;
 abstract class ReversibleSetOp<T extends HashedObject> extends MutationOp {
 
     constructor(target?: ReversibleSet<T>, causalOps?: IterableIterator<MutationOp>) {
-        super(target, causalOps);
+        super(target);
 
         if (target !== undefined) {
             let author = target.getAuthor();
             if (author !== undefined) {
                 this.setAuthor(author);
+            }
+
+            if (causalOps !== undefined) {
+                this.setCausalOps(causalOps);
             }
         }
     }

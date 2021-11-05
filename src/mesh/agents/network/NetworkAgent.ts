@@ -725,7 +725,7 @@ class NetworkAgent implements Agent {
             } else if (dice < 0.02) {
                 // delay
                 const delay = Math.random() * 5000;
-                new Promise(r => setTimeout(r, delay)).then(() => { conn.send(JSON.stringify(message)); })
+                new Promise(r => setTimeout(r, delay)).then(() => { conn.send(JSON.stringify(message)); }).catch(() => {});
             } else if (dice < 0.03) {
                 // truncate
                 conn.send(JSON.stringify(message).substring(0, 100));

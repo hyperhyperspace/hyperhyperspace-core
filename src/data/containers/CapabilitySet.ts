@@ -9,17 +9,17 @@ type Key = string;
 
 class GrantOp extends MutationOp {
 
-    static className = 'hhs/v0/GrantCapabilityOp';
+    static className = 'hhs/v0/GrantOp';
 
     grantee?    : Identity;
     capability? : Capability;
 
-    constructor(targetObject?: CapabilitySet, grantee?: Identity, capability?: Capability, causalOps?: IterableIterator<MutationOp>) {
-        super(targetObject, causalOps);
+    constructor(targetObject?: CapabilitySet, grantee?: Identity, capability?: Capability) {
+        super(targetObject);
 
         this.grantee = grantee;
         this.capability = capability;
-
+ 
     }
     
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
@@ -38,10 +38,10 @@ class GrantOp extends MutationOp {
 
 class RevokeAfterOp extends InvalidateAfterOp {
 
-    static className = 'hhs/v0/RevokeCapabilityAfterOp';
+    static className = 'hhs/v0/RevokeAfterOp';
 
-    constructor(grantOp?: GrantOp, terminalOps?: IterableIterator<MutationOp>, causalOps?: IterableIterator<MutationOp>) {
-        super(grantOp, terminalOps, causalOps);
+    constructor(grantOp?: GrantOp, terminalOps?: IterableIterator<MutationOp>) {
+        super(grantOp, terminalOps);
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
@@ -70,12 +70,14 @@ class UseOp extends MutationOp {
     usageKey?: Hash;
 
     constructor(grantOp?: GrantOp, usageKey?: Hash) {
-        super(grantOp?.getTargetObject(), grantOp === undefined? undefined : [grantOp].values());
+        super(grantOp?.getTargetObject());
 
         if (grantOp !== undefined) {
             this.grantOp = grantOp;
             this.usageKey = usageKey;
             this.setAuthor(grantOp.grantee as Identity);
+
+            this.setCausalOps([grantOp].values());
         }
         
     }
@@ -90,6 +92,10 @@ class UseOp extends MutationOp {
 
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
         if (!await super.validate(references)) {
+            return false;
+        }
+
+        if (this.getId() !== undefined) {
             return false;
         }
 
@@ -165,19 +171,22 @@ class CapabilitySet extends MutableObject {
         
     }
 
-    async mutate(op: MutationOp): Promise<boolean> {
+    async mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean> {
 
         let mutated = false;
 
-        if (op instanceof GrantOp) {
-            const key = CapabilitySet.getGranteeCapabilityKeyForOp(op);
-            const hash = op.hash();
-            this._grants.add(key, hash);
-            this._grantOps.set(hash, op);
-        } else if (op instanceof RevokeAfterOp) {
-            const grantOp = op.getTargetOp();
-            this._revokes.add(grantOp.hash(), op.hash());
+        if (valid && !cascade) {
+            if (op instanceof GrantOp) {
+                const key = CapabilitySet.getGranteeCapabilityKeyForOp(op);
+                const hash = op.hash();
+                this._grants.add(key, hash);
+                this._grantOps.set(hash, op);
+            } else if (op instanceof RevokeAfterOp) {
+                const grantOp = op.getTargetOp();
+                this._revokes.add(grantOp.hash(), op.hash());
+            }
         }
+        
 
         return mutated;
     }
@@ -193,10 +202,10 @@ class CapabilitySet extends MutableObject {
         let result = false;
 
         for (const grantHash of this._grants.get(CapabilitySet.getGranteeCapabilityKey(grantee, capability))) {
-            if (!this.isUndone(grantHash)) {
+            if (this.isValidOp(grantHash)) {
                 let revoked = false;
                 for (const revokeHash of this._revokes.get(grantHash)) {
-                    if (!this.isUndone(revokeHash)) {
+                    if (this.isValidOp(revokeHash)) {
                         revoked = true;
                     }
                 }
@@ -237,16 +246,38 @@ class CapabilitySet extends MutableObject {
         return useOp;
     }
 
+    useCapabilityForOp(grantee: Identity, capability: Capability, op: MutationOp): UseOp {
+        const usageKey = op.nonCausalHash();
+        const useOp = this.useCapability(grantee, capability, usageKey);
+        op.addCausalOp(useOp);
+        return useOp;
+    }
+
+    useCapabilityForOpIfAvailable(grantee: Identity, capability: Capability, op: MutationOp): UseOp|undefined {
+        const usageKey = op.nonCausalHash();
+        const useOp = this.useCapabilityIfAvailable(grantee, capability, usageKey);
+        if (useOp !== undefined) {
+            op.addCausalOp(useOp);
+            return useOp;
+        } else {
+            return undefined;
+        }
+    }
+
+    isCapabilityUseForOp(op: MutationOp, useOp: UseOp): boolean {
+        return useOp.usageKey === op.nonCausalHash();
+    }
+
     protected findValidGrant(grantee: Identity, capability: Capability): GrantOp|undefined {
         
         let chosenGrantOp: GrantOp|undefined = undefined;
         let chosenGrantOpHash: Hash|undefined = undefined;
 
         for (const grantOpHash of this._grants.get(CapabilitySet.getGranteeCapabilityKey(grantee, capability))) {
-            if (!this.isUndone(grantOpHash)) {
+            if (this.isValidOp(grantOpHash)) {
                 let revoked = false;
                 for (const revokeHash of this._revokes.get(grantOpHash)) {
-                    if (!this.isUndone(revokeHash)) {
+                    if (this.isValidOp(revokeHash)) {
                         revoked = true;
                     }
                 }
@@ -268,10 +299,10 @@ class CapabilitySet extends MutableObject {
         const all = new Map<Hash, GrantOp>();
 
         for (const grantOpHash of this._grants.get(CapabilitySet.getGranteeCapabilityKey(grantee, capability))) {
-            if (!this.isUndone(grantOpHash)) {
+            if (this.isValidOp(grantOpHash)) {
                 let revoked = false;
                 for (const revokeHash of this._revokes.get(grantOpHash)) {
-                    if (!this.isUndone(revokeHash)) {
+                    if (this.isValidOp(revokeHash)) {
                         revoked = true;
                     }
                 }

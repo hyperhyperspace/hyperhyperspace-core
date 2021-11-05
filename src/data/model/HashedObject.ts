@@ -60,7 +60,7 @@ abstract class HashedObject {
     abstract init() : void;
     abstract validate(references: Map<Hash, HashedObject>) : Promise<boolean>;
 
-    getId() : (string | undefined) {
+    getId(): (string | undefined) {
         return this.id;
     }
 
@@ -71,6 +71,10 @@ abstract class HashedObject {
     setRandomId() {
         //TODO: use b64 here
         this.id = new RNGImpl().randomHexString(BITS_FOR_ID);
+    }
+
+    hasId(): boolean {
+        return this.id !== undefined;
     }
 
     setAuthor(author: Identity) {

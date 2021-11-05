@@ -923,7 +923,7 @@ class HistorySynchronizer {
             this.cancelRequest(reqInfo, 'invalid-literal', detail);
             return false;
         }
-        
+            
         reqInfo.receivedObjects?.literals.set(literal.hash, literal);
         reqInfo.nextLiteralSequence = reqInfo.nextLiteralSequence + 1;
 
@@ -933,10 +933,12 @@ class HistorySynchronizer {
                 
                 try {
 
-                    const op = await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
-                    
+                    // throws if validation fails
+                    await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
+
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
-                    await this.syncAgent.store.save(op);
+                    
+                    await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
 
                     // FIXME: there's no validation of the op matching the actual causal history op
                     // TODO:  validate, remove op and all history following if op does not match
@@ -955,7 +957,7 @@ class HistorySynchronizer {
                     this.opXferLog.warning(e);
                     this.opXferLog.warning(e.stack);
                     this.opXferLog.warning('\n'+this.logPrefix+'\nnextLiteralSequence='+reqInfo.nextLiteralSequence);
-                    this.opXferLog.warning('\n'+this.logPrefix+'\nreceivedLiteralsCount='+reqInfo.receivedLiteralsCount)
+                    this.opXferLog.warning('\n'+this.logPrefix+'\nreceivedLiteralsCount='+reqInfo.receivedLiteralsCount);
                     return false;    
                 }
 
