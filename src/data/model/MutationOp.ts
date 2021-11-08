@@ -10,7 +10,7 @@ abstract class MutationOp extends HashedObject {
 
     targetObject?  : MutableObject;
     prevOps? : HashedSet<HashReference<MutationOp>>;
-    causalOps?: HashedSet<HashReference<MutationOp>>;
+    causalOps?: HashedSet<MutationOp>;
 
     constructor(targetObject?: MutableObject) {
         super();
@@ -23,18 +23,22 @@ abstract class MutationOp extends HashedObject {
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
 
         if (this.targetObject === undefined) {
+            console.log('a')
             return false;
         }
 
         if (!(this.targetObject instanceof MutableObject)) {
+            console.log('b')
             return false;
         }
 
         if (this.prevOps === undefined) {
+            console.log('c')
             return false;
         }
 
         if (!(this.prevOps instanceof HashedSet)) {
+            console.log('d')
             return false;
         }
 
@@ -42,36 +46,43 @@ abstract class MutationOp extends HashedObject {
             const prevOp = references.get(prevOpRef.hash);
 
             if (prevOp === undefined) {
+                console.log('e')
                 return false;
             } else if (! (prevOp instanceof MutationOp)) {
+                console.log('f')
                 return false
             } else if (! ((prevOp as MutationOp).targetObject as MutableObject).equals(this.targetObject)) { 
+                console.log('g')
                 return false;
             }
         }
 
         if (!this.targetObject.supportsUndo() && this.causalOps !== undefined) {
+            console.log('h')
             return false;
         }
 
         if (this.causalOps !== undefined) {
 
             if (! (this.causalOps instanceof HashedSet)) {
+                console.log('i')
                 return false;
             }
 
-            for (const causalOpRef of this.causalOps.values()) {
-                const causalOp = references.get(causalOpRef.hash);
+            for (const causalOp of this.causalOps.values()) {
 
                 if (causalOp === undefined) {
+                    console.log('j')
                     return false;
                 } else if (! (causalOp instanceof MutationOp)) {
+                    console.log('k')
                     return false;
                 }
             }
         }
 
         if (!this.targetObject.shouldAcceptMutationOp(this, references)) {
+            console.log('l')
             return false;
         }
         
@@ -80,10 +91,8 @@ abstract class MutationOp extends HashedObject {
     }
 
     setCausalOps(causalOps: IterableIterator<MutationOp>) {
-        const causalOpArray = Array.from(causalOps).map((op: MutationOp) => op.createReference());
-        if (causalOpArray.length > 0) {
-            this.causalOps = new HashedSet(causalOpArray.values()); 
-        } else {
+        this.causalOps = new HashedSet(causalOps); 
+        if (this.causalOps.size() === 0) {
             this.causalOps = undefined;
         }
     }
@@ -93,14 +102,14 @@ abstract class MutationOp extends HashedObject {
             throw new Error('Called getCausalOps, but this.causalOps is undefined.');
         }
 
-        return this.causalOps as HashedSet<HashReference<MutationOp>>;
+        return this.causalOps as HashedSet<MutationOp>;
     }
 
     addCausalOp(causalOp: MutationOp) {
         if (this.causalOps === undefined) {
-            this.causalOps = new HashedSet([causalOp.createReference()].values());
+            this.causalOps = new HashedSet([causalOp].values());
         } else {
-            this.causalOps.add(causalOp.createReference());
+            this.causalOps.add(causalOp);
         }
     }
 

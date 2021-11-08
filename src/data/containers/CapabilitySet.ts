@@ -1,15 +1,15 @@
 import { MultiMap } from 'util/multimap';
 
-import { Hash, HashReference } from '../model';
+import { Hash } from '../model';
 import { Identity } from '../identity';
 import { HashedObject, MutableObject, MutationOp, InvalidateAfterOp } from '../model';
 
 type Capability = string;
 type Key = string;
 
-class GrantOp extends MutationOp {
+class GrantCapabilityOp extends MutationOp {
 
-    static className = 'hhs/v0/GrantOp';
+    static className = 'hhs/v0/GrantCapabilityOp';
 
     grantee?    : Identity;
     capability? : Capability;
@@ -27,7 +27,7 @@ class GrantOp extends MutationOp {
     }
 
     getClassName(): string {
-        return GrantOp.className;
+        return GrantCapabilityOp.className;
     }
 
     init(): void {
@@ -36,24 +36,24 @@ class GrantOp extends MutationOp {
 
 }
 
-class RevokeAfterOp extends InvalidateAfterOp {
+class RevokeCapabilityAfterOp extends InvalidateAfterOp {
 
-    static className = 'hhs/v0/RevokeAfterOp';
+    static className = 'hhs/v0/RevokeCapabilityAfterOp';
 
-    constructor(grantOp?: GrantOp, terminalOps?: IterableIterator<MutationOp>) {
+    constructor(grantOp?: GrantCapabilityOp, terminalOps?: IterableIterator<MutationOp>) {
         super(grantOp, terminalOps);
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
-        return await super.validate(references) && this.getTargetOp() instanceof GrantOp;
+        return await super.validate(references) && this.getTargetOp() instanceof GrantCapabilityOp;
     }
 
-    getTargetOp(): GrantOp {
-        return super.getTargetOp() as GrantOp;
+    getTargetOp(): GrantCapabilityOp {
+        return super.getTargetOp() as GrantCapabilityOp;
     }
 
     getClassName(): string {
-        return RevokeAfterOp.className;
+        return RevokeCapabilityAfterOp.className;
     }
 
     init(): void {
@@ -62,14 +62,14 @@ class RevokeAfterOp extends InvalidateAfterOp {
 
 }
 
-class UseOp extends MutationOp {
+class UseCapabilityOp extends MutationOp {
 
     static className = 'hhs/v0/UseCapabilityOp';
 
-    grantOp?: GrantOp;
+    grantOp?: GrantCapabilityOp;
     usageKey?: Hash;
 
-    constructor(grantOp?: GrantOp, usageKey?: Hash) {
+    constructor(grantOp?: GrantCapabilityOp, usageKey?: Hash) {
         super(grantOp?.getTargetObject());
 
         if (grantOp !== undefined) {
@@ -83,7 +83,7 @@ class UseOp extends MutationOp {
     }
 
     getClassName(): string {
-        return UseOp.className;
+        return UseCapabilityOp.className;
     }
 
     init(): void {
@@ -109,14 +109,13 @@ class UseOp extends MutationOp {
             return false;
         }
 
-        const causalOpRef = causalOps.values().next().value as HashReference<MutationOp>;
-        const causalOp = references.get(causalOpRef.hash);
+        const causalOp = causalOps.values().next().value as MutationOp;
 
         if (causalOp === undefined) {
              return false;
         }
 
-        if (!(causalOp instanceof GrantOp)) {
+        if (!(causalOp instanceof GrantCapabilityOp)) {
             return false;
         }
 
@@ -128,7 +127,7 @@ class UseOp extends MutationOp {
             return false;
         }
 
-        if (this.grantOp === undefined || !(this.grantOp instanceof GrantOp)) {
+        if (this.grantOp === undefined || !(this.grantOp instanceof GrantCapabilityOp)) {
             return false
         }
 
@@ -145,12 +144,12 @@ class UseOp extends MutationOp {
 class CapabilitySet extends MutableObject {
 
     static className = 'hhs/v0/CapabilitySet';
-    static opClasses = [GrantOp.className, RevokeAfterOp.className, UseOp.className];
+    static opClasses = [GrantCapabilityOp.className, RevokeCapabilityAfterOp.className, UseCapabilityOp.className];
 
     _grants  : MultiMap<Key, Hash>;
     _revokes : MultiMap<Hash, Hash>;
 
-    _grantOps: Map<Hash, GrantOp>;
+    _grantOps: Map<Hash, GrantCapabilityOp>;
 
     constructor() {
         super(CapabilitySet.opClasses, true);
@@ -176,12 +175,12 @@ class CapabilitySet extends MutableObject {
         let mutated = false;
 
         if (valid && !cascade) {
-            if (op instanceof GrantOp) {
+            if (op instanceof GrantCapabilityOp) {
                 const key = CapabilitySet.getGranteeCapabilityKeyForOp(op);
                 const hash = op.hash();
                 this._grants.add(key, hash);
                 this._grantOps.set(hash, op);
-            } else if (op instanceof RevokeAfterOp) {
+            } else if (op instanceof RevokeCapabilityAfterOp) {
                 const grantOp = op.getTargetOp();
                 this._revokes.add(grantOp.hash(), op.hash());
             }
@@ -220,7 +219,7 @@ class CapabilitySet extends MutableObject {
         return result;
     }
 
-    useCapability(grantee: Identity, capability: Capability, usageKey: string): UseOp {
+    useCapability(grantee: Identity, capability: Capability, usageKey: string): UseCapabilityOp {
 
         let useOp = this.useCapabilityIfAvailable(grantee, capability, usageKey);
 
@@ -232,13 +231,13 @@ class CapabilitySet extends MutableObject {
 
     }
 
-    useCapabilityIfAvailable(grantee: Identity, capability: Capability, usageKey: string): UseOp|undefined {
-        let useOp: UseOp|undefined = undefined;
+    useCapabilityIfAvailable(grantee: Identity, capability: Capability, usageKey: string): UseCapabilityOp|undefined {
+        let useOp: UseCapabilityOp|undefined = undefined;
 
         const grantOp = this.findValidGrant(grantee, capability);
 
         if (grantOp !== undefined) {
-            useOp = new UseOp(grantOp, usageKey);
+            useOp = new UseCapabilityOp(grantOp, usageKey);
             useOp.setAuthor(grantee);
             this.applyNewOp(useOp);
         }
@@ -246,14 +245,14 @@ class CapabilitySet extends MutableObject {
         return useOp;
     }
 
-    useCapabilityForOp(grantee: Identity, capability: Capability, op: MutationOp): UseOp {
+    useCapabilityForOp(grantee: Identity, capability: Capability, op: MutationOp): UseCapabilityOp {
         const usageKey = op.nonCausalHash();
         const useOp = this.useCapability(grantee, capability, usageKey);
         op.addCausalOp(useOp);
         return useOp;
     }
 
-    useCapabilityForOpIfAvailable(grantee: Identity, capability: Capability, op: MutationOp): UseOp|undefined {
+    useCapabilityForOpIfAvailable(grantee: Identity, capability: Capability, op: MutationOp): UseCapabilityOp|undefined {
         const usageKey = op.nonCausalHash();
         const useOp = this.useCapabilityIfAvailable(grantee, capability, usageKey);
         if (useOp !== undefined) {
@@ -264,13 +263,38 @@ class CapabilitySet extends MutableObject {
         }
     }
 
-    isCapabilityUseForOp(op: MutationOp, useOp: UseOp): boolean {
+    checkCapabilityForOp(useOp: UseCapabilityOp, capability: Capability, op: MutationOp, grantee?: Identity): boolean {
+        const usageKey = op.nonCausalHash();
+        if (useOp.usageKey !== usageKey) {
+            console.log(10)
+            return false;
+        }
+
+        if (useOp.grantOp?.capability !== capability) {
+            console.log(11)
+            return false;
+        }
+
+        if (!op.hasCausalOps() || !op.getCausalOps().has(useOp)) {
+            console.log(12)
+            return false;
+        }
+
+        if (grantee !== undefined && !grantee.equals(useOp.getAuthor())) {
+            console.log(13)
+            return false;
+        }
+
+        return true;
+    }
+
+    isCapabilityUseForOp(op: MutationOp, useOp: UseCapabilityOp): boolean {
         return useOp.usageKey === op.nonCausalHash();
     }
 
-    protected findValidGrant(grantee: Identity, capability: Capability): GrantOp|undefined {
+    protected findValidGrant(grantee: Identity, capability: Capability): GrantCapabilityOp|undefined {
         
-        let chosenGrantOp: GrantOp|undefined = undefined;
+        let chosenGrantOp: GrantCapabilityOp|undefined = undefined;
         let chosenGrantOpHash: Hash|undefined = undefined;
 
         for (const grantOpHash of this._grants.get(CapabilitySet.getGranteeCapabilityKey(grantee, capability))) {
@@ -294,9 +318,9 @@ class CapabilitySet extends MutableObject {
         return chosenGrantOp;
     }
 
-    protected findAllValidGrants(grantee: Identity, capability: Capability): Map<Hash, GrantOp> {
+    protected findAllValidGrants(grantee: Identity, capability: Capability): Map<Hash, GrantCapabilityOp> {
         
-        const all = new Map<Hash, GrantOp>();
+        const all = new Map<Hash, GrantCapabilityOp>();
 
         for (const grantOpHash of this._grants.get(CapabilitySet.getGranteeCapabilityKey(grantee, capability))) {
             if (this.isValidOp(grantOpHash)) {
@@ -308,7 +332,7 @@ class CapabilitySet extends MutableObject {
                 }
 
                 if (!revoked) {
-                    all.set(grantOpHash, this._grantOps.get(grantOpHash) as GrantOp);
+                    all.set(grantOpHash, this._grantOps.get(grantOpHash) as GrantCapabilityOp);
                 }
             }
         }
@@ -316,11 +340,11 @@ class CapabilitySet extends MutableObject {
         return all;
     }
 
-    static getGranteeCapabilityKeyForOp(op: GrantOp|RevokeAfterOp): Key {
+    static getGranteeCapabilityKeyForOp(op: GrantCapabilityOp|RevokeCapabilityAfterOp): Key {
 
         let revoke = false;
 
-        if (op instanceof RevokeAfterOp) {
+        if (op instanceof RevokeCapabilityAfterOp) {
             op = op.getTargetOp();
             revoke = true;
         }
@@ -334,10 +358,10 @@ class CapabilitySet extends MutableObject {
 }
 
 HashedObject.registerClass(CapabilitySet.className, CapabilitySet);
-HashedObject.registerClass(GrantOp.className, GrantOp);
-HashedObject.registerClass(RevokeAfterOp.className, RevokeAfterOp);
-HashedObject.registerClass(UseOp.className, UseOp);
+HashedObject.registerClass(GrantCapabilityOp.className, GrantCapabilityOp);
+HashedObject.registerClass(RevokeCapabilityAfterOp.className, RevokeCapabilityAfterOp);
+HashedObject.registerClass(UseCapabilityOp.className, UseCapabilityOp);
     
 
 
-export { CapabilitySet, Capability, UseOp, GrantOp, RevokeAfterOp };
+export { CapabilitySet, Capability, UseCapabilityOp, GrantCapabilityOp, RevokeCapabilityAfterOp };

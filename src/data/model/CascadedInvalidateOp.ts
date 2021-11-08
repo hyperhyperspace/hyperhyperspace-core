@@ -114,7 +114,7 @@ class CascadedInvalidateOp extends MutationOp {
             // sanity checks:
 
             // The cascade has merit: causalOp.targetOp \in targetOp.causalOps
-            if (!targetOp.getCausalOps().has(causalOp.getTargetOp().createReference())) {
+            if (!targetOp.getCausalOps().has(causalOp.getTargetOp())) {
                 throw new Error('Creating undo because of an InvalidateAfterOp, but the op being undone does not depend on the invalidated one.');
             }
 
@@ -239,7 +239,7 @@ class CascadedInvalidateOp extends MutationOp {
         }
 
         // The cascade has merit: causalOp.targetOp \in targetOp.causalOps
-        if (!this.targetOp.getCausalOps().has(causalOp.getTargetOp().createReference())) {
+        if (!this.targetOp.getCausalOps().has(causalOp.getTargetOp())) {
             return false;
         }
 

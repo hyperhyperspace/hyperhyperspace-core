@@ -1,10 +1,10 @@
 import { Identity } from 'data/identity';
-import { Hash, HashedObject, HashReference, MutationOp } from 'data/model';
-import { CapabilitySet, GrantOp, RevokeAfterOp, UseOp } from 'data/containers';
+import { Hash, HashedObject, MutationOp } from 'data/model';
+import { CapabilitySet, GrantCapabilityOp, RevokeCapabilityAfterOp, UseCapabilityOp } from 'data/containers';
 
 //type PermissionTestOp = GrantOp|RevokeAfterOp|UseOp;
 
-type PermissionUse = UseOp;
+type PermissionUse = UseCapabilityOp;
 
 class PermissionTest extends CapabilitySet {
 
@@ -25,35 +25,21 @@ class PermissionTest extends CapabilitySet {
     isRootOp(op: MutationOp): boolean { 
         const root = this.getAuthor();
 
-        return root !== undefined && root.equals(op.getAuthor()) && (op.causalOps === undefined || op.causalOps.size() === 0);
+        return root !== undefined && root.equals(op.getAuthor()) && op.causalOps === undefined;
     }
 
     isAdminOp(op: MutationOp, opReferences: Map<Hash, HashedObject>, admin?: Identity): boolean {
+
+        opReferences;
 
         const causalUseOps = op.causalOps;
         if (causalUseOps === undefined || causalUseOps.size() !== 1) {
             return false;
         }
 
-        const causalUseOpRef = causalUseOps.values().next().value as MutationOp;
+        const causalGrantOp = causalUseOps.values().next().value as MutationOp;
 
-        if (!(causalUseOpRef instanceof HashReference)) {
-            return false;
-        }
-
-        const causalUseOp = opReferences.get(causalUseOpRef.hash);
-
-        if (causalUseOp === undefined || !(causalUseOp instanceof UseOp)) {
-            return false;
-        }
-
-        const causalGrantOp = causalUseOp.grantOp as GrantOp;
-
-        if (!this.isCapabilityUseForOp(op, causalUseOp)) {
-            return false;
-        }
-
-        if (!(causalGrantOp instanceof GrantOp)) {
+        if (!(causalGrantOp instanceof GrantCapabilityOp)) {
             return false;
         }
 
@@ -76,7 +62,7 @@ class PermissionTest extends CapabilitySet {
 
         if (super.isAcceptedMutationOpClass(op)) {
 
-            if (op instanceof GrantOp) {
+            if (op instanceof GrantCapabilityOp) {
                 if (op.capability === 'admin' && this.isRootOp(op)) {
                     return true;
                 } else if (op.capability === 'user' && (this.isRootOp(op) || this.isAdminOp(op, opReferences))) {
@@ -84,7 +70,7 @@ class PermissionTest extends CapabilitySet {
                 } else {
                     return false;
                 }
-            } else if (op instanceof RevokeAfterOp) {
+            } else if (op instanceof RevokeCapabilityAfterOp) {
                 if (op.getTargetOp().capability === 'admin' && this.isRootOp(op)) {
                     return true;
                 } else if (op.getTargetOp().capability === 'user' && (this.isRootOp(op) || this.isAdminOp(op, opReferences))) {
@@ -108,7 +94,7 @@ class PermissionTest extends CapabilitySet {
         let grantOp = this.findValidGrant(id, 'admin');
 
         if (grantOp === undefined) {
-            grantOp = new GrantOp(this, id, 'admin');
+            grantOp = new GrantCapabilityOp(this, id, 'admin');
             grantOp.setAuthor(this.getAuthor() as Identity);
             return this.applyNewOp(grantOp).then(() => true);
         } else {
@@ -121,7 +107,7 @@ class PermissionTest extends CapabilitySet {
         const applies: Array<Promise<void>> = []
 
         for (const grantOp of this.findAllValidGrants(id, 'admin').values()) {
-            const revokeOp = new RevokeAfterOp(grantOp, this._terminalOps.values());
+            const revokeOp = new RevokeCapabilityAfterOp(grantOp, this._terminalOps.values());
             revokeOp.setAuthor(this.getAuthor() as Identity);
             applies.push(this.applyNewOp(revokeOp));
         }
@@ -137,7 +123,7 @@ class PermissionTest extends CapabilitySet {
         const validGrantOp = this.findValidGrant(id, 'user');
 
         if (validGrantOp === undefined) {
-            const grantOp = new GrantOp(this, id, 'user');
+            const grantOp = new GrantCapabilityOp(this, id, 'user');
             if (admin === undefined) {
                 
                 grantOp.setAuthor(this.getAuthor() as Identity);
@@ -145,11 +131,16 @@ class PermissionTest extends CapabilitySet {
 
             } else {
 
-                grantOp.setAuthor(admin as Identity);
-                grantOp.setPrevOps(this._terminalOps.values());
-                const useAdminOp = this.useCapabilityForOp(admin, 'admin', grantOp);
-                
-                return this.applyNewOp(useAdminOp).then(() => this.applyNewOp(grantOp).then(() => true));
+                grantOp.setAuthor(admin);
+                //grantOp.setPrevOps(this._terminalOps.values());
+                //const useAdminOp = this.useCapabilityForOp(admin, 'admin', grantOp);
+                const adminGrantOp = this.findValidGrant(admin, 'admin');
+                if (adminGrantOp !== undefined) {
+                    grantOp.addCausalOp(adminGrantOp);
+                    return this.applyNewOp(grantOp).then(() => true);
+                } else {
+                    return Promise.reject(new Error(admin.hash() + " cannot grant 'user' capability to " + id.hash() + ": there is no valid 'admin' grant."));
+                }
             }
             
         } else {
@@ -163,18 +154,21 @@ class PermissionTest extends CapabilitySet {
 
         const allValidGrants = this.findAllValidGrants(id, 'user');
 
+        const revoker = admin === undefined? this.getAuthor() as Identity : admin;
+        const adminGrantOp = admin === undefined? undefined : this.findValidGrant(admin, 'admin');
+
+        if (admin !== undefined && adminGrantOp === undefined) {
+            return Promise.reject(new Error(admin.hash() + " cannot revoke 'user' capability for " + id.hash() + ": there is no valid 'admin' grant."));
+        }
+
         for (const grantOp of allValidGrants.values()) {
 
-            const revokeOp = new RevokeAfterOp(grantOp, this._terminalOps.values());
-            if (admin !== undefined) {
-                revokeOp.setAuthor(this.getAuthor() as Identity);
-                revokeOp.setPrevOps(this._terminalOps.values());
-                const useAdminOp = this.useCapabilityForOp(admin, 'admin', revokeOp);
-                applies.push(this.applyNewOp(useAdminOp));
-            } else {
-                revokeOp.setAuthor(this.getAuthor() as Identity);
+            const revokeOp = new RevokeCapabilityAfterOp(grantOp, this._terminalOps.values());
+            revokeOp.setAuthor(revoker);
+            if (adminGrantOp !== undefined) {
+                revokeOp.addCausalOp(adminGrantOp);
             }
-            
+
             applies.push(this.applyNewOp(revokeOp));
         }
 

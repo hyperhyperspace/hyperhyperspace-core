@@ -1,6 +1,5 @@
 import { Hash } from '../model/Hashing';
 import { HashedObject } from '../model/HashedObject';
-import { HashReference } from '../model/HashReference';
 import { HashedSet } from '../model/HashedSet';
 import { MutableObject } from '../model/MutableObject';
 import { MutationOp } from '../model/MutationOp';
@@ -18,15 +17,11 @@ class EnableFeatureOp extends MutationOp {
 
     featureName?: FeatureName;
 
-    constructor(target?: FeatureSet, featureName?: FeatureName, causalOps?: IterableIterator<MutationOp>) {
+    constructor(target?: FeatureSet, featureName?: FeatureName) {
         super(target);
 
         if (featureName !== undefined) {
             this.featureName = featureName;
-
-            if (causalOps !== undefined) {
-                this.setCausalOps(causalOps);
-            }
         }
 
     }
@@ -38,21 +33,25 @@ class EnableFeatureOp extends MutationOp {
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         
 
-        if (!(await super.validate(references))) { 
+        if (!(await super.validate(references))) {
+            console.log(1)
             return false;
         }
 
         const target = this.getTargetObject();
 
         if (!(target instanceof FeatureSet)) {
+            console.log(2)
             return false;
         }
 
         if (this.featureName === undefined || !target.getFeatureNames().has(this.featureName)) {
+            console.log(3)
             return false;
         }
 
-        if (this.hasId()) {
+        if (this.hasCausalOps() && this.hasId()) {
+            console.log(4)
             return false;
         }
 
@@ -77,25 +76,34 @@ class EnableFeatureOp extends MutationOp {
     getClassName(): string {
         return EnableFeatureOp.className;
     }
-
-    getUsageKey() {
-        return 'enable-' + this.featureName?.replace(/-/g, '--') + '-' + this.getAuthor()?.hash();
-    }
 }
 
 class DisableFeatureAfterOp extends InvalidateAfterOp {
     static className = 'hhs/v0/DisableFeatureAfterOp';
 
-    constructor(targetOp?: EnableFeatureOp, terminalOps?: IterableIterator<MutationOp>, causalOps?: IterableIterator<MutationOp>) {
+    constructor(targetOp?: EnableFeatureOp, terminalOps?: IterableIterator<MutationOp>) {
         super(targetOp, terminalOps);
-
-        if (causalOps !== undefined) {
-            this.setCausalOps(causalOps);
-        }
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
-        return await super.validate(references) && this.getTargetOp() instanceof EnableFeatureOp;
+
+        if (!await super.validate(references)) {
+            return false;
+        }
+
+        if (!(this.getTargetOp() instanceof EnableFeatureOp)) {
+            return false
+        }
+
+        if (!this.getTargetOp().getTargetObject()?.equals(this.getTargetObject())) {
+            return false;
+        }
+
+        if (this.hasCausalOps() && this.hasId()) {
+            return false;
+        }
+
+        return true;
     }
 
     getTargetOp(): EnableFeatureOp {
@@ -140,8 +148,7 @@ class UseFeatureOp extends MutationOp {
             return false;
         }
 
-        const causalOpRef = causalOps.values().next().value as HashReference<MutationOp>;
-        const causalOp = references.get(causalOpRef.hash);
+        const causalOp = causalOps.values().next().value as MutationOp;
 
         if (causalOp === undefined) {
              return false;
@@ -200,33 +207,7 @@ class FeatureSet extends MutableObject {
         
     }
 
-    // return false iif the feature was already enabled
-    enableFeaure(featureName: FeatureName, causalOps: Array<MutationOp>): boolean {
-        
-        if (!this.isEnabled(featureName)) {
-            const enableOp = new EnableFeatureOp(this, featureName, causalOps.values());
-            this.applyNewOp(enableOp);
-            return true;
-        } else {
-            return false;
-        }
 
-    }
-
-    // return false iif the feature was already disabled
-    disableFeature(featureName: FeatureName, causalOps: Array<MutationOp>): boolean {
-
-        let mutated = false;
-
-        for (const validEnableOpHash of this._validEnableOpsPerFeature.get(featureName).values()) {
-            const validEnableOp = this._allValidEnableOps.get(validEnableOpHash);
-            const disableOp = new DisableFeatureAfterOp(validEnableOp, this._terminalOps.values(), causalOps.values());
-            this.applyNewOp(disableOp);
-            mutated = true;
-        }
-
-        return mutated;
-    }
 
     useFeatureIfEnabled(featureName: FeatureName, usageKey: Hash, usingIdentity?: Identity): UseFeatureOp|undefined {
         
@@ -347,4 +328,4 @@ HashedObject.registerClass(DisableFeatureAfterOp.className, DisableFeatureAfterO
 HashedObject.registerClass(UseFeatureOp.className, UseFeatureOp);
 HashedObject.registerClass(FeatureSet.className, FeatureSet);
 
-export { FeatureSet, EnableFeatureOp, DisableFeatureAfterOp, UseFeatureOp };
+export { FeatureSet, FeatureName, EnableFeatureOp, DisableFeatureAfterOp, UseFeatureOp };
