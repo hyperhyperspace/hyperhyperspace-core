@@ -1,12 +1,12 @@
 import { Identity } from 'data/identity';
 import { Hash, HashedObject, MutationOp } from 'data/model';
-import { CapabilitySet, GrantCapabilityOp, RevokeCapabilityAfterOp, UseCapabilityOp } from 'data/containers';
+import { AbstractCapabilitySet, GrantCapabilityOp, RevokeCapabilityAfterOp, UseCapabilityOp } from 'data/containers';
 
 //type PermissionTestOp = GrantOp|RevokeAfterOp|UseOp;
 
 type PermissionUse = UseCapabilityOp;
 
-class PermissionTest extends CapabilitySet {
+class PermissionTest extends AbstractCapabilitySet {
 
     static className = 'hhs-test/PermissionTest';
 

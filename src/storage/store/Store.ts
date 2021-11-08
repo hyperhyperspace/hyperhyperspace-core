@@ -255,7 +255,7 @@ class Store {
                     // If any of the causal ops has been invalidated, check if we should cascade
                     
                     for (const causalOp of object.causalOps.values()) {
-                        const invalidations = await this.loadAllInvalidations(causalOp.hash);
+                        const invalidations = await this.loadAllInvalidations(causalOp.getLastHash());
                         
                         for (const inv of invalidations) {
                             // Note1: Since the invAfterOp was already saved and this op was not (loaded === undefined above)
