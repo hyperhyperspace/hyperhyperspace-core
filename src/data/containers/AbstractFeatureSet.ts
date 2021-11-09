@@ -17,7 +17,7 @@ class EnableFeatureOp extends MutationOp {
 
     featureName?: FeatureName;
 
-    constructor(target?: FeatureSet, featureName?: FeatureName) {
+    constructor(target?: AbstractFeatureSet, featureName?: FeatureName) {
         super(target);
 
         if (featureName !== undefined) {
@@ -40,7 +40,7 @@ class EnableFeatureOp extends MutationOp {
 
         const target = this.getTargetObject();
 
-        if (!(target instanceof FeatureSet)) {
+        if (!(target instanceof AbstractFeatureSet)) {
             console.log(2)
             return false;
         }
@@ -183,8 +183,8 @@ class UseFeatureOp extends MutationOp {
     }
 }
 
-class FeatureSet extends MutableObject {
-    static className = 'hhs/v0/FeatureSet';
+abstract class AbstractFeatureSet extends MutableObject {
+
     static opClasses = [EnableFeatureOp.className, DisableFeatureAfterOp.className, UseFeatureOp.className];
 
     featureNames?: HashedSet<string>;
@@ -193,7 +193,7 @@ class FeatureSet extends MutableObject {
     _validEnableOpsPerFeature: MultiMap<FeatureName, Hash>;
 
     constructor(featureNames?: IterableIterator<string>) {
-        super(FeatureSet.opClasses, true);
+        super(AbstractFeatureSet.opClasses, true);
 
         if (featureNames !== undefined) {
             this.featureNames = new HashedSet(featureNames);
@@ -280,11 +280,7 @@ class FeatureSet extends MutableObject {
 
         return Promise.resolve(mutated);
     }
-
-    getClassName(): string {
-        return FeatureSet.className;
-    }
-
+    
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         
         references;
@@ -326,6 +322,5 @@ class FeatureSet extends MutableObject {
 HashedObject.registerClass(EnableFeatureOp.className, EnableFeatureOp);
 HashedObject.registerClass(DisableFeatureAfterOp.className, DisableFeatureAfterOp);
 HashedObject.registerClass(UseFeatureOp.className, UseFeatureOp);
-HashedObject.registerClass(FeatureSet.className, FeatureSet);
 
-export { FeatureSet, FeatureName, EnableFeatureOp, DisableFeatureAfterOp, UseFeatureOp };
+export { AbstractFeatureSet, FeatureName, EnableFeatureOp, DisableFeatureAfterOp, UseFeatureOp };

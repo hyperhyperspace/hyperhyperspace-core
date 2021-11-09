@@ -1,10 +1,10 @@
-import { FeatureName, FeatureSet, DisableFeatureAfterOp, EnableFeatureOp, UseFeatureOp, UseCapabilityOp } from 'data/containers';
+import { FeatureName, AbstractFeatureSet, DisableFeatureAfterOp, EnableFeatureOp, UseFeatureOp, UseCapabilityOp } from 'data/containers';
 import { Hash, HashedObject, MutationOp } from 'data/model';
 import { Identity } from 'data/identity';
 import { PermissionTest } from './PermissionTest';
 
 
-class PermissionedFeatureSet extends FeatureSet {
+class PermissionedFeatureSet extends AbstractFeatureSet {
     static className = 'hhs-test/PermissionedFeatureSet';
 
     static adminFeatures = new Set(['anon-write', 'anon-read']);
