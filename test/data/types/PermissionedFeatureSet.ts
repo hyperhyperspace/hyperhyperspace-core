@@ -63,29 +63,24 @@ class PermissionedFeatureSet extends AbstractFeatureSet {
         
         const causalUseOps = op.causalOps;
         if (causalUseOps === undefined || causalUseOps.size() !== 1) {
-            console.log('*')
             return false;
         }
 
         const causalUseOp = causalUseOps.values().next().value as UseCapabilityOp;
 
         if (!(causalUseOp instanceof UseCapabilityOp)) {
-            console.log('?')
             return false;
         }
 
         if (!this.users?.checkCapabilityForOp(causalUseOp, 'admin', op, op.getAuthor())) {
-            console.log('%')
             return false;
         }
 
         if ((op instanceof EnableFeatureOp) && (op.featureName === undefined || !PermissionedFeatureSet.adminFeatures.has(op.featureName))) {
-            console.log('@')
             return false;
         }
 
         if ((op instanceof DisableFeatureAfterOp) && (op.getTargetOp().featureName === undefined || !PermissionedFeatureSet.adminFeatures.has(op.getTargetOp().featureName as string))) {
-            console.log('!')
             return false;
         }
 

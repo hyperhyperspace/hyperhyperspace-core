@@ -23,22 +23,18 @@ abstract class MutationOp extends HashedObject {
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
 
         if (this.targetObject === undefined) {
-            console.log('a')
             return false;
         }
 
         if (!(this.targetObject instanceof MutableObject)) {
-            console.log('b')
             return false;
         }
 
         if (this.prevOps === undefined) {
-            console.log('c')
             return false;
         }
 
         if (!(this.prevOps instanceof HashedSet)) {
-            console.log('d')
             return false;
         }
 
@@ -46,43 +42,35 @@ abstract class MutationOp extends HashedObject {
             const prevOp = references.get(prevOpRef.hash);
 
             if (prevOp === undefined) {
-                console.log('e')
                 return false;
             } else if (! (prevOp instanceof MutationOp)) {
-                console.log('f')
                 return false
             } else if (! ((prevOp as MutationOp).targetObject as MutableObject).equals(this.targetObject)) { 
-                console.log('g')
                 return false;
             }
         }
 
         if (!this.targetObject.supportsUndo() && this.causalOps !== undefined) {
-            console.log('h')
             return false;
         }
 
         if (this.causalOps !== undefined) {
 
             if (! (this.causalOps instanceof HashedSet)) {
-                console.log('i')
                 return false;
             }
 
             for (const causalOp of this.causalOps.values()) {
 
                 if (causalOp === undefined) {
-                    console.log('j')
                     return false;
                 } else if (! (causalOp instanceof MutationOp)) {
-                    console.log('k')
                     return false;
                 }
             }
         }
 
         if (!this.targetObject.shouldAcceptMutationOp(this, references)) {
-            console.log('l')
             return false;
         }
         
