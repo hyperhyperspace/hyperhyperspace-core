@@ -342,11 +342,11 @@ class SecureNetworkAgent implements Agent {
         const toRemove = new Array<string>();
 
         for (const [id, partialMsg] of this.messageFragments.entries()) {
-            const timeout = Math.max(8000, 1000 * partialMsg.fragCount) + partialMsg.created;
+            const timeout = Math.max(8000, 400 * partialMsg.fragCount) + partialMsg.created;
             const updateTimeout = Math.max(timeout, 6000 + partialMsg.updated);
             const now = Date.now();
 
-            if (now > timeout || now > updateTimeout) {
+            if (now > timeout && now > updateTimeout) {
                 toRemove.push(id);
                 SecureNetworkAgent.logger.warning('Removed message ' + id + ' due to re-assembly timeout!');
             }
@@ -701,7 +701,7 @@ class SecureNetworkAgent implements Agent {
                             partialMsg.recipient === secureMessage.identityHash &&
                             partialMsg.fragCount === secureMessage.fragCount &&
                             secureMessage.fragSeq < secureMessage.fragCount) {
-
+                            
                             partialMsg.fragments.set(secureMessage.fragSeq, secureMessage.payload);
 
                             if (partialMsg.fragments.size === partialMsg.fragCount) {

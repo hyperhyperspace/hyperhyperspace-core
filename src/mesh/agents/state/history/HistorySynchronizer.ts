@@ -18,8 +18,8 @@ import { RequestMsg, ResponseMsg, CancelRequestMsg } from './HistoryProvider';
 const MaxRequestsPerRemote = 2;
 const MaxPendingOps = 1024;
 
-const RequestTimeout = 16;
-const LiteralArrivalTimeout = 8;
+const RequestTimeout = 32;
+const LiteralArrivalTimeout = 16;
 
 const MaxSavedCancelledRequests = 64;
 
@@ -61,6 +61,7 @@ class HistorySynchronizer {
     static opXferLog  = new Logger(HistorySynchronizer.name, LogLevel.INFO);
     static storeLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
     static requestLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static responseLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
 
     syncAgent: HeaderBasedSyncAgent;
 
@@ -99,6 +100,7 @@ class HistorySynchronizer {
     opXferLog  : Logger;
     storeLog   : Logger;
     requestLog : Logger;
+    responseLog : Logger;
 
     constructor(syncAgent: HeaderBasedSyncAgent) {
 
@@ -128,12 +130,13 @@ class HistorySynchronizer {
 
         this.logPrefix = 'On peer ' + this.syncAgent.peerGroupAgent.localPeer.identity?.hash() as Hash + ':';
 
-        this.controlLog = HistorySynchronizer.controlLog;
-        this.sourcesLog = HistorySynchronizer.sourcesLog;
-        this.stateLog   = HistorySynchronizer.stateLog;
-        this.opXferLog  = HistorySynchronizer.opXferLog;
-        this.storeLog   = HistorySynchronizer.storeLog;
-        this.requestLog = HistorySynchronizer.requestLog;
+        this.controlLog  = HistorySynchronizer.controlLog;
+        this.sourcesLog  = HistorySynchronizer.sourcesLog;
+        this.stateLog    = HistorySynchronizer.stateLog;
+        this.opXferLog   = HistorySynchronizer.opXferLog;
+        this.storeLog    = HistorySynchronizer.storeLog;
+        this.requestLog  = HistorySynchronizer.requestLog;
+        this.responseLog = HistorySynchronizer.responseLog;
     }
 
     async onNewHistory(remote: Endpoint, receivedOpHistories: Set<OpHeader>) {
@@ -212,10 +215,13 @@ class HistorySynchronizer {
 
             let debugInfo = '\n'+this.logPrefix+'\nState info before attempt:\n';
 
-            debugInfo = debugInfo + '\nDiscovered op histories:   [' + Array.from(this.discoveredHistory.contents.keys()) + ']';    
+            const discHist =  Array.from(this.discoveredHistory.contents.keys());
+            const pendingHist = Array.from(this.requestsForOpHistory.keys());
+            const pendingOps = Array.from(this.requestsForOp.keys());
+            debugInfo = debugInfo + '\nDiscovered op histories:   [' + discHist.slice(0, 8) + ( discHist.length > 8 ? ' ...' : '') + '] (count: ' + discHist.length + ')';    
             debugInfo = debugInfo + '\nMissing prev op histories: [' + Array.from(this.discoveredHistory.missingPrevOpHeaders) + ']';
-            debugInfo = debugInfo + '\nPending op histories:      [' + Array.from(this.requestsForOpHistory.keys()) + ']';
-            debugInfo = debugInfo + '\nPending ops:               [' + Array.from(this.requestsForOp.keys()) + ']';
+            debugInfo = debugInfo + '\nPending op histories:      [' + pendingHist.slice(0, 8) + (pendingHist.length > 8 ? ' ...' : '') + '] (count: ' + pendingHist.length + ')';
+            debugInfo = debugInfo + '\nPending ops:               [' + pendingOps.slice(0, 8) + (pendingOps.length > 8 ? ' ...' : '') + '] (count: ' + pendingOps.length + ')';
             debugInfo = debugInfo + '\nLocal state:               [' + Array.from(this.localStateFragment.contents.keys()) + ']';
             debugInfo = debugInfo + '\nRequests:                  [' + Array.from(this.requests.keys()).map((k: RequestId) => k + '(' + this.requests.get(k)?.status + ')') + ']';
 
@@ -268,7 +274,7 @@ class HistorySynchronizer {
                     }
                 }
 
-                this.sourcesLog.debug('\n'+this.logPrefix+'\nSources for missing prev op history ' + hash + ': ', sources);
+                this.sourcesLog.trace('\n'+this.logPrefix+'\nSources for missing prev op history ' + hash + ': ', sources);
             } else {
                 if (!isUnrequested) {
                     this.controlLog.trace('\n'+this.logPrefix+'\nIgnoring missing prev op history ' + hash + ': it has already been requested.');
@@ -350,7 +356,7 @@ class HistorySynchronizer {
                 let debugInfo = '';            
     
                 if (opHistories.size > 0) {
-                    debugInfo = debugInfo + '\n';
+                    debugInfo = debugInfo + '\nNew request for ' + remote + '\n';
                     debugInfo = debugInfo + 'Requesting op histories: [' + Array.from(opHistories) + ']\n';
                     debugInfo = debugInfo + '          starting from: [' + Array.from(current.startingOpHistories) + ']\n';
                 }
@@ -514,9 +520,11 @@ class HistorySynchronizer {
             const ops = opHeaders.map( (opHeaderHash: Hash) => 
                                        (remoteHistory.contents.get(opHeaderHash) as OpHeader).opHash);
 
+
+            const allRemoteOps = Array.from(remoteHistory.contents.keys());
             this.controlLog.debug('starting ops: ' + Array.from(startingOps));
-            this.controlLog.debug('all remote ops: ' + Array.from(remoteHistory.contents.keys()));
-            this.controlLog.debug('to request: ' + opHeaders);
+            this.controlLog.debug('all remote ops: ' + allRemoteOps.slice(0, 8) + (allRemoteOps.length > 8 ? ' ...' : '') + ' (count: ' + allRemoteOps.length + ')');
+            this.controlLog.debug('to request: ' + opHeaders.slice(0, 8) + (opHeaders.length > 8 ? ' ...' : '') + ' (count: ' + opHeaders.length + ')');
 
             return ops;
         } else {
@@ -645,14 +653,15 @@ class HistorySynchronizer {
 
             debugInfo = debugInfo + 'Received response for request ' + msg.requestId + ' from ' + remote + ' with ' + msg.history?.length + ' op histories, ' + msg.sendingOps?.length + ' ops and expecting ' + msg.literalCount + ' literals.\n';
             if (msg.history !== undefined) {
-                debugInfo = debugInfo + 'Histories: [' + msg.history.map((opHistory: OpHeaderLiteral) => opHistory.headerHash) + ']\n';
+                const histories = msg.history.map((opHistory: OpHeaderLiteral) => opHistory.headerHash);
+                debugInfo = debugInfo + 'Histories: [' + histories.slice(0, 8) + ( histories.length > 8 ? ' ...' : '') + '] (count: ' + histories.length + ')\n';
             }
 
             if (msg.sendingOps !== undefined) {
-                debugInfo = debugInfo + '      Ops: [' + msg.sendingOps + ']\n';
+                debugInfo = debugInfo + '      Ops: [' + msg.sendingOps.slice(0, 8) + (msg.sendingOps.length > 8 ? ' ...' : '') + '] (count: ' + msg.sendingOps.length + ')\n';
             }
             
-            this.controlLog.debug('\n'+this.logPrefix+'\n'+debugInfo);
+            this.responseLog.debug('\n'+this.logPrefix+'\n'+debugInfo);
         }
 
 
@@ -799,16 +808,28 @@ class HistorySynchronizer {
             // Do it backwards, so if new ops are added while this loop is running, we will never
             // add an op but omit one of its predecessors because it was stored in-between.
 
-            if (reqInfo.receivedHistory !== undefined) {
+            if (reqInfo.receivedHistory !== undefined && reqInfo.receivedHistory.contents.size > 0) {
+
+                let addedOpHeaders = 0;
+                let duplicatedOpHeaders = 0;
+    
+
                 const rcvdHistory = reqInfo.receivedHistory;
                 for (const opHistory of rcvdHistory.iterateFrom(rcvdHistory.terminalOpHeaders, 'backward', 'bfs')) {
                     this.requestsForOpHistory.delete(opHistory.headerHash, req.requestId)
                     if (await this.opHistoryIsMissingFromStore(opHistory.headerHash) && this.opHistoryIsUndiscovered(opHistory.headerHash)) {
+                        addedOpHeaders = addedOpHeaders + 1;                        
                         this.discoveredHistory.add(opHistory);
+                    } else {
+                        duplicatedOpHeaders = duplicatedOpHeaders + 1;
                     }
                 }
+
+                this.responseLog.debug('Imported ' + addedOpHeaders + ' new and ignored ' + duplicatedOpHeaders + ' duplicated op headers for request ' + req.requestId);
             }
             
+            
+
             // Update expected op arrivals: delete what we asked and use what the server actually is sending instead
 
             if (req.requestedOps !== undefined) {
@@ -1092,7 +1113,7 @@ class HistorySynchronizer {
     }
 
     private async validateResponse(remote: Endpoint, msg: ResponseMsg): Promise<boolean> {
-        
+
         const reqInfo = this.requests.get(msg.requestId);
 
         // if request is known and was sent to 'remote' and unreplied as of now:
@@ -1209,7 +1230,6 @@ class HistorySynchronizer {
             }
 
             reqInfo.receivedHistory = receivedHistory;
-
             return true;
         } else {
             return false;
@@ -1364,8 +1384,6 @@ class HistorySynchronizer {
                 this.requestsForOpHistory.add(opHistoryHash, reqId)
             }
         }
-        
-        
 
         let sent = this.syncAgent.sendMessageToPeer(reqInfo.remote, this.syncAgent.getAgentId(), reqInfo.request);
 
@@ -1390,6 +1408,7 @@ class HistorySynchronizer {
 
         HeaderBasedSyncAgent.controlLog.debug('\n'+this.logPrefix+'\n'+detail);
 
+        console.log('cleaning up due to cancelling')
         this.cleanupRequest(reqInfo);
 
         const msg: CancelRequestMsg = {
@@ -1414,7 +1433,7 @@ class HistorySynchronizer {
             this.cancelRequest(reqInfo, 'slow-connection', 'Timeout waiting for response');
             return true;
 
-        } else if (reqInfo.response !== undefined) {
+        } else if (reqInfo.response !== undefined && reqInfo.status !== 'validating') { // ??? requests are vanishing during validation
             if (reqInfo.response.sendingOps === undefined || reqInfo.response.sendingOps.length === 0) {
 
                 // This request is not sending any ops, so it can be removed as soon as there is a response

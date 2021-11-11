@@ -34,24 +34,20 @@ class EnableFeatureOp extends MutationOp {
         
 
         if (!(await super.validate(references))) {
-            console.log(1)
             return false;
         }
 
         const target = this.getTargetObject();
 
         if (!(target instanceof AbstractFeatureSet)) {
-            console.log(2)
             return false;
         }
 
         if (this.featureName === undefined || !target.getFeatureNames().has(this.featureName)) {
-            console.log(3)
             return false;
         }
 
         if (this.hasCausalOps() && this.hasId()) {
-            console.log(4)
             return false;
         }
 
