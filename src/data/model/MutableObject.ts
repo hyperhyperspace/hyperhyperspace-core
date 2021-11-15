@@ -42,6 +42,8 @@ abstract class MutableObject extends HashedObject {
     // an external mutation callback should be registered below.
     _externalMutationCallbacks : Set<(mut: MutationOp) => void>;
 
+    private _loadedAllChanges: boolean;
+
     constructor(acceptedOpClasses : Array<string>, supportsUndo=false) {
         super();
 
@@ -62,6 +64,8 @@ abstract class MutableObject extends HashedObject {
         this._unappliedOps    = new Map();
         
         this._applyOpsLock = new Lock();
+
+        this._loadedAllChanges = false;
 
         this._opCallback = async (hash: Hash) => {
             await this.applyOpFromStore(hash);
@@ -233,6 +237,8 @@ abstract class MutableObject extends HashedObject {
                                         start: results.end
                                     });
         }
+
+        this._loadedAllChanges = true;
     }
 
     async loadAndWatchForChanges(loadBatchSize=128) {
@@ -512,6 +518,10 @@ abstract class MutableObject extends HashedObject {
 
     getAcceptedMutationOpClasses() : Array<string> {
         return this._acceptedMutationOpClasses;
+    }
+
+    hasLoadedAllChanges(): boolean {
+        return this._loadedAllChanges;
     }
 
 }
