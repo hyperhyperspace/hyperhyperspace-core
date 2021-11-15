@@ -261,22 +261,18 @@ abstract class AbstractCapabilitySet extends MutableObject {
     checkCapabilityForOp(useOp: UseCapabilityOp, capability: Capability, op: MutationOp, grantee?: Identity): boolean {
         const usageKey = op.nonCausalHash();
         if (useOp.usageKey !== usageKey) {
-            console.log(10)
             return false;
         }
 
         if (useOp.grantOp?.capability !== capability) {
-            console.log(11)
             return false;
         }
 
         if (!op.hasCausalOps() || !op.getCausalOps().has(useOp)) {
-            console.log(12)
             return false;
         }
 
         if (grantee !== undefined && !grantee.equals(useOp.getAuthor())) {
-            console.log(13)
             return false;
         }
 
