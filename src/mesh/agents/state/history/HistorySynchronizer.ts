@@ -55,12 +55,12 @@ type RequestInfo = {
 };
 
 class HistorySynchronizer {
-    static controlLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
-    static sourcesLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
-    static stateLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
-    static opXferLog  = new Logger(HistorySynchronizer.name, LogLevel.INFO);
-    static storeLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
-    static requestLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static controlLog  = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static sourcesLog  = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static stateLog    = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static opXferLog   = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static storeLog    = new Logger(HistorySynchronizer.name, LogLevel.INFO);
+    static requestLog  = new Logger(HistorySynchronizer.name, LogLevel.INFO);
     static responseLog = new Logger(HistorySynchronizer.name, LogLevel.INFO);
 
     syncAgent: HeaderBasedSyncAgent;
@@ -94,12 +94,12 @@ class HistorySynchronizer {
     terminated = false;
 
     readonly logPrefix: Hash;
-    controlLog : Logger;
-    sourcesLog : Logger;
-    stateLog   : Logger;
-    opXferLog  : Logger;
-    storeLog   : Logger;
-    requestLog : Logger;
+    controlLog  : Logger;
+    sourcesLog  : Logger;
+    stateLog    : Logger;
+    opXferLog   : Logger;
+    storeLog    : Logger;
+    requestLog  : Logger;
     responseLog : Logger;
 
     constructor(syncAgent: HeaderBasedSyncAgent) {
