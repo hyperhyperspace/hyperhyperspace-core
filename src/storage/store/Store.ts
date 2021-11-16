@@ -347,7 +347,6 @@ class Store {
             }
 
         }
-
     }
 
     async loadLiteral(hash: Hash): Promise<Literal | undefined> {

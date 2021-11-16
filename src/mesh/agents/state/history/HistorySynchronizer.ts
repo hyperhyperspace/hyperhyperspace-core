@@ -955,16 +955,24 @@ class HistorySynchronizer {
                 try {
 
                     // throws if validation fails
+                    const t1 = Date.now()
                     await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
+                    const t2 = Date.now()
+
+                    console.log('validated ' + literal.hash + ' in ' + (t2 - t1) + 'ms')
 
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     
+                    const s1 = Date.now()
                     await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
+                    const s2 = Date.now()
+
+                    console.log('saved ' + literal.hash + ' in ' + (s2 - s1) + 'ms')
 
                     // FIXME: there's no validation of the op matching the actual causal history op
                     // TODO:  validate, remove op and all history following if op does not match
 
-                    this.opXferLog.debug('\n'+this.logPrefix+'\nReceived op ' + literal.hash + ' from request ' + reqInfo.request.requestId);
+                    this.opXferLog.debug('\n'+this.logPrefix+'\nReceived op ' + literal.hash + ' from request ' + reqInfo.request.requestId + '(was requested: ' + (reqInfo.request.requestedOps !== undefined && reqInfo.request.requestedOps.indexOf(literal.hash) >= 0) + ') ');
 
                     const removed = this.checkRequestRemoval(reqInfo);
 
