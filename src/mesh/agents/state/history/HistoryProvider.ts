@@ -175,8 +175,8 @@ class HistoryProvider {
                 requestArrivalTimestamp: Date.now()
             };
 
-            if (msg.mutableObj !== this.syncAgent.mutableObj) {
-                const detail = 'Rejecting request ' + respInfo.request.requestId + ', mutableObj is ' + respInfo.request.mutableObj + ' but it should be ' + this.syncAgent.mutableObj;
+            if (msg.mutableObj !== this.syncAgent.mutableObjHash) {
+                const detail = 'Rejecting request ' + respInfo.request.requestId + ', mutableObj is ' + respInfo.request.mutableObj + ' but it should be ' + this.syncAgent.mutableObjHash;
                 this.rejectRequest(respInfo, 'invalid-request', detail);
                 return;
             } else {
@@ -285,7 +285,7 @@ class HistoryProvider {
 
         // Generate history fragment to include in the response
 
-        const respDelta = new HistoryDelta(this.syncAgent.mutableObj, this.syncAgent.store);
+        const respDelta = new HistoryDelta(this.syncAgent.mutableObjHash, this.syncAgent.store);
 
         let maxHistory = req.maxHistory;
         let maxOps     = req.maxLiterals;

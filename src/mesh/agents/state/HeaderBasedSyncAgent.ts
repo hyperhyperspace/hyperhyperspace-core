@@ -1,4 +1,4 @@
-import { Hash, HashedObject, HashedSet, Literal, LiteralUtils, MutationOp } from 'data/model';
+import { Hash, HashedObject, HashedSet, Literal, LiteralUtils, MutableObject, MutationOp } from 'data/model';
 import { AgentPod } from 'mesh/service/AgentPod';
 import { Store } from 'storage/store';
 import { Logger, LogLevel } from 'util/logging';
@@ -27,7 +27,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     static MaxRequestsPerRemote = 2;
 
-    mutableObj: Hash;
+    mutableObj: MutableObject;
+    mutableObjHash: Hash;
     acceptedMutationOpClasses: string[];
     stateOpFilter?: StateFilter;
 
@@ -50,10 +51,11 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     controlLog: Logger;
     messageLog: Logger;
 
-    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: Hash, resources: Resources, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
+    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: MutableObject, resources: Resources, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
         super(peerGroupAgent);
 
-        this.mutableObj = mutableObj;
+        this.mutableObj  = mutableObj;
+        this.mutableObjHash = mutableObj.hash();
         this.acceptedMutationOpClasses = acceptedMutationOpClasses;
         this.stateOpFilter = stateOpFilter;
 
@@ -75,7 +77,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     
     getAgentId(): string {
-        return HeaderBasedSyncAgent.syncAgentIdFor(this.mutableObj, this.peerGroupAgent.peerGroupId);
+        return HeaderBasedSyncAgent.syncAgentIdFor(this.mutableObjHash, this.peerGroupAgent.peerGroupId);
     }
 
     ready(pod: AgentPod): void {
@@ -111,7 +113,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         let isNew = false;
 
-        if (state instanceof HeaderBasedState && state.mutableObj === this.mutableObj) {
+        if (state instanceof HeaderBasedState && state.mutableObj === this.mutableObjHash) {
 
 
 
@@ -174,18 +176,18 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     // Monitoring local state for changes: 
 
     watchStoreForOps() {
-        this.store.watchReferences('targetObject', this.mutableObj, this.opCallback);
+        this.store.watchReferences('targetObject', this.mutableObjHash, this.opCallback);
     }
 
     unwatchStoreForOps() {
-        this.store.removeReferencesWatch('targetObject', this.mutableObj, this.opCallback);
+        this.store.removeReferencesWatch('targetObject', this.mutableObjHash, this.opCallback);
     }
 
     async opCallback(opHash: Hash): Promise<void> {
 
         if (this.terminated) return;
 
-        this.controlLog.trace('Op ' + opHash + ' found for object ' + this.mutableObj + ' in peer ' + this.peerGroupAgent.getLocalPeer().endpoint);
+        this.controlLog.trace('Op ' + opHash + ' found for object ' + this.mutableObjHash + ' in peer ' + this.peerGroupAgent.getLocalPeer().endpoint);
 
         let op = await this.store.load(opHash) as MutationOp;
         if (this.shouldAcceptMutationOp(op)) {
@@ -202,7 +204,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             const fields    = LiteralUtils.getFields(literal);
             const className = LiteralUtils.getClassName(literal);
 
-            if (fields['targetObject'] !== undefined && fields['targetObject']._hash === this.mutableObj &&
+            if (fields['targetObject'] !== undefined && fields['targetObject']._hash === this.mutableObjHash &&
                 this.acceptedMutationOpClasses.indexOf(className) >= 0) {
 
                 valid = true;
@@ -229,7 +231,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }*/
 
     private async loadStateFromStore(): Promise<HeaderBasedState> {
-        let terminalOpsInfo = await this.store.loadTerminalOpsForMutable(this.mutableObj);
+        let terminalOpsInfo = await this.store.loadTerminalOpsForMutable(this.mutableObjHash);
 
         if (terminalOpsInfo === undefined) {
             terminalOpsInfo = {terminalOps: []};
@@ -244,7 +246,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
             terminalOpHeaders.push(terminalOpHeader as OpHeader)
         }
-        const state = HeaderBasedState.create(this.mutableObj, terminalOpHeaders);
+        const state = HeaderBasedState.create(this.mutableObjHash, terminalOpHeaders);
 
         if (this.stateOpFilter === undefined) {
             return state;
@@ -257,7 +259,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         const stateHash = state.hash();
 
         if (this.stateHash === undefined || this.stateHash !== stateHash) {
-            HeaderBasedSyncAgent.controlLog.trace('Found new state ' + stateHash + ' for ' + this.mutableObj + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
+            HeaderBasedSyncAgent.controlLog.trace('Found new state ' + stateHash + ' for ' + this.mutableObjHash + ' in ' + this.peerGroupAgent.getLocalPeer().endpoint);
             this.state = state;
             this.stateHash = stateHash;
             this.stateOpHeadersByOpHash = new Map();
@@ -278,17 +280,17 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     private shouldAcceptMutationOp(op: MutationOp): boolean {
 
-        return this.mutableObj === op.targetObject?.hash() &&
+        return this.mutableObjHash === op.targetObject?.hash() &&
                this.acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0;
     }
 
     async lastStoredOpsDescription(limit=25) {
 
-        const load = await this.store.loadByReference('targetObject', this.mutableObj, { order: 'desc', limit: limit});
+        const load = await this.store.loadByReference('targetObject', this.mutableObjHash, { order: 'desc', limit: limit});
 
         const last = load.objects.length === limit? 'last ' : '';
 
-        let contents = 'Showing ' + last + load.objects.length + ' ops in store for ' + this.mutableObj + '\n';
+        let contents = 'Showing ' + last + load.objects.length + ' ops in store for ' + this.mutableObjHash + '\n';
 
         let idx=0;
         for (const op of load.objects) {

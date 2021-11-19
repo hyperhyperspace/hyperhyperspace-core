@@ -502,7 +502,7 @@ abstract class MutableObject extends HashedObject {
     }
 
     createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {
-        return new HeaderBasedSyncAgent(peerGroupAgent, this.getLastHash(), this.getResources() as Resources, this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
+        return new HeaderBasedSyncAgent(peerGroupAgent, this, this.getResources() as Resources, this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
         //return new TerminalOpsSyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 

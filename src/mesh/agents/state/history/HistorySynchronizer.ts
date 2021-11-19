@@ -106,12 +106,12 @@ class HistorySynchronizer {
 
         this.syncAgent = syncAgent;
 
-        this.localStateFragment   = new HistoryFragment(this.syncAgent.mutableObj);
+        this.localStateFragment   = new HistoryFragment(this.syncAgent.mutableObjHash);
         this.remoteStateFragments = new Map();
 
-        this.discoveredHistory = new HistoryFragment(this.syncAgent.mutableObj);
+        this.discoveredHistory = new HistoryFragment(this.syncAgent.mutableObjHash);
         
-        this.requestedOps      = new HistoryFragment(this.syncAgent.mutableObj);
+        this.requestedOps      = new HistoryFragment(this.syncAgent.mutableObjHash);
 
         this.requests = new Map();
 
@@ -427,7 +427,7 @@ class HistorySynchronizer {
         const msg: RequestMsg = {
             type: MessageType.Request,
             requestId: new RNGImpl().randomHexString(128),
-            mutableObj: this.syncAgent.mutableObj,
+            mutableObj: this.syncAgent.mutableObjHash,
             mode: mode,
             maxLiterals: MaxLiteralsPerRequest,
             maxHistory: MaxHistoryPerRequest
@@ -609,7 +609,7 @@ class HistorySynchronizer {
         let remoteState = this.remoteStateFragments.get(remote);
 
         if (remoteState === undefined) {
-            remoteState = new HistoryFragment(this.syncAgent.mutableObj);
+            remoteState = new HistoryFragment(this.syncAgent.mutableObjHash);
             this.remoteStateFragments.set(remote, remoteState);
         }
 
@@ -859,6 +859,7 @@ class HistorySynchronizer {
             if (resp.sendingOps !== undefined && resp.sendingOps.length > 0) {
                 reqInfo.receivedObjects = new Context();
                 reqInfo.receivedObjects.resources = this.syncAgent.resources;
+                reqInfo.receivedObjects.objects.set(this.syncAgent.mutableObjHash, this.syncAgent.mutableObj);
             }
 
             if (resp.omittedObjsOwnershipProofs !== undefined &&
@@ -983,7 +984,7 @@ class HistorySynchronizer {
                 }
 
             } else {
-                const detail = '\n'+this.logPrefix+'\nReceived op '+ literal.hash +' is not valid for mutableObj ' + this.syncAgent.mutableObj + ', in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
+                const detail = '\n'+this.logPrefix+'\nReceived op '+ literal.hash +' is not valid for mutableObj ' + this.syncAgent.mutableObjHash + ', in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                 this.cancelRequest(reqInfo, 'invalid-literal', detail);
                 return false;
             }
@@ -1135,7 +1136,7 @@ class HistorySynchronizer {
             // Validate received history
 
             if (resp.history !== undefined) {
-                receivedHistory = new HistoryFragment(this.syncAgent.mutableObj);
+                receivedHistory = new HistoryFragment(this.syncAgent.mutableObjHash);
 
                 // Verify all received op history literals and create a fragment from 'em:
                 for (const opHistoryLiteral of resp.history) {
@@ -1194,7 +1195,7 @@ class HistorySynchronizer {
             
             // The reply MAY contain ops we didn't request, if they directly follow our stated current state.
             // Make a history fragment using this additional ops to check that is indeed the case.
-            const additionalOpsHistory = new HistoryFragment(this.syncAgent.mutableObj);
+            const additionalOpsHistory = new HistoryFragment(this.syncAgent.mutableObjHash);
 
             if (resp.sendingOps !== undefined) {
                 for (const hash of resp.sendingOps) {
