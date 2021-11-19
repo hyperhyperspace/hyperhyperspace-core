@@ -871,13 +871,16 @@ class HistorySynchronizer {
 
                 for (const idx of resp.omittedObjs.keys()) {
 
+                    
                     const hash = resp.omittedObjs[idx];
                     const omissionProof = resp.omittedObjsOwnershipProofs[idx];
     
                     const dep = await this.syncAgent.store.load(hash);
-    
+                    
                     if (dep !== undefined && dep.hash(reqInfo.request.omissionProofsSecret) === omissionProof) {
-                        reqInfo.receivedObjects?.objects.set(dep.hash(), dep);
+                        if (reqInfo.receivedObjects?.objects?.get(dep.hash()) === undefined) {
+                            reqInfo.receivedObjects?.objects.set(dep.hash(), dep);
+                        }
                     }
                 }
     
