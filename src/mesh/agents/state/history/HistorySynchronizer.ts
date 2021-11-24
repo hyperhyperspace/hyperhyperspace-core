@@ -17,6 +17,7 @@ import { RequestMsg, ResponseMsg, CancelRequestMsg } from './HistoryProvider';
 
 const MaxRequestsPerRemote = 2;
 const MaxPendingOps = 1024;
+const MinRequestedOps = 128;
 
 const RequestTimeout = 32;
 const LiteralArrivalTimeout = 16;
@@ -205,9 +206,13 @@ class HistorySynchronizer {
 
         this.controlLog.debug('\n'+this.logPrefix+'\nAttempting new request...');
 
-        if (this.discoveredHistory.contents.size === 0) {
-            
+        if (this.discoveredHistory.contents.size === 0) {  
             this.controlLog.debug('\n'+this.logPrefix+'\nThere is nothing to request.');
+            return;
+        }
+
+        if (this.requestedOps.contents.size > MinRequestedOps) {
+            this.controlLog.debug('\n'+this.logPrefix+'\nDelaying request, too many pending ops.');
             return;
         }
 
