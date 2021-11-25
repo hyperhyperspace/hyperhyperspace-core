@@ -183,6 +183,11 @@ class Space {
 
         const hash = entryPoint.hash();
 
+        return Space.getWordCodingForHash(hash, words, lang);
+    }
+
+    static getWordCodingForHash(hash: Hash, words=3, lang='en') {
+
         let coder = WordCode.lang.get(lang);
 
         if (coder === undefined) {
