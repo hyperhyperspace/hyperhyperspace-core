@@ -45,11 +45,11 @@ describeProxy('[SYN] State sync', () => {
 
     }, 300000);
 
-    test('[SYN05] Causal history agent-based set sync in small peer group (wrtc), using SQLite', async (done) => {
+    /*test('[SYN05] Causal history agent-based set sync in small peer group (wrtc), using SQLite', async (done) => {
 
         await syncInSmallPeerGroup(done, 'wrtc', undefined, undefined, true);
 
-    }, 300000);
+    }, 300000);*/
 
 
     test('[SYN06] Causal history agent-based set sync in small peer group (ws)', async (done) => {
