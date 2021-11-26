@@ -24,7 +24,6 @@
     "@types/jest": "^26.0.19",
     "@types/node": "^14.0.13",
     "@types/ws": "^7.2.6",
-    "@zerollup/ts-transform-paths": "^1.7.18",
     "jest": "^26.6.3",
     "ts-jest": "^26.4.4",
     "ttypescript": "^1.5.12",
