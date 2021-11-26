@@ -14,6 +14,15 @@ import { HistoryProvider, MessageType, SyncMsg } from './history/HistoryProvider
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { Resources } from 'spaces/Resources';
 
+/*
+ *  Important notice: The constructor of the HeaderBasedSyncAgent can receive either an instance or just the
+ *                    hash of the object that it will synchronize. If it receives an instance, it will add it
+ *                    to the context where incoming ops are validated, thus saving any initialization costs
+ *                    the object may incur to perform validation. However, this object will also be saved
+ *                    to the store with the rest of the received op's context: hence it must have all the
+ *                    necessary keys for signing, must not be used to receive local operations, etc.
+ */
+
 type StateFilter = (state: HeaderBasedState, store: Store, isLocal: boolean, localState?: HeaderBasedState) => Promise<HeaderBasedState>;
 
 class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
