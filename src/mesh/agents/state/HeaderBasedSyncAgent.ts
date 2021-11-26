@@ -27,7 +27,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     static MaxRequestsPerRemote = 2;
 
-    mutableObj: MutableObject;
+    mutableObj?: MutableObject;
     mutableObjHash: Hash;
     acceptedMutationOpClasses: string[];
     stateOpFilter?: StateFilter;
@@ -51,11 +51,15 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     controlLog: Logger;
     messageLog: Logger;
 
-    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: MutableObject, resources: Resources, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
+    constructor(peerGroupAgent: PeerGroupAgent, mutableObjOrHash: MutableObject|Hash, resources: Resources, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
         super(peerGroupAgent);
 
-        this.mutableObj  = mutableObj;
-        this.mutableObjHash = mutableObj.hash();
+        if (mutableObjOrHash instanceof MutableObject) {
+            this.mutableObj  = mutableObjOrHash;
+            this.mutableObjHash = mutableObjOrHash.hash();    
+        } else {
+            this.mutableObjHash =  mutableObjOrHash;
+        }
         this.acceptedMutationOpClasses = acceptedMutationOpClasses;
         this.stateOpFilter = stateOpFilter;
 

@@ -41,7 +41,7 @@ abstract class HashedObject {
         if (another === undefined) {
             HashedObject.knownClasses.set(name, clazz);
         } else if (another !== clazz) {
-            throw new Error('Attempting to register two different instances of class ' + name + ', this would cause "isinstance" to give incorrect results. Check if your project has imported two instances of @hyper-hyper-space/core (maybe your dependencies are using two different versions?).')
+            throw new Error('Attempting to register two different instances of class ' + name + ', this would cause "instanceof" to give incorrect results. Check if your project has imported two instances of @hyper-hyper-space/core (maybe your dependencies are using two different versions?).')
         }
     }
 
@@ -232,6 +232,11 @@ abstract class HashedObject {
 
         let clone = HashedObject.fromContext(c) as this;
 
+        clone.init();
+
+        clone._signOnSave    = this._signOnSave;
+        clone._lastSignature = this._lastSignature;
+        
         return clone;
     }
 

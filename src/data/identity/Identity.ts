@@ -101,6 +101,13 @@ class Identity extends HashedObject {
         return this._keyPair.decrypt(text);
     }
 
+    clone(): this {
+        const clone = super.clone();
+        clone._keyPair = this._keyPair;
+
+        return clone;
+    }
+
 }
 
 HashedObject.registerClass(Identity.className, Identity);

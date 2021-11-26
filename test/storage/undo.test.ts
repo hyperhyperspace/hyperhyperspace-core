@@ -241,7 +241,7 @@ async function testBasicUndoCycleWithSync(stores: Store[]) {
         const peerGroupAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         
         //let agent = new TerminalOpsSyncAgent(peerGroupAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(peerGroupAgent, permissions.clone(), await Resources.create({store: stores[i]}), permissions.getAcceptedMutationOpClasses());
+        let agent = new HeaderBasedSyncAgent(peerGroupAgent, permissions.hash(), await Resources.create({store: stores[i]}), permissions.getAcceptedMutationOpClasses());
         let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
@@ -459,7 +459,7 @@ async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
         const peerGroupAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         
         //let agent = new TerminalOpsSyncAgent(peerGroupAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(peerGroupAgent, features.clone(),  await Resources.create({store: stores[i]}), features.getAcceptedMutationOpClasses());
+        let agent = new HeaderBasedSyncAgent(peerGroupAgent, features.hash(),  await Resources.create({store: stores[i]}), features.getAcceptedMutationOpClasses());
         let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;

@@ -864,7 +864,9 @@ class HistorySynchronizer {
             if (resp.sendingOps !== undefined && resp.sendingOps.length > 0) {
                 reqInfo.receivedObjects = new Context();
                 reqInfo.receivedObjects.resources = this.syncAgent.resources;
-                reqInfo.receivedObjects.objects.set(this.syncAgent.mutableObjHash, this.syncAgent.mutableObj);
+                if (this.syncAgent.mutableObj !== undefined) {
+                    reqInfo.receivedObjects.objects.set(this.syncAgent.mutableObjHash, this.syncAgent.mutableObj);
+                }
             }
 
             if (resp.omittedObjsOwnershipProofs !== undefined &&
@@ -966,9 +968,6 @@ class HistorySynchronizer {
 
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     
-                    await this.syncAgent.store.save(this.syncAgent.mutableObj); // Since we provided this obj to the context,
-                                                                                // the store is gonna believe that it was already
-                                                                                // saved, which may not be the actual case.
                     await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
 
                     // FIXME: there's no validation of the op matching the actual causal history op
