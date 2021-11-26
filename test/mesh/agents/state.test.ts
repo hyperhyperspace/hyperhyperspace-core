@@ -224,7 +224,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
         const peerGroupAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         
         //let agent = new TerminalOpsSyncAgent(peerGroupAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(peerGroupAgent, s.hash(),  await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let agent = new HeaderBasedSyncAgent(peerGroupAgent, s.clone(),  await Resources.create({store: stores[i]}), MutableSet.opClasses);
         let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
@@ -358,7 +358,7 @@ async function stagedSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(meshAgent, s.hash(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let agent = new HeaderBasedSyncAgent(meshAgent, s.clone(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
         let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
@@ -525,7 +525,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(meshAgent, s.hash(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let agent = new HeaderBasedSyncAgent(meshAgent, s.clone(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
         if (i===0) {
 
             //syncAgent = agent;
@@ -739,7 +739,7 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(meshAgent, s.hash(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let agent = new HeaderBasedSyncAgent(meshAgent, s.clone(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
         
         agent.synchronizer.controlLog = new Logger('synchronizer', LogLevel.INFO);
         agent.synchronizer.stateLog   = new Logger('synchronizer', LogLevel.INFO);

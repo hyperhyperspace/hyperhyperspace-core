@@ -893,8 +893,6 @@ class HistorySynchronizer {
             
             }
 
-            
-
             reqInfo.status = 'accepted-response';
 
             await this.attemptToProcessLiterals(reqInfo);
@@ -968,6 +966,9 @@ class HistorySynchronizer {
 
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     
+                    await this.syncAgent.store.save(this.syncAgent.mutableObj); // Since we provided this obj to the context,
+                                                                                // the store is gonna believe that it was already
+                                                                                // saved, which may not be the actual case.
                     await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
 
                     // FIXME: there's no validation of the op matching the actual causal history op
