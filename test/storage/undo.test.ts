@@ -9,7 +9,7 @@ import { TestPeerGroupPods } from 'mesh/mock/TestPeerGroupPods';
 import { Resources } from 'spaces/Resources';
 import { IdbBackend, MemoryBackend } from 'storage/backends';
 import { Store } from 'storage/store';
-import { SQLiteBackend } from '../../../sqlite/dist';
+//import { SQLiteBackend } from '../../../sqlite/dist';
 
 describeProxy('[UND] Undo support', () => {
     test( '[UND01] Basic undo w/ IndexedDB backend', async (done) => {
@@ -34,6 +34,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 30000);
 
+    /*
     test( '[UND03] Basic undo w/ SQLite backend', async (done) => {
 
         let store = new Store(new SQLiteBackend(':memory:'));
@@ -44,6 +45,7 @@ describeProxy('[UND] Undo support', () => {
 
         done();
     }, 30000);
+    */
 
     test( '[UND04] Basic undo w/ IndexedDB backend over sync', async (done) => {
 
@@ -95,6 +97,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 30000);
 
+    /*
     test( '[UND08] Multi object undo cascade w/ SQLite backend', async (done) => {
 
         let store = new Store(new SQLiteBackend(':memory:'));
@@ -105,6 +108,7 @@ describeProxy('[UND] Undo support', () => {
 
         done();
     }, 30000);
+    */
 
     test( '[UND09] Multi object undo cascade w/ IndexedDB backend over sync', async (done) => {
 

@@ -29,12 +29,20 @@ const BITS_FOR_ID = 128;
  and which objects should be preloaded when loading operations that mutate
  this object and its subobjects. */
 
+//let done = false;
+
 abstract class HashedObject {
     
     static knownClasses = new Map<string, new () => HashedObject>();
 
     static registerClass(name: string, clazz: new () => HashedObject) {
-        HashedObject.knownClasses.set(name, clazz);
+        
+        const another = HashedObject.knownClasses.get(name);
+        if (another === undefined) {
+            HashedObject.knownClasses.set(name, clazz);
+        } else if (another !== clazz) {
+            throw new Error('Attempting to register two different instances of class ' + name + ', this would cause "isinstance" to give incorrect results. Check if your project has imported two instances of @hyper-hyper-space/core (maybe your dependencies are using two different versions?).')
+        }
     }
 
     static lookupClass(name: string): (new () => HashedObject) | undefined {

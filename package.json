@@ -12,8 +12,8 @@
     "url": "https://github.com/hyperhyperspace/hyperhyperspace-core.git"
   },
   "scripts": {
-    "build": "npx tsc --project tsconfig.build.json",
-    "build-dev": "npx tsc",
+    "build": "npx ttsc --project tsconfig.build.json",
+    "build-dev": "npx ttsc",
     "clean": "rm -rf ./dist/* && rm -rf ./dist-dev/* ",
     "winclean": "if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-dev (rmdir dist-dev /s /q) && mkdir dist-dev",
     "test": "npx jest",
@@ -21,7 +21,6 @@
   },
   "devDependencies": {
     "@hyper-hyper-space/node-env": "^0.11.0",
-    "@hyper-hyper-space/sqlite": "0.1.0",
     "@types/jest": "^26.0.19",
     "@types/node": "^14.0.13",
     "@types/ws": "^7.2.6",

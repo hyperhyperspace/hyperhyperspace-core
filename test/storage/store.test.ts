@@ -8,7 +8,7 @@ import { describeProxy } from 'config';
 import { HistoryFragment } from 'data/history/HistoryFragment';
 import { OpHeader } from 'data/history/OpHeader';
 
-import { SQLiteBackend } from '@hyper-hyper-space/sqlite';
+//import { SQLiteBackend } from '@hyper-hyper-space/sqlite';
 
 
 describeProxy('[STR] Storage', () => {
@@ -24,11 +24,11 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });
 
-    test('[STR03] SQLite-based load / store cycle', async() => {
+    /*test('[STR03] SQLite-based load / store cycle', async() => {
         let store = new Store(new SQLiteBackend(':memory:'));
         await testLoadStoreCycle(store);
         store.close();
-    });
+    });*/
 
     test('[STR04] Indexeddb-based reference-based load hit', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
@@ -42,11 +42,11 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });
 
-    test('[STR06] SQLite-based reference-based load hit', async () => {
+    /*test('[STR06] SQLite-based reference-based load hit', async () => {
         let store = new Store(new SQLiteBackend(':memory:'));
         await testReferenceBasedLoadHit(store);
         store.close();
-    });
+    });*/
 
     test('[STR07] Indexeddb-based reference-based load miss', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
@@ -60,11 +60,11 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });
 
-    test('[STR09] SQLite-based reference-based load miss', async () => {
+    /*test('[STR09] SQLite-based reference-based load miss', async () => {
         let store = new Store(new SQLiteBackend(':memory:'));
         await testReferenceBasedLoadMiss(store);
         store.close();
-    });
+    });*/
     
     test('[STR07] Indexeddb-based mutation op saving and loading', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
@@ -78,11 +78,11 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });
 
-    test('[STR09] SQLite-based mutation op saving and loading', async () => {
+    /*test('[STR09] SQLite-based mutation op saving and loading', async () => {
         let store = new Store(new SQLiteBackend(':memory:'));
         await testMutationOps(store);
         store.close();
-    });
+    });*/
 
     test('[STR10] Indexeddb-based mutation op saving and auto-loading', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
@@ -96,11 +96,11 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });
 
-    test('[STR12] SQLite-based mutation op saving and auto-loading', async () => {
+    /*test('[STR12] SQLite-based mutation op saving and auto-loading', async () => {
         let store = new Store(new SQLiteBackend(':memory:'));
         await testMutationOpAutoLoad(store);
         store.close();
-    });
+    });*/
 
     test('[STR13] Indexeddb-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
@@ -114,11 +114,11 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });
 
-    test('[STR15] SQLite-based mutation op automatic prevOp generation', async () => {
+    /*test('[STR15] SQLite-based mutation op automatic prevOp generation', async () => {
         let store = new Store(new SQLiteBackend(':memory:'));
         await testPrevOpGeneration(store);
         store.close();
-    });
+    });*/
 
     test('[STR16] Validate history retrieved from IDB store', async () => {
         let store = new Store(new IdbBackend('test-storage-backend'));
@@ -132,11 +132,11 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });
 
-    test('[STR18] Validate history retrieved from SQLite store', async () => {
+    /*test('[STR18] Validate history retrieved from SQLite store', async () => {
         let store = new Store(new SQLiteBackend(':memory:'));
         await testHistoryGeneration(store);
         store.close();
-    });
+    });*/
 
 });
 

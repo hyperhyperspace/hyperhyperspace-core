@@ -16,7 +16,7 @@ import { HeaderBasedSyncAgent, HistorySynchronizer, TerminalOpsSyncAgent } from 
 import { Logger, LogLevel } from 'util/logging';
 import { Resources } from 'spaces/Resources';
 import { NetworkAgent } from 'mesh/agents/network';
-import { SQLiteBackend } from '../../../../sqlite/dist';
+//import { SQLiteBackend } from '../../../../sqlite/dist';
 
 describeProxy;
 
@@ -201,8 +201,11 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     let stores : Array<Store> = [];
     
     for (let i=0; i<size; i++) {
+
+        useSQLite
+
         const peerNetwork = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
-        const store = new Store(useSQLite? new SQLiteBackend(':memory:') : new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
+        const store = new Store(/*useSQLite ? new SQLiteBackend(':memory:') :*/ new IdbBackend('store-for-peer-' + peerNetwork.getLocalPeer().endpoint));
         stores.push(store);
         let gossip = new StateGossipAgent(peerNetworkId, peerNetwork);
         
