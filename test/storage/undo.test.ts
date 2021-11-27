@@ -32,19 +32,8 @@ describeProxy('[UND] Undo support', () => {
 
         done();
     }, 30000);
-    
-    /*test( '[UND03] Basic undo w/ SQLite backend', async (done) => {
 
-        let store = new Store(new SQLiteBackend(':memory:'));
-        
-        await testBasicUndoCycle(store);
-
-        store.close();
-
-        done();
-    }, 30000);*/
-
-    test( '[UND04] Basic undo w/ IndexedDB backend over sync', async (done) => {
+    test( '[UND03] Basic undo w/ IndexedDB backend over sync', async (done) => {
 
         let stores = [new Store(new IdbBackend('test-basic-undo-over-sync-1')),
                       new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
@@ -58,7 +47,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 50000);
 
-    test( '[UND05] Basic undo w/ memory backend over sync', async (done) => {
+    test( '[UND04] Basic undo w/ memory backend over sync', async (done) => {
 
         let stores = [new Store(new MemoryBackend('test-basic-undo-over-sync-1')),
                       new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
@@ -72,7 +61,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 50000);
 
-    test( '[UND06] Multi object undo cascade w/ IndexedDB backend', async (done) => {
+    test( '[UND05] Multi object undo cascade w/ IndexedDB backend', async (done) => {
 
         let store = new Store(new IdbBackend('test-basic-undo'));
         
@@ -83,7 +72,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 30000);
 
-    test( '[UND07] Multi object undo cascade  w/ memory backend', async (done) => {
+    test( '[UND06] Multi object undo cascade  w/ memory backend', async (done) => {
 
         let store = new Store(new MemoryBackend('test-basic-undo'));
         
@@ -94,20 +83,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 30000);
 
-    /*
-    test( '[UND08] Multi object undo cascade w/ SQLite backend', async (done) => {
-
-        let store = new Store(new SQLiteBackend(':memory:'));
-        
-        await testMultiObjectUndoCascade (store);
-
-        store.close();
-
-        done();
-    }, 30000);
-    */
-
-    test( '[UND09] Multi object undo cascade w/ IndexedDB backend over sync', async (done) => {
+    test( '[UND07] Multi object undo cascade w/ IndexedDB backend over sync', async (done) => {
 
         let stores = [new Store(new IdbBackend('test-basic-undo-over-sync-1')),
                       new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
@@ -121,7 +97,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 50000);
 
-    test( '[UND10] Multi object undo cascade w/ memory backend over sync', async (done) => {
+    test( '[UND8] Multi object undo cascade w/ memory backend over sync', async (done) => {
 
         let stores = [new Store(new MemoryBackend('test-basic-undo-over-sync-1')),
                       new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
