@@ -9,7 +9,7 @@ This library helps you create distributed data structures, mostly for p2p applic
 
 ## Intro
 
-In the same way in which the Internet bridges networks together, the Hyper Hyper Space attempts to create a cryptographically secure append-only distributed data layer that makes information universally accessible. We follow two guiding principles:
+In the same way in which the Internet bridges networks together, the [Hyper Hyper Space](https://www.hyperhyperspace.org) attempts to create a cryptographically secure append-only distributed data layer that makes information universally accessible. We follow two guiding principles:
 
 * Make all data local: always read and modify data locally
 * Communicate only through data sync: do not use APIs or any form of remoting
