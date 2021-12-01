@@ -1,7 +1,7 @@
-# The Hyper Hyper Space core library  
+![Hyper Hyper Space](https://www.hyperhyperspace.org/logos/HHS_Logo_500px.png)
 
 
-> An offline-first shared data library for creating p2p apps that work in the browser (and now also nodejs).  
+> An offline-first shared data library for creating p2p apps that work in the browser (and now also NodeJs). 
 
 ## TLDR
 
@@ -9,11 +9,12 @@ This library helps you create distributed data structures, mostly for p2p applic
 
 ## Intro
 
-In the same way in which the Internet bridges networks together, the HHS attempts to decouple data from the apps used to manage it, thus enabling individuals to have better ownership and control over their information.
+In the same way in which the Internet bridges networks together, the Hyper Hyper Space attempts to create a cryptographically secure append-only distributed data layer that makes information universally accessible. We follow two guiding principles:
 
-Apps that use the HHS model store information locally (the current implementation works in a modern web browser, effectively turning it into an autonomus node in a p2p network).
+* Make all data local: always read and modify data locally
+* Communicate only through data sync: do not use APIs or any form of remoting
 
-Apps will most of the time work on the local store as if it were universal (i.e. a magic database that contains all the needed information from everybody). The HHS library contains networking primitives that allow apps to form ad-hoc groups of peers that make the necessary information flow from one local store to another. Usually each app module can be split in two, cleanly separating all the information handling from the synchronization logic.
+You can read our [White Paper](https://www.hyperhyperspace.org/whitepaper) to find out more about how this works.
 
 **This project is experimental. All APIs may change, bugs exist and the crypto has not been audited.**
 
