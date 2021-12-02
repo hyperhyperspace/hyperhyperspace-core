@@ -276,15 +276,21 @@ class WebRTCConnection implements Connection {
         }
 
         if (this.connection !== undefined) {
-            this.connection.ondatachannel = (ev) => {
-                WebRTCConnection.logger.debug(this.localAddress.linkupId + ' received DataChannel from ' + this.remoteAddress.linkupId + ' on call ' + this.callId);
-                this.channel = ev.channel;
-                this.setUpChannel();
+
+            if (this.connection.signalingState !== 'closed') {
+                this.connection.ondatachannel = (ev) => {
+                    WebRTCConnection.logger.debug(this.localAddress.linkupId + ' received DataChannel from ' + this.remoteAddress.linkupId + ' on call ' + this.callId);
+                    this.channel = ev.channel;
+                    this.setUpChannel();
+                }
+    
+                this.connection.setRemoteDescription(description).catch((reason: any) => {
+                    WebRTCConnection.logger.warning('Failed to set remote description, reason: ' + JSON.stringify(reason));
+                 });    
+            } else {
+                WebRTCConnection.logger.debug('A remote description arrived untimely (signalingState=="closed") and will be ignored.');
             }
 
-            this.connection.setRemoteDescription(description).catch((reason: any) => {
-                WebRTCConnection.logger.warning('Failed to set remote description, reason: ' + JSON.stringify(reason));
-             });
         } else {
             WebRTCConnection.logger.error('Received message for callId ' + callId + ' but connection was undefined on ' + this.localAddress.linkupId);
         }
