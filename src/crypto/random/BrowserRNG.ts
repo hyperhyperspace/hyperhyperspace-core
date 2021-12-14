@@ -1,6 +1,12 @@
 import { RNG } from "./RNG";
 
-let getRandomValues : (<T extends Int8Array | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Uint8ClampedArray | Float32Array | Float64Array | DataView | null>(array: T) => T) = require('get-random-values');
+let getRandomValues : (<T extends Int8Array | Int16Array | Int32Array | Uint8Array | Uint16Array | Uint32Array | Uint8ClampedArray | Float32Array | Float64Array | DataView | null>(array: T) => T);// = require('get-random-values');
+
+if (window?.crypto?.getRandomValues !== undefined) {
+    getRandomValues = window.crypto.getRandomValues;
+} else {
+    getRandomValues = require("get-random-values");
+}
 
 class BrowserRNG implements RNG {
 
@@ -25,7 +31,7 @@ class BrowserRNG implements RNG {
     
     private randomHex8bitsWord() {
 
-        let result = (getRandomValues(new Uint8Array(1))[0]).toString(16);
+        let result = (((window?.crypto?.getRandomValues !== undefined)? window.crypto.getRandomValues(new Uint8Array(1)) : (getRandomValues(new Uint8Array(1))))[0].toString(16));
 
         return result.padStart(2, '0');
     }

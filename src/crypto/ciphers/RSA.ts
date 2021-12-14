@@ -1,5 +1,5 @@
 //import { JSEncryptRSA } from './JSEncryptRSA';
-import { NodeRSA } from './NodeRSA';
+//import { NodeRSA } from './NodeRSA';
 import { WebCryptoRSA } from './WebCryptoRSA';
 
 interface RSA {
@@ -19,12 +19,7 @@ interface RSA {
 }
 
 class RSADefaults {
-    //static impl: new () => RSA = globalThis?.crypto?.subtle !== undefined ? WebCryptoRSA : NodeRSA;
     static impl: new () => RSA = WebCryptoRSA;
-
-    static useNodeForRSA() {
-        RSADefaults.impl = NodeRSA;
-    }
 }
 
 export { RSA, RSADefaults };

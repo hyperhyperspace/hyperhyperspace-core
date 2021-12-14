@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "*": ["./src/*"]
+    }, 
+    "outDir": "./dist-browser",
+    "module": "es2020"
+  },
+  "files": [ "src/index.ts" ],
+  "include": [ "./types/*" ]
+}

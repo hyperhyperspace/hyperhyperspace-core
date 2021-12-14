@@ -1,5 +1,6 @@
 dist/
 dist-dev/
+dist-browser/
 decl/
 node_modules
 package-lock.json

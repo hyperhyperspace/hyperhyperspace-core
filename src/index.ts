@@ -29,3 +29,5 @@ export * from './mesh/share';
 export * from './spaces/spaces';
 
 export * from './util/shuffling';
+export * from './util/strings';
+export * from './util/logging';
