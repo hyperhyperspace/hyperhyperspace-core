@@ -117,7 +117,8 @@
 
     <p>
         To create a Document Space, do this (paste this to the console in this page):
-        
+    </p>
+
 <pre>
     await init();
     let ds = new DocumentSpace();
@@ -128,12 +129,14 @@
     ds.startSync()
 </pre>
 
+    <p>
         You only need to run the code above once. The 3-word code for your newly created space will be printed on the console, and the space will be persisted to in-browser storage.
     </p>
 
     <p>
         You can then instantiate this object in another computer / browser / tab (or re-open it in the same browser where you created it) by opening this
         page again and then typing this in the console:
+    </p>
 
 <pre>
     await init();
@@ -144,6 +147,7 @@
     ds.startSync();
 </pre>
 
+    <p>
         Remember to replace the 3-code word in the code above by the one you got when creating your space!
         You need to keep at least one browser tab open for the space to be available.
     </p>
@@ -152,23 +156,21 @@
 <pre>
     ds.setValue({'myApp': 'state'});
 </pre>
-    </p>
 
     <p>
         And you can read that back in the rest of them:
+    </p>
 <pre>
     ds.getValue();
-</pre>  
-    </p>
+</pre>
 
     <p>If you were <b>really</b> creating an HHS-based webpage, you'll probably want to use something like these <a href="https://github.com/hyperhyperspace/hyperhyperspace-react">react bindings</a> to tie your web components automatically to the objects in your store!</p>
 
-    <p>Or maybe you can get away with a callback whenever state changes, something like this:
+    <p>Or maybe you can get away with a callback whenever state changes, something like this:</p>
 
 <pre>
     ds.contents.addMutationCallback(() => {console.log('do something! state has changed!');})
 </pre>
-    </p>
 
     <p> Help / feedback: <a href="https://github.com/hyperhyperspace/hyperhyperspace-core">Github</a>, <a href="https://discord.gg/9epr3XrRnW">Discord</a></p>
 </body>
