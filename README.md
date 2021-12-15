@@ -17,6 +17,10 @@ Apps will most of the time work on the local store as if it were universal (i.e.
 
 **This project is experimental. All APIs may change, bugs exist and the crypto has not been audited.**
 
+## Playground
+
+You can play with the library, using it to synchronize a plain javascript object from your browser's console, in this [playground page](https://www.hyperhyperspace.org/playground.html).
+
 ## Examples
 
 To create datatypes that can be shared using HHS, you need to extend the `HashedObject` and `MutableObject` classes. You can learn more on the [Data Model](#data-model) section below,
