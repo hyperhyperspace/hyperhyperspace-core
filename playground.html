@@ -1,0 +1,173 @@
+<html>
+<head>
+
+    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <script src="./dist-browser/hhs.js"></script>
+
+    <script>
+
+        globalThis.Buffer = globalThis.buffer.Buffer
+
+        Object.entries(HHS).forEach(([k, v]) => (globalThis[k] = v));
+
+        class DocumentSpace extends HashedObject {
+
+            constructor() {
+                super();
+                this.setRandomId();
+                this.addDerivedField('contents', new MutableReference());
+            }
+
+            getClassName() {
+                return 'test/DocumentSpace';
+            }
+
+            init() {
+
+            }
+
+            async validate(references) {
+                return this.getId() !== undefined && this.checkDerivedField('contents') 
+            }
+
+            setValue(value) {
+                return this.contents.setValue(value).then(() => { this.getStore().save(this.contents) });
+            }
+
+            getValue() {
+                return this.contents.getValue();
+            }
+
+            async startSync() {
+
+                let resources = this.getResources();
+
+                if (resources === undefined) {
+                    throw new Error('Cannot start sync: resources not configured.');
+                }
+
+                if (resources.config?.id === undefined) {
+                    throw new Error('Cannot start sync: local identity has not been defined.');
+                }
+
+                if (resources.store === undefined) {
+                    throw new Error('Cannot start sync: a local store has not been configured.')
+                }
+
+                this._node = new PeerNode(resources);
+
+                this._node.broadcast(this);
+                this._node.sync(this);
+
+                this.contents.loadAndWatchForChanges();
+            }
+
+            async stopSync() {
+                this._node?.stopBroadcast(this);
+                this._node?.stopSync(this);
+            }
+
+            setResources(resources) {
+                super.setResources(resources);
+                this.contents.setResources(resources);
+            }
+
+        }
+
+        HashedObject.registerClass('test/DocumentSpace', DocumentSpace);
+
+
+        let store;
+        let key;
+        let id;
+
+        let resources;
+
+        let init = async () => {
+            store = new Store(new WorkerSafeIdbBackend('document-space-example'));
+            
+            key = await RSAKeyPair.generate(1024);
+            id = Identity.fromKeyPair({name: new RNGImpl().randomHexString(128)}, key);
+
+            await store.save(key);
+            await store.save(id);
+
+            resources = await Resources.create({config: {id: id}, store: store});
+        }
+
+
+    </script>
+
+</head>
+<body>
+
+    <h1>Playground for Hyper Hyper Space</h1>
+
+    <p> If you open the console in this page, you'll find the contents of the 
+        @hyper-hyper-space/core are avaiable in the gobal scope.</p>
+
+    <p> Additionally, this page defines an example DocumentSpace class, that can sync a single javascript
+        object last-writer-wins style. It also defines an init() function, that will create
+        a Resources object you can use to initialize HHS (it has a random crypto id and an 
+        IndexedDB-based store).
+    </p>
+
+    <p>
+        To create a Document Space, do this (paste this to the console in this page):
+        
+<pre>
+    await init();
+    let ds = new DocumentSpace();
+    let space = Space.fromEntryPoint(ds, resources);
+    await space.entryPoint
+    console.log(await space.getWordCoding())
+    ds.setResources(resources)
+    ds.startSync()
+</pre>
+
+        You only need to run the code above once. The 3-word code for your newly created space will be printed on the console, and the space will be persisted to in-browser storage.
+    </p>
+
+    <p>
+        You can then instantiate this object in another computer / browser / tab (or re-open it in the same browser where you created it) by opening this
+        page again and then typing this in the console:
+
+<pre>
+    await init();
+    let space = Space.fromWordCode(['your', 'words', 'here!'], resources) // replace 3 words;
+    let ds = await space.getEntryPoint();
+    ds.setResources(resources);
+    await resources.store.save(ds);
+    ds.startSync();
+</pre>
+
+        Remember to replace the 3-code word in the code above by the one you got when creating your space!
+        You need to keep at least one browser tab open for the space to be available.
+    </p>
+
+    <p>Now you can do, in any of your browser windows:
+<pre>
+    ds.setValue({'myApp': 'state'});
+</pre>
+    </p>
+
+    <p>
+        And you can read that back in the rest of them:
+<pre>
+    ds.getValue();
+</pre>  
+    </p>
+
+    <p>If you were <b>really</b> creating an HHS-based webpage, you'll probably want to use something like these <a href="https://github.com/hyperhyperspace/hyperhyperspace-react">react bindings</a> to tie your web components automatically to the objects in your store!</p>
+
+    <p>Or maybe you can get away with a callback whenever state changes, something like this:
+
+<pre>
+    ds.contents.addMutationCallback(() => {console.log('do something! state has changed!');})
+</pre>
+    </p>
+
+    <p> Help / feedback: <a href="https://github.com/hyperhyperspace/hyperhyperspace-core">Github</a>, <a href="https://discord.gg/9epr3XrRnW">Discord</a></p>
+</body>
+
+</html>

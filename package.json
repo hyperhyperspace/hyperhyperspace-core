@@ -14,6 +14,7 @@
   "scripts": {
     "build": "npx ttsc --project tsconfig.build.json",
     "build-dev": "npx ttsc",
+    "build-browser": "npx ttsc --project tsconfig.browser.json && npx rollup -c",
     "clean": "rm -rf ./dist/* && rm -rf ./dist-dev/* ",
     "winclean": "if exist dist (rmdir dist /s /q) && mkdir dist && if exist dist-dev (rmdir dist-dev /s /q) && mkdir dist-dev",
     "test": "npx jest",
@@ -21,19 +22,24 @@
   },
   "devDependencies": {
     "@hyper-hyper-space/node-env": "^0.11.0",
+    "@rollup/plugin-commonjs": "^21.0.1",
+    "@rollup/plugin-node-resolve": "^13.1.1",
     "@types/jest": "^26.0.19",
     "@types/node": "^14.0.13",
+    "@types/node-rsa": "^1.1.0",
     "@types/ws": "^7.2.6",
     "@zerollup/ts-transform-paths": "^1.7.18",
     "jest": "^26.6.3",
+    "rollup": "^2.61.1",
     "ts-jest": "^26.4.4",
     "ttypescript": "^1.5.12",
     "typescript": "4.4.4"
   },
   "dependencies": {
-    "@types/node-rsa": "^1.1.0",
+
     "broadcast-channel": "^3.5.3",
     "chacha-js": "^2.1.1",
+    "chacha20-universal": "^1.0.4",
     "fast-text-encoding": "^1.0.3",
     "get-random-values": "^1.2.0",
     "idb": "^5.0.4",
