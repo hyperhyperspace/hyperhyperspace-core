@@ -85,6 +85,10 @@ class LinearStateAgent extends PeeringAgentBase implements StateSyncAgent {
         this.id = id;
         this.prevStates = new Set();
     }
+    expectingMoreOps(receivedOpHashes?: Set<string>): boolean {
+        receivedOpHashes;
+        throw new Error('Method not implemented.');
+    }
 
     getAgentId(): string {
         return  LinearStateAgent.createId(this.id);

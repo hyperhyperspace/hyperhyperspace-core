@@ -73,7 +73,7 @@ import { RNGImpl } from 'crypto/random';
  * acquired resource (a peer group being joined, an object synchronized or broadcasted)
  * the Mesh will return a UsageToken. The token needs to be produced to leave the peer 
  * group or to stop the sync/broadcasting of the object. The resource is effectively 
- * released when all the returned usage tokens are released.
+ * released when all the registered usage tokens are released.
  * 
  */ 
 
@@ -351,6 +351,10 @@ class Mesh {
     findObjectByHashSuffixRetry(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {
         const discoveryAgent = this.getDiscoveryAgentFor(hashSuffix);
         discoveryAgent.query(linkupServers, replyEndpoint, count);
+    }
+
+    getSyncAgentFor(peerGroupId: PeerGroupId, mutHash: Hash): StateSyncAgent|undefined {
+        return this.syncAgents.get(peerGroupId)?.get(mutHash);
     }
 
     private getDiscoveryAgentFor(hashSuffix: string): ObjectDiscoveryAgent {

@@ -3,7 +3,7 @@ import { ChaCha20, ChaCha20Impl } from 'crypto/ciphers';
 import { describeProxy } from 'config';
 import { RSADefaults } from 'crypto/ciphers/RSA';
 import { WebCryptoRSA } from 'crypto/ciphers/WebCryptoRSA';
-import { NodeRSA } from 'crypto/ciphers/NodeRSA';
+//import { NodeRSA } from 'crypto/ciphers/NodeRSA';
 
 const privateKey = 
 "-----BEGIN PRIVATE KEY-----\n" +
@@ -116,7 +116,7 @@ describeProxy('[ENC] Ciphers', () => {
         expect(await rsaPublic.verify(message, wrongSignature)).toEqual(false);
     });
 
-    test('[ENC05] RSA self test - force NodeRSA', async () => {
+    /*test('[ENC05] RSA self test - force NodeRSA', async () => {
 
         let rsa = new NodeRSA() as RSA;
         await rsa.loadKeyPair(publicKey, privateKey);
@@ -164,6 +164,6 @@ describeProxy('[ENC] Ciphers', () => {
         let signature2 = await rsa.sign(message);
         expect(await rsaPublic2.verify(message, signature2)).toEqual(true);
 
-    });
+    });*/
 });
 

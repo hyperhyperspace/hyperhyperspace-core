@@ -178,6 +178,23 @@ class HistorySynchronizer {
         }
     }
 
+    // given an op we have received, determine whether there are more ops to follow
+    expectingMoreOps(receivedOpHashes=new Set<Hash>()): boolean {
+
+        if (this.discoveredHistory.contents.size > receivedOpHashes.size) {
+            return true;
+        } else {
+            const missingOpHeaderHashes  = new Set<Hash>(this.discoveredHistory.contents.keys());
+            
+            for (const opHash of receivedOpHashes) {
+                for (const opHeader of this.discoveredHistory.getAllOpHeadersForOp(opHash)) {
+                    missingOpHeaderHashes.delete(opHeader.headerHash);
+                }
+            }
+            return missingOpHeaderHashes.size > 0;
+        }
+    }
+
     private async attemptNewRequests() {
 
         if (this.newRequestsLock.acquire()) {

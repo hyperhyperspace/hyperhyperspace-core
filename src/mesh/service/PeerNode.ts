@@ -1,5 +1,5 @@
 
-import { HashedObject } from 'data/model';
+import { Hash, HashedObject } from 'data/model';
 import { ObjectDiscoveryPeerSource, PeerInfo } from 'mesh/agents/peer';
 import { Resources } from 'spaces/spaces';
 import { MultiMap } from 'util/multimap';
@@ -137,7 +137,22 @@ class PeerNode {
         }
 
         return result;
+    }
 
+    async expectingMoreOps(obj: HashedObject, receivedOps?: Set<Hash>, peerGroupId?: string, rootObject?: HashedObject): Promise<boolean> {
+
+        if (peerGroupId === undefined) {
+            const peerGroup = await this.discoveryPeerGroupInfo(rootObject !== undefined? rootObject : obj);
+            peerGroupId = peerGroup.id;
+        }
+
+        let syncAgent = this.resources.mesh.getSyncAgentFor(peerGroupId, obj.hash());
+
+        if (syncAgent === undefined) {
+            return false;
+        } else {
+            return syncAgent.expectingMoreOps(receivedOps);
+        }
     }
 
 }

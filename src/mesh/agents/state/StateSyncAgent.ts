@@ -5,6 +5,7 @@ import { Endpoint } from '../network/NetworkAgent';
 interface StateSyncAgent extends Agent {
     
     receiveRemoteState(sender: Endpoint, stateHash: Hash, state: HashedObject) : Promise<boolean>;
+    expectingMoreOps(receivedOpHashes?: Set<Hash>): boolean;
 
 }
 

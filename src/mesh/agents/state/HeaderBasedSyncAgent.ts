@@ -314,6 +314,10 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         return contents;            
     }
 
+    expectingMoreOps(receivedOpHashes=new Set<Hash>()): boolean {
+        return this.synchronizer.expectingMoreOps(receivedOpHashes);
+    }
+
 }
 
 export { SyncMsg as HistoryMsg, HeaderBasedSyncAgent, StateFilter }

@@ -295,6 +295,10 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         }, 5000);
 
     }
+    expectingMoreOps(receivedOpHashes?: Set<string>): boolean {
+        receivedOpHashes;
+        throw new Error('Method not implemented.');
+    }
 
     getAgentId(): string {
         return TerminalOpsSyncAgent.syncAgentIdFor(this.objHash, this.peerGroupAgent.peerGroupId);
