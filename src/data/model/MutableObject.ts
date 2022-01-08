@@ -28,7 +28,7 @@ abstract class MutableObject extends HashedObject {
 
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
-    _activeUndoOpsPerOp       : MultiMap<Hash, Hash>;
+    _activeCascInvsPerOp       : MultiMap<Hash, Hash>;
 
 
     _unsavedOps      : Array<MutationOp>;
@@ -56,7 +56,7 @@ abstract class MutableObject extends HashedObject {
 
         this._allAppliedOps = new Set();
         this._terminalOps   = new Map();
-        this._activeUndoOpsPerOp  = new MultiMap();
+        this._activeCascInvsPerOp  = new MultiMap();
 
         this._unsavedOps      = [];
         this._unappliedOps    = new Map();
@@ -88,7 +88,7 @@ abstract class MutableObject extends HashedObject {
     }*/
 
     protected isValidOp(opHash: Hash): boolean {
-        return this._activeUndoOpsPerOp.get(opHash).size === 0;
+        return this._activeCascInvsPerOp.get(opHash).size === 0;
     }
 
     addMutationCallback(cb: (mut: MutationOp) => void) {
@@ -376,16 +376,62 @@ abstract class MutableObject extends HashedObject {
         let result = Promise.resolve(false);
 
         if (op instanceof CascadedInvalidateOp) {
+            
+            let targetOp: MutationOp|undefined;
+            let targetOpHash: Hash|undefined;
 
             const finalTargetOp     = op.getFinalTargetOp();
             const finalTargetOpHash = finalTargetOp.hash();
             
-            const wasUndone = this._activeUndoOpsPerOp.get(finalTargetOpHash).size > 0;
+            const wasValid = this.isValidOp(finalTargetOpHash);
+
+            let currentOp: CascadedInvalidateOp|undefined = op;
+            let currentOpHash: Hash|undefined = currentOp.hash();
+            let flipped: boolean;
+
+            do {
+                targetOp = currentOp.getTargetOp();
+                targetOpHash = targetOp?.hash();
+
+                const wasValid = this.isValidOp(targetOpHash);
+                if (this.isValidOp(currentOpHash)) {
+                    this._activeCascInvsPerOp.add(targetOpHash, currentOpHash);
+                } else {
+                    this._activeCascInvsPerOp.delete(targetOpHash, currentOpHash);
+                }
+                const isValid  = this.isValidOp(targetOpHash);
+                
+                flipped = wasValid !== isValid;
+                
+                if (flipped && targetOp instanceof CascadedInvalidateOp) {
+                    currentOp = targetOp;
+                    currentOpHash = targetOpHash;
+                } else {
+                    currentOp = undefined;
+                    currentOpHash = undefined;
+                }
+
+            } while (currentOp !== undefined && currentOpHash !== undefined);
+
+            if (wasValid !== this.isValidOp(finalTargetOpHash) ) {
+                if (op.undo) {
+                    result = this.mutate(op.getFinalTargetOp(), false, true);
+                } else {
+                    result = this.mutate(op.getFinalTargetOp(), true, true);
+                }
+            }
+            
+            /*
+            
+            const finalTargetOp     = op.getFinalTargetOp();
+            const finalTargetOpHash = finalTargetOp.hash();
+            
+            const wasUndone = this._activeCascInvsPerOp.get(finalTargetOpHash).size > 0;
 
             if (op.undo) {
-                this._activeUndoOpsPerOp.add(finalTargetOpHash, opHash);
+                this._activeCascInvsPerOp.add(finalTargetOpHash, opHash);
             } else { // redo
-                this._activeUndoOpsPerOp.delete(finalTargetOpHash, op.getTargetOp().hash());
+                this._activeCascInvsPerOp.delete(finalTargetOpHash, op.getTargetOp().hash());
             }
 
             if (wasUndone !== op.undo) {
@@ -397,7 +443,7 @@ abstract class MutableObject extends HashedObject {
                     result = this.mutate(op.getFinalTargetOp(), true, true);
                 }
             }
-
+            */
         } else {
             result = this.mutate(op, true, false);
         }
@@ -469,6 +515,11 @@ abstract class MutableObject extends HashedObject {
         }
 
         return this.getStore().load(opHash) as Promise<MutationOp|undefined>;
+    }
+
+    protected setCurrentPrevOps(op: MutationOp): void {
+
+        op.setPrevOps(this._terminalOps.values());
     }
 
     protected enqueueOpToSave(op: MutationOp) : void {

@@ -16,6 +16,7 @@ import { Mesh } from 'mesh/service';
 import { Resources } from 'spaces/spaces';
 
 import { Literal, Dependency } from './Literals';
+import { Logger } from 'util/logging';
 
 //import { __spreadArrays } from 'tslib';
 
@@ -33,6 +34,8 @@ const BITS_FOR_ID = 128;
 
 abstract class HashedObject {
     
+    static validationLog = new Logger('validation');
+
     static knownClasses = new Map<string, new () => HashedObject>();
 
     static registerClass(name: string, clazz: new () => HashedObject) {

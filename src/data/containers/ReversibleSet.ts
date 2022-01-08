@@ -96,7 +96,7 @@ class ReversibleSetAddOp<T extends HashedObject> extends ReversibleSetOp<T> {
     }
 }
 
-ReversibleSetAddOp.registerClass(ReversibleSetAddOp.className, ReversibleSetAddOp);
+
 
 class ReversibleSetDeleteOp<T extends HashedObject> extends ReversibleSetOp<T> {
 
@@ -123,15 +123,6 @@ class ReversibleSetDeleteOp<T extends HashedObject> extends ReversibleSetOp<T> {
         }
     }
 
-    // need a valid() function, that is called only when an object is NEW and we don't yet
-    // trust its integrity. init() will be called every time it is loaded (after all the
-    // fields have been filled in, either by the constructor or by the deliteralization
-    // mechanism, and after valid, if it is untrusted)
-    
-    // valid needs all the references also, already validated, to do its checks.
-
-    // (all this follows from the need to validate deletedOps)
-
     init() {
 
         super.init();
@@ -152,7 +143,7 @@ class ReversibleSetDeleteOp<T extends HashedObject> extends ReversibleSetOp<T> {
         }
 
         if (typeof this.elementHash !== 'string') {
-            ReversibleSet.logger.warning('The field elementHash of type MutebleSetDeleteOp should be a string.')
+            ReversibleSet.logger.warning('The field elementHash of type ReversibleSetDeleteOp should be a string.')
             return false;
         }
 
@@ -201,8 +192,6 @@ class ReversibleSetDeleteOp<T extends HashedObject> extends ReversibleSetOp<T> {
     }
     
 }
-
-ReversibleSetDeleteOp.registerClass(ReversibleSetDeleteOp.className, ReversibleSetDeleteOp);
 
 class ReversibleSet<T extends HashedObject> extends MutableObject {
 
@@ -253,7 +242,7 @@ class ReversibleSet<T extends HashedObject> extends MutableObject {
     }
 
     async delete(element: T, causalOps?: IterableIterator<MutationOp>) {
-        return await this.deleteByHash(element.hash(), causalOps);
+        return this.deleteByHash(element.hash(), causalOps);
     }
 
     async deleteByHash(hash: Hash, causalOps?: IterableIterator<MutationOp>): Promise<boolean> {
@@ -405,7 +394,9 @@ class ReversibleSet<T extends HashedObject> extends MutableObject {
 
 }
 
-ReversibleSet.registerClass(ReversibleSet.className, ReversibleSet);
+HashedObject.registerClass(ReversibleSetDeleteOp.className, ReversibleSetDeleteOp);
+HashedObject.registerClass(ReversibleSetAddOp.className, ReversibleSetAddOp);
+HashedObject.registerClass(ReversibleSet.className, ReversibleSet);
 
 
 export { ReversibleSet };

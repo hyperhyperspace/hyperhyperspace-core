@@ -97,7 +97,7 @@ class RefUpdateOp<T> extends MutationOp {
 
     async validate(references: Map<Hash, HashedObject>) {
 
-        if (!super.validate(references)) {
+        if (!await super.validate(references)) {
             return false;
         }
 

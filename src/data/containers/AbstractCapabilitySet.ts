@@ -40,8 +40,8 @@ class RevokeCapabilityAfterOp extends InvalidateAfterOp {
 
     static className = 'hhs/v0/RevokeCapabilityAfterOp';
 
-    constructor(grantOp?: GrantCapabilityOp, terminalOps?: IterableIterator<MutationOp>) {
-        super(grantOp, terminalOps);
+    constructor(grantOp?: GrantCapabilityOp) {
+        super(grantOp);
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
@@ -329,6 +329,10 @@ abstract class AbstractCapabilitySet extends MutableObject {
         }
 
         return all;
+    }
+
+    findAllCurrentGrantees(_capability: Capability) {
+        
     }
 
     static getGranteeCapabilityKeyForOp(op: GrantCapabilityOp|RevokeCapabilityAfterOp): Key {

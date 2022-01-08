@@ -51,7 +51,7 @@ describeProxy('[PGM] Peer group management', () => {
 
         await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery');
 
-    }, 300000);
+    }, 400000);
 });
 
 async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number) {

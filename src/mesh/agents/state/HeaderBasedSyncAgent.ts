@@ -208,7 +208,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         }
     };
 
-    literalIsValidOp(literal?: Literal): boolean {
+    literalIsValidOp(literal?: Literal, log=false): boolean {
         
         let valid = false;
 
@@ -220,6 +220,12 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 this.acceptedMutationOpClasses.indexOf(className) >= 0) {
 
                 valid = true;
+            } else if (log) {
+                console.log(this.acceptedMutationOpClasses);
+                console.log(className);
+                console.log(fields['targetObject'])
+                console.log(fields['targetObject']._hash)
+                console.log(this.mutableObjHash);
             }
         }
 

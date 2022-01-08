@@ -10,23 +10,16 @@ import { HashReference } from './HashReference';
 abstract class InvalidateAfterOp extends MutationOp {
 
     targetOp?: MutationOp;
-    terminalOps?: HashedSet<HashReference<MutationOp>>;
 
-    // Meaning: invalidate targetOp after terminalOps, i.e. undo any ops that
+    // Meaning: invalidate targetOp after prevOps, i.e. undo any ops that
     // have targetOp in causalOps but are not contained in the set of ops that
-    // come up to {terminalOps}.
+    // come up to {prevOps}.
 
-    constructor(targetOp?: MutationOp, terminalOps?: IterableIterator<MutationOp>) {
+    constructor(targetOp?: MutationOp) {
         super(targetOp?.targetObject);
         
         if (targetOp !== undefined) {
             this.targetOp = targetOp;
-
-            if (terminalOps === undefined) {
-                throw new Error('InvalidateAfterOp cannot be created: terminalOps parameter is missing.');
-            } else {
-                this.terminalOps = new HashedSet(Array.from(terminalOps).map((op: MutationOp) => op.createReference()).values());
-            }
 
             if (targetOp instanceof CascadedInvalidateOp) {
                 throw new Error('An InvalidateAfterOp cannot target an undo / redo op directly.');
@@ -47,21 +40,6 @@ abstract class InvalidateAfterOp extends MutationOp {
 
         if (! (await super.validate(references))) {
             return false;
-        }
-        
-        // check that the terminalOps and the InvAfterOp itself all point to the same MutableObject.
-        for (const terminalOpRef of (this.terminalOps as HashedSet<HashReference<MutationOp>>).values()) {
-            
-            const terminalOp = references.get(terminalOpRef.hash) as MutationOp;
-
-            if (terminalOp === undefined) {
-                return false;
-            }
-
-            if (!terminalOp.getTargetObject().equals(this.targetObject)) {
-                return false;
-            }
-            
         }
 
         if (this.targetOp instanceof CascadedInvalidateOp) {
@@ -88,12 +66,13 @@ abstract class InvalidateAfterOp extends MutationOp {
         return this.targetOp;
     }
 
-    getTerminalOps() {
-        if (this.terminalOps === undefined) {
-            throw new Error('Trying to get terminalOps for InvalidateAfterOp ' + this.hash() + ', but it is not present.');
+    getTerminalOps(): HashedSet<HashReference<MutationOp>> {
+        
+        if (this.prevOps === undefined) {
+            throw new Error('Trying to get terminalOps for InvalidateAfterOp ' + this.hash() + ', but prevOps is not present.');
         }
 
-        return this.terminalOps;
+        return this.prevOps;
     }
 
 }

@@ -140,16 +140,18 @@ test('[SPA02] 2-node nested sync test', async (done) => {
     lastThings.loadAllChanges();
 
     let ticks = 0;
-    while (ticks++ < 400 && lastThings.size() < 1) {
+    while (ticks++ < 1200 && lastThings.size() < 1) {
         await new Promise(r => setTimeout(r, 50));
         await lastThings?.loadAllChanges();
         //console.log('T'+ticks);
     }
 
+    expect(lastThings.size()).toEqual(1);
+
     let lastInner = lastThings?.size() > 0 ? lastThings.values().next().value : undefined;
 
     ticks = 0;
-    while (lastInner !== undefined && ticks++ < 800 && lastInner?.size() === 0) {
+    while (lastInner !== undefined && ticks++ < 1200 && (lastInner?.size() === 0)) {
         await new Promise(r => setTimeout(r, 50));
         await lastInner.loadAllChanges();
         //console.log('I'+ticks);
@@ -157,8 +159,8 @@ test('[SPA02] 2-node nested sync test', async (done) => {
 
     let samplePeer = lastInner?.size() > 0 ? lastInner.values().next().value : undefined;
 
-    expect((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length).toEqual(size-1);
-    expect(lastThings.size()).toEqual(1);
+    //expect((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length).toEqual(size-1);
+    
     expect(lastInner.size()).toEqual(1);
     expect(samplePeer?.hash()).toEqual(samplePeers[0].hash());
 

@@ -9,7 +9,6 @@ import { Identity } from '../identity/Identity';
 
 import { MultiMap } from 'util/multimap';
 
-
 type FeatureName = string;
 
 class EnableFeatureOp extends MutationOp {
@@ -77,8 +76,8 @@ class EnableFeatureOp extends MutationOp {
 class DisableFeatureAfterOp extends InvalidateAfterOp {
     static className = 'hhs/v0/DisableFeatureAfterOp';
 
-    constructor(targetOp?: EnableFeatureOp, terminalOps?: IterableIterator<MutationOp>) {
-        super(targetOp, terminalOps);
+    constructor(targetOp?: EnableFeatureOp) {
+        super(targetOp);
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {

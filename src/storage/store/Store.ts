@@ -254,21 +254,27 @@ class Store {
 
                     // If any of the causal ops has been invalidated, check if we should cascade
                     
+                    //console.log('checking invalidations for ' + object.hash())
                     for (const causalOp of object.causalOps.values()) {
+                        //console.log('found causal op ' + causalOp.hash())
                         const invalidations = await this.loadAllInvalidations(causalOp.getLastHash());
                         
                         for (const inv of invalidations) {
+                            //console.log('found ' + inv.hash())
                             // Note1: Since the invAfterOp was already saved and this op was not (loaded === undefined above)
-                            //        we can be sure that object is outside of invAfterOp.terminalOps.
+                            //        we can be sure that object is outside of invAfterOp.prevOps.
                             // Note2: invAfterOp only affects causal relationships within the same MutableObject (otherwise 
-                            //        terminalOps is meaningless).
+                            //        prevOps is meaningless).
                             const shouldInv  = inv instanceof InvalidateAfterOp && inv.getTargetObject().equals(object.getTargetObject());
                             const shouldCasc = inv instanceof CascadedInvalidateOp;
                             if (shouldInv || shouldCasc) {
+                                //console.log('WILL CASCADE')
                                 const casc = CascadedInvalidateOp.create(object, inv);
                                 casc.toContext(context);
                                 await this.saveWithContext(casc.getLastHash(), context);
-                            } 
+                            }  else {
+                                //console.log('WILL NOT CASCADE')
+                            }
                         }
                     }
 
@@ -277,14 +283,27 @@ class Store {
             }
             
             if (object instanceof InvalidateAfterOp || object instanceof CascadedInvalidateOp) {
+
+                //console.log('looking for invalidations targets for ' + object.hash() + ' of type ' + object.getClassName());
+                //console.log('targeting:')
+                //console.log(object.getTargetOp());
+
                 const consequences = await this.loadAllConsequences(object.getTargetOp().hash());
+
+                //console.log('found consequences of target: ')
+                //console.log(consequences);
                 
                 if (object instanceof InvalidateAfterOp) {
 
                     const validConsequences = await this.loadPrevOpsClosure(object.getTerminalOps());
 
+                    //console.log('valid consequences are:')
+                    //console.log(validConsequences);
+
                     for (const conseqOp of consequences.values()) {
                         if (!validConsequences.has(conseqOp.getLastHash())) {
+                            //console.log('found invalid consequence:')
+                            //console.log(conseqOp);
                             const casc = CascadedInvalidateOp.create(conseqOp, object);
                             casc.toContext(context);
                             await this.saveWithContext(casc.getLastHash(), context);

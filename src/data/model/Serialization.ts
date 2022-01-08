@@ -7,6 +7,9 @@ class Serialization {
         // like literals with "0", "1", "2"... as keys.
 
         if (typeof literal === 'object') {
+
+          plain = plain + '{';
+
           var keys = Object.keys(literal);
           keys.sort();
     
@@ -14,6 +17,8 @@ class Serialization {
             plain = plain +
                     Serialization.escapeString(key) + ':' + Serialization.default((literal as any)[key]) + ',';
           });
+
+          plain = plain + '}';
         } else {
           plain = Serialization.escapeString(literal.toString());
         }

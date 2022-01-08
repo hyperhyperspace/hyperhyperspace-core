@@ -23,18 +23,22 @@ abstract class MutationOp extends HashedObject {
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
 
         if (this.targetObject === undefined) {
+            MutationOp.validationLog.debug('Target object for ' + this.hash() + ' is missing');
             return false;
         }
 
         if (!(this.targetObject instanceof MutableObject)) {
+            MutationOp.validationLog.debug('Target object for ' + this.hash() + ' is not an instance of MutableObject');
             return false;
         }
 
         if (this.prevOps === undefined) {
+            MutationOp.validationLog.debug('prevOps is missing for ' + this.hash());
             return false;
         }
 
         if (!(this.prevOps instanceof HashedSet)) {
+            MutationOp.validationLog.debug('prevOps for ' + this.hash() + ' is not an instance of HashedSet');
             return false;
         }
 
@@ -42,35 +46,43 @@ abstract class MutationOp extends HashedObject {
             const prevOp = references.get(prevOpRef.hash);
 
             if (prevOp === undefined) {
+                MutationOp.validationLog.debug('prevOps for ' + this.hash() + ' contains undefined');
                 return false;
             } else if (! (prevOp instanceof MutationOp)) {
+                MutationOp.validationLog.debug('a prevOp for ' + this.hash() + ' is not an instance of MutationOp');
                 return false
             } else if (! ((prevOp as MutationOp).targetObject as MutableObject).equals(this.targetObject)) { 
+                MutationOp.validationLog.debug('a prevOp for ' + this.hash() + ' points to another object: ' + prevOp.targetObject?.hash());
                 return false;
             }
         }
 
         if (!this.targetObject.supportsUndo() && this.causalOps !== undefined) {
+            MutationOp.validationLog.debug('The target object for ' + this.hash() + ' does not support undo, yet this op has causalOps !== undefined');
             return false;
         }
 
         if (this.causalOps !== undefined) {
 
             if (! (this.causalOps instanceof HashedSet)) {
+                MutationOp.validationLog.debug('causalOps for ' + this.hash() + ' is not an instance of HashedSet');
                 return false;
             }
 
             for (const causalOp of this.causalOps.values()) {
 
                 if (causalOp === undefined) {
+                    MutationOp.validationLog.debug('causalOps for ' + this.hash() + ' contains undefined');
                     return false;
                 } else if (! (causalOp instanceof MutationOp)) {
+                    MutationOp.validationLog.debug('causalOps for ' + this.hash() + ' contains an element that is not an instance of MutationOp');
                     return false;
                 }
             }
         }
 
         if (!this.targetObject.shouldAcceptMutationOp(this, references)) {
+            MutationOp.validationLog.debug(this.hash() + ' was rejected by its target');
             return false;
         }
         
@@ -91,6 +103,19 @@ abstract class MutationOp extends HashedObject {
         }
 
         return this.causalOps as HashedSet<MutationOp>;
+    }
+
+    hasSingleCausalOp() {
+        return this.causalOps !== undefined && this.causalOps.size() === 1;
+    }
+
+    getSingleCausalOp() {
+
+        if (!this.hasSingleCausalOp()) {
+            throw new Error('Expected a single causal op, but got ' + this.causalOps?.size());
+        }
+
+        return this.causalOps?.values().next().value as MutationOp;
     }
 
     addCausalOp(causalOp: MutationOp) {

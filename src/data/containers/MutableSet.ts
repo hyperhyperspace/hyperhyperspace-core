@@ -89,8 +89,6 @@ class MutableSetAddOp<T extends HashedObject> extends MutableSetOp<T> {
     }
 }
 
-MutableSetAddOp.registerClass(MutableSetAddOp.className, MutableSetAddOp);
-
 class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
 
     static className = 'hhs/v0/MutableSetDeleteOp';
@@ -194,8 +192,6 @@ class MutableSetDeleteOp<T extends HashedObject> extends MutableSetOp<T> {
     }
     
 }
-
-MutableSetDeleteOp.registerClass(MutableSetDeleteOp.className, MutableSetDeleteOp);
 
 class MutableSet<T extends HashedObject> extends MutableObject {
 
@@ -370,6 +366,8 @@ class MutableSet<T extends HashedObject> extends MutableObject {
 
 }
 
+MutableSetDeleteOp.registerClass(MutableSetDeleteOp.className, MutableSetDeleteOp);
+MutableSetAddOp.registerClass(MutableSetAddOp.className, MutableSetAddOp);
 MutableSet.registerClass(MutableSet.className, MutableSet);
 
 

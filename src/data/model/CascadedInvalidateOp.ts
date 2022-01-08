@@ -1,7 +1,6 @@
 import { HashedObject } from './HashedObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
-import { HashReference } from './HashReference';
 import { InvalidateAfterOp } from './InvalidateAfterOp';
 import { MutationOp } from './MutationOp';
 
@@ -156,7 +155,7 @@ class CascadedInvalidateOp extends MutationOp {
                 throw new Error('The cause of an undo/redo can only be another UndoOp/RedoOp, or an InvalidateAfterOp.');
             }
 
-            this.prevOps = new HashedSet([causalOp.createReference(), targetOp.createReference()].values());
+            this.prevOps = new HashedSet([/*causalOp.createReference(), */targetOp.createReference()].values());
 
         }
         
@@ -172,44 +171,46 @@ class CascadedInvalidateOp extends MutationOp {
         }
 
         if (this.getAuthor() !== undefined) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' has an author, it should not.');
             return false;
         }
 
         if (this.undo === undefined) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' has no undo field');
             return false;
         }
 
         if (typeof(this.undo) !== 'boolean') {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' undo field is not boolean');
             return false;
         }
 
         if (this.targetOp === undefined) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' targetOp is undefined');
             return false;
         }
 
         if (!(this.targetOp instanceof MutationOp)) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' targetOp is not a mutationOp');
             return false;
         }
 
         if (this.causalOps === undefined) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' causalOps is undefined');
             return false;
         }
 
         if (!(this.causalOps instanceof HashedSet)) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' causalOps is not an instance of HashedSet');
             return false;
         }
 
         if (this.causalOps?.size() !== 1) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' causalOps does not have exactly one element');
             return false;
         }
 
-        const causalOpRef = this.causalOps.values().next().value;
-
-        if (!(causalOpRef instanceof HashReference)) {
-            return false;
-        }
-
-        const causalOp = references.get(causalOpRef.hash);
+        const causalOp = this.causalOps.values().next().value;
 
         if (causalOp instanceof InvalidateAfterOp) {
             
@@ -217,6 +218,7 @@ class CascadedInvalidateOp extends MutationOp {
 
             // invAfterOps can only be used as cause for UndoOps
             if (!this.undo) {
+                CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' is consequence of an InvalidateAfterOp, but it is a redo (only undos make sense in that case)');
                 return false;
             }
 
@@ -225,39 +227,46 @@ class CascadedInvalidateOp extends MutationOp {
 
             // invAfterOps can only be used as cause for ops within the same MutableObject
             if (!this.getTargetObject().equals(invAfterOp.getTargetObject())) {
+                CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' is caused by an InvalidateAfterOp in another object');
                 return false;
             }
 
             // undo / redo ops cannot be invalidated by a InvAfterOp
             if (this.targetOp instanceof CascadedInvalidateOp) {
+                CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' is invalidating another CascadedInvalidateOp, but is caused by an InvalidateAfterOp (hence it is not a cascade!)');
                 return false;
             }
         } else if (causalOp instanceof CascadedInvalidateOp) {
             // we're covered here
         } else {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' is not either the consequence of an InvalidateAfterOp or a cascade of another CascadeInvalidateOp, the offending class is ' + causalOp?.getClassName());
             return false;
         }
 
         // The cascade has merit: causalOp.targetOp \in targetOp.causalOps
         if (!this.targetOp.getCausalOps().has(causalOp.getTargetOp())) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' makes no sense: causalOp.targetOp not in targetOp.causalOps');
             return false;
         }
 
         // First CascadedInvOp in a chain is always an UndoOp, after that undos and redos alternate.
         if (this.targetOp instanceof CascadedInvalidateOp) {
             if (this.undo === this.targetOp.undo) {
+                CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' makes no sense: its undo value is equal to its targetOp undo value (it should be opposite)');
                 return false;
             }
         } else {
             if (!this.undo) {
+                CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' is consequence of an InvalidateAfterOp, but it is a redo (only undos make sense in that case)');
                 return false;
             }
         }
 
-        const prevOps = new HashedSet([causalOp.createReference(), this.targetOp.createReference()].values());
+        const prevOps = new HashedSet([/*causalOp.createReference(), */this.targetOp.createReference()].values());
 
         // see that prevOps are correctly generated
         if (this.prevOps === undefined || !this.prevOps.equals(prevOps)) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' prevOps contents is wrong (should be just the targetOp)');
             return false;
         }
 

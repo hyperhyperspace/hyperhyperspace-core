@@ -107,7 +107,7 @@ class PermissionTest extends AbstractCapabilitySet {
         const applies: Array<Promise<void>> = []
 
         for (const grantOp of this.findAllValidGrants(id, 'admin').values()) {
-            const revokeOp = new RevokeCapabilityAfterOp(grantOp, this._terminalOps.values());
+            const revokeOp = new RevokeCapabilityAfterOp(grantOp);
             revokeOp.setAuthor(this.getAuthor() as Identity);
             applies.push(this.applyNewOp(revokeOp));
         }
@@ -163,7 +163,7 @@ class PermissionTest extends AbstractCapabilitySet {
 
         for (const grantOp of allValidGrants.values()) {
 
-            const revokeOp = new RevokeCapabilityAfterOp(grantOp, this._terminalOps.values());
+            const revokeOp = new RevokeCapabilityAfterOp(grantOp);
             revokeOp.setAuthor(revoker);
             if (adminGrantOp !== undefined) {
                 revokeOp.addCausalOp(adminGrantOp);

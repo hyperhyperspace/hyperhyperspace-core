@@ -237,7 +237,7 @@ class HistoryProvider {
                 if (opHistory !== undefined) {
                     const literal = await this.syncAgent.store.loadLiteral(opHistory.opHash);
 
-                    if (!this.syncAgent.literalIsValidOp(literal)) {
+                    if (!this.syncAgent.literalIsValidOp(literal, true)) {
                         const detail = 'Invalid requestedTerminalOpHistory/requestedStartingOpHistory for request ' + respInfo.request.requestId + ', rejecting';
                         this.rejectRequest(respInfo, 'invalid-request', detail);
                         return false;
