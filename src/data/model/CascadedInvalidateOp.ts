@@ -1,3 +1,4 @@
+import { HashedMap } from './HashedMap';
 import { HashedObject } from './HashedObject';
 import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
@@ -106,14 +107,14 @@ class CascadedInvalidateOp extends MutationOp {
                 throw new Error('Cannot create ' + opType + ', causalOp not provided.');
             }
 
-            this.setCausalOps([causalOp].values());
+            this.addCausalOp('CascadedInvalidateOp/cause', causalOp);
             
             // this.causalOps is initialized by call to super() above
 
             // sanity checks:
 
             // The cascade has merit: causalOp.targetOp \in targetOp.causalOps
-            if (!targetOp.getCausalOps().has(causalOp.getTargetOp())) {
+            if (!new Set(targetOp.getCausalOps().valueHashes()).has(causalOp.getTargetOp().hash())) {
                 throw new Error('Creating undo because of an InvalidateAfterOp, but the op being undone does not depend on the invalidated one.');
             }
 
@@ -200,8 +201,8 @@ class CascadedInvalidateOp extends MutationOp {
             return false;
         }
 
-        if (!(this.causalOps instanceof HashedSet)) {
-            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' causalOps is not an instance of HashedSet');
+        if (!(this.causalOps instanceof HashedMap)) {
+            CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' causalOps is not an instance of HashedMap');
             return false;
         }
 
@@ -210,7 +211,7 @@ class CascadedInvalidateOp extends MutationOp {
             return false;
         }
 
-        const causalOp = this.causalOps.values().next().value;
+        const causalOp = this.causalOps.get('CascadedInvalidateOp/cause');
 
         if (causalOp instanceof InvalidateAfterOp) {
             
@@ -244,7 +245,7 @@ class CascadedInvalidateOp extends MutationOp {
         }
 
         // The cascade has merit: causalOp.targetOp \in targetOp.causalOps
-        if (!this.targetOp.getCausalOps().has(causalOp.getTargetOp())) {
+        if (!new Set(this.targetOp.getCausalOps().valueHashes()).has(causalOp.getTargetOp().hash())) {
             CascadedInvalidateOp.validationLog.debug('CascadedInvalidateOp ' + this.hash() + ' makes no sense: causalOp.targetOp not in targetOp.causalOps');
             return false;
         }

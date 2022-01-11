@@ -136,7 +136,7 @@ class PermissionTest extends AbstractCapabilitySet {
                 //const useAdminOp = this.useCapabilityForOp(admin, 'admin', grantOp);
                 const adminGrantOp = this.findValidGrant(admin, 'admin');
                 if (adminGrantOp !== undefined) {
-                    grantOp.addCausalOp(adminGrantOp);
+                    grantOp.addCausalOp('admin-grant-op', adminGrantOp);
                     return this.applyNewOp(grantOp).then(() => true);
                 } else {
                     return Promise.reject(new Error(admin.hash() + " cannot grant 'user' capability to " + id.hash() + ": there is no valid 'admin' grant."));
@@ -166,7 +166,7 @@ class PermissionTest extends AbstractCapabilitySet {
             const revokeOp = new RevokeCapabilityAfterOp(grantOp);
             revokeOp.setAuthor(revoker);
             if (adminGrantOp !== undefined) {
-                revokeOp.addCausalOp(adminGrantOp);
+                revokeOp.addCausalOp('admin-grant-op', adminGrantOp);
             }
 
             applies.push(this.applyNewOp(revokeOp));

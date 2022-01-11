@@ -1,6 +1,6 @@
-import { CausalSet } from 'data/containers';
+import { CausalSet, SingleAuthorCausalSet } from 'data/containers';
 import { Identity } from 'data/identity';
-import { Authorizer, HashedObject, MutationOp } from 'data/model';
+import { Authorization, Authorizer, Hash, HashedObject } from 'data/model';
 import { FeatureSet } from './FeatureSet';
 
 enum Features {
@@ -49,6 +49,8 @@ class Message extends HashedObject {
 
 class MessageSet extends CausalSet<Message> {
 
+    static className = 'hss-test/MessageSet';
+
     static features = [Features.OpenPost, Features.AnonRead];
 
     config?: FeatureSet;
@@ -58,7 +60,7 @@ class MessageSet extends CausalSet<Message> {
 
         if (owner !== undefined) {
 
-            const authorized = new CausalSet<Identity>();
+            const authorized = new SingleAuthorCausalSet<Identity>(owner);
             authorized.setAuthor(owner);
 
             this.config = new FeatureSet(authorized, MessageSet.features);
@@ -75,14 +77,10 @@ class MessageSet extends CausalSet<Message> {
             throw new Error('Messages cannot be posted if they do not have an author.');
         }
 
-        if (this.config?.has(Features.OpenPost)) {
-            authorizer = async (op: MutationOp) => await this.getConfig().attestMembershipForOp(Features.OpenPost, op);
-        } else if (this.config?.authorized?.has(author)) {
-            authorizer = async (op: MutationOp) => await this.getConfig().getAuthorizedIdentitiesSet().attestMembershipForOp(author, op);
-        } else {
-            return false;
-        }
-
+        authorizer = Authorization.firstOne(
+            [this.getConfig().createMembershipAuthorizer(Features.OpenPost),
+             this.getConfig().getAuthorizedIdentitiesSet().createMembershipAuthorizer(author)]);
+        
         return this.add(msg, author, authorizer);
     }
 
@@ -90,7 +88,18 @@ class MessageSet extends CausalSet<Message> {
         return this.config as FeatureSet;
     }
 
+    async validate(references: Map<Hash, HashedObject>) {
+        references;
+
+        return true;
+    }
+
+    getClassName() {
+        return MessageSet.className;
+    }
 
 }
+
+HashedObject.registerClass(MessageSet.className, MessageSet);
 
 export { Features, Message, MessageSet }

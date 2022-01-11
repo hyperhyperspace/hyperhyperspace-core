@@ -2,6 +2,7 @@ import { describeProxy } from 'config';
 import { RNGImpl } from 'crypto/random';
 import { CausalSet } from 'data/containers';
 import { Identity, RSAKeyPair } from 'data/identity';
+import { HashedObject } from 'data/model';
 import { FeatureSet } from 'data/types/FeatureSet';
 import { Features, MessageSet } from 'data/types/Messaging';
 import { PermissionedFeatureSet } from 'data/types/PermissionedFeatureSet';
@@ -13,6 +14,8 @@ import { Resources } from 'spaces/Resources';
 import { IdbBackend, MemoryBackend } from 'storage/backends';
 import { Store } from 'storage/store';
 import { LogLevel } from 'util/logging';
+
+HashedObject.validationLog.level = LogLevel.TRACE;
 
 describeProxy('[UND] Undo support', () => {
     test( '[UND01] Basic undo w/ IndexedDB backend', async (done) => {
@@ -579,7 +582,7 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     const messages = new MessageSet(rootId);
 
 
-    await messages.config?.authorized?.add(adminId, rootId);
+    await messages.config?.authorized?.add(adminId);
     await localStore.save(messages);
     await localStore.save(messages.config?.authorized as CausalSet<Identity>);
 
@@ -600,6 +603,7 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     // set up sync in pods
 
     LogLevel.TRACE
+    HashedObject.validationLog.level = LogLevel.TRACE;
     //HeaderBasedSyncAgent.controlLog.level = LogLevel.TRACE;
 
     for (let i=0; i<size; i++) {
@@ -625,17 +629,17 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     let messagesClone: MessageSet = messages.clone();
     await remoteStore.save(messagesClone);
 
-    expect( !messagesClone?.config?.has(Features.OpenPost)).toBeTruthy();
+    expect( !messagesClone?.config?.isEnabled(Features.OpenPost)).toBeTruthy();
 
     let i = 0;
-    while (i < 100 && !messages?.config?.has(Features.OpenPost)) {
+    while (i < 100 && !messages?.config?.isEnabled(Features.OpenPost)) {
         await messages?.config?.loadAllChanges();
         await new Promise(r => setTimeout(r, 100));
         i = i + 1;
     }
     
 
-    expect(messages?.config?.has(Features.OpenPost)).toBeTruthy();
+    expect(messages?.config?.isEnabled(Features.OpenPost)).toBeTruthy();
 
     let enabled = false;
 
@@ -653,10 +657,10 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     }
 
     expect(enabled).toBeTruthy();
-    expect(messagesClone?.config?.has(Features.AnonRead)).toBeTruthy();
+    expect(messagesClone?.config?.isEnabled(Features.AnonRead)).toBeTruthy();
 
     
-    await messages.config?.authorized?.delete(adminId, rootId);
+    await messages.config?.authorized?.delete(adminId);
 
 
 
@@ -670,7 +674,7 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     //console.log(messages?.config?.authorized)
 
     i = 0;
-    while (i < 100 && messagesClone?.config?.has(Features.AnonRead)) {
+    while (i < 100 && messagesClone?.config?.isEnabled(Features.AnonRead)) {
         await messagesClone?.config?.loadAllChanges();
         //console.log(messagesClone?.config?.has(Features.AnonRead))
         //console.log(messagesClone?.config)
@@ -705,8 +709,8 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     console.log(messagesClone?.config?._allAppliedOps);
 */    
     expect(!messagesClone?.config?.authorized?.has(adminId)).toBeTruthy();
-    expect(!messagesClone?.config?.has(Features.AnonRead)).toBeTruthy();
-    expect(messagesClone?.config?.has(Features.OpenPost)).toBeTruthy();
+    expect(!messagesClone?.config?.isEnabled(Features.AnonRead)).toBeTruthy();
+    expect(messagesClone?.config?.isEnabled(Features.OpenPost)).toBeTruthy();
 
     for (const pod of pods) {
         pod.shutdown();

@@ -66,18 +66,16 @@ class UseCapabilityOp extends MutationOp {
 
     static className = 'hhs/v0/UseCapabilityOp';
 
-    grantOp?: GrantCapabilityOp;
     usageKey?: Hash;
 
     constructor(grantOp?: GrantCapabilityOp, usageKey?: Hash) {
         super(grantOp?.getTargetObject());
 
         if (grantOp !== undefined) {
-            this.grantOp = grantOp;
             this.usageKey = usageKey;
             this.setAuthor(grantOp.grantee as Identity);
+            this.addCausalOp('grant-op', grantOp);
 
-            this.setCausalOps([grantOp].values());
         }
         
     }
@@ -109,7 +107,7 @@ class UseCapabilityOp extends MutationOp {
             return false;
         }
 
-        const causalOp = causalOps.values().next().value as MutationOp;
+        const causalOp = causalOps.get('grant-op');
 
         if (causalOp === undefined) {
              return false;
@@ -127,16 +125,22 @@ class UseCapabilityOp extends MutationOp {
             return false;
         }
 
-        if (this.grantOp === undefined || !(this.grantOp instanceof GrantCapabilityOp)) {
+        const grantOp = this.getGrantOp();
+
+        if (grantOp === undefined || !(grantOp instanceof GrantCapabilityOp)) {
             return false
         }
 
-        if (!this.grantOp.equals(causalOp)) {
+        if (!grantOp.equals(causalOp)) {
             return false;
         }
 
         return true;
         
+    }
+
+    getGrantOp() {
+        return this.getCausalOps().get('grant-op') as GrantCapabilityOp;
     }
 
 }
@@ -243,7 +247,10 @@ abstract class AbstractCapabilitySet extends MutableObject {
     useCapabilityForOp(grantee: Identity, capability: Capability, op: MutationOp): UseCapabilityOp {
         const usageKey = op.nonCausalHash();
         const useOp = this.useCapability(grantee, capability, usageKey);
-        op.addCausalOp(useOp);
+
+        const key = AbstractCapabilitySet.getGranteeCapabilityKey(grantee, capability)
+
+        op.addCausalOp(key, useOp);
         return useOp;
     }
 
@@ -251,7 +258,8 @@ abstract class AbstractCapabilitySet extends MutableObject {
         const usageKey = op.nonCausalHash();
         const useOp = this.useCapabilityIfAvailable(grantee, capability, usageKey);
         if (useOp !== undefined) {
-            op.addCausalOp(useOp);
+            const key = AbstractCapabilitySet.getGranteeCapabilityKey(grantee, capability)
+            op.addCausalOp(key, useOp);
             return useOp;
         } else {
             return undefined;
@@ -261,18 +269,24 @@ abstract class AbstractCapabilitySet extends MutableObject {
     checkCapabilityForOp(useOp: UseCapabilityOp, capability: Capability, op: MutationOp, grantee?: Identity): boolean {
         const usageKey = op.nonCausalHash();
         if (useOp.usageKey !== usageKey) {
+            console.log('a1')
             return false;
         }
 
-        if (useOp.grantOp?.capability !== capability) {
+        const grantOp = useOp.getGrantOp();
+
+        if (grantOp?.capability !== capability) {
+            console.log('a2')
             return false;
         }
 
-        if (!op.hasCausalOps() || !op.getCausalOps().has(useOp)) {
+        if (!op.hasCausalOps() || !new Set(op.getCausalOps().contentHashes.values()).has(useOp.hash())) {
+            console.log('a3')
             return false;
         }
 
         if (grantee !== undefined && !grantee.equals(useOp.getAuthor())) {
+            console.log('a4')
             return false;
         }
 

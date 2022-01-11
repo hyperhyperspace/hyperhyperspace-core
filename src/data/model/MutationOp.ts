@@ -5,12 +5,13 @@ import { HashedSet } from './HashedSet';
 import { Hash } from './Hashing';
 import { HashReference } from './HashReference';
 import { OpHeader, OpHeaderProps } from 'data/history/OpHeader';
+import { HashedMap } from './HashedMap';
 
 abstract class MutationOp extends HashedObject {
 
     targetObject?  : MutableObject;
     prevOps? : HashedSet<HashReference<MutationOp>>;
-    causalOps?: HashedSet<MutationOp>;
+    causalOps?: HashedMap<string, MutationOp>;
 
     constructor(targetObject?: MutableObject) {
         super();
@@ -64,12 +65,23 @@ abstract class MutationOp extends HashedObject {
 
         if (this.causalOps !== undefined) {
 
-            if (! (this.causalOps instanceof HashedSet)) {
-                MutationOp.validationLog.debug('causalOps for ' + this.hash() + ' is not an instance of HashedSet');
+
+            if (this.causalOps.size() === 0) {
+                MutationOp.validationLog.debug('Empty causalOps is not allowed in MutationOp: should be undefined');
                 return false;
             }
 
-            for (const causalOp of this.causalOps.values()) {
+            if (! (this.causalOps instanceof HashedMap)) {
+                MutationOp.validationLog.debug('causalOps for ' + this.hash() + ' is not an instance of HashedMap');
+                return false;
+            }
+
+            for (const [key, causalOp] of this.causalOps.entries()) {
+
+                if (typeof key !== 'string') {
+                    MutationOp.validationLog.debug('A key for a causalOp for ' + this.hash() + ' is not of type string but ' + (typeof key));
+                    return false;
+                } 
 
                 if (causalOp === undefined) {
                     MutationOp.validationLog.debug('causalOps for ' + this.hash() + ' contains undefined');
@@ -82,7 +94,7 @@ abstract class MutationOp extends HashedObject {
         }
 
         if (!this.targetObject.shouldAcceptMutationOp(this, references)) {
-            MutationOp.validationLog.debug(this.hash() + ' was rejected by its target');
+            MutationOp.validationLog.debug(this.hash() + ' of type ' + this.getClassName() + ' was rejected by its target of type ' + this.targetObject?.getClassName());
             return false;
         }
         
@@ -90,39 +102,35 @@ abstract class MutationOp extends HashedObject {
 
     }
 
-    setCausalOps(causalOps: IterableIterator<MutationOp>) {
-        this.causalOps = new HashedSet(causalOps); 
+    setCausalOps(causalOps: IterableIterator<[string, MutationOp]>) {
+        this.causalOps = new HashedMap(causalOps); 
+        
         if (this.causalOps.size() === 0) {
             this.causalOps = undefined;
         }
     }
 
-    getCausalOps() {
+    getCausalOps(): HashedMap<string, MutationOp> {
         if (this.causalOps === undefined) {
             throw new Error('Called getCausalOps, but this.causalOps is undefined.');
         }
 
-        return this.causalOps as HashedSet<MutationOp>;
+        return this.causalOps as HashedMap<string, MutationOp>;
     }
 
-    hasSingleCausalOp() {
-        return this.causalOps !== undefined && this.causalOps.size() === 1;
-    }
-
-    getSingleCausalOp() {
-
-        if (!this.hasSingleCausalOp()) {
-            throw new Error('Expected a single causal op, but got ' + this.causalOps?.size());
-        }
-
-        return this.causalOps?.values().next().value as MutationOp;
-    }
-
-    addCausalOp(causalOp: MutationOp) {
+    addCausalOp(key: string, causalOp: MutationOp) {
         if (this.causalOps === undefined) {
-            this.causalOps = new HashedSet([causalOp].values());
+            this.causalOps = new HashedMap([[key, causalOp] as [string, MutationOp]].values());
         } else {
-            this.causalOps.add(causalOp);
+            const oldVal = this.causalOps.get(key);
+
+            if (oldVal !== undefined) {
+                if (causalOp.hash() !== oldVal.hash()) {
+                    throw new Error('Trying to re-use causal property with name ' + key + ' in ' + this.getClassName());
+                }
+            }
+
+            this.causalOps.set(key, causalOp);
         }
     }
 

@@ -21,23 +21,43 @@ class HashedMap<K, V> {
         }
     }
 
-    set(key: K, value: V) {
+    set(key: K, value: V): void {
         let hash = HashedObject.hashElement(value);
         this.content.set(key, value);
         this.contentHashes.set(key, hash);
     }
 
-    remove(key: K) {
+    remove(key: K): void {
         this.content.delete(key);
         this.contentHashes.delete(key);
     }
 
-    has(key: K) {
+    has(key: K): boolean {
         return this.contentHashes.has(key);
+    }
+
+    get(key: K): (V|undefined) {
+        return this.content.get(key);
     }
 
     entries() : IterableIterator<[K, V]> {
         return this.content.entries();
+    }
+
+    size(): number {
+        return this.content.size;
+    }
+
+    keys() {
+        return this.content.keys();
+    }
+
+    values() {
+        return this.content.values();
+    }
+
+    valueHashes() {
+        return this.contentHashes.values();
     }
 
     toArrays() : {entries: [K,V][], hashes: Hash[]} {

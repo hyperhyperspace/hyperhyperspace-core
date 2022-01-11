@@ -33,20 +33,24 @@ class EnableFeatureOp extends MutationOp {
         
 
         if (!(await super.validate(references))) {
+            console.log(1)
             return false;
         }
 
         const target = this.getTargetObject();
 
         if (!(target instanceof AbstractFeatureSet)) {
+            console.log(2)
             return false;
         }
 
         if (this.featureName === undefined || !target.getFeatureNames().has(this.featureName)) {
+            console.log(3)
             return false;
         }
 
         if (this.hasCausalOps() && this.hasId()) {
+            console.log(4)
             return false;
         }
 
@@ -123,7 +127,7 @@ class UseFeatureOp extends MutationOp {
             this.enableOp = enableOp;
             this.usageKey = usageKey;
 
-            this.setCausalOps([enableOp].values())
+            this.addCausalOp('enable-op', enableOp)
         }
         
     }
@@ -143,7 +147,7 @@ class UseFeatureOp extends MutationOp {
             return false;
         }
 
-        const causalOp = causalOps.values().next().value as MutationOp;
+        const causalOp = causalOps.get('enable-op');
 
         if (causalOp === undefined) {
              return false;
