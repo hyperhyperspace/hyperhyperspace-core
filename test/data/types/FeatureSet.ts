@@ -1,8 +1,7 @@
-import { CausalSet, SingleAuthorCausalSet } from 'data/containers';
-import { CausalSetAddOp, CausalSetDeleteOp} from 'data/containers/CausalSet';
+import { CausalSet, SingleAuthorCausalSet, CausalSetAddOp, CausalSetDeleteOp } from 'data/containers';
 import { Identity } from 'data/identity';
-import { Authorization, Hash, HashedObject, MutationOp } from 'data/model';
-import { Authorizer } from 'data/model';
+import { Hash, HashedObject, MutationOp } from 'data/model';
+import { Authorizer, Authorization } from 'data/model';
 import { Verification } from 'data/model/Authorization';
 
 type Feature = string;
@@ -30,27 +29,33 @@ class FeatureSet extends CausalSet<Feature> {
         return FeatureSet.className;
     }
 
-    async enable(feature: Feature, author: Identity, extraAuthorizer?: Authorizer): Promise<boolean> {
+    async enable(feature: Feature, author: Identity): Promise<boolean> {
 
         if (this.features !== undefined && this.features.indexOf(feature) < 0) {
             throw new Error('Cannot enable feature ' + feature + ', accepted features are: ' + this.features);
         }
 
-        return super.add(feature, author, this.createAuthorizerFor(author, extraAuthorizer));
+        const auth = this.createAuthorizerFor(author);
+
+        return super.add(feature, author, auth);
     }
 
-    async disable(feature: Feature, author: Identity, extraAuthorizer?: Authorizer): Promise<boolean> {
+    async disable(feature: Feature, author: Identity): Promise<boolean> {
 
         if (this.features !== undefined && this.features.indexOf(feature) < 0) {
             throw new Error('Cannot disable feature ' + feature + ', accepted features are: ' + this.features);
         }
 
-        return this.disableByHash(HashedObject.hashElement(feature), author, this.createAuthorizerFor(author, extraAuthorizer));
+        const auth = this.createAuthorizerFor(author);
+
+        return super.delete(feature, author, auth);
     }
 
-    async disableByHash(hash: Hash, author: Identity, extraAuthorizer?: Authorizer): Promise<boolean> {
+    async disableByHash(hash: Hash, author: Identity): Promise<boolean> {
 
-        return super.deleteByHash(hash, author, this.createAuthorizerFor(author, extraAuthorizer));
+        const auth = this.createAuthorizerFor(author);
+
+        return super.deleteByHash(hash, author, auth);
     }
 
     isEnabled(feature: Feature) {
@@ -61,14 +66,14 @@ class FeatureSet extends CausalSet<Feature> {
         return this.hasByHash(hash);
     }
 
-    protected createAuthorizerFor(author: Identity, extraAuthorizer?: Authorizer): Authorizer|undefined {
+    protected createAuthorizerFor(author: Identity): Authorizer {
 
         const owner = this.authorized?.getAuthor();
 
         if (author.equals(owner)) {
             return Authorization.always;
         } else {
-            return Authorization.chain(this.getAuthorizedIdentitiesSet().createMembershipAuthorizer(author), extraAuthorizer);
+            return this.getAuthorizedIdentitiesSet().createMembershipAuthorizer(author);
         }
     }
 
@@ -97,24 +102,19 @@ class FeatureSet extends CausalSet<Feature> {
                 return false;
             }
 
-            if (owner === undefined || !owner.equals(op.getAuthor())) {
-                if (!opAuthor.equals(this.getAuthorizedIdentitiesSet().getAuthor())) {
+            if (owner === undefined || !owner.equals(opAuthor)) {
 
-                    const usedKeys = new Set<string>();
-                    const verify = this.getAuthorizedIdentitiesSet().createMembershipVerifier(opAuthor);
+                const auth = this.createAuthorizerFor(opAuthor);
+                const usedKeys = new Set<string>();
 
-                    if (!(verify(op, usedKeys)) ) {
-                        return false
-                    }
-
-                    if (!Verification.keys(usedKeys, op)) {
-                        return false;
-                    }
+                if (!(auth.verify(op, usedKeys)) ) {
+                    return false
                 }
 
-
+                if (!Verification.checkKeys(usedKeys, op)) {
+                    return false;
+                }
             }
-    
     
         }
 

@@ -1,6 +1,6 @@
 import { CausalSet, SingleAuthorCausalSet } from 'data/containers';
 import { Identity } from 'data/identity';
-import { Authorization, Authorizer, Hash, HashedObject } from 'data/model';
+import { Authorization, Hash, HashedObject } from 'data/model';
 import { FeatureSet } from './FeatureSet';
 
 enum Features {
@@ -69,19 +69,15 @@ class MessageSet extends CausalSet<Message> {
 
     async post(msg: Message): Promise<boolean> {
 
-        let authorizer: Authorizer | undefined;
-
         const author = msg.getAuthor();
 
         if (author === undefined) {
             throw new Error('Messages cannot be posted if they do not have an author.');
         }
 
-        authorizer = Authorization.firstOne(
-            [this.getConfig().createMembershipAuthorizer(Features.OpenPost),
-             this.getConfig().getAuthorizedIdentitiesSet().createMembershipAuthorizer(author)]);
+        const auth = this.createAuthorizerFor(author);
         
-        return this.add(msg, author, authorizer);
+        return this.add(msg, author, auth);
     }
 
     getConfig() {
@@ -96,6 +92,13 @@ class MessageSet extends CausalSet<Message> {
 
     getClassName() {
         return MessageSet.className;
+    }
+
+    private createAuthorizerFor(author: Identity) {
+
+        return Authorization.oneOf(
+                    [this.getConfig().createMembershipAuthorizer(Features.OpenPost),
+                    this.getConfig().getAuthorizedIdentitiesSet().createMembershipAuthorizer(author)]);
     }
 
 }

@@ -111,11 +111,12 @@ abstract class MutationOp extends HashedObject {
     }
 
     getCausalOps(): HashedMap<string, MutationOp> {
+        
         if (this.causalOps === undefined) {
-            throw new Error('Called getCausalOps, but this.causalOps is undefined.');
+            return new HashedMap();
         }
 
-        return this.causalOps as HashedMap<string, MutationOp>;
+        return this.causalOps;
     }
 
     addCausalOp(key: string, causalOp: MutationOp) {

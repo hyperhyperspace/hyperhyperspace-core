@@ -1,9 +1,11 @@
 import { Identity } from '../identity';
 import { Hash, HashedObject } from '../model';
 import { MutableObject, MutationOp, InvalidateAfterOp } from '../model';
-import { Authorizer, Verifier } from '../model/Authorization'
+import { Authorizer } from '../model'
 
 import { MultiMap } from 'util/multimap';
+import { Authorization, Verification } from 'data/model/Authorization';
+import { HashedSet } from 'data/model/HashedSet';
 
 /*
  * CausalSet: A set with an explicit membership op that can be used by other objects as
@@ -137,6 +139,9 @@ abstract class CausalSet<T> extends MutableObject {
     
     static opClasses = [AddOp.className, DeleteOp.className, MembershipAttestationOp.className];
 
+    acceptedTypes?: HashedSet<string>;
+    acceptedElementHashes?: HashedSet<Hash>;
+    
     _allElements: Map<Hash, T>;
 
     _currentAddOps        : Map<Hash, AddOp<T>>;
@@ -145,10 +150,21 @@ abstract class CausalSet<T> extends MutableObject {
     _validAddOpsPerElmt     : MultiMap<Hash, Hash>;
     _validDeleteOpsPerAddOp : MultiMap<Hash, Hash>;
 
-    constructor() {
+    constructor(acceptedTypes?: Array<string>, acceptedElements?: Array<any>) {
         super(CausalSet.opClasses, true);
 
         this.setRandomId();
+
+        if (acceptedTypes !== undefined) {
+            this.acceptedTypes = new HashedSet<string>(acceptedTypes.values());
+        }
+
+        if (acceptedElements !== undefined) {
+            this.acceptedElementHashes = new HashedSet<Hash>();
+            for (const acceptedElement of acceptedElements.values()) {
+                this.acceptedElementHashes.add(HashedObject.hashElement(acceptedElement));
+            }
+        }
         
         this._allElements = new Map();
 
@@ -159,7 +175,7 @@ abstract class CausalSet<T> extends MutableObject {
         this._validDeleteOpsPerAddOp = new MultiMap();
     }
 
-    protected async add(elmt: T, author?: Identity, authorizer?: Authorizer): Promise<boolean> {
+    protected async add(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
         
         const addOp = new AddOp(this, elmt);
 
@@ -167,30 +183,37 @@ abstract class CausalSet<T> extends MutableObject {
             addOp.setAuthor(author);
         }
 
-        if (authorizer !== undefined) {
-            this.setCurrentPrevOps(addOp);
+        const auth = Authorization.chain(this.createAddAuthorizer(elmt, author), extraAuth);
 
-            if (!(await authorizer(addOp))) {
+        this.setCurrentPrevOps(addOp);
+
+        if (!(await auth.attempt(addOp))) {
                 return false;
-            }
         }
-
+        
         return this.applyNewOp(addOp).then(() => true);
 
     }
 
-    protected async delete(elmt: T, author?: Identity, authorizer?: Authorizer): Promise<boolean> {
+    protected async delete(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
 
         const hash = HashedObject.hashElement(elmt);
         
-        return this.deleteByHash(hash, author, authorizer);
+        return this.deleteByHash(hash, author, extraAuth);
 
     }
 
-    protected async deleteByHash(hash: Hash, author?: Identity, authorizer?: Authorizer): Promise<boolean> {
+    protected async deleteByHash(hash: Hash, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        
+        const auth = Authorization.chain(this.createDeleteAuthorizerByHash(hash, author), extraAuth);
+
+        return this.deleteByHashWithAuth(hash, auth, author, extraAuth);
+    }
+
+    private async deleteByHashWithAuth(hash: Hash, ourAuth: Authorizer, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
 
         const deleteOps: Array<DeleteOp<T>> = [];
-        const deletions: Array<Promise<void>> = [];
+        
 
         for (const addOpHash of this._currentAddOpsPerElmt.get(hash)) {
             const addOp = this._currentAddOps.get(addOpHash) as AddOp<T>;
@@ -198,16 +221,19 @@ abstract class CausalSet<T> extends MutableObject {
             if (author !== undefined) {
                 deleteOp.setAuthor(author);
             }
-            if (authorizer !== undefined) {
 
-                this.setCurrentPrevOps(deleteOp);
+            const auth = Authorization.chain(ourAuth, extraAuth);
 
-                if (!(authorizer(deleteOp))) {
-                    return false;
-                }
+            this.setCurrentPrevOps(deleteOp);
+
+            if (!(await auth.attempt(deleteOp))) {
+                return false;
             }
+            
             deleteOps.push(deleteOp);
         }
+
+        const deletions: Array<Promise<void>> = [];
 
         for (const deleteOp of deleteOps) {
             deletions.push(this.applyNewOp(deleteOp));
@@ -298,6 +324,40 @@ abstract class CausalSet<T> extends MutableObject {
         return true;
     }
 
+    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
+
+        opReferences;
+
+        if (!super.shouldAcceptMutationOp(op, opReferences)) {
+            return false;
+        }
+
+        if (op instanceof AddOp || op instanceof DeleteOp) {
+            const author = op.getAuthor();
+
+            if (author === undefined) {
+                return false;
+            }
+
+            const auth = (op instanceof AddOp) ?
+                                            this.createAddAuthorizer(op.getElement(), author)
+                                                        :
+                                            this.createDeleteAuthorizerByHash(
+                                                    HashedObject.hashElement(op.getAddOp().getElement()), author);;
+                                                                                
+            const usedKeys     = new Set<string>();
+
+            if (!auth.verify(op, usedKeys)) {
+                return false;
+            }
+
+            if (!Verification.checkKeys(usedKeys, op)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     async mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean> {
 
@@ -361,14 +421,81 @@ abstract class CausalSet<T> extends MutableObject {
         
     }
 
-    createMembershipAuthorizer(elmt: T): Authorizer {
+    protected createAddAuthorizer(elmt: T, _author?: Identity): Authorizer {
 
-        return (op:  MutationOp) => this.attestMembershipForOp(elmt, op);
+        if (this.acceptedElementHashes !== undefined && !this.acceptedElementHashes.has(HashedObject.hashElement(elmt))) {
+            return Authorization.never;
+        }
+
+        if (this.acceptedTypes !== undefined && 
+              !(
+                (elmt instanceof HashedObject && this.acceptedTypes.has(elmt.getClassName())) 
+                        ||
+                (!(elmt instanceof HashedObject) && this.acceptedTypes.has(typeof(elmt)))
+               )
+                
+        ) {
+
+            return Authorization.never;
+
+        }
+
+        return Authorization.always;
     }
 
-    createMembershipVerifier(elmt: T): Verifier {
+    // It's important to keep the two delete authorizer functions independent (by hash / by element)
+    // so subclasses may redefine their behaviour separately.
 
-        return (op: MutationOp, usedKeys: Set<string>) => this.verifyMembershipAttestationForOp(elmt, op, usedKeys);
+    protected createDeleteAuthorizer(elmt: T, author?: Identity): Authorizer {
+        return this.createDeleteAuthorizerByHash(HashedObject.hashElement(elmt), author);
+    }
+
+    protected createDeleteAuthorizerByHash(_elmtHash: Hash, _author?: Identity): Authorizer {
+        return Authorization.always;
+    }
+
+    createMembershipAuthorizer(elmt: T): Authorizer {
+
+        return {
+            attempt : (op:  MutationOp) => this.attestMembershipForOp(elmt, op),
+            verify  : (op: MutationOp, usedKeys: Set<string>) => this.verifyMembershipAttestationForOp(elmt, op, usedKeys)
+        };
+
+    }
+
+    async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
+
+        references;
+
+        if (this.acceptedElementHashes !== undefined && this.acceptedElementHashes.size() === 0) {
+            return false;
+        }
+
+        if (this.acceptedTypes !== undefined && this.acceptedTypes.size() === 0) {
+            return false;
+        }
+
+        return true;
+    }
+
+    checkAcceptedTypes(acceptedTypes: Array<string>): boolean {
+        return (this.acceptedTypes !== undefined && this.acceptedTypes.equals(new HashedSet(acceptedTypes.values())));
+    }
+
+    checkAcceptedTypesIsMissing(): boolean {
+        return this.acceptedTypes === undefined;
+    }
+
+    checkAcceptedElements(acceptedElements: Array<any>): boolean {
+        const expected = new HashedSet<Hash>();
+
+        acceptedElements.forEach((elmt: any) => expected.add(HashedObject.hashElement(elmt)));
+
+        return (this.acceptedElementHashes !== undefined && this.acceptedElementHashes.equals(expected));
+    }
+
+    checkAcceptedElementsIsMissing(): boolean {
+        return this.acceptedElementHashes === undefined;
     }
 }
 

@@ -21,4 +21,4 @@ export { CascadedInvalidateOp } from './model/CascadedInvalidateOp';
 export { InvalidateAfterOp } from './model/InvalidateAfterOp';
 export { Serialization } from './model/Serialization';
 export { Namespace } from './model/Namespace';
-export { Authorizer, Authorization } from './model/Authorization';
+export * from './model/Authorization';

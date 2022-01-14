@@ -1,16 +1,15 @@
 import { Identity } from '../identity';
 import { CausalSet } from '../containers';
-import { Hash, HashedObject, MutationOp, CascadedInvalidateOp } from '../model';
-
-import { CausalSetMembershipAttestationOp } from './CausalSet';
+import { Hash, HashedObject } from '../model';
+import { Authorization, Authorizer } from '../model/Authorization';
 
 
 class SingleAuthorCausalSet<T> extends CausalSet<T> {
 
     static className = 'hss/v0/SingleAuthorCausalSet';
 
-    constructor(author?: Identity) {
-        super();
+    constructor(author?: Identity, acceptedTypes?: Array<string>, acceptedElements?: Array<any>) {
+        super(acceptedTypes, acceptedElements);
 
         if (author !== undefined) {
             this.setAuthor(author);
@@ -40,30 +39,33 @@ class SingleAuthorCausalSet<T> extends CausalSet<T> {
         return super.hasByHash(hash);
     }
 
-    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
-
-        opReferences;
-        
-        if (!this.isAcceptedMutationOpClass(op)) {
-            SingleAuthorCausalSet.validationLog.debug('Trying to apply op of type ' + op?.getClassName() + ', but it is not an accepted mutation type for ' + this.hash() + ' (' + this.getClassName() + ')');
-            return false;
-        }
-
-        const owner = this.getAuthor();
-
-        if (!(op instanceof CausalSetMembershipAttestationOp || op instanceof CascadedInvalidateOp) && owner !== undefined && !owner.equals(op.getAuthor())) {
-            CausalSet.validationLog.debug('Op ' + op?.hash() + ' of class ' + op?.getClassName() + ' has the wrong owner');
-            return false;
-        }
-
-        return true;
-    }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         
-        references;
+        if (!super.validate(references)) {
+            return false;
+        }
 
         return this.getAuthor() !== undefined;
+    }
+
+    protected createAddAuthorizer(_elmt: T, author: Identity): Authorizer {
+
+        if (author.equals(this.getAuthor())) {
+            return Authorization.always;
+        } else {
+            return Authorization.never;
+        }
+    }
+
+    protected createDeleteAuthorizerByHash(_elmtHash: Hash, author: Identity): Authorizer {
+
+        if (author.equals(this.getAuthor())) {
+            return Authorization.always;
+        } else {
+            return Authorization.never;
+        }
+
     }
 
     getClassName() {
