@@ -23,7 +23,7 @@ class HashedLiteral extends HashedObject {
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
-        return true;
+        return HashedLiteral.valid(this.value);
     }
 
     static valid(value: any, seen=new Set()) : boolean {
@@ -51,6 +51,10 @@ class HashedLiteral extends HashedObject {
                 return true;
 
             } else  {
+                if (value instanceof HashedObject) {
+                    return false;
+                }
+
                 let s = Object.prototype.toString.call(value);
                 
                 if (s !== '[object Object]') {
