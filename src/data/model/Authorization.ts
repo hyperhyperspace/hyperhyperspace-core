@@ -1,4 +1,5 @@
-import { HashedSet, MutationOp } from 'data/model';
+import { HashedSet } from './HashedSet';
+import { MutationOp } from './MutationOp';
 
 
 /**
@@ -147,7 +148,7 @@ class Verification {
         
         = (usedKeys: Set<string>, op: MutationOp) => 
                 (usedKeys.size === 0 && !op.hasCausalOps()) ||
-                (op.hasCausalOps() && new HashedSet<string>(usedKeys.values()).equals(new HashedSet<string>(op.getCausalOps()?.content?.keys())));
+                (op.hasCausalOps() && (new HashedSet<string>(usedKeys.values())).equals(new HashedSet<string>(op.getCausalOps()?.content?.keys())));
         
 }
 
