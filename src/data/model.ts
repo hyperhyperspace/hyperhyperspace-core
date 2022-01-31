@@ -1,4 +1,5 @@
 export { HashedObject } from './model/HashedObject';
+export { ClassRegistry } from './model/ClassRegistry';
 export { Literal, Dependency, LiteralUtils } from './model/Literals';
 export { Context, LiteralContext } from './model/Context';
 export { MutableObject } from './model/MutableObject';

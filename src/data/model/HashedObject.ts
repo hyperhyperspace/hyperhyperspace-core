@@ -17,6 +17,7 @@ import { Resources } from 'spaces/spaces';
 
 import { Literal, Dependency } from './Literals';
 import { Logger } from 'util/logging';
+import { ClassRegistry } from './ClassRegistry';
 
 //import { __spreadArrays } from 'tslib';
 
@@ -33,25 +34,13 @@ const BITS_FOR_ID = 128;
 //let done = false;
 
 abstract class HashedObject {
+
+    // This method is deprecated, use the registry directly.
+    static registerClass(name: string, clazz: new () => HashedObject) {
+        ClassRegistry.register(name, clazz);
+    }
     
     static validationLog = new Logger('validation');
-
-    static knownClasses = new Map<string, new () => HashedObject>();
-
-    static registerClass(name: string, clazz: new () => HashedObject) {
-        
-        const another = HashedObject.knownClasses.get(name);
-        if (another === undefined) {
-            HashedObject.knownClasses.set(name, clazz);
-        } else if (another !== clazz) {
-            throw new Error('Attempting to register two different instances of class ' + name + ', this would cause "instanceof" to give incorrect results. Check if your project has imported two instances of @hyper-hyper-space/core (maybe your dependencies are using two different versions?).')
-        }
-    }
-
-    static lookupClass(name: string): (new () => HashedObject) | undefined {
-        return HashedObject.knownClasses.get(name);
-    }
-
 
     private id?     : string;
     private author? : Identity;
@@ -583,7 +572,7 @@ abstract class HashedObject {
             throw new Error("Missing 'hashed_object' type signature while attempting to deliteralize " + literal.hash);
         }
         
-        let constr = HashedObject.lookupClass(value['_class']);
+        let constr = ClassRegistry.lookup(value['_class']);
 
         if (constr === undefined) {
             throw new Error("A local implementation of class '" + value['_class'] + "' is necessary to deliteralize " + literal.hash);
@@ -695,93 +684,6 @@ abstract class HashedObject {
         }
 
         return hash;
-    }
-
-    // the following only for pretty printing.
-
-    static stringifyLiteral(literal: {value: any, dependencies : Map<Hash, any>}) : string {
-        return HashedObject.stringifyLiteralWithIndent(literal, 0);
-    }
-
-    private static stringifyLiteralWithIndent(literal: {value: any, dependencies : Map<Hash, any>}, indent: number) : string{
-       
-        const value = literal['value'];
-        const dependencies = literal['dependencies'];
-
-        let something: string;
-
-        let typ = typeof(value);
-
-        let tab = '\n' + ' '.repeat(indent * 4);
-
-        if (typ === 'boolean' || typ === 'number' || typ === 'string') {
-            something = value;
-        } else if (typ === 'object') {
-            if (Array.isArray(value)) {
-                if (value.length > 0) {
-                    something =  tab + '[';
-                    let first = true;
-                    for (const elmt of value) {
-                        if (!first) {
-                            something = something + tab + ',';
-                        }
-                        first = false;
-                        something = something + HashedObject.stringifyLiteralWithIndent({value: elmt, dependencies: dependencies}, indent + 1);
-                    }
-                } else {
-                    return '[]';
-                }
-                
-               something = something + tab + ']';
-            } else if (value['_type'] === 'hashed_set') {
-                something = tab + 'HashedSet =>';
-                something = something + HashedObject.stringifyLiteralWithIndent({value: value['_elements'], dependencies: dependencies}, indent + 1);
-
-            } else {
-                if (value['_type'] === 'hash') {
-                    let hash = value['_content'];
-                    something = HashedObject.stringifyLiteralWithIndent({value: dependencies.get(hash), dependencies: dependencies}, indent);
-                } else {
-                    something = tab;
-                    let contents;
-                    if (value['_type'] === 'hashed_object') {
-                        let constr = HashedObject.lookupClass(value['_class']);
-                        if (constr === undefined) {
-                            something = something + 'HashedObject: ';
-                        } else {
-                            something = something + value['_class'] + ' ';
-                        }
-                        contents = value['_contents'];
-                    } else {
-                        contents = value;
-                    }
-
-                    something = something + '{';
-                    
-                    for (const [key, propValue] of Object.entries(contents)) {
-                        something = something + tab + '  ' + key + ':' + HashedObject.stringifyLiteralWithIndent({value: propValue, dependencies: dependencies}, indent + 1);
-                    }
-
-                    something = something + tab + '}'
-                }
-            }
-        } else {
-            throw Error("Unexpected type encountered while attempting to deliteralize: " + typ);
-        }
-
-        return something;
-
-    }
-
-    static stringifyHashedLiterals(hashedLiterals: {hash: Hash, literals: Map<Hash, any>}) : string {
-        let s = '';
-
-        for (let hash of hashedLiterals['literals'].keys()) {
-            s = s + hash + ' =>';
-            s = s + HashedObject.stringifyLiteralWithIndent({'value': hashedLiterals['literals'].get(hash), dependencies: hashedLiterals['literals']}, 1);
-        }
-
-        return s;
     }
 
 }
