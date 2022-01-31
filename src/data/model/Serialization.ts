@@ -8,7 +8,7 @@ class Serialization {
 
         if (typeof literal === 'object') {
 
-          plain = plain + '{';
+          plain = plain + (Array.isArray(literal)? '[' : '{');
 
           var keys = Object.keys(literal);
           keys.sort();
@@ -18,16 +18,23 @@ class Serialization {
                     Serialization.escapeString(key) + ':' + Serialization.default((literal as any)[key]) + ',';
           });
 
-          plain = plain + '}';
-        } else {
+          plain = plain + (Array.isArray(literal)? ']' : '}');
+        } else if (typeof literal === 'string') {
           plain = Serialization.escapeString(literal.toString());
+        } else if (typeof literal === 'boolean' || typeof literal === 'number') {
+          plain = literal.toString();
+          // important notice: because of how the javascript number type works, we are sure that
+          //                   integer numbers always get serialized without a fractional part
+          //                   (e.g. '1.0' cannot happen)
+        } else {
+          throw new Error('Cannot serialize ' + literal + ', its type ' + (typeof literal) + ' is illegal for a literal.');
         }
     
         return plain;
     }
 
     private static escapeString(text: string) {
-        return "'" + text.toString().replace("'", "''") + "'";
+        return "'" + text.replace("'", "''") + "'";
     }
 
 }
