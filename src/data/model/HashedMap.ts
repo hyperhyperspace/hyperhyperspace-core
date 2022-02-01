@@ -130,6 +130,10 @@ class HashedMap<K, V> {
         let hashes = value['_hashes'];
         let entries = HashedObject.deliteralizeField(value['_entries'], context, validate);
 
+        if (validate && hashes.length !== entries.length) {
+            throw new Error('Trying to deliteralize HashedMap but hashes and entries arrays have different lengths.');
+        }
+
         let hmap = new HashedMap();
         hmap.fromArrays(hashes, entries);
 

@@ -116,11 +116,32 @@ class HashedSet<T> {
             throw new Error("Trying to deliteralize value, but _type is '" + value['_type'] + "' (shoud be 'hashed_set')");
         }
 
+        if (validate && Object.keys(value).length !== 3) {
+            throw new Error('HashedSet literal values should have exactly 3 keys, found ' + Object.keys(value));
+        }
+
         let hashes = value['_hashes'];
         let elements = HashedObject.deliteralizeField(value['_elements'], context, validate);
+
+        if (validate && hashes.length !== elements.length) {
+            throw new Error('HashedSet hashes and elements arrays have different lengths');
+        }
         
         let hset = new HashedSet();
         hset.fromArrays(hashes, elements);
+        
+        if (validate) {
+
+            let another = new HashedSet();
+            for (const element of elements) {
+                another.add(element);
+            }
+
+            if (!hset.equals(another)) {
+                throw new Error('HashedSet failed validation: reconstruction resulted in a different set.');
+            }
+
+        }
 
         return hset;
     }
