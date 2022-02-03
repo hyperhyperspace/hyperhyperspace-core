@@ -288,7 +288,7 @@ abstract class HashedObject {
     literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
         
         let fields = {} as any;
-        let dependencies = new Set<Dependency>();
+        let dependencies = new Map<Hash, Dependency>();
 
         for (const fieldName of Object.keys(this)) {
             if (fieldName.length > 0 && fieldName[0] !== '_') {
@@ -321,7 +321,7 @@ abstract class HashedObject {
             hash = Hashing.forValue(value)
         }
 
-        let literal: Literal = { hash: hash, value: value, dependencies: Array.from(dependencies) };
+        let literal: Literal = { hash: hash, value: value, dependencies: Array.from(dependencies.values()) };
 
         if (this.author !== undefined) {
             literal.author = value['_fields']['author']['_hash'];
@@ -364,12 +364,12 @@ abstract class HashedObject {
         }
     }
 
-    static literalizeField(fieldPath: string, something: any, context?: Context) : { value: any, dependencies : Set<Dependency> }  {
+    static literalizeField(fieldPath: string, something: any, context?: Context) : { value: any, dependencies : Map<Hash, Dependency> }  {
 
         let typ = typeof(something);
 
         let value;
-        let dependencies = new Set<Dependency>();
+        let dependencies = new Map<Hash, Dependency>();
 
         if (typ === 'boolean' || typ === 'number' || typ === 'string') {
             value = something;
@@ -401,22 +401,24 @@ abstract class HashedObject {
                     let reference = something as HashReference<any>;
 
                     let dependency : Dependency = { path: fieldPath, hash: reference.hash, className: reference.className, type: 'reference'};
-                    dependencies.add(dependency);
+                    dependencies.set(Hashing.forValue(dependency), dependency);
 
                     value = reference.literalize();
                 } else if (something instanceof HashedObject) {
                     let hashedObject = something as HashedObject;
 
                     if (context === undefined) {
-                        throw new Error('Context needed to deliteralize HashedObject');
+                        throw new Error('Context needed to literalize HashedObject');
                     }
 
                     let hash = hashedObject.literalizeInContext(context, fieldPath);
 
                     let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClassName(), type: 'literal'};
-                    dependencies.add(dependency);
+                    dependencies.set(Hashing.forValue(dependency), dependency);
 
-                    HashedObject.collectChildDeps(dependencies, new Set((context.literals.get(hash) as Literal).dependencies));
+                    const hashedDeps = (context.literals.get(hash) as Literal).dependencies.map((d: Dependency)=>[Hashing.forValue(d), d] as [Hash, Dependency])
+
+                    HashedObject.collectChildDeps(dependencies, new Map(hashedDeps));
 
                     value = { _type: 'hashed_object_dependency', _hash: hash };
                 } else {
@@ -490,7 +492,7 @@ abstract class HashedObject {
                 }
             }
 
-            const obj = HashedObject.fromContext(context, hash);
+            const obj = HashedObject.fromContext(context, hash, true);
 
             if (obj.hash() !== hash) {
                 context.objects.delete(hash);
@@ -522,7 +524,9 @@ abstract class HashedObject {
         }
     }
     
-    static fromContext(context: Context, hash?: Hash) : HashedObject {
+    // do not use validate=true directly, use fromContextWithValidation
+
+    static fromContext(context: Context, hash?: Hash, validate=false) : HashedObject {
 
         if (hash === undefined) {
             if (context.rootHashes.length === 0) {
@@ -533,7 +537,7 @@ abstract class HashedObject {
             hash = context.rootHashes[0];
         }
 
-        HashedObject.deliteralizeInContext(hash, context);
+        HashedObject.deliteralizeInContext(hash, context, validate);
 
         return context.objects.get(hash) as HashedObject;
     }
@@ -542,7 +546,7 @@ abstract class HashedObject {
     //                        recreate the object and insert it into the context
     //                        (be smart and only do it if it hasn't been done already)
 
-    static deliteralizeInContext(hash: Hash, context: Context) : void {
+    static deliteralizeInContext(hash: Hash, context: Context, validate=false) : void {
 
         let hashedObject = context.objects.get(hash);
 
@@ -582,7 +586,7 @@ abstract class HashedObject {
 
         for (const [fieldName, fieldValue] of Object.entries(value['_fields'])) {
             if (fieldName.length>0 && fieldName[0] !== '_') {
-                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context);
+                (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context, validate);
             }
         }
 
@@ -647,7 +651,7 @@ abstract class HashedObject {
                 } else if (value['_type'] === 'hashed_object_dependency') {
                     let hash = value['_hash'];
 
-                    HashedObject.deliteralizeInContext(hash, context);
+                    HashedObject.deliteralizeInContext(hash, context, validate);
                     something = context.objects.get(hash) as HashedObject;
 
                 } else if (value['_type'] === 'hashed_object') {
@@ -663,9 +667,9 @@ abstract class HashedObject {
         return something;
     }
 
-    static collectChildDeps(parentDeps : Set<Dependency>, childDeps : Set<Dependency>) {
-        for (const childDep of childDeps) {
-            parentDeps.add(childDep);
+    static collectChildDeps(parentDeps : Map<Hash, Dependency>, childDeps : Map<Hash, Dependency>) {
+        for (const [hash, childDep] of childDeps.entries()) {
+            parentDeps.set(hash, childDep);
         }
     }
 

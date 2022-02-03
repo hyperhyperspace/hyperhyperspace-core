@@ -62,6 +62,11 @@ class HashedLiteral extends HashedObject {
                 }
 
                 for (const fieldName of Object.keys(value)) {
+
+                    if (!(typeof(fieldName) === 'string')) {
+                        return false;
+                    }
+
                     if (!HashedLiteral.valid(value[fieldName], seen)) {
                         return false;
                     }

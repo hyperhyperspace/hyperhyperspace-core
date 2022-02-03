@@ -6,6 +6,7 @@ export { MutableObject } from './model/MutableObject';
 export { MutationOp } from './model/MutationOp';
 export { HashReference } from './model/HashReference';
 export { HashedSet } from './model/HashedSet';
+export { HashedMap } from './model/HashedMap';
 export { HashedLiteral } from './model/HashedLiteral';
 export { Hashing, Hash } from './model/Hashing';
 

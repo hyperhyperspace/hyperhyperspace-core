@@ -1,6 +1,5 @@
 
-import { Context, HashedLiteral, HashedObject, HashedSet } from 'data/model';
-import { HashedMap } from 'data/model/HashedMap';
+import { Context, HashedLiteral, HashedObject, HashedSet, HashedMap } from 'data/model';
 
 class Wrapper extends HashedObject {
 

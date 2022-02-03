@@ -1,6 +1,3 @@
-
-
-
 import { Context } from 'data/model';
 import hashingChecks from '../hashing';
 
@@ -12,7 +9,7 @@ function saveToFile(ctx: Context, filename: string) {
     fs.writeFileSync(filename, contents, {encoding: 'utf-8'});
 }
 
-const dest = './compat/model/data';
+const dest = './compat/model/data-ts';
 
 if (!fs.existsSync(dest)) {
     fs.mkdirSync(dest);

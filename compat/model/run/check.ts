@@ -23,22 +23,29 @@ async function loadFromFile(filename: string, validate=true): Promise<Context> {
     return ctx;
 }
 
-const src = './compat/model/data';
+const srcs = ['./compat/model/data-ts', './compat/model/data-py'];
 
 async function run() {
 
-    for (const t of hashingChecks) {
+    for (const src of srcs) {
 
-        console.log(t.slug + ': ' + t.desc);
-    
-        const ctx = await loadFromFile(src + '/' + t.slug + '.ctx');
+        console.log('Checking folder ' + src + '...');
 
-        if (t.check(ctx)) {
-            console.log('pass');
-        } else {
-            console.log('fail');
+        for (const t of hashingChecks) {
+
+            console.log(t.slug + ': ' + t.desc);
+        
+            const ctx = await loadFromFile(src + '/' + t.slug + '.ctx');
+
+            if (t.check(ctx)) {
+                console.log('pass');
+            } else {
+                console.log('fail');
+            }
         }
     }
+
+    
 
 }
 

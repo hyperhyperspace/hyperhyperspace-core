@@ -102,9 +102,13 @@ class HashedMap<K, V> {
         return result;
     }
 
-    literalize(path='', context?: Context) : { value: any, dependencies : Set<Dependency> }  {
+    literalize(path='', context?: Context) : { value: any, dependencies : Map<Hash, Dependency> }  {
 
-        let dependencies = new Set<Dependency>();
+        let dependencies = new Map<Hash, Dependency>();
+
+        if (context === undefined) {
+            context = new Context();
+        }
 
         let arrays = this.toArrays();
         let hashes = arrays.hashes;

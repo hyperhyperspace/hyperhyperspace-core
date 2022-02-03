@@ -1,6 +1,7 @@
 import { MutableObject } from '../model/MutableObject';
 import { HashedObject } from '../model/HashedObject';
 import { HashReference } from '../model/HashReference';
+import { ClassRegistry } from '../model/ClassRegistry';
 
 
 class ImmutableReference<T extends MutableObject> extends HashedObject {
@@ -23,7 +24,7 @@ class ImmutableReference<T extends MutableObject> extends HashedObject {
         }
 
         const ref = references.get(this.value.hash);
-        const knownClass = HashedObject.lookupClass(this.value.className);
+        const knownClass = ClassRegistry.lookup(this.value.className);
 
         if (ref === undefined || knownClass === undefined) {
             return false;
