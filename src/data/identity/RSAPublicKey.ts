@@ -1,6 +1,7 @@
 import { RSA, RSADefaults } from 'crypto/ciphers';
-import { HashedObject } from 'data/model/HashedObject';
 import { RSAKeyPair } from './RSAKeyPair';
+
+import { HashedObject } from '../model/immutable/HashedObject';
 
 class RSAPublicKey extends HashedObject {
 

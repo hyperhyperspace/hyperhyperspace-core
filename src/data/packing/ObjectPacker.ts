@@ -1,7 +1,7 @@
-import { HistoryFragment } from 'data/history/HistoryFragment';
-import { HashedSet } from 'data/model/HashedSet';
+import { HistoryFragment } from '../history/HistoryFragment';
+import { HashedSet } from '../model/immutable';
 import { Hash } from 'data/model/Hashing';
-import { HashReference } from 'data/model/HashReference';
+import { HashReference } from 'data/model/immutable';
 import { Dependency, Literal, LiteralUtils } from 'data/model/Literals';
 import { Store } from 'storage/store';
 

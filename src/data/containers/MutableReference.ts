@@ -1,6 +1,6 @@
-import { MutableObject } from '../model/MutableObject';
-import { MutationOp } from '../model/MutationOp';
-import { HashedObject } from '../model/HashedObject';
+import { MutableObject } from '../model/mutable/MutableObject';
+import { MutationOp } from '../model/mutable/MutationOp';
+import { HashedObject } from '../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
 import { Types } from './Types';
 import { Hash } from 'data/model/Hashing';

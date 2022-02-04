@@ -1,5 +1,5 @@
-import { HashedSet } from './HashedSet';
-import { MutationOp } from './MutationOp';
+import { HashedSet } from '../immutable/HashedSet';
+import { MutationOp } from '../mutable/MutationOp';
 
 
 /**

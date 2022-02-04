@@ -6,7 +6,7 @@ import { AgentId } from '../../service/Agent';
 import { Endpoint } from '../network/NetworkAgent';
 //import { PeerId } from '../../network/Peer';
 
-import { HashedMap } from 'data/model/HashedMap';
+import { HashedMap } from 'data/model/immutable';
 import { Hash, HashedObject } from 'data/model';
 import { Shuffle } from 'util/shuffling';
 import { Logger, LogLevel } from 'util/logging';

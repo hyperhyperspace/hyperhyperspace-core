@@ -9,8 +9,8 @@ import { Logger, LogLevel } from 'util/logging';
 
 import { Resources } from 'spaces/spaces';
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
-import { InvalidateAfterOp } from 'data/model/InvalidateAfterOp';
-import { CascadedInvalidateOp } from 'data/model/CascadedInvalidateOp';
+import { InvalidateAfterOp } from 'data/model/causal/InvalidateAfterOp';
+import { CascadedInvalidateOp } from 'data/model/causal/CascadedInvalidateOp';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,

@@ -1,5 +1,5 @@
-import { HashedObject, MutableObject } from "data/model";
-import { MutationOp } from 'data/model/MutationOp';
+import { HashedObject, MutableObject } from 'data/model';
+import { MutationOp } from 'data/model/mutable';
 
 
 class HasId extends MutableObject {

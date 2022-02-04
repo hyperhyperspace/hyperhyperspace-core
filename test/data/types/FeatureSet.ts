@@ -2,7 +2,7 @@ import { CausalSet, SingleAuthorCausalSet, CausalSetAddOp, CausalSetDeleteOp } f
 import { Identity } from 'data/identity';
 import { Hash, HashedObject, MutationOp } from 'data/model';
 import { Authorizer, Authorization } from 'data/model';
-import { Verification } from 'data/model/Authorization';
+import { Verification } from 'data/model/causal/Authorization';
 
 type Feature = string;
 

@@ -1,7 +1,7 @@
-import { HashedMap } from 'data/model/HashedMap';
-import { HashedSet } from 'data/model/HashedSet';
-import { HashReference } from 'data/model/HashReference';
-import { MutationOp } from 'data/model/MutationOp';
+import { HashedMap } from '../model/immutable/HashedMap';
+import { HashedSet } from '../model/immutable/HashedSet';
+import { HashReference } from '../model/immutable/HashReference';
+import { MutationOp } from '../model/mutable/MutationOp';
 import { Hash, Hashing } from '../model/Hashing';
 
 type OpHeaderLiteral = {

@@ -1,11 +1,11 @@
-import { HashedObject } from './HashedObject';
-import { Context } from './Context';  
+import { HashedObject } from '../immutable/HashedObject';
+import { Context } from '../Context';  
 import { MutableObject } from './MutableObject';
-import { HashedSet } from './HashedSet';
-import { Hash } from './Hashing';
-import { HashReference } from './HashReference';
+import { HashedSet } from '../immutable/HashedSet';
+import { Hash } from '../Hashing';
+import { HashReference } from '../immutable/HashReference';
 import { OpHeader, OpHeaderProps } from 'data/history/OpHeader';
-import { HashedMap } from './HashedMap';
+import { HashedMap } from '../immutable/HashedMap';
 
 abstract class MutationOp extends HashedObject {
 

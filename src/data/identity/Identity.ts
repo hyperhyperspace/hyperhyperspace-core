@@ -1,4 +1,4 @@
-import { HashedObject } from '../model/HashedObject';
+import { HashedObject } from '../model/immutable/HashedObject';
 
 import { RSAKeyPair } from './RSAKeyPair';
 import { RSAPublicKey } from './RSAPublicKey';

@@ -1,6 +1,5 @@
-import { HashedObject } from 'data/model/HashedObject';
+import { HashedObject, HashedSet } from 'data/model/immutable';
 import { Hash } from 'data/model/Hashing';
-import { HashedSet } from 'data/model/HashedSet';
 
 
 class TerminalOpsState extends HashedObject {

@@ -1,5 +1,5 @@
-import { HashedObject } from './HashedObject';
-import { MutableObject } from './MutableObject';
+import { HashedObject } from './immutable/HashedObject';
+import { MutableObject } from './mutable/MutableObject';
 
 class Namespace {
 

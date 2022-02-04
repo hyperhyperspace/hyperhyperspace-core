@@ -1,9 +1,9 @@
-import { MutableObject } from '../model/MutableObject';
-import { HashedObject } from '../model/HashedObject';
+import { MutableObject } from '../model/mutable/MutableObject';
+import { HashedObject } from '../model/immutable/HashedObject';
 import { Hash } from 'data/model/Hashing';
-import { MutationOp } from 'data/model/MutationOp';
-import { HashedSet } from 'data/model/HashedSet';
-import { HashReference } from 'data/model/HashReference';
+import { MutationOp } from 'data/model/mutable/MutationOp';
+import { HashedSet } from 'data/model/immutable/HashedSet';
+import { HashReference } from 'data/model/immutable/HashReference';
 import { Types } from './Types';
 import { Logger, LogLevel } from 'util/logging';
 

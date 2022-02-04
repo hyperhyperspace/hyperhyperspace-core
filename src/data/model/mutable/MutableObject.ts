@@ -1,19 +1,19 @@
 import { Store } from 'storage/store';
 
-import { HashedObject } from './HashedObject';
-import { Context } from './Context';
+import { HashedObject } from '../immutable/HashedObject';
+import { Context } from '../Context';
 import { MutationOp } from './MutationOp';
-import { Hash } from './Hashing';
+import { Hash } from '../Hashing';
 import { Logger, LogLevel } from 'util/logging';
 import { HeaderBasedSyncAgent, StateSyncAgent, StateFilter } from 'mesh/agents/state';
 import { PeerGroupAgent } from 'mesh/agents/peer';
-import { HashedSet } from './HashedSet';
-import { HashReference } from './HashReference';
+import { HashedSet } from '../immutable/HashedSet';
+import { HashReference } from '../immutable/HashReference';
 import { Lock } from 'util/concurrency';
 import { MultiMap } from 'util/multimap';
 import { Resources } from 'spaces/Resources';
-import { CascadedInvalidateOp } from './CascadedInvalidateOp';
-import { OpHeader } from '../history/OpHeader';
+import { CascadedInvalidateOp } from '../causal/CascadedInvalidateOp';
+import { OpHeader } from '../../history/OpHeader';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 

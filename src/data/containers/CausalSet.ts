@@ -1,11 +1,11 @@
 import { Identity } from '../identity';
 import { Hash, HashedObject } from '../model';
 import { MutableObject, MutationOp, InvalidateAfterOp } from '../model';
-import { Authorizer } from '../model'
+import { Authorizer } from '../model/causal/Authorization'
 
 import { MultiMap } from 'util/multimap';
-import { Authorization, Verification } from 'data/model/Authorization';
-import { HashedSet } from 'data/model/HashedSet';
+import { Authorization, Verification } from '../model/causal/Authorization';
+import { HashedSet } from '../model/immutable/HashedSet';
 
 /*
  * CausalSet: A set with an explicit membership op that can be used by other objects as

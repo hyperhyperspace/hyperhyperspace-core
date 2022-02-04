@@ -1,9 +1,9 @@
-import { MutationOp } from './MutationOp';
+import { MutationOp } from '../mutable/MutationOp';
 import { CascadedInvalidateOp } from './CascadedInvalidateOp';
-import { HashedObject } from './HashedObject';
-import { HashedSet } from './HashedSet';
-import { Hash } from './Hashing';
-import { HashReference } from './HashReference';
+import { HashedObject } from '../immutable/HashedObject';
+import { HashedSet } from '../immutable/HashedSet';
+import { Hash } from '../Hashing';
+import { HashReference } from '../immutable/HashReference';
 
 
 

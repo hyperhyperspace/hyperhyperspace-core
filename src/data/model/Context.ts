@@ -1,5 +1,5 @@
 
-import { HashedObject } from './HashedObject';
+import { HashedObject } from './immutable/HashedObject';
 import { Literal, LiteralUtils } from './Literals';
 import { Hash } from './Hashing';
 import { Resources } from 'spaces/spaces';

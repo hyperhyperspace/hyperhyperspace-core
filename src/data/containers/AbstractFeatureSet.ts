@@ -1,9 +1,9 @@
 import { Hash } from '../model/Hashing';
-import { HashedObject } from '../model/HashedObject';
-import { HashedSet } from '../model/HashedSet';
-import { MutableObject } from '../model/MutableObject';
-import { MutationOp } from '../model/MutationOp';
-import { InvalidateAfterOp } from '../model/InvalidateAfterOp';
+import { HashedObject } from '../model/immutable/HashedObject';
+import { HashedSet } from '../model/immutable/HashedSet';
+import { MutableObject } from '../model/mutable/MutableObject';
+import { MutationOp } from '../model/mutable/MutationOp';
+import { InvalidateAfterOp } from '../model/causal/InvalidateAfterOp';
 
 import { Identity } from '../identity/Identity';
 

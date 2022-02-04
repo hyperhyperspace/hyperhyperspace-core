@@ -1,4 +1,4 @@
-import { HashedObject } from "data/model/HashedObject";
+import { HashedObject } from '../model/immutable/HashedObject';
 
 abstract class Types {
     

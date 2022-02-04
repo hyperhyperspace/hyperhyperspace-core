@@ -1,9 +1,9 @@
-import { HashedMap } from './HashedMap';
-import { HashedObject } from './HashedObject';
-import { HashedSet } from './HashedSet';
-import { Hash } from './Hashing';
+import { HashedMap } from '../immutable/HashedMap';
+import { HashedObject } from '../immutable/HashedObject';
+import { HashedSet } from '../immutable/HashedSet';
+import { Hash } from '../Hashing';
 import { InvalidateAfterOp } from './InvalidateAfterOp';
-import { MutationOp } from './MutationOp';
+import { MutationOp } from '../mutable/MutationOp';
 
  /*
   *        Op0 <-

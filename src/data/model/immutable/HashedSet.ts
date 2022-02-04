@@ -1,8 +1,8 @@
-import { Hashing, Hash } from './Hashing';
+import { Hashing, Hash } from '../Hashing';
 import { HashedObject } from './HashedObject';
-import { Context } from './Context';
+import { Context } from '../Context';
 
-import { Dependency } from './Literals';
+import { Dependency } from '../Literals';
 
 class HashedSet<T> {
 

@@ -1,6 +1,6 @@
-import { MutableObject } from '../model/MutableObject';
-import { HashedObject } from '../model/HashedObject';
-import { HashReference } from '../model/HashReference';
+import { MutableObject } from '../model/mutable/MutableObject';
+import { HashedObject } from '../model/immutable/HashedObject';
+import { HashReference } from '../model/immutable/HashReference';
 import { ClassRegistry } from '../model/ClassRegistry';
 
 
