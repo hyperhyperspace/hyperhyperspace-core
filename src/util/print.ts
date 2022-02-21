@@ -1,5 +1,5 @@
 import { Hash } from "data/model";
-import { ClassRegistry } from "data/model/ClassRegistry";
+import { ClassRegistry } from "data/model/literals/ClassRegistry";
 
 class Print {
     // the following only for pretty printing.

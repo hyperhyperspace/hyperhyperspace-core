@@ -1,7 +1,7 @@
 import { PeerSource } from '../PeerSource';
 import { PeerInfo } from '../PeerGroupAgent';
 import { Shuffle } from 'util/shuffling';
-import { MutableSet } from 'data/containers';
+import { MutableSet } from 'data/collections';
 import { HashedObject, HashedSet, Hash } from 'data/model';
 import { Endpoint } from '../../network/NetworkAgent';
 import { Peer } from '../Peer';

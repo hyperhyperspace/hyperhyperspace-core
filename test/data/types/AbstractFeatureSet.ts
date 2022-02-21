@@ -1,11 +1,11 @@
-import { Hash } from '../model/Hashing';
-import { HashedObject } from '../model/immutable/HashedObject';
-import { HashedSet } from '../model/immutable/HashedSet';
-import { MutableObject } from '../model/mutable/MutableObject';
-import { MutationOp } from '../model/mutable/MutationOp';
-import { InvalidateAfterOp } from '../model/causal/InvalidateAfterOp';
+import { Hash } from 'data/model/hashing/Hashing';
+import { HashedObject } from 'data/model/immutable/HashedObject';
+import { HashedSet } from 'data/model/immutable/HashedSet';
+import { MutableObject } from 'data/model/mutable/MutableObject';
+import { MutationOp } from 'data/model/mutable/MutationOp';
+import { InvalidateAfterOp } from 'data/model/causal/InvalidateAfterOp';
 
-import { Identity } from '../identity/Identity';
+import { Identity } from 'data/identity/Identity';
 
 import { MultiMap } from 'util/multimap';
 

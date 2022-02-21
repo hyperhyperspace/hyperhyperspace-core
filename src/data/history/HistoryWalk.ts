@@ -1,4 +1,4 @@
-import { Hash } from 'data/model/Hashing';
+import { Hash } from 'data/model/hashing/Hashing';
 import { HistoryFragment } from './HistoryFragment';
 import { OpHeader } from './OpHeader';
 

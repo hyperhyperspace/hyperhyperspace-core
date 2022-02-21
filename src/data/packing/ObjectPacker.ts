@@ -1,8 +1,8 @@
 import { HistoryFragment } from '../history/HistoryFragment';
 import { HashedSet } from '../model/immutable';
-import { Hash } from 'data/model/Hashing';
+import { Hash } from 'data/model/hashing/Hashing';
 import { HashReference } from 'data/model/immutable';
-import { Dependency, Literal, LiteralUtils } from 'data/model/Literals';
+import { Dependency, Literal, LiteralUtils } from 'data/model/literals/LiteralUtils';
 import { Store } from 'storage/store';
 
 

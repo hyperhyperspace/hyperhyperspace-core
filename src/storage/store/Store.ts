@@ -1,6 +1,6 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
 import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp, HashedSet } from 'data/model';
-import { Hash } from 'data/model/Hashing';
+import { Hash } from 'data/model/hashing/Hashing';
 
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity/Identity';

@@ -3,7 +3,7 @@
 
 export * from './data/identity';
 export * from './data/model';
-export * from './data/containers';
+export * from './data/collections';
 export * from './data/history';
 
 export * from './storage/backends';

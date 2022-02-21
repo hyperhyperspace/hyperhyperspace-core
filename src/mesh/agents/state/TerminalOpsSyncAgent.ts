@@ -15,7 +15,7 @@ import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
-import { LiteralUtils } from 'data/model/Literals';
+import { LiteralUtils } from 'data/model/literals/LiteralUtils';
 
 /*
 

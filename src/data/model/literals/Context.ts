@@ -1,7 +1,7 @@
 
-import { HashedObject } from './immutable/HashedObject';
-import { Literal, LiteralUtils } from './Literals';
-import { Hash } from './Hashing';
+import { HashedObject } from '../immutable/HashedObject';
+import { Literal, LiteralUtils } from './LiteralUtils';
+import { Hash } from '../hashing/Hashing';
 import { Resources } from 'spaces/spaces';
 
 type LiteralContext = { rootHashes: Array<Hash>, literals: any };

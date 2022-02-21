@@ -1,7 +1,7 @@
-import { Identity } from '../identity';
-import { CausalSet } from '../containers';
-import { Hash, HashedObject } from '../model';
-import { Authorization, Authorizer } from '../model/causal/Authorization';
+import { Identity } from '../../identity';
+import { CausalSet } from './CausalSet';
+import { Hash, HashedObject } from '../../model';
+import { Authorization, Authorizer } from '../../model/causal/Authorization';
 
 
 class SingleAuthorCausalSet<T> extends CausalSet<T> {

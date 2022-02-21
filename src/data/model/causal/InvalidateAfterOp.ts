@@ -2,7 +2,7 @@ import { MutationOp } from '../mutable/MutationOp';
 import { CascadedInvalidateOp } from './CascadedInvalidateOp';
 import { HashedObject } from '../immutable/HashedObject';
 import { HashedSet } from '../immutable/HashedSet';
-import { Hash } from '../Hashing';
+import { Hash } from '../hashing/Hashing';
 import { HashReference } from '../immutable/HashReference';
 
 

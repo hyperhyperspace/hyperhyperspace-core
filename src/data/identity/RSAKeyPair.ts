@@ -1,7 +1,7 @@
 import { RSA, RSADefaults } from 'crypto/ciphers';
 import { HashedObject } from '../model/immutable/HashedObject';
 import { RSAPublicKey } from './RSAPublicKey';
-import { Hashing } from 'data/model/Hashing';
+import { Hashing } from 'data/model/hashing/Hashing';
 
 // Note: this classs uses a custom hash function that omits the private key,
 //       using only the public part, thus allowing a public key to generate

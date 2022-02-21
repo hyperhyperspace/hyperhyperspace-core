@@ -1,8 +1,8 @@
-import { Hash, Hashing } from '../Hashing';
+import { Hash, Hashing } from '../hashing/Hashing';
 import { HashedObject } from './HashedObject';
-import { Context } from '../Context';
+import { Context } from '../literals/Context';
 
-import { Dependency } from '../Literals';
+import { Dependency } from '../literals/LiteralUtils';
 
 class HashedMap<K, V> {
 

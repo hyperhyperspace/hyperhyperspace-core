@@ -4,20 +4,20 @@ import { RNGImpl } from 'crypto/random';
 
 import { Identity } from '../../identity/Identity';
 
-import { Hashing, Hash } from '../Hashing';
+import { Hashing, Hash } from '../hashing/Hashing';
 
 import { HashedSet } from './HashedSet';
 import { HashReference } from './HashReference';
 import { HashedMap } from './HashedMap';
 
-import { Context, LiteralContext } from '../Context';
+import { Context, LiteralContext } from '../literals/Context';
 
 import { Mesh } from 'mesh/service';
 import { Resources } from 'spaces/spaces';
 
-import { Literal, Dependency } from '../Literals';
+import { Literal, Dependency } from '../literals/LiteralUtils';
 import { Logger } from 'util/logging';
-import { ClassRegistry } from '../ClassRegistry';
+import { ClassRegistry } from '../literals/ClassRegistry';
 
 //import { __spreadArrays } from 'tslib';
 

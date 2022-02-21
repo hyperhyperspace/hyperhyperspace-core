@@ -1,4 +1,4 @@
-import { Hash } from '../Hashing'
+import { Hash } from '../hashing/Hashing'
 import { HashedObject } from './HashedObject';
 
 

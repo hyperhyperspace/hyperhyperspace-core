@@ -1,7 +1,7 @@
 import { HashedMap } from '../immutable/HashedMap';
 import { HashedObject } from '../immutable/HashedObject';
 import { HashedSet } from '../immutable/HashedSet';
-import { Hash } from '../Hashing';
+import { Hash } from '../hashing/Hashing';
 import { InvalidateAfterOp } from './InvalidateAfterOp';
 import { MutationOp } from '../mutable/MutationOp';
 

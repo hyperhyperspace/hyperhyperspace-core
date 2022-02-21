@@ -1,5 +1,5 @@
-import { Literal } from 'data/model/Literals';
-import { Hash } from 'data/model/Hashing';
+import { Literal } from 'data/model/literals/LiteralUtils';
+import { Hash } from 'data/model/hashing/Hashing';
 import { StoredOpHeader } from '../store/Store';
 
 type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, limit?: number};

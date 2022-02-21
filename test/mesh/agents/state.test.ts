@@ -9,7 +9,7 @@ import { RNGImpl } from 'crypto/random';
 import { LinearStateAgent } from '../mock/LinearStateAgent';
 import { Store } from 'storage/store';
 import { IdbBackend, MemoryBackend } from 'storage/backends';
-import { MutableSet } from 'data/containers';
+import { MutableSet } from 'data/collections';
 import { Identity } from 'data/identity';
 import { describeProxy } from 'config';
 import { HeaderBasedSyncAgent, HistorySynchronizer, TerminalOpsSyncAgent } from 'mesh/agents/state';

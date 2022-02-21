@@ -1,6 +1,6 @@
 import { Identity } from 'data/identity';
 import { Hash, HashedObject, MutationOp } from 'data/model';
-import { AbstractCapabilitySet, GrantCapabilityOp, RevokeCapabilityAfterOp, UseCapabilityOp } from 'data/containers';
+import { AbstractCapabilitySet, GrantCapabilityOp, RevokeCapabilityAfterOp, UseCapabilityOp } from './AbstractCapabilitySet';
 
 //type PermissionTestOp = GrantOp|RevokeAfterOp|UseOp;
 

@@ -1,4 +1,5 @@
-import { FeatureName, AbstractFeatureSet, DisableFeatureAfterOp, EnableFeatureOp, UseFeatureOp, UseCapabilityOp } from 'data/containers';
+import { FeatureName, AbstractFeatureSet, DisableFeatureAfterOp, EnableFeatureOp, UseFeatureOp } from './AbstractFeatureSet';
+import { UseCapabilityOp } from './AbstractCapabilitySet';
 import { Hash, HashedObject, MutationOp } from 'data/model';
 import { Identity } from 'data/identity';
 import { PermissionTest } from './PermissionTest';

@@ -1,8 +1,8 @@
 import { MultiMap } from 'util/multimap';
 
-import { Hash } from '../model';
-import { Identity } from '../identity';
-import { HashedObject, MutableObject, MutationOp, InvalidateAfterOp } from '../model';
+import { Hash } from 'data/model';
+import { Identity } from 'data/identity';
+import { HashedObject, MutableObject, MutationOp, InvalidateAfterOp } from 'data/model';
 
 type Capability = string;
 type Key = string;

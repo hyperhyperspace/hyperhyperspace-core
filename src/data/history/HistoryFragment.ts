@@ -1,6 +1,6 @@
 import { Store } from 'storage/store';
 import { MultiMap } from 'util/multimap';
-import { Hash } from '../model/Hashing';
+import { Hash } from '../model/hashing/Hashing';
 import { BFSHistoryWalk } from './BFSHistoryWalk';
 import { FullHistoryWalk } from './FullHistoryWalk';
 import { OpHeader } from './OpHeader';

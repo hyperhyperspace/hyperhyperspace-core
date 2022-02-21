@@ -1,8 +1,8 @@
 import { HashedObject } from '../immutable/HashedObject';
-import { Context } from '../Context';  
+import { Context } from '../literals/Context';  
 import { MutableObject } from './MutableObject';
 import { HashedSet } from '../immutable/HashedSet';
-import { Hash } from '../Hashing';
+import { Hash } from '../hashing/Hashing';
 import { HashReference } from '../immutable/HashReference';
 import { OpHeader, OpHeaderProps } from 'data/history/OpHeader';
 import { HashedMap } from '../immutable/HashedMap';

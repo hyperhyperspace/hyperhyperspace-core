@@ -2,7 +2,7 @@ import { Backend, BackendSearchParams, BackendSearchResults } from './Backend';
 import { Literal, Hash, HashReference, HashedSet } from 'data/model';
 import { MultiMap } from 'util/multimap';
 import { Store, StoredOpHeader } from 'storage/store/Store';
-import { LiteralUtils } from 'data/model/Literals';
+import { LiteralUtils } from 'data/model/literals/LiteralUtils';
 import { Logger, LogLevel } from 'util/logging';
 
 type MemStorageFormat = {

@@ -4,7 +4,7 @@ import { Identity, RSAKeyPair } from 'data/identity';
 import { Hash } from 'data/model';
 import { RNGImpl } from 'crypto/random';
 import { SamplePeerSource } from '../types/SamplePeerSource';
-import { MutableSet } from 'data/containers';
+import { MutableSet } from 'data/collections';
 import { Logger, LogLevel } from 'util/logging';
 import { PeerGroupAgent } from 'mesh/agents/peer';
 import { describeProxy } from 'config';

@@ -1,4 +1,4 @@
-import { CausalSet, SingleAuthorCausalSet, CausalSetAddOp, CausalSetDeleteOp } from 'data/containers';
+import { CausalSet, SingleAuthorCausalSet, CausalSetAddOp, CausalSetDeleteOp } from 'data/collections';
 import { Identity } from 'data/identity';
 import { Hash, HashedObject, MutationOp } from 'data/model';
 import { Authorizer, Authorization } from 'data/model';

@@ -1,9 +1,9 @@
 import { Store } from 'storage/store';
 
 import { HashedObject } from '../immutable/HashedObject';
-import { Context } from '../Context';
+import { Context } from '../literals/Context';
 import { MutationOp } from './MutationOp';
-import { Hash } from '../Hashing';
+import { Hash } from '../hashing/Hashing';
 import { Logger, LogLevel } from 'util/logging';
 import { HeaderBasedSyncAgent, StateSyncAgent, StateFilter } from 'mesh/agents/state';
 import { PeerGroupAgent } from 'mesh/agents/peer';

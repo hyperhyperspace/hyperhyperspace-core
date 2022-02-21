@@ -1,6 +1,6 @@
 import { describeProxy } from 'config';
 import { RNGImpl } from 'crypto/random';
-import { CausalSet } from 'data/containers';
+import { CausalSet } from 'data/collections';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { HashedObject } from 'data/model';
 import { FeatureSet } from 'data/types/FeatureSet';

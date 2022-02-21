@@ -7,10 +7,10 @@ class MultiMap<K, V> {
     
     constructor() {
         this.inner = new Map();
-        this.size = 0;
+        this.size  = 0;
     }
 
-    add(key: K, value: V) : void {
+    add(key: K, value: V): void {
         let s = this.inner.get(key);
 
         if (s === undefined) {
@@ -25,7 +25,7 @@ class MultiMap<K, V> {
         
     }
 
-    delete(key: K, value: V) : boolean {
+    delete(key: K, value: V): boolean {
         let s = this.inner.get(key);
 
         if (s === undefined) {
@@ -45,7 +45,7 @@ class MultiMap<K, V> {
         return ret;
     }
 
-    deleteKey(key: K) : boolean {
+    deleteKey(key: K): boolean {
 
         const vals = this.inner.get(key);
 
@@ -56,7 +56,7 @@ class MultiMap<K, V> {
         return this.inner.delete(key);
     }
 
-    get(key: K) : Set<V> {
+    get(key: K): Set<V> {
         let result = this.inner.get(key);
         
         if (result === undefined) {
@@ -66,11 +66,11 @@ class MultiMap<K, V> {
         }
     }
 
-    hasKey(key: K) : boolean {
+    hasKey(key: K): boolean {
         return this.inner.has(key);
     }
 
-    has(key: K, value: V) : boolean {
+    has(key: K, value: V): boolean {
         const kv = this.inner.get(key);
         return kv !== undefined && kv.has(value);
     }
@@ -109,7 +109,7 @@ class DedupMultiMap<K, V> {
         this.inner = new Map();
     }
 
-    add(key: K, value: V) : void {
+    add(key: K, value: V): void {
         let s = this.inner.get(key);
 
         if (s === undefined) {
@@ -120,7 +120,7 @@ class DedupMultiMap<K, V> {
         s.add(value);
     }
 
-    delete(key: K, value: V) : boolean {
+    delete(key: K, value: V): boolean {
         let s = this.inner.get(key);
 
         if (s === undefined) {
@@ -136,11 +136,11 @@ class DedupMultiMap<K, V> {
         return ret;
     }
 
-    deleteKey(key: K) : boolean {
+    deleteKey(key: K): boolean {
         return this.inner.delete(key);
     }
 
-    get(key: K) : Set<V> {
+    get(key: K): Set<V> {
         let result = this.inner.get(key);
         
         if (result === undefined) {
@@ -150,11 +150,11 @@ class DedupMultiMap<K, V> {
         }
     }
 
-    hasKey(key: K) : boolean {
+    hasKey(key: K): boolean {
         return this.inner.has(key);
     }
 
-    has(key: K, value: V) : boolean {
+    has(key: K, value: V): boolean {
         const kv = this.inner.get(key);
         return kv !== undefined && kv.has(value);
     }

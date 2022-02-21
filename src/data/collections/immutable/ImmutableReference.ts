@@ -1,7 +1,7 @@
-import { MutableObject } from '../model/mutable/MutableObject';
-import { HashedObject } from '../model/immutable/HashedObject';
-import { HashReference } from '../model/immutable/HashReference';
-import { ClassRegistry } from '../model/ClassRegistry';
+import { MutableObject } from '../../model/mutable/MutableObject';
+import { HashedObject } from '../../model/immutable/HashedObject';
+import { HashReference } from '../../model/immutable/HashReference';
+import { ClassRegistry } from '../../model/literals/ClassRegistry';
 
 
 class ImmutableReference<T extends MutableObject> extends HashedObject {

@@ -1,4 +1,4 @@
-import { Hash, Hashing } from './Hashing';
+import { Hash, Hashing } from '../hashing/Hashing';
 
 type Literal           = { hash: Hash, value: any, author?: Hash, signature?: string, dependencies: Array<Dependency> }
 type Dependency        = { path: string, hash: Hash, className: string, type: ('literal'|'reference') };

@@ -8,7 +8,7 @@ import { Literal, Hash, HashedSet, HashReference } from 'data/model';
 import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
 import { Store, StoredOpHeader } from 'storage/store/Store';
 import { MultiMap } from 'util/multimap';
-import { LiteralUtils } from 'data/model/Literals';
+import { LiteralUtils } from 'data/model/literals/LiteralUtils';
 
 type IdbStorageFormat = {
     literal   : Literal,
