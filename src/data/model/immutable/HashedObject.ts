@@ -244,7 +244,7 @@ abstract class HashedObject {
                field.getId() === this.getDerivedFieldId(fieldName);
     }
 
-    private getDerivedFieldId(fieldName: string) {
+    getDerivedFieldId(fieldName: string) {
         return Hashing.forValue('#' + this.getId() + '.' + fieldName);
     }
 
