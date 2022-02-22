@@ -1,8 +1,8 @@
-import { Hash, Hashing } from '../hashing/Hashing';
+import { Hash, Hashing } from '../hashing';
 import { HashedObject } from './HashedObject';
-import { Context } from '../literals/Context';
+import { Context } from '../literals';
 
-import { Dependency } from '../literals/LiteralUtils';
+import { Dependency } from '../literals';
 
 class HashedMap<K, V> {
 
@@ -22,7 +22,7 @@ class HashedMap<K, V> {
     }
 
     set(key: K, value: V): void {
-        let hash = Hashing.default(value);
+        let hash = HashedObject.hashElement(value);
         this.content.set(key, value);
         this.contentHashes.set(key, hash);
     }

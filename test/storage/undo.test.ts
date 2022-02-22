@@ -697,7 +697,7 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     console.log('auth term')
     console.log(messagesClone?.config?.authorized?._terminalOps);
     console.log('current per elmt')
-    console.log(messagesClone?.config?._currentAddOpsPerElmt.get(Hashing.default(Features.AnonRead)));
+    console.log(messagesClone?.config?._currentAddOpsPerElmt.get(HashedObject.hashElement(Features.AnonRead)));
     console.log('config term')
     console.log(messagesClone?.config?._terminalOps);
 

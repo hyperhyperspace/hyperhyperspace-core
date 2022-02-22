@@ -18,11 +18,11 @@ class HashedSet<T> {
     }
 
     add(element: T) {
-        this.hashedElements.set(Hashing.default(element), element);
+        this.hashedElements.set(HashedObject.hashElement(element), element);
     }
 
     remove(element: T) : boolean {
-        return this.removeByHash(Hashing.default(element));
+        return this.removeByHash(HashedObject.hashElement(element));
     }
 
     removeByHash(hash: Hash) : boolean {
@@ -30,7 +30,7 @@ class HashedSet<T> {
     }
 
     has(element: T) {
-        return this.hasByHash(Hashing.default(element));
+        return this.hasByHash(HashedObject.hashElement(element));
     }
 
     hasByHash(hash: Hash) {

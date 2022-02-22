@@ -1,6 +1,6 @@
 import { MutableObject } from '../../model/mutable/MutableObject';
 import { HashedObject } from '../../model/immutable/HashedObject';
-import { Hash, Hashing } from '../../model/hashing/Hashing';
+import { Hash } from '../../model/hashing/Hashing';
 import { MutationOp } from 'data/model/mutable/MutationOp';
 import { HashedSet } from 'data/model/immutable/HashedSet';
 import { HashReference } from 'data/model/immutable/HashReference';
@@ -81,6 +81,10 @@ class AddOp<T> extends MutableSetOp<T> {
         if (!Types.satisfies(this.element, constraints)) {
             return false;
             //throw new Error('MutableSet/AddOp contains a value with an unexpected type.')
+        }
+
+        if (!(this.element instanceof HashedObject) || HashedObject.isLiteral(this.element)) {
+            return false;
         }
 
         return true;
@@ -168,7 +172,7 @@ class DeleteOp<T> extends MutableSetOp<T> {
 
             const addOp = op as AddOp<T>;
 
-            if (Hashing.default(addOp.element) !== this.elementHash) {
+            if (HashedObject.hashElement(addOp.element) !== this.elementHash) {
                 MutableSet.logger.warning('Addition op referenced in MutableSet deletion op contains an element whose hash does not match the one being deleted.');
                 return false;
             }
@@ -232,7 +236,7 @@ class MutableSet<T> extends MutableObject {
     }
 
     async delete(element: T) {
-        return await this.deleteByHash(Hashing.default(element));
+        return await this.deleteByHash(HashedObject.hashElement(element));
     }
 
     async deleteByHash(hash: Hash): Promise<boolean> {
@@ -248,7 +252,7 @@ class MutableSet<T> extends MutableObject {
     }
 
     has(element: T) {
-        return this.hasByHash(Hashing.default(element));
+        return this.hasByHash(HashedObject.hashElement(element));
     }
 
     hasByHash(hash: Hash) {

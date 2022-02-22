@@ -1,4 +1,3 @@
-import { LiteralUtils } from '../literals';
 import { HashedObject } from './HashedObject';
 
 
@@ -24,7 +23,7 @@ class HashedLiteral extends HashedObject {
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
-        return LiteralUtils.isLiteral(this.value);
+        return HashedObject.isLiteral(this.value);
     }
 
 }

@@ -1,5 +1,5 @@
 
-import { Context, HashedLiteral, HashedObject, HashedSet, HashedMap, Hashing } from 'data/model';
+import { Context, HashedLiteral, HashedObject, HashedSet, HashedMap } from 'data/model';
 
 class Wrapper extends HashedObject {
 
@@ -52,7 +52,7 @@ const checkLiterals = {
                 return false;
             }
 
-            if (Hashing.default(toCheck.value) !== Hashing.default(hashedLiteral.value)) {
+            if (HashedObject.hashElement(toCheck.value) !== HashedObject.hashElement(hashedLiteral.value)) {
                 console.log('-> HashedLiteral with hash ' + hashedLiteral.hash() + ' is is expected to have value:');
                 console.log(toCheck.value);
                 console.log('-> but has value:');

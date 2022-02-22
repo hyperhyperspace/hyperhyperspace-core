@@ -1,5 +1,4 @@
 import { SHA, RMD, SHAImpl, RMDImpl } from 'crypto/hashing';
-import { HashedObject } from '../immutable';
 import { Strings } from 'util/strings';
 import { Serialization } from './Serialization';
 
@@ -26,19 +25,6 @@ class Hashing {
         let text = Serialization.default(value);
         
         return Hashing.forString(text, seed);
-    }
-
-    static default(element: any) : Hash {
-
-        let hash: Hash;
-
-        if (element instanceof HashedObject) {
-            hash = (element as HashedObject).hash();
-        } else {
-            hash = Hashing.forValue(HashedObject.literalizeField('', element).value);
-        }
-
-        return hash;
     }
 
     static toHex(hash: Hash) {

@@ -1,4 +1,4 @@
-import { Hash, Hashing } from '../../model/hashing';
+import { Hash } from '../../model/hashing';
 import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
 import { MutableObject } from '../../model';
@@ -76,7 +76,7 @@ class InsertOp<T> extends MutableArrayOp<T> {
             return false;
         }
 
-        if (this.element === undefined || !(this.element instanceof HashedObject)) {
+        if (this.element === undefined || !((this.element instanceof HashedObject) || HashedObject.isLiteral(this.element))) {
             return false;
         }
 
@@ -169,7 +169,7 @@ class DeleteOp<T> extends MutableArrayOp<T> {
 
             const insertOp = op as InsertOp<T>;
 
-            if (Hashing.default(insertOp.element) !== this.elementHash) {
+            if (HashedObject.hashElement(insertOp.element) !== this.elementHash) {
                 MutableArray.logger.warning('Insertion op referenced in MutableArray deletion op contains an element whose hash does not match the one being deleted.');
                 return false;
             }
@@ -250,7 +250,7 @@ class MutableArray<T> extends MutableObject {
 
         for (const element of elements) {
 
-            const elementHash = Hashing.default(element);
+            const elementHash = HashedObject.hashElement(element);
             const ordinal = DenseOrder.between(after, before);
 
             let oldInsertionOps: Set<HashReference<InsertOp<T>>>|undefined;
@@ -300,7 +300,7 @@ class MutableArray<T> extends MutableObject {
     }
 
     async deleteElement(element: T) {
-        this.deleteElementByHash(Hashing.default(element));
+        this.deleteElementByHash(HashedObject.hashElement(element));
     }
 
     async deleteElementByHash(hash: Hash) {
@@ -342,7 +342,7 @@ class MutableArray<T> extends MutableObject {
     }
 
     indexOf(element: T) {
-        return this.indexOfByHash(Hashing.default(element));
+        return this.indexOfByHash(HashedObject.hashElement(element));
     }
 
     indexOfByHash(hash: Hash) {
@@ -389,7 +389,7 @@ class MutableArray<T> extends MutableObject {
             const element = op.element as T;
             const ordinal = op.ordinal as Ordinal;
 
-            const elementHash = Hashing.default(element);
+            const elementHash = HashedObject.hashElement(element);
 
             this._elementsPerOrdinal.add(ordinal, elementHash);
             this._ordinalsPerElement.add(elementHash, ordinal);
