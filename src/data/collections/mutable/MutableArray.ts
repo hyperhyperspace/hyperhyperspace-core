@@ -1,4 +1,4 @@
-import { Hash } from '../../model/hashing/Hashing';
+import { Hash, Hashing } from '../../model/hashing';
 import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
 import { MutableObject } from '../../model';
@@ -13,7 +13,7 @@ import { ArrayMap } from 'util/arraymap';
 // can work with or without duplicates (in the latter, inserting an element already in the set has no)
 
 
-abstract class MutableArrayOp<T extends HashedObject> extends MutationOp {
+abstract class MutableArrayOp<T> extends MutationOp {
 
     constructor(target?: MutableArray<T>) {
         super(target);
@@ -49,7 +49,7 @@ abstract class MutableArrayOp<T extends HashedObject> extends MutationOp {
     
 }
 
-class InsertOp<T extends HashedObject> extends MutableArrayOp<T> {
+class InsertOp<T> extends MutableArrayOp<T> {
 
     static className = 'hhs/v0/MutableArray/InsertOp';
 
@@ -88,7 +88,7 @@ class InsertOp<T extends HashedObject> extends MutableArrayOp<T> {
     }
 }
 
-class DeleteOp<T extends HashedObject> extends MutableArrayOp<T> {
+class DeleteOp<T> extends MutableArrayOp<T> {
 
     static className = 'hhs/v0/MutableArray/DeleteOp';
 
@@ -169,7 +169,7 @@ class DeleteOp<T extends HashedObject> extends MutableArrayOp<T> {
 
             const insertOp = op as InsertOp<T>;
 
-            if (insertOp.element?.hash() !== this.elementHash) {
+            if (Hashing.default(insertOp.element) !== this.elementHash) {
                 MutableArray.logger.warning('Insertion op referenced in MutableArray deletion op contains an element whose hash does not match the one being deleted.');
                 return false;
             }
@@ -186,7 +186,7 @@ class DeleteOp<T extends HashedObject> extends MutableArrayOp<T> {
     
 }
 
-class MutableArray<T extends HashedObject> extends MutableObject {
+class MutableArray<T> extends MutableObject {
 
     static className = 'hhs/v0/MutableArray';
     static opClasses = [InsertOp.className, DeleteOp.className];
@@ -250,7 +250,7 @@ class MutableArray<T extends HashedObject> extends MutableObject {
 
         for (const element of elements) {
 
-            const elementHash = element.hash();
+            const elementHash = Hashing.default(element);
             const ordinal = DenseOrder.between(after, before);
 
             let oldInsertionOps: Set<HashReference<InsertOp<T>>>|undefined;
@@ -300,7 +300,7 @@ class MutableArray<T extends HashedObject> extends MutableObject {
     }
 
     async deleteElement(element: T) {
-        this.deleteElementByHash(element.hash());
+        this.deleteElementByHash(Hashing.default(element));
     }
 
     async deleteElementByHash(hash: Hash) {
@@ -342,7 +342,7 @@ class MutableArray<T extends HashedObject> extends MutableObject {
     }
 
     indexOf(element: T) {
-        return this.indexOfByHash(element.hash());
+        return this.indexOfByHash(Hashing.default(element));
     }
 
     indexOfByHash(hash: Hash) {
@@ -389,7 +389,7 @@ class MutableArray<T extends HashedObject> extends MutableObject {
             const element = op.element as T;
             const ordinal = op.ordinal as Ordinal;
 
-            const elementHash = element.hash();
+            const elementHash = Hashing.default(element);
 
             this._elementsPerOrdinal.add(ordinal, elementHash);
             this._ordinalsPerElement.add(elementHash, ordinal);

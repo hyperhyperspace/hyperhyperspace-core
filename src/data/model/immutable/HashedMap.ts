@@ -22,7 +22,7 @@ class HashedMap<K, V> {
     }
 
     set(key: K, value: V): void {
-        let hash = HashedObject.hashElement(value);
+        let hash = Hashing.default(value);
         this.content.set(key, value);
         this.contentHashes.set(key, hash);
     }

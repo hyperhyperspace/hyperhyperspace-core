@@ -6,6 +6,7 @@ import { Authorizer } from '../../model/causal/Authorization'
 import { MultiMap } from 'util/multimap';
 import { Authorization, Verification } from '../../model/causal/Authorization';
 import { HashedSet } from '../../model/immutable/HashedSet';
+import { Hashing } from 'data/model/hashing';
 
 /*
  * CausalSet: A set with an explicit membership op that can be used by other objects as
@@ -162,7 +163,7 @@ abstract class CausalSet<T> extends MutableObject {
         if (acceptedElements !== undefined) {
             this.acceptedElementHashes = new HashedSet<Hash>();
             for (const acceptedElement of acceptedElements.values()) {
-                this.acceptedElementHashes.add(HashedObject.hashElement(acceptedElement));
+                this.acceptedElementHashes.add(Hashing.default(acceptedElement));
             }
         }
         
@@ -197,7 +198,7 @@ abstract class CausalSet<T> extends MutableObject {
 
     protected async delete(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
 
-        const hash = HashedObject.hashElement(elmt);
+        const hash = Hashing.default(elmt);
         
         return this.deleteByHash(hash, author, extraAuth);
 
@@ -243,7 +244,7 @@ abstract class CausalSet<T> extends MutableObject {
     }
 
     protected has(elmt: T): boolean {
-        return this.hasByHash(HashedObject.hashElement(elmt));
+        return this.hasByHash(Hashing.default(elmt));
     }
 
     protected hasByHash(hash: Hash): boolean {
@@ -251,7 +252,7 @@ abstract class CausalSet<T> extends MutableObject {
     }
 
     attestationKey(elmt: T) {
-        return this.attestationKeyByHash(HashedObject.hashElement(elmt));
+        return this.attestationKeyByHash(Hashing.default(elmt));
     }
 
     attestationKeyByHash(hash: Hash) {
@@ -260,7 +261,7 @@ abstract class CausalSet<T> extends MutableObject {
 
     protected async attestMembershipForOp(elmt: T, op: MutationOp): Promise<boolean> {
 
-        const hash = HashedObject.hashElement(elmt);
+        const hash = Hashing.default(elmt);
 
         return this.attestMembershipForOpByHash(hash, op);
     }
@@ -288,7 +289,7 @@ abstract class CausalSet<T> extends MutableObject {
 
     protected verifyMembershipAttestationForOp(elmt: T, op: MutationOp, usedKeys: Set<string>): boolean {
 
-        return this.checkMembershipAttestationByHashForOp(HashedObject.hashElement(elmt), op, usedKeys);
+        return this.checkMembershipAttestationByHashForOp(Hashing.default(elmt), op, usedKeys);
     }
 
     protected checkMembershipAttestationByHashForOp(elmtHash: Hash, op: MutationOp, usedKeys: Set<string>): boolean {
@@ -315,7 +316,7 @@ abstract class CausalSet<T> extends MutableObject {
 
         const addOp = attestOp.getAddOp();
 
-        if (HashedObject.hashElement(addOp.getElement()) !== elmtHash) {
+        if (Hashing.default(addOp.getElement()) !== elmtHash) {
             return false;
         }
 
@@ -343,7 +344,7 @@ abstract class CausalSet<T> extends MutableObject {
                                             this.createAddAuthorizer(op.getElement(), author)
                                                         :
                                             this.createDeleteAuthorizerByHash(
-                                                    HashedObject.hashElement(op.getAddOp().getElement()), author);;
+                                                    Hashing.default(op.getAddOp().getElement()), author);;
                                                                                 
             const usedKeys     = new Set<string>();
 
@@ -369,7 +370,7 @@ abstract class CausalSet<T> extends MutableObject {
 
             addOp     = op;
             addOpHash = addOp.hash();
-            elmtHash  = HashedObject.hashElement(addOp.getElement());
+            elmtHash  = Hashing.default(addOp.getElement());
 
             if (valid) {
                 this._validAddOpsPerElmt.add(elmtHash, addOpHash);
@@ -387,7 +388,7 @@ abstract class CausalSet<T> extends MutableObject {
 
             addOp     = op.getTargetOp() as AddOp<T>;
             addOpHash = addOp.hash();
-            elmtHash  = HashedObject.hashElement(addOp.getElement());
+            elmtHash  = Hashing.default(addOp.getElement());
 
             if (valid) {
                this._validDeleteOpsPerAddOp.add(addOpHash, deleteOpHash);
@@ -423,7 +424,7 @@ abstract class CausalSet<T> extends MutableObject {
 
     protected createAddAuthorizer(elmt: T, _author?: Identity): Authorizer {
 
-        if (this.acceptedElementHashes !== undefined && !this.acceptedElementHashes.has(HashedObject.hashElement(elmt))) {
+        if (this.acceptedElementHashes !== undefined && !this.acceptedElementHashes.has(Hashing.default(elmt))) {
             return Authorization.never;
         }
 
@@ -447,7 +448,7 @@ abstract class CausalSet<T> extends MutableObject {
     // so subclasses may redefine their behaviour separately.
 
     protected createDeleteAuthorizer(elmt: T, author?: Identity): Authorizer {
-        return this.createDeleteAuthorizerByHash(HashedObject.hashElement(elmt), author);
+        return this.createDeleteAuthorizerByHash(Hashing.default(elmt), author);
     }
 
     protected createDeleteAuthorizerByHash(_elmtHash: Hash, _author?: Identity): Authorizer {
@@ -489,7 +490,7 @@ abstract class CausalSet<T> extends MutableObject {
     checkAcceptedElements(acceptedElements: Array<any>): boolean {
         const expected = new HashedSet<Hash>();
 
-        acceptedElements.forEach((elmt: any) => expected.add(HashedObject.hashElement(elmt)));
+        acceptedElements.forEach((elmt: any) => expected.add(Hashing.default(elmt)));
 
         return (this.acceptedElementHashes !== undefined && this.acceptedElementHashes.equals(expected));
     }

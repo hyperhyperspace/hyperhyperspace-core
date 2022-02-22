@@ -1,3 +1,4 @@
+import { LiteralUtils } from '../literals';
 import { HashedObject } from './HashedObject';
 
 
@@ -23,61 +24,7 @@ class HashedLiteral extends HashedObject {
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
-        return HashedLiteral.valid(this.value);
-    }
-
-    static valid(value: any, seen=new Set()) : boolean {
-
-        let typ = typeof(value);
-
-        if (typ === 'boolean' || typ === 'number' || typ === 'string') {
-            return true;
-        } else if (typ === 'object') {
-
-            if (seen.has(value)) {
-                return false;
-            }
-
-            seen.add(value);
-
-            if (Array.isArray(value)) {
-
-                for (const member of value) {
-                    if (!HashedLiteral.valid(member, seen)) {
-                        return false;
-                    }
-                }
-
-                return true;
-
-            } else  {
-                if (value instanceof HashedObject) {
-                    return false;
-                }
-
-                let s = Object.prototype.toString.call(value);
-                
-                if (s !== '[object Object]') {
-                    return false;
-                }
-
-                for (const fieldName of Object.keys(value)) {
-
-                    if (!(typeof(fieldName) === 'string')) {
-                        return false;
-                    }
-
-                    if (!HashedLiteral.valid(value[fieldName], seen)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            }
-        } else {
-            return false;
-        }
-
+        return LiteralUtils.isLiteral(this.value);
     }
 
 }

@@ -677,19 +677,6 @@ abstract class HashedObject {
         return Hashing.forValue('#' + parentId + '.' + path);
     }
 
-    static hashElement(element: any) : Hash {
-
-        let hash: Hash;
-
-        if (element instanceof HashedObject) {
-            hash = (element as HashedObject).hash();
-        } else {
-            hash = Hashing.forValue(HashedObject.literalizeField('', element).value);
-        }
-
-        return hash;
-    }
-
 }
 
 export { HashedObject };

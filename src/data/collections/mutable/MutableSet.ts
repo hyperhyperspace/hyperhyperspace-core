@@ -1,6 +1,6 @@
 import { MutableObject } from '../../model/mutable/MutableObject';
 import { HashedObject } from '../../model/immutable/HashedObject';
-import { Hash } from 'data/model/hashing/Hashing';
+import { Hash, Hashing } from '../../model/hashing/Hashing';
 import { MutationOp } from 'data/model/mutable/MutationOp';
 import { HashedSet } from 'data/model/immutable/HashedSet';
 import { HashReference } from 'data/model/immutable/HashReference';
@@ -11,7 +11,7 @@ type ElmtHash = Hash;
 
 // a simple mutable set with a single writer
 
-abstract class MutableSetOp<T extends HashedObject> extends MutationOp {
+abstract class MutableSetOp<T> extends MutationOp {
 
     constructor(target?: MutableSet<T>) {
         super(target);
@@ -47,7 +47,7 @@ abstract class MutableSetOp<T extends HashedObject> extends MutationOp {
     
 }
 
-class AddOp<T extends HashedObject> extends MutableSetOp<T> {
+class AddOp<T> extends MutableSetOp<T> {
 
     static className = 'hhs/v0/MutableSet/AddOp';
 
@@ -87,7 +87,7 @@ class AddOp<T extends HashedObject> extends MutableSetOp<T> {
     }
 }
 
-class DeleteOp<T extends HashedObject> extends MutableSetOp<T> {
+class DeleteOp<T> extends MutableSetOp<T> {
 
     static className = 'hhs/v0/MutableSet/DeleteOp';
 
@@ -168,7 +168,7 @@ class DeleteOp<T extends HashedObject> extends MutableSetOp<T> {
 
             const addOp = op as AddOp<T>;
 
-            if (addOp.element?.hash() !== this.elementHash) {
+            if (Hashing.default(addOp.element) !== this.elementHash) {
                 MutableSet.logger.warning('Addition op referenced in MutableSet deletion op contains an element whose hash does not match the one being deleted.');
                 return false;
             }
@@ -185,7 +185,7 @@ class DeleteOp<T extends HashedObject> extends MutableSetOp<T> {
     
 }
 
-class MutableSet<T extends HashedObject> extends MutableObject {
+class MutableSet<T> extends MutableObject {
 
     static className = 'hss/v0/MutableSet';
     static opClasses = [AddOp.className, DeleteOp.className];
@@ -232,7 +232,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     }
 
     async delete(element: T) {
-        return await this.deleteByHash(element.hash());
+        return await this.deleteByHash(Hashing.default(element));
     }
 
     async deleteByHash(hash: Hash): Promise<boolean> {
@@ -248,7 +248,7 @@ class MutableSet<T extends HashedObject> extends MutableObject {
     }
 
     has(element: T) {
-        return this.hasByHash(element.hash());
+        return this.hasByHash(Hashing.default(element));
     }
 
     hasByHash(hash: Hash) {
