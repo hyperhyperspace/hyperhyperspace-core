@@ -46,7 +46,7 @@ class Person extends HashedObject {
     }
 }
 
-HashedObject.registerClass(Person.className, Person);
+ClassRegistry.register(Person.className, Person);
 ```
 
 Notice that Typescript's compile time checks are not very helpful in this scenario: we want to be able to send instances of ```Person``` over an untrusted network, so we need to validate them in runtime as they are received. In this case, we are making the instance members ```name``` and ```birthday``` mandatory. The store will refuse to accept an instance of ```Person``` whose contents do not comply to its ```validate``` method. We're also declaring a meta-type name ```hhs-example/Person``` and later declaring that Person is our implementation for that type. The peer on the other end of the network may be using another implementation of this ```hhs-example/Person``` meta-type, and this explicit declaration enables interoperation.

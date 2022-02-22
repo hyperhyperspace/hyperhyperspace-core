@@ -7,11 +7,11 @@ import {Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
 import { DedupMultiMap } from 'util/multimap';
 import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
+import { Types } from 'data/collections';
 
 // a simple mutable list with a single writer
 
 // can work with or without duplicates (in the latter, inserting an element already in the set has no)
-
 
 abstract class MutableArrayOp<T> extends MutationOp {
 
@@ -82,6 +82,12 @@ class InsertOp<T> extends MutableArrayOp<T> {
 
         if (this.ordinal === undefined || !Ordinals.isOrdinal(this.ordinal)) {
             return false;
+        }
+
+        const constraints = (this.getTargetObject() as MutableArray<T>).typeConstraints;
+
+        if (!Types.satisfies(this.element, constraints)) {
+            return false;            
         }
 
         return true;
@@ -194,6 +200,7 @@ class MutableArray<T> extends MutableObject {
     
 
     duplicates: boolean;
+    typeConstraints?: Array<string>;
 
     _elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
     _ordinalsPerElement: ArrayMap<Hash, Ordinal>;
@@ -473,7 +480,7 @@ class MutableArray<T> extends MutableObject {
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
-        return true; 
+        return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
     }
 
 }

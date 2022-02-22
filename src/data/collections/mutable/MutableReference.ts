@@ -4,6 +4,7 @@ import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
 import { Types } from '../Types';
 import { Hash } from 'data/model/hashing/Hashing';
+import { ClassRegistry } from 'data/model';
 
 class MutableReference<T> extends MutableObject {
 
@@ -102,46 +103,46 @@ class RefUpdateOp<T> extends MutationOp {
         }
 
         if (this.getTargetObject().getAuthor() !== undefined && !(this.getTargetObject().getAuthor()?.equals(this.getAuthor()))) {
+            MutableObject.validationLog.debug('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTargetObject().getAuthor()?.hash() + '.');
             return false;
-            //throw new Error('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTarget().getAuthor()?.hash() + '.');
         }
 
         if (this.sequence === undefined) {
+            MutableObject.validationLog.debug('The field sequence is mandatory in class RefUpdateOp');
             return false;
-            //throw new Error('The field sequence is mandatory in class RefUpdateOp');
         }
 
         if ((typeof this.sequence) !== 'number') {
+            MutableObject.validationLog.debug('The field sequence should be of type number in class RefUpdateop');
             return false;
-            //throw new Error('The field sequence should be of type number in class RefUpdateop');
         }
 
         if (this.timestamp === undefined) {
+            MutableObject.validationLog.debug('The field timestamp is mandatory in class RefUpdateOp');
             return false;
-            //throw new Error('The field timestamp is mandatory in class RefUpdateOp');
         }
 
         if ((typeof this.timestamp) !== 'string') {
+            MutableObject.validationLog.debug('The field timestamp should be of type timestamp in class RefUpdateop');
             return false;
-            //throw new Error('The field timestamp should be of type timestamp in class RefUpdateop');
         }
 
         if (this.value === undefined) {
+            MutableObject.validationLog.debug('The field value is mandatory in class REfUpdateop');
             return false;
-            //throw new Error('The field value is mandatory in class REfUpdateop');
         }
 
         if (this.targetObject === undefined || 
             this.targetObject.getClassName() !== MutableReference.className ) {
+                MutableObject.validationLog.debug('A RefUpdateOp can only have a MutableReference as its target.');
                 return false;
-                //throw new Error('A RefUpdateOp can only have a MutableReference as its target.');
         }
 
         let constraints = (this.targetObject as MutableReference<T>).typeConstraints;
 
         if (!Types.satisfies(this.value, constraints)) {
+            MutableObject.validationLog.debug('RefUpdateOp contains a value with an unexpected type.');
             return false;
-            //throw new Error('RefUpdateOp contains a value with an unexpected type.')
         }
 
         return true;
@@ -160,7 +161,7 @@ class RefUpdateOp<T> extends MutationOp {
     }
 }
 
-HashedObject.registerClass(MutableReference.className, MutableReference);
-HashedObject.registerClass(RefUpdateOp.className, RefUpdateOp);
+ClassRegistry.register(MutableReference.className, MutableReference);
+ClassRegistry.register(RefUpdateOp.className, RefUpdateOp);
 
 export { MutableReference };
