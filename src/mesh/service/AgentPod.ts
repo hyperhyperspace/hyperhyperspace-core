@@ -1,5 +1,6 @@
 import { Agent, AgentId } from './Agent';
 import { Logger, LogLevel } from 'util/logging';
+import { HashedObject } from 'data/model';
 
 type Event = { type: string, content: any };
 
@@ -94,7 +95,7 @@ class AgentPod {
 
     broadcastEvent(ev: Event) {
 
-        AgentPod.logger.trace('EventPod broadcasting event ' + ev.type + ' with content ' + JSON.stringify(ev.content.toLiteral()));
+        AgentPod.logger.trace('EventPod broadcasting event ' + ev.type + ' with content ' + (ev.content instanceof HashedObject? JSON.stringify(ev.content.toLiteral()) : ev.content));
 
         for (const agent of this.agents.values()) {
             agent.receiveLocalEvent(ev);
