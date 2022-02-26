@@ -8,6 +8,7 @@ import { DedupMultiMap } from 'util/dedupmultimap';
 import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
 import { Types } from 'data/collections';
+import { path } from 'util/events';
 
 // a simple mutable list with a single writer
 
@@ -505,9 +506,9 @@ class MutableArray<T> extends MutableObject {
     }
 }
 
-type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', data: T};
-type MoveEvent<T> = {emitter: MutableArray<T>, action: 'insert', data: T};
-type DeleteEvent<T> = {emitter: MutableArray<T>, action: 'delete', data: Hash};
+type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', path?: path<T>, data: T, };
+type MoveEvent<T> = {emitter: MutableArray<T>, action: 'move', path?: path<T>, data: T};
+type DeleteEvent<T> = {emitter: MutableArray<T>, action: 'delete', path?: path<T>, data: Hash};
 
 type MutationEvent<T> = InsertEvent<T> | MoveEvent<T> | DeleteEvent<T>;
 
