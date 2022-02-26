@@ -4,7 +4,7 @@ import { MutationOp } from '../../model/mutable';
 import { MutableObject } from '../../model';
 
 import {Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
-import { DedupMultiMap } from 'util/multimap';
+import { DedupMultiMap } from 'util/dedupmultimap';
 import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
 import { Types } from 'data/collections';
@@ -128,7 +128,6 @@ class DeleteOp<T> extends MutableArrayOp<T> {
         if (!await super.validate(references)) {
             return false;
         }
-
 
         if (this.elementHash === undefined) {
             
@@ -381,13 +380,6 @@ class MutableArray<T> extends MutableObject {
     }
 
     async mutate(op: MutationOp): Promise<boolean> {
-        
-
-        //_elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
-        //_ordinalsPerElement: ArrayMap<Hash, Ordinal>;
-        //_elements: Map<Hash, T>;
-    
-        //_currentInsertOpRefs: Map<Hash, HashedSet<HashReference<InsertOp<T>>>>;
 
         const opHash = op.hash();
 
@@ -405,6 +397,8 @@ class MutableArray<T> extends MutableObject {
 
             this._currentInsertOpRefs.add(elementHash, op.createReference());
             this._currentInsertOpOrds.set(opHash, ordinal);
+
+            this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element});
 
             this._needToRebuild = true;
 
@@ -428,6 +422,8 @@ class MutableArray<T> extends MutableObject {
             if (current.size === 0) {
                 this._elements.delete(elementHash);
             }
+
+            this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash});
 
             this._needToRebuild = true;
 
@@ -485,4 +481,4 @@ class MutableArray<T> extends MutableObject {
 
 }
 
-export { MutableArray };
+export { MutableArray, InsertOp as MutableArrayInsertOp, DeleteOp as MutableArrayDeleteOp };

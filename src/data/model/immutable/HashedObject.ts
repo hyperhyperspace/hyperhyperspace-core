@@ -18,7 +18,9 @@ import { Resources } from 'spaces/spaces';
 import { Literal, Dependency } from '../literals/LiteralUtils';
 import { Logger } from 'util/logging';
 import { ClassRegistry } from '../literals/ClassRegistry';
+import { EventRelay } from 'util/events';
 
+import { MutationObserver } from '../mutable';
 //import { __spreadArrays } from 'tslib';
 
 const BITS_FOR_ID = 128;
@@ -50,6 +52,8 @@ abstract class HashedObject {
     private _lastSignature?   : string;
 
     private _resources? : Resources;
+
+    protected _mutationEventSource?: EventRelay<HashedObject>;
 
     constructor() {
         this._signOnSave = false;
@@ -252,11 +256,74 @@ abstract class HashedObject {
         this._resources = resources;
     }
 
-    getResources() : Resources | undefined {
+    getResources(): Resources | undefined {
         return this._resources;
     }
 
-    toLiteralContext(context?: Context) : LiteralContext {
+    protected getMutationEventSource(context?: Context): EventRelay<HashedObject> {
+
+        if (this._mutationEventSource === undefined) {
+
+            if (context === undefined) {
+                context = this.toContext();
+            }    
+
+            const subObservers = new Map<string, EventRelay<HashedObject>>();
+
+            for (const [fieldName, subobj] of this.getSubObjects(context)) {
+                subObservers.set(fieldName, subobj.getMutationEventSource(context));
+            }
+
+            this._mutationEventSource = new EventRelay(this, subObservers);
+        }
+
+        return this._mutationEventSource;
+
+    }
+
+    addMutationObserver(obs: MutationObserver) {
+        this.getMutationEventSource().addObserver(obs);
+    }
+
+    removeMutationObserver(obs: MutationObserver) {
+        this._mutationEventSource?.removeObserver(obs);
+    }
+
+    getSubObjects(context?: Context): Map<string, HashedObject> {
+        
+        let literal: Literal;
+
+        if (context === undefined) {
+            context = this.toContext();
+            literal = context.literals.get(context.rootHashes[0]) as Literal;
+        } else {
+            literal = context.literals.get(this.hash()) as Literal;
+        }
+        
+        const subobjs = new Map();
+
+        for (const dep of literal.dependencies) {
+
+            let path = undefined;
+
+            for (const part of dep.path.split('.')) {
+                if (path !== undefined) {
+                    path = path + '.';
+                }
+                path = path + part;
+
+                const subobj = (this as any)[path];
+                if (subobj instanceof HashedObject) {
+                    subobjs.set(dep.path, subobj);
+                    break;
+                }
+            }
+        }
+
+        return subobjs;
+    }
+
+    toLiteralContext(context?: Context): LiteralContext {
 
         if (context === undefined) {
             context = new Context();

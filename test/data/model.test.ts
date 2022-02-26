@@ -6,6 +6,7 @@ import { HashedMap } from 'data/model/immutable';
 import { describeProxy } from 'config';
 
 describeProxy('[MOD] Data model', () => {
+
     test( '[MOD01] Basic types', () => {
         
         const original = ['hello', 1.0, false, 2.5, 'bye', true];

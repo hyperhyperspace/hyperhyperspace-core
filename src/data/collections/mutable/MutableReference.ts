@@ -46,6 +46,8 @@ class MutableReference<T> extends MutableObject {
                  this._value = refUpdateOp.getValue();                    
 
                  mutated = true;
+
+                 this._mutationEventSource?.emit({emitter: this, action: 'update', data: refUpdateOp.getValue()});
             }
         }
 

@@ -2,7 +2,6 @@ import { Store } from 'storage/store';
 
 import { HashedObject } from '../immutable/HashedObject';
 import { Context } from '../literals/Context';
-import { MutationOp } from './MutationOp';
 import { Hash } from '../hashing/Hashing';
 import { Logger, LogLevel } from 'util/logging';
 import { HeaderBasedSyncAgent, StateSyncAgent, StateFilter } from 'mesh/agents/state';
@@ -14,6 +13,9 @@ import { MultiMap } from 'util/multimap';
 import { Resources } from 'spaces/Resources';
 import { CascadedInvalidateOp } from '../causal/CascadedInvalidateOp';
 import { OpHeader } from '../../history/OpHeader';
+
+import { MutationOp } from './MutationOp';
+
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
@@ -91,11 +93,11 @@ abstract class MutableObject extends HashedObject {
         return this._activeCascInvsPerOp.get(opHash).size === 0;
     }
 
-    addMutationCallback(cb: (mut: MutationOp) => void) {
+    addMutationOpCallback(cb: (mut: MutationOp) => void) {
         this._externalMutationCallbacks.add(cb);
     }
 
-    deleteMutationCallback(cb: (mut: MutationOp) => void) {
+    deleteMutationOpCallback(cb: (mut: MutationOp) => void) {
         this._externalMutationCallbacks.delete(cb);
     }
 

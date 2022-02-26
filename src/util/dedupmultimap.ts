@@ -1,27 +1,21 @@
+import { HashedSet } from 'data/model';
 
-class MultiMap<K, V> {
-    
-    inner: Map<K, Set<V>>;
-    size: number;
+class DedupMultiMap<K, V> {
+    inner: Map<K, HashedSet<V>>;
     
     constructor() {
         this.inner = new Map();
-        this.size  = 0;
     }
 
     add(key: K, value: V): void {
         let s = this.inner.get(key);
 
         if (s === undefined) {
-            s = new Set();
+            s = new HashedSet();
             this.inner.set(key, s);
         }
 
-        if (!s.has(value)) {
-            s.add(value);
-            this.size = this.size + 1;
-        }
-        
+        s.add(value);
     }
 
     delete(key: K, value: V): boolean {
@@ -31,27 +25,16 @@ class MultiMap<K, V> {
             return false;
         }
 
-        let ret = s.delete(value);
+        let ret = s.remove(value);
 
-        if (s.size === 0) {
+        if (s.size() === 0) {
             this.inner.delete(key);
-        }
-
-        if (ret) {
-            this.size = this.size - 1;
         }
 
         return ret;
     }
 
     deleteKey(key: K): boolean {
-
-        const vals = this.inner.get(key);
-
-        if (vals !== undefined) {
-            this.size = this.size - vals.size;
-        }
-
         return this.inner.delete(key);
     }
 
@@ -61,7 +44,7 @@ class MultiMap<K, V> {
         if (result === undefined) {
             return new Set();
         } else {
-            return new Set(result);
+            return new Set(result.values());
         }
     }
 
@@ -81,24 +64,6 @@ class MultiMap<K, V> {
     keys() {
         return this.inner.keys();
     }
-
-    values() {
-        return this.inner.values();
-    }
-
-    entries() {
-        return this.inner.entries();
-    }
-
-    clone() {
-        const clone = new MultiMap<K, V>();
-
-        for (const [k, s] of this.inner.entries()) {
-            clone.inner.set(k, new Set(s));
-        }
-
-        return clone;
-    }
 }
 
-export { MultiMap };
+export { DedupMultiMap };
