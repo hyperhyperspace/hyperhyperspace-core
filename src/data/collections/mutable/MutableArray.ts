@@ -395,10 +395,22 @@ class MutableArray<T> extends MutableObject {
 
             this._elements.set(elementHash, element);
 
+            let wasNotBefore = false;
+
+            if (!this.duplicates && this._currentInsertOpRefs.get(elementHash).size === 0) {
+                wasNotBefore = true;
+            }
+
             this._currentInsertOpRefs.add(elementHash, op.createReference());
             this._currentInsertOpOrds.set(opHash, ordinal);
 
-            this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element});
+            if (this.duplicates || wasNotBefore) {
+                this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element});
+            } else {
+                this._mutationEventSource?.emit({emitter: this, action: 'move', data: element});
+            }
+
+            
 
             this._needToRebuild = true;
 
@@ -407,6 +419,14 @@ class MutableArray<T> extends MutableObject {
             const elementHash = op.elementHash as Hash;
             const deletedOps = op.deletedOps as HashedSet<HashReference<DeleteOp<T>>>;
             
+            let wasBefore = false;
+
+            if (!this.duplicates && this._currentInsertOpRefs.get(elementHash).size > 0) {
+                wasBefore = true;
+            }
+
+            let deletedOrdinal = false;
+
             for (const opRef of deletedOps.values()) {
                 if (this._currentInsertOpRefs.delete(elementHash, opRef)) {
                     const ordinal = this._currentInsertOpOrds.get(opRef.hash) as Ordinal;
@@ -414,16 +434,21 @@ class MutableArray<T> extends MutableObject {
 
                     this._elementsPerOrdinal.delete(ordinal, elementHash);
                     this._ordinalsPerElement.delete(elementHash, ordinal);
+
+                    deletedOrdinal = true;
                 }
             }
 
             let current = this._currentInsertOpRefs.get(elementHash);
 
-            if (current.size === 0) {
+            const wasDeleted = current.size === 0; 
+            if (wasDeleted) {
                 this._elements.delete(elementHash);
             }
 
-            this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash});
+            if ((this.duplicates && deletedOrdinal) || (!this.duplicates && wasBefore && wasDeleted)) {
+                this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash});
+            }
 
             this._needToRebuild = true;
 
@@ -478,7 +503,14 @@ class MutableArray<T> extends MutableObject {
         references;
         return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
     }
-
 }
 
+type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', data: T};
+type MoveEvent<T> = {emitter: MutableArray<T>, action: 'insert', data: T};
+type DeleteEvent<T> = {emitter: MutableArray<T>, action: 'delete', data: Hash};
+
+type MutationEvent<T> = InsertEvent<T> | MoveEvent<T> | DeleteEvent<T>;
+
 export { MutableArray, InsertOp as MutableArrayInsertOp, DeleteOp as MutableArrayDeleteOp };
+export { InsertEvent as ArrayInsertEvent, MoveEvent as ArrayMoveEvent, DeleteEvent as ArrayDeleteEvent,
+         MutationEvent as ArrayMutationEvent };
