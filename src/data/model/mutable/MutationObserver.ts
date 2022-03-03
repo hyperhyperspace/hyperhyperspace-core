@@ -228,9 +228,19 @@ class MutationEventFilter implements EventFilter<HashedObject> {
         
         return true;
     }
-
-        
-
 }
 
-export { MutationEvent, MutationObserver, MutationEventFilter, MutatedPathFilter, MutatedFieldFilter };
+class MutationEvents {
+    static getOriginEmitter<T extends HashedObject> (ev: MutationEvent): T {
+
+        let origin = ev.emitter;
+
+        if (ev.path !== undefined && ev.path.length > 0) {
+            origin = ev.path[0].emitter;
+        }
+
+        return origin as T;
+    }
+}
+
+export { MutationEvent, MutationObserver, MutationEventFilter, MutatedPathFilter, MutatedFieldFilter, MutationEvents };
