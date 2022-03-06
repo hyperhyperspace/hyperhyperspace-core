@@ -98,6 +98,11 @@ class WordCode {
         return result.toUpperCase();
     }
     
+    check(word: string) {
+        this.fillWordPositions();
+
+        return this.wordPositions?.get(this.normalizer(word)) !== undefined;
+    }
 }
 
 export { WordCode };
