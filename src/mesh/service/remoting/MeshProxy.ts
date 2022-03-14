@@ -48,7 +48,8 @@ class MeshProxy {
                     source: literalReply.source,
                     destination: literalReply.destination,
                     hash: literalReply.hash,
-                    object: HashedObject.fromLiteralContext(literalReply.objContext),
+                    object: literalReply.objContext === undefined? undefined : HashedObject.fromLiteralContext(literalReply.objContext),
+                    error: literalReply.error,
                     timestamp: literalReply.timestamp
                 }
 

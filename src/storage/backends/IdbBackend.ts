@@ -258,8 +258,8 @@ class IdbBackend implements Backend {
     }
 
     close() {
-        IdbBackend.deregister(this);
-        //this.idbPromise.then((idb: IDBPDatabase) => { idb.close(); IdbBackend.deregister(this);});
+        //IdbBackend.deregister(this);
+        return this.idbPromise.then((idb: IDBPDatabase) => { idb.close(); IdbBackend.deregister(this);});
     }
 
     private async searchByIndex(index: string, value: string, params?: BackendSearchParams) : Promise<BackendSearchResults> {

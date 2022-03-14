@@ -23,6 +23,8 @@ class LiteralUtils {
 
     // FIXME: I think this break custom hashes!!!!
     // I think you cannot check the hash without deliteralizing the object.
+
+    // TODO: remove custom hash support.
     static validateHash(literal: Literal): boolean {
         return literal.hash === Hashing.forValue(literal.value);
     }

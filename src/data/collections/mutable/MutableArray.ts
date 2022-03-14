@@ -9,6 +9,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
 import { Types } from 'data/collections';
 import { path } from 'util/events';
+import { ClassRegistry } from 'data/model/literals';
 
 // a simple mutable list with a single writer
 
@@ -505,6 +506,11 @@ class MutableArray<T> extends MutableObject {
         return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
     }
 }
+
+ClassRegistry.register(InsertOp.className, InsertOp);
+ClassRegistry.register(DeleteOp.className, DeleteOp);
+ClassRegistry.register(MutableArray.className, MutableArray);
+
 
 type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', path?: path<T>, data: T, };
 type MoveEvent<T> = {emitter: MutableArray<T>, action: 'move', path?: path<T>, data: T};

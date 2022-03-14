@@ -320,12 +320,12 @@ class Mesh {
         
     }
 
-    findObjectByHash(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
+    findObjectByHash(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false, includeErrors=false) : AsyncStream<ObjectDiscoveryReply> {
         const suffix = Hashing.toHex(hash);
-        return this.findObjectByHashSuffix(suffix, linkupServers, replyEndpoint, count, maxAge, strictEndpoints);
+        return this.findObjectByHashSuffix(suffix, linkupServers, replyEndpoint, count, maxAge, strictEndpoints, includeErrors);
     }
 
-    findObjectByHashSuffix(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
+    findObjectByHashSuffix(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false, includeErrors=false) : AsyncStream<ObjectDiscoveryReply> {
         
         const discoveryAgent = this.getDiscoveryAgentFor(hashSuffix);
 
@@ -339,6 +339,8 @@ class Mesh {
             params.linkupServers = linkupServers;
             params.localEndpoints = [replyEndpoint];
         }
+
+        params.includeErrors = includeErrors;
 
         return discoveryAgent.getReplyStream(params);
     }

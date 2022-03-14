@@ -91,7 +91,7 @@ class Space {
 
             this.entryPoint = this.lookupOrDiscover(suffix);
         } else {
-            throw new Error('Created new space, but no initialization was provided (entry object nor hash no word code).');
+            throw new Error('Created new space, but no initialization was provided (entry object nor hash nor word code).');
         }
 
     }

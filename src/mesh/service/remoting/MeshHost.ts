@@ -70,6 +70,7 @@ type FindObjectByHash = {
     count?: number,
     maxAge?: number,
     strictEndpoints?: boolean,
+    includeErrors?: boolean,
     retry: boolean,
     streamId?: string // used when retry is false
 }
@@ -81,6 +82,7 @@ type FindObjectByHashSuffix = {
     replyEndpoint: Endpoint,
     count?: number,
     maxAge?: number,
+    includeErrors?: boolean,
     strictEndpoints?: boolean,
     retry: boolean,
     streamId?: string // used when retry is false
@@ -108,7 +110,8 @@ type LiteralObjectDiscoveryReply = {
     source: Endpoint, 
     destination: Endpoint, 
     hash: Hash, 
-    objContext: LiteralContext, 
+    objContext?: LiteralContext, 
+    error?: string,
     timestamp: number
 };
 
@@ -292,11 +295,11 @@ class MeshHost {
 
                 if (command.type === 'find-object-by-hash') {
                     replyStream = this.mesh.findObjectByHash(
-                        (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
+                        (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints, find.includeErrors
                     );
                 } else {
                     replyStream = this.mesh.findObjectByHashSuffix(
-                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints
+                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints, find.includeErrors
                     );
                 }
                 
@@ -314,7 +317,8 @@ class MeshHost {
                                 source: discov.source, 
                                 destination: discov.destination,
                                 hash: discov.hash, 
-                                objContext: discov.object.toLiteralContext(), 
+                                objContext: discov.object?.toLiteralContext(), 
+                                error: discov.error,
                                 timestamp: discov.timestamp
                             };
 

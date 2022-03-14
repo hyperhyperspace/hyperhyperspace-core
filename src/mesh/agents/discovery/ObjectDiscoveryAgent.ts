@@ -1,4 +1,4 @@
-import { Hash, HashedObject, Hashing } from 'data/model';
+import { Hash, HashedObject, Hashing, LiteralUtils } from 'data/model';
 import { AgentPod, Event } from 'mesh/service/AgentPod';
 import { LinkupAddress } from 'net/linkup';
 import { Logger, LogLevel } from 'util/logging';
@@ -14,9 +14,9 @@ type Params = {
     maxStoredReplies      : number
 };
 
-type ObjectDiscoveryReply = { source: Endpoint, destination: Endpoint, hash: Hash, object: HashedObject, timestamp: number };
+type ObjectDiscoveryReply = { source: Endpoint, destination: Endpoint, hash: Hash, object?: HashedObject, error?: string, timestamp: number };
 
-type ObjectDiscoveryReplyParams = {maxAge?: number, linkupServers?: string[], localEndpoints?: Endpoint[]};
+type ObjectDiscoveryReplyParams = {maxAge?: number, linkupServers?: string[], localEndpoints?: Endpoint[], includeErrors?: boolean};
 
 class ObjectDiscoveryAgent implements Agent {
 
@@ -133,10 +133,12 @@ class ObjectDiscoveryAgent implements Agent {
         const maxAge         = filterParams?.maxAge;
         const linkupServers  = filterParams?.linkupServers;
         const localEndpoints = filterParams?.localEndpoints;
+        const includeErrors  = filterParams?.includeErrors || false;
 
         if (maxAge !== undefined ||
             linkupServers !== undefined ||
-            localEndpoints !== undefined) {
+            localEndpoints !== undefined || 
+            !includeErrors) {
 
             let filter = (elem: ObjectDiscoveryReply) => {
 
@@ -146,7 +148,8 @@ class ObjectDiscoveryAgent implements Agent {
                 accept = accept && (maxAge === undefined || elem.timestamp >= now - maxAge * 1000);
                 accept = accept && (linkupServers === undefined || linkupServers.indexOf(LinkupAddress.fromURL(elem.source).serverURL) >= 0);
                 accept = accept && (localEndpoints === undefined || localEndpoints.indexOf(elem.destination) >= 0);
-                
+                accept = accept && (includeErrors || elem.error === undefined);
+
                 return accept;
             }
             
@@ -167,24 +170,40 @@ class ObjectDiscoveryAgent implements Agent {
 
                 
 
-                let replyHash: Hash = '';
+                let replyHash: Hash|undefined = undefined;
                 let object: HashedObject | undefined = undefined;
+                let error: string | undefined = undefined;
                 try {
                     object = HashedObject.fromLiteralContext(reply.literalContext);
                     replyHash = object.hash();
-                } catch (e) {
+                } catch (e: any) {
+
+                    // Since anybody may reply with _anything_, only replies that at least match the hash
+                    // suffix being queried will be reported back to the caller.
+
                     ObjectDiscoveryAgent.log.warning('Error deliteralizing object discovery reply:' + e);
                     object = undefined;
+                    replyHash = undefined;
+                    const literal = reply.literalContext.literals[reply.literalContext.rootHashes[0]];
+
+                    if (literal !== undefined && LiteralUtils.validateHash(literal)) {
+                        if (literal.hash === reply.literalContext.rootHashes[0]) {
+                            replyHash = literal.hash;
+                        }
+                    }
+
+                    error = String(e);
                 }
 
-                if (object !== undefined && replyHash === reply.literalContext.rootHashes[0] && 
+                if (replyHash === reply.literalContext.rootHashes[0] && 
                     this.hexHashSuffix === Hashing.toHex(replyHash).slice(-this.hexHashSuffix.length) &&
                     this.localEndpoints.has(msg.destination)) {
 
                     ObjectDiscoveryAgent.log.trace(() => 'Received object with hash ' + replyHash + ' from ' + msg.source + ' at ' + msg.destination);
 
-                    let item = {source: msg.source, destination: msg.destination, hash: replyHash, object: object, timestamp: Date.now()}; 
+                    let item = {source: msg.source, destination: msg.destination, hash: replyHash, object: object, error: error, timestamp: Date.now()}; 
                     
+
                     this.streamSource.ingest(item);
                     
                 } else {
