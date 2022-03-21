@@ -512,8 +512,8 @@ ClassRegistry.register(DeleteOp.className, DeleteOp);
 ClassRegistry.register(MutableArray.className, MutableArray);
 
 
-type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', path?: path<T>, data: T, };
-type MoveEvent<T> = {emitter: MutableArray<T>, action: 'move', path?: path<T>, data: T};
+type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', path?: path<T>, data: T};
+type MoveEvent<T>   = {emitter: MutableArray<T>, action: 'move', path?: path<T>, data: T};
 type DeleteEvent<T> = {emitter: MutableArray<T>, action: 'delete', path?: path<T>, data: Hash};
 
 type MutationEvent<T> = InsertEvent<T> | MoveEvent<T> | DeleteEvent<T>;

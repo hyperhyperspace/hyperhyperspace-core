@@ -65,11 +65,13 @@ class IdbBackend implements Backend {
 
     name: string;
     idbPromise: Promise<IDBPDatabase>;
+    closed: boolean;
 
     objectStoreCallback?: (literal: Literal) => Promise<void>
 
     constructor(name: string) {
         this.name = name;
+        this.closed = false;
 
         this.idbPromise = openDB(name, 1, {
             upgrade(db, _oldVersion, _newVersion, _transaction) {
@@ -113,6 +115,10 @@ class IdbBackend implements Backend {
     }
 
     async store(literal: Literal, opHeader?: StoredOpHeader): Promise<void> {
+
+        if (this.closed) {
+            throw new Error('Attempted to store a literal on a closed IndexedDB backend.')
+        }
 
         let idb = await this.idbPromise;
 
@@ -208,6 +214,10 @@ class IdbBackend implements Backend {
     
     async load(hash: Hash): Promise<Literal | undefined> {
 
+        if (this.closed) {
+            throw new Error('Attempted to load a literal from a closed IndexedDB backend.')
+        }
+
         let idb = await this.idbPromise;
 
         const loaded = await (idb.get(IdbBackend.OBJ_STORE, hash) as Promise<IdbStorageFormat|undefined>);
@@ -236,11 +246,22 @@ class IdbBackend implements Backend {
     }
     
     async loadOpHeader(opHash: string): Promise<StoredOpHeader | undefined> {
+
+        if (this.closed) {
+            throw new Error('Attempted to load an op header from a closed IndexedDB backend.')
+        }
+
         let idb = await this.idbPromise;
         return await (idb.get(IdbBackend.OP_HEADERS_STORE, opHash) as Promise<StoredOpHeader|undefined>);
     }
 
     async loadOpHeaderByHeaderHash(headerHash: Hash) : Promise<StoredOpHeader | undefined> {
+
+
+        if (this.closed) {
+            throw new Error('Attempted to load an op header by hash from a closed IndexedDB backend.')
+        }
+
         let idb = await this.idbPromise;
 
         const stored = await idb.transaction([IdbBackend.OP_HEADERS_STORE], 'readonly').objectStore(IdbBackend.OP_HEADERS_STORE).index(IdbBackend.OP_HEADER_HASH_IDX_KEY + '_idx').get(headerHash);
@@ -259,11 +280,16 @@ class IdbBackend implements Backend {
 
     close() {
         //IdbBackend.deregister(this);
+        this.closed = true;
         return this.idbPromise.then((idb: IDBPDatabase) => { idb.close(); IdbBackend.deregister(this);});
     }
 
     private async searchByIndex(index: string, value: string, params?: BackendSearchParams) : Promise<BackendSearchResults> {
         
+        if (this.closed) {
+            throw new Error('Attempted to load literals from a closed IndexedDB backend.')
+        }
+
         let idb = await this.idbPromise;
 
         let order = (params === undefined || params.order === undefined) ? 'asc' : params.order.toLowerCase();

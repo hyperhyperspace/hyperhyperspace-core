@@ -126,6 +126,8 @@ class HistoryProvider {
 
     checkIfLiteralIsValidOp: (literal: Literal) => boolean;
 
+    terminated = false;
+
 
     controlLog : Logger;
     storeLog   : Logger;
@@ -152,6 +154,11 @@ class HistoryProvider {
 
 
     continueStreamingResponses() {
+
+        if (this.terminated) {
+            return;
+        }
+
         for (const requestId of this.currentResponses.values()) {
             const respInfo = this.responses.get(requestId);
             if (respInfo !== undefined) {
@@ -164,6 +171,10 @@ class HistoryProvider {
     //       from a previous request and this needs to be queued
 
     async onReceivingRequest(remote: Endpoint, msg: RequestMsg) {
+
+        if (this.terminated) {
+            return;
+        }
         
         if (this.responses.get(msg.requestId) === undefined) {
 
@@ -197,12 +208,20 @@ class HistoryProvider {
     
     onReceivingRequestCancellation(remote: Endpoint, msg: CancelRequestMsg) {
 
+        if (this.terminated) {
+            return;
+        }
+
         const cancelledResp = this.responses.get(msg.requestId);
 
         if (cancelledResp !== undefined && cancelledResp.remote === remote) {
             this.removeResponse(cancelledResp);
             HistoryProvider.controlLog.debug('Received request cancellation for ' + msg.requestId);
         }
+    }
+
+    shutdown() {
+        this.terminated = true;
     }
 
     private async createResponse(respInfo: ResponseInfo): Promise<boolean> {

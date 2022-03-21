@@ -264,21 +264,26 @@ abstract class HashedObject {
 
         if (this._mutationEventSource === undefined) {
 
-            if (context === undefined) {
-                context = this.toContext();
-            }    
-
-            const subObservers = new Map<string, EventRelay<HashedObject>>();
-
-            for (const [fieldName, subobj] of this.getSubObjects(context)) {
-                subObservers.set(fieldName, subobj.getMutationEventSource(context));
-            }
-
-            this._mutationEventSource = new EventRelay(this, subObservers);
+            this._mutationEventSource = this.createMutationEventSource(context);
+            
         }
 
         return this._mutationEventSource;
 
+    }
+
+    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
+        if (context === undefined) {
+            context = this.toContext();
+        }    
+
+        const subObservers = new Map<string, EventRelay<HashedObject>>();
+
+        for (const [fieldName, subobj] of this.getAllSubObjects(context)) {
+            subObservers.set(fieldName, subobj.getMutationEventSource(context));
+        }
+
+        return new EventRelay(this, subObservers);
     }
 
     addMutationObserver(obs: MutationObserver) {
@@ -289,7 +294,7 @@ abstract class HashedObject {
         this._mutationEventSource?.removeObserver(obs);
     }
 
-    getSubObjects(context?: Context): Map<string, HashedObject> {
+    getAllSubObjects(context?: Context): Map<string, HashedObject> {
         
         let literal: Literal;
 
@@ -305,6 +310,7 @@ abstract class HashedObject {
         for (const dep of literal.dependencies) {
 
             let path = undefined;
+            let subobj = this;
 
             for (const part of dep.path.split('.')) {
                 if (path !== undefined) {
@@ -312,11 +318,35 @@ abstract class HashedObject {
                 }
                 path = path + part;
 
-                const subobj = (this as any)[path];
+                subobj = (subobj as any)[part];
                 if (subobj instanceof HashedObject) {
-                    subobjs.set(dep.path, subobj);
+                    subobjs.set(path, subobj);
                     break;
                 }
+            }
+        }
+
+        return subobjs;
+    }
+
+    getDirectSubObjects(context?: Context): Map<string, HashedObject> {
+        
+        let literal: Literal;
+
+        if (context === undefined) {
+            context = this.toContext();
+            literal = context.literals.get(context.rootHashes[0]) as Literal;
+        } else {
+            literal = context.literals.get(this.hash()) as Literal;
+        }
+        
+        const subobjs = new Map();
+
+        for (const dep of literal.dependencies) {
+
+            if (dep.path.indexOf('.') < 0) {
+                const subobj = (this as any)[dep.path];
+                subobjs.set(dep.path, subobj);
             }
         }
 
@@ -809,6 +839,28 @@ abstract class HashedObject {
             return false;
         }
 
+    }
+
+    // load / store
+
+    async loadAndWatchForChanges(loadBatchSize=128): Promise<void> {
+        for (const [_path, obj] of this.getDirectSubObjects().entries()) {
+            await obj.loadAndWatchForChanges(loadBatchSize);
+        }
+    }
+
+    watchForChanges(auto: boolean): boolean {
+        let result = false;
+        for (const [_path, obj] of this.getDirectSubObjects().entries()) {
+                result = result || obj.watchForChanges(auto);
+        }
+        return result;
+    }
+
+    async loadAllChanges() {
+        for (const [_path, obj] of this.getDirectSubObjects().entries()) {
+            await obj.loadAllChanges();
+        }
     }
 
 }

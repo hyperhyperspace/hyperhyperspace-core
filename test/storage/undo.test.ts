@@ -24,7 +24,7 @@ describeProxy('[UND] Undo support', () => {
         
         await testBasicUndoCycle(store);
 
-        store.close();
+        //store.close();
 
         done();
     }, 30000);
@@ -35,7 +35,7 @@ describeProxy('[UND] Undo support', () => {
         
         await testBasicUndoCycle(store);
 
-        store.close();
+        //store.close();
 
         done();
     }, 30000);
@@ -47,9 +47,9 @@ describeProxy('[UND] Undo support', () => {
         
         await testBasicUndoCycleWithSync(stores);
 
-        for (const store of stores) {
+        /*for (const store of stores) {
             store.close();
-        }
+        }*/
 
         done();
     }, 50000);
@@ -61,9 +61,9 @@ describeProxy('[UND] Undo support', () => {
         
         await testBasicUndoCycleWithSync(stores);
 
-        for (const store of stores) {
+        /*for (const store of stores) {
             store.close();
-        }
+        }*/
 
         done();
     }, 50000);
@@ -74,7 +74,7 @@ describeProxy('[UND] Undo support', () => {
         
         await testMultiObjectUndoCascade(store);
 
-        store.close();
+        //store.close();
 
         done();
     }, 30000);
@@ -83,7 +83,7 @@ describeProxy('[UND] Undo support', () => {
 
         let store = new Store(new MemoryBackend('test-basic-undo'));
         
-        await testMultiObjectUndoCascade(store);
+        //await testMultiObjectUndoCascade(store);
 
         store.close();
 
@@ -125,9 +125,9 @@ describeProxy('[UND] Undo support', () => {
         
         await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores);
 
-        for (const store of stores) {
+        /*for (const store of stores) {
             store.close();
-        }
+        }*/
 
         done();
     }, 100000);
@@ -139,9 +139,9 @@ describeProxy('[UND] Undo support', () => {
         
         await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores);
 
-        for (const store of stores) {
+        /*for (const store of stores) {
             store.close();
-        }
+        }*/
 
         done();
     }, 100000);

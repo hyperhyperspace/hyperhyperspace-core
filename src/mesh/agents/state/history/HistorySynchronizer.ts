@@ -142,6 +142,9 @@ class HistorySynchronizer {
 
     async onNewHistory(remote: Endpoint, receivedOpHistories: Set<OpHeader>) {
 
+        if (this.terminated) {
+            return;
+        }
 
         this.controlLog.debug('\n'+this.logPrefix+'\nReceived new state from ' + remote);
 
@@ -723,6 +726,10 @@ class HistorySynchronizer {
     }
 
     async onReceivingLiteral(remote: Endpoint, msg: SendLiteralMsg) {
+
+        if (this.terminated) {
+            return;
+        }
 
         const reqInfo = this.requests.get(msg.requestId);
 
