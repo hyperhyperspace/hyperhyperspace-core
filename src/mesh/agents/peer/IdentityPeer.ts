@@ -9,8 +9,8 @@ import { Endpoint } from '../network/NetworkAgent';
 
 class IdentityPeer implements Peer {
 
-    static fromIdentity(id: Identity, linkupServer = LinkupManager.defaultLinkupServer) : IdentityPeer {
-        let ip = new IdentityPeer(linkupServer, id.hash(), id);
+    static fromIdentity(id: Identity, linkupServer = LinkupManager.defaultLinkupServer, info: string) : IdentityPeer {
+        let ip = new IdentityPeer(linkupServer, id.hash(), id, info);
 
         return ip;
     }
@@ -18,11 +18,13 @@ class IdentityPeer implements Peer {
     linkupServer?: string;
     identityHash?: Hash;
     identity?: Identity;
+    info?: string;
 
-    constructor(linkupServer?: string, identityHash?: Hash, identity?: Identity) {
+    constructor(linkupServer?: string, identityHash?: Hash, identity?: Identity, info?: string) {
         this.linkupServer = linkupServer;
         this.identityHash = identityHash;
         this.identity = identity;
+        this.info = info;
     }
 
     async asPeer(): Promise<PeerInfo> {
@@ -34,13 +36,20 @@ class IdentityPeer implements Peer {
             throw new Error('Missing peer information.');
         }
 
-        return { endpoint: new LinkupAddress(this.linkupServer, Hashing.toHex(this.identityHash)).url(), identityHash: this.identityHash, identity: this.identity }
+        let linkupId = Hashing.toHex(this.identityHash);
+        if (this.info !== undefined) {
+            linkupId = linkupId + '/' + this.info;
+        }
+
+        return { endpoint: new LinkupAddress(this.linkupServer, linkupId).url(), identityHash: this.identityHash, identity: this.identity }
     }
 
     async initFromEndpoint(ep: string, store?: Store): Promise<void> {
         const address = LinkupAddress.fromURL(ep);
         this.linkupServer = address.serverURL;
-        this.identityHash = Hashing.fromHex(address.linkupId);
+        const parts = address.linkupId.split('/');
+        this.identityHash = Hashing.fromHex(parts.shift() as string);
+        this.info = parts.length > 0? parts.join('/') : undefined;
 
         if (store !== undefined) {
             this.identity = await store.loadRef<Identity>(new HashReference(this.identityHash, Identity.className));
