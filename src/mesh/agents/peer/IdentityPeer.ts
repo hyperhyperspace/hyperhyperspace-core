@@ -26,10 +26,11 @@ class IdentityPeer implements Peer {
         this.identity = identity;
         this.info = info;
     }
-
-    // in this case, there's nothing async to wait for.
     
     async asPeer(): Promise<PeerInfo> {
+
+        // in this case, there's nothing async to wait for.
+        
         return this.asPeerIfReady();
     }
 
