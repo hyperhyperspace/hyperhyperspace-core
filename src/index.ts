@@ -32,3 +32,4 @@ export * from './util/shuffling';
 export * from './util/strings';
 export * from './util/logging';
 export * from './util/multimap';
+export * from './util/events';

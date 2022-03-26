@@ -1,5 +1,5 @@
 import { Agent, AgentId } from 'mesh/service/Agent';
-import { AgentPod, Event } from 'mesh/service/AgentPod';
+import { AgentPod, AgentEvent } from 'mesh/service/AgentPod';
 
 import { Endpoint, NetworkAgent, NetworkEventType, LinkupMessage } from 'mesh/agents/network/NetworkAgent';
 import { Hash, HashedObject, Hashing, LiteralContext } from 'data/model';
@@ -109,7 +109,7 @@ class ObjectBroadcastAgent implements Agent {
 
     }
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
 
         const MIN_BITS_TO_ANSWER = 36;
 

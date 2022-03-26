@@ -1,4 +1,4 @@
-import { AgentPod, Event } from './AgentPod';
+import { AgentPod, AgentEvent } from './AgentPod';
 
 type AgentId = string;
 
@@ -8,7 +8,7 @@ interface Agent {
 
     ready(pod: AgentPod) : void;
 
-    receiveLocalEvent(ev: Event) : void;
+    receiveLocalEvent(ev: AgentEvent) : void;
 
     shutdown() : void;
 }

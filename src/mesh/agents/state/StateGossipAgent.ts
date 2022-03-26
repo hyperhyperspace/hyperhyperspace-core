@@ -1,7 +1,7 @@
 import { StateSyncAgent } from '../state/StateSyncAgent';
 import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 
-import { AgentPod, Event, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../service/AgentPod';
+import { AgentPod, AgentEvent, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../service/AgentPod';
 import { AgentId } from '../../service/Agent';
 import { Endpoint } from '../network/NetworkAgent';
 //import { PeerId } from '../../network/Peer';
@@ -209,7 +209,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
     // local events listening
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
 
         if (ev.type === AgentPodEventType.AgentSetChange) {
             

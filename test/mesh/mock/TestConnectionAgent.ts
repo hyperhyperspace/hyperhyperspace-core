@@ -1,6 +1,6 @@
 import { Endpoint, ConnectionId, NetworkEventType, 
         ConnectionStatusChangeEvent, ConnectionStatus, NetworkAgent, MessageReceivedEvent } from 'mesh/agents/network';
-import { AgentPod, Event } from 'mesh/common';
+import { AgentPod, AgentEvent } from 'mesh/common';
 import { Agent } from 'mesh/common';
 import { MultiMap } from 'util/multimap';
 
@@ -73,7 +73,7 @@ class TestConnectionAgent implements Agent {
         }
     }
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
         if (ev.type === NetworkEventType.ConnectionStatusChange) {
             let connEv = ev as ConnectionStatusChangeEvent;
 

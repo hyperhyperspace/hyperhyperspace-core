@@ -9,7 +9,7 @@ import { Endpoint } from '../network/NetworkAgent';
 
 class IdentityPeer implements Peer {
 
-    static fromIdentity(id: Identity, linkupServer = LinkupManager.defaultLinkupServer, info: string) : IdentityPeer {
+    static fromIdentity(id: Identity, linkupServer = LinkupManager.defaultLinkupServer, info?: string) : IdentityPeer {
         let ip = new IdentityPeer(linkupServer, id.hash(), id, info);
 
         return ip;

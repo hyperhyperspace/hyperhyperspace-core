@@ -1,5 +1,5 @@
 import { Agent, AgentId } from '../../service/Agent';
-import { Event, AgentPod } from '../../service/AgentPod';
+import { AgentEvent, AgentPod } from '../../service/AgentPod';
 import { Logger, LogLevel } from 'util/logging';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { LinkupManager } from 'net/linkup/LinkupManager';
@@ -781,7 +781,7 @@ class NetworkAgent implements Agent {
         this.intervalRef = setInterval(this.tick, TickInterval * 1000);
     }
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
         ev;
     }
 

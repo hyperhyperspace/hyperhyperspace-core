@@ -9,7 +9,7 @@ import { Agent, AgentId } from '../../service/Agent';
 import { NetworkAgent, Endpoint, ConnectionId, NetworkEventType, RemoteAddressListeningEvent, 
          ConnectionStatusChangeEvent, ConnectionStatus, MessageReceivedEvent } from '../network/NetworkAgent';
 
-import { AgentPod, Event } from '../../service/AgentPod';
+import { AgentPod, AgentEvent } from '../../service/AgentPod';
 import { LinkupAddress } from 'net/linkup/LinkupAddress';
 
 import { Hash } from 'data/model';
@@ -996,7 +996,7 @@ class PeerGroupAgent implements Agent {
      * etc.)
      */
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
         if (ev.type === NetworkEventType.RemoteAddressListening) {
             const listenEv = ev as RemoteAddressListeningEvent;
             

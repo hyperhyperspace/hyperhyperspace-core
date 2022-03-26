@@ -1,6 +1,6 @@
 import { StateSyncAgent } from 'mesh/agents/state/StateSyncAgent';
 import { Endpoint } from 'mesh/agents/network';
-import { AgentPod, Event } from 'mesh/common';
+import { AgentPod, AgentEvent } from 'mesh/common';
 import { HashedObject, Hash } from 'data/model';
 import { GossipEventTypes, StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
@@ -142,7 +142,7 @@ class LinearStateAgent extends PeeringAgentBase implements StateSyncAgent {
         this.gossipAgent = pod.getAgent(StateGossipAgent.agentIdForGossip(this.topic)) as StateGossipAgent;
     }
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
         ev;
         // ignore
     }

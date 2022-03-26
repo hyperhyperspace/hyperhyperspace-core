@@ -2,7 +2,7 @@ import { Agent, AgentId } from './Agent';
 import { Logger, LogLevel } from 'util/logging';
 import { HashedObject } from 'data/model';
 
-type Event = { type: string, content: any };
+type AgentEvent = { type: string, content: any };
 
 enum AgentPodEventType {
     AgentSetChange          = 'agent-set-change',
@@ -93,7 +93,7 @@ class AgentPod {
 
     // send an event that will be received by all local agents
 
-    broadcastEvent(ev: Event) {
+    broadcastEvent(ev: AgentEvent) {
 
         AgentPod.logger.trace('EventPod broadcasting event ' + ev.type + ' with content ' + (ev.content instanceof HashedObject? JSON.stringify(ev.content.toLiteral()) : ev.content));
 
@@ -109,4 +109,4 @@ class AgentPod {
     }
 }
 
-export { AgentPod, Event, AgentPodEventType, AgentSetChangeEvent, AgentSetChange };
+export { AgentPod, AgentEvent, AgentPodEventType, AgentSetChangeEvent, AgentSetChange };

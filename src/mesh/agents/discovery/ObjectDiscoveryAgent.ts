@@ -1,5 +1,5 @@
 import { Hash, HashedObject, Hashing, LiteralUtils } from 'data/model';
-import { AgentPod, Event } from 'mesh/service/AgentPod';
+import { AgentPod, AgentEvent } from 'mesh/service/AgentPod';
 import { LinkupAddress } from 'net/linkup';
 import { Logger, LogLevel } from 'util/logging';
 import { Agent } from '../../service/Agent';
@@ -159,7 +159,7 @@ class ObjectDiscoveryAgent implements Agent {
         return new BufferedAsyncStream(source);;
     }
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
 
         if (! this.wasShutdown && ev.type === NetworkEventType.LinkupMessageReceived) {
             const msg = ev.content as LinkupMessage;

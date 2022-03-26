@@ -1,6 +1,6 @@
 import { PeerGroupAgent } from './PeerGroupAgent';
 import { Agent, AgentId } from '../../service/Agent';
-import { AgentPod, Event } from '../../service/AgentPod';
+import { AgentPod, AgentEvent } from '../../service/AgentPod';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { Hash } from 'data/model';
@@ -17,7 +17,7 @@ abstract class PeeringAgentBase implements Agent {
     abstract ready(pod: AgentPod): void;
     abstract shutdown(): void;
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
         ev;
     }
     

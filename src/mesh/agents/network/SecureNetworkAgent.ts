@@ -1,6 +1,6 @@
 import { Agent, AgentId } from '../../service/Agent';
 
-import { AgentPod, Event } from '../../service/AgentPod';
+import { AgentPod, AgentEvent } from '../../service/AgentPod';
 
 import { NetworkAgent, ConnectionId, 
          NetworkEventType, ConnectionStatusChangeEvent, 
@@ -380,7 +380,7 @@ class SecureNetworkAgent implements Agent {
         this.pod = pod;
     }
 
-    receiveLocalEvent(ev: Event): void {
+    receiveLocalEvent(ev: AgentEvent): void {
         if (ev.type === NetworkEventType.ConnectionStatusChange) {
             let connEv = ev as ConnectionStatusChangeEvent;
             
