@@ -1,8 +1,8 @@
 import { HashedObject } from 'data/model';
-import { Observer, Event, EventFilter, location, path} from 'util/events';
+import { Observer, Event, EventFilter, location } from 'util/events';
 
-type MutatedField     = location<HashedObject>
-type MutatedPath     = path<HashedObject>;
+type MutatedField    = location<HashedObject>
+type MutatedPath     = MutatedField[];
 
 type MutationEvent    = Event<HashedObject>;
 type MutationObserver = Observer<HashedObject>;
@@ -157,7 +157,7 @@ class MutatedFieldFilter extends MutatedPathFilterBase implements MutatedPathFil
             return noMatch;
         }
 
-        const mutatedField = path[0];
+        const mutatedField = path[skip];
 
         if (this.className !== undefined && mutatedField.emitter.getClassName() !== this.className) {
             return noMatch;

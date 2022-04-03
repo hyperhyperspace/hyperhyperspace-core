@@ -2,11 +2,11 @@ type hash = string;
 type hashable = { hash(): hash; };
 
 type location<T> = {name: string, emitter: T};
-type path<T> = Array<location<T>>;
+//type path<T> = Array<location<T>>;
 
 type Event<T extends hashable> = {
     emitter: T;
-    path?: path<T>;
+    path?: location<T>[];
     action: string;
     data: any;
 }
@@ -61,10 +61,10 @@ class EventRelay<T extends hashable> {
 
                 const upstreamEmitters = upstreamEv.path === undefined? [] : Array.from(upstreamEv.path)
 
-                upstreamEmitters.push({name: name, emitter: upstreamEv.emitter});
+                upstreamEmitters.push({name: name, emitter: this.emitter});
 
                 const ev: Event<T> = {
-                    emitter: this.emitter,
+                    emitter: upstreamEv.emitter,
                     path: upstreamEmitters,
                     action: upstreamEv.action,
                     data: upstreamEv.data                
@@ -76,8 +76,12 @@ class EventRelay<T extends hashable> {
         }
     }
 
-    removeSource(path: string) {
-        this.upstreamRelays.delete(path);
+    removeUpstreamRelay(name: string) {
+        this.upstreamRelays.delete(name);
+    }
+
+    hasUpstreamRelay(name: string) {
+        return this.upstreamRelays.has(name);
     }
 
     private wouldCreateACycle(emitterHash: hash) {
@@ -105,4 +109,4 @@ class EventRelay<T extends hashable> {
     }
 }
 
-export { Event, EventRelay, EventCallback, EventFilter, Observer, location, path }
+export { Event, EventRelay, EventCallback, EventFilter, Observer, location, hashable }

@@ -8,8 +8,8 @@ import { DedupMultiMap } from 'util/dedupmultimap';
 import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
 import { Types } from 'data/collections';
-import { path } from 'util/events';
-import { ClassRegistry } from 'data/model/literals';
+import { EventRelay, location } from 'util/events';
+import { ClassRegistry, Context } from 'data/model/literals';
 
 // a simple mutable list with a single writer
 
@@ -399,7 +399,7 @@ class MutableArray<T> extends MutableObject {
 
             let wasNotBefore = false;
 
-            if (!this.duplicates && this._currentInsertOpRefs.get(elementHash).size === 0) {
+            if (this._currentInsertOpRefs.get(elementHash).size === 0) {
                 wasNotBefore = true;
             }
 
@@ -407,12 +407,13 @@ class MutableArray<T> extends MutableObject {
             this._currentInsertOpOrds.set(opHash, ordinal);
 
             if (this.duplicates || wasNotBefore) {
-                this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element});
+                this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element} as InsertEvent<T>);
+                if (wasNotBefore) {
+                    MutableArray.addEventRelayForElmt(this._mutationEventSource, elementHash, element);
+                }
             } else {
-                this._mutationEventSource?.emit({emitter: this, action: 'move', data: element});
+                this._mutationEventSource?.emit({emitter: this, action: 'move', data: element} as MoveEvent<T>);
             }
-
-            
 
             this._needToRebuild = true;
 
@@ -423,7 +424,7 @@ class MutableArray<T> extends MutableObject {
             
             let wasBefore = false;
 
-            if (!this.duplicates && this._currentInsertOpRefs.get(elementHash).size > 0) {
+            if (this._currentInsertOpRefs.get(elementHash).size > 0) {
                 wasBefore = true;
             }
 
@@ -445,12 +446,19 @@ class MutableArray<T> extends MutableObject {
 
             const wasDeleted = current.size === 0; 
             if (wasDeleted) {
+                if (wasBefore) {
+                    const element = this._elements.get(elementHash);
+                    MutableArray.removeEventRelayForElmt(this._mutationEventSource, elementHash, element);
+                }
+
                 this._elements.delete(elementHash);
             }
 
             if ((this.duplicates && deletedOrdinal) || (!this.duplicates && wasBefore && wasDeleted)) {
-                this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash});
+                this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash} as DeleteEvent<T>);
+                
             }
+                
 
             this._needToRebuild = true;
 
@@ -505,6 +513,32 @@ class MutableArray<T> extends MutableObject {
         references;
         return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
     }
+
+    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
+
+        const source = super.createMutationEventSource(context);
+
+        for (const [hash, elmt] of this._elements.entries()) {
+            MutableArray.addEventRelayForElmt(source, hash, elmt);
+        }
+
+        return source;
+
+    }
+
+    private static addEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
+        if (own !== undefined && elmt instanceof HashedObject) {
+            own.addUpstreamRelay('['+hash+']', elmt.getMutationEventSource())
+        }
+    }
+
+    private static removeEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
+        if (own !== undefined && elmt instanceof HashedObject) {
+            own.removeUpstreamRelay('['+hash+']');
+        }
+    }
+
+
 }
 
 ClassRegistry.register(InsertOp.className, InsertOp);
@@ -512,9 +546,9 @@ ClassRegistry.register(DeleteOp.className, DeleteOp);
 ClassRegistry.register(MutableArray.className, MutableArray);
 
 
-type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', path?: path<T>, data: T};
-type MoveEvent<T>   = {emitter: MutableArray<T>, action: 'move', path?: path<T>, data: T};
-type DeleteEvent<T> = {emitter: MutableArray<T>, action: 'delete', path?: path<T>, data: Hash};
+type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', path?: location<HashedObject>[], data: T};
+type MoveEvent<T>   = {emitter: MutableArray<T>, action: 'move', path?: location<HashedObject>[], data: T};
+type DeleteEvent<T> = {emitter: MutableArray<T>, action: 'delete', path?: location<HashedObject>[], data: Hash};
 
 type MutationEvent<T> = InsertEvent<T> | MoveEvent<T> | DeleteEvent<T>;
 

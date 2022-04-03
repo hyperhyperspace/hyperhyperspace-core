@@ -4,7 +4,8 @@ import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
 import { Types } from '../Types';
 import { Hash } from 'data/model/hashing/Hashing';
-import { ClassRegistry } from 'data/model';
+import { ClassRegistry, Context } from 'data/model';
+import { EventRelay } from 'util/events';
 
 class MutableReference<T> extends MutableObject {
 
@@ -41,6 +42,9 @@ class MutableReference<T> extends MutableObject {
                 (this._sequence === refUpdateOp.getSequence() && 
                  Timestamps.after(refUpdateOp.getTimestamp(), this._timestamp as string))) {
 
+
+                 const oldVal = this._value;
+
                  this._sequence = refUpdateOp.getSequence();
                  this._timestamp = refUpdateOp.getTimestamp();
                  this._value = refUpdateOp.getValue();                    
@@ -48,6 +52,16 @@ class MutableReference<T> extends MutableObject {
                  mutated = true;
 
                  this._mutationEventSource?.emit({emitter: this, action: 'update', data: refUpdateOp.getValue()});
+
+                 if (oldVal !== undefined && oldVal instanceof HashedObject) {
+                     this._mutationEventSource?.removeUpstreamRelay('[content]');
+                 }
+
+                 if (this._value instanceof HashedObject) {
+                    this._mutationEventSource?.addUpstreamRelay('[content]', this._value.getMutationEventSource());
+                 }
+                 
+
             }
         }
 
@@ -68,6 +82,17 @@ class MutableReference<T> extends MutableObject {
         return Types.isTypeConstraint(this.typeConstraints);
     }
     
+    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
+
+        const source = super.createMutationEventSource(context);
+
+        if (this._value !== undefined && this._value instanceof HashedObject) {
+            source.addUpstreamRelay('[content]', this._value.getMutationEventSource());
+        }
+
+        return source;
+
+    }
 }
 
 class RefUpdateOp<T> extends MutationOp {

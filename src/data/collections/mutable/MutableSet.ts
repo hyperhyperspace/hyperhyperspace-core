@@ -6,6 +6,8 @@ import { HashedSet } from 'data/model/immutable/HashedSet';
 import { HashReference } from 'data/model/immutable/HashReference';
 import { Types } from '../Types';
 import { Logger, LogLevel } from 'util/logging';
+import { EventRelay } from 'util/events';
+import { Context } from 'data/model';
 
 type ElmtHash = Hash;
 
@@ -299,6 +301,7 @@ class MutableSet<T> extends MutableObject {
 
             if (mutated) {
                 this._mutationEventSource?.emit({emitter: this, action: 'add', data: addOp.element});
+                MutableSet.addEventRelayForElmt(this._mutationEventSource, hash, op.element);
                 /*if (this._addElementCallback !== undefined) {
                     try {
                         this._addElementCallback(addOp.element as T);
@@ -333,6 +336,7 @@ class MutableSet<T> extends MutableObject {
                     this._elements.delete(hash);
                     this._currentAddOpRefs.delete(hash);
                     this._mutationEventSource?.emit({emitter: this, action: 'delete', data: deleted});
+                    MutableSet.removeEventRelayForElmt(this._mutationEventSource, hash, deleted);
                     /*if (this._deleteElementCallback !== undefined) {
                         try {
                             this._deleteElementCallback(deleted);
@@ -360,6 +364,30 @@ class MutableSet<T> extends MutableObject {
     
     getClassName(): string {
         return MutableSet.className;
+    }
+
+    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
+
+        const source = super.createMutationEventSource(context);
+
+        for (const [hash, elmt] of this._elements.entries()) {
+            MutableSet.addEventRelayForElmt(source, hash, elmt);
+        }
+
+        return source;
+
+    }
+
+    private static addEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
+        if (own !== undefined && elmt instanceof HashedObject) {
+            own.addUpstreamRelay('['+hash+']', elmt.getMutationEventSource())
+        }
+    }
+
+    private static removeEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
+        if (own !== undefined && elmt instanceof HashedObject) {
+            own.removeUpstreamRelay('['+hash+']');
+        }
     }
 
 }

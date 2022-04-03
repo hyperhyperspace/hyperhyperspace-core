@@ -112,9 +112,9 @@ class HashedMap<K, V> {
 
         let arrays = this.toArrays();
         let hashes = arrays.hashes;
-        let child = HashedObject.literalizeField(path, arrays.entries, context);
+        let child = HashedObject.literalizeField('', arrays.entries, context);
         let entries = child.value;
-        HashedObject.collectChildDeps(dependencies, child.dependencies);
+        HashedObject.collectChildDeps(dependencies, path, child.dependencies, true);
 
         let value = {_type: 'hashed_map', _hashes: hashes, _entries: entries };
 

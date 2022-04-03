@@ -66,13 +66,6 @@ class Store {
         this.classReferencesCallbacks = new MultiMap();
     }
 
-    // save: The saving of operations is not recursive.
-    //
-    //                         If an operation is itself mutable, you need to call save() again
-    //       (* note 1)        on the operation if you want its mutations flushed to the database
-    //                         as well. (All mutable dependencies are flushed if required - this
-    //                         applies only to their mutation ops)
-
     setResources(resources: Resources) {
         this.resources = resources;
     }
@@ -80,6 +73,13 @@ class Store {
     getResources() : Partial<Resources> | undefined {
         return this.resources;
     }
+
+    // save: The saving of operations is not recursive.
+    //
+    //                         If an operation is itself mutable, you need to call save() again
+    //       (* note 1)        on the operation if you want its mutations flushed to the database
+    //                         as well. (All mutable dependencies are flushed if required - this
+    //                         applies only to their mutation ops)
 
     async save(object: HashedObject, flushMutations=true) : Promise<void> {
         let context = object.toContext();

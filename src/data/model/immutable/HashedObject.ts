@@ -260,7 +260,7 @@ abstract class HashedObject {
         return this._resources;
     }
 
-    protected getMutationEventSource(context?: Context): EventRelay<HashedObject> {
+    getMutationEventSource(context?: Context): EventRelay<HashedObject> {
 
         if (this._mutationEventSource === undefined) {
 
@@ -279,7 +279,7 @@ abstract class HashedObject {
 
         const subObservers = new Map<string, EventRelay<HashedObject>>();
 
-        for (const [fieldName, subobj] of this.getAllSubObjects(context)) {
+        for (const [fieldName, subobj] of this.getDirectSubObjects(context)) {
             subObservers.set(fieldName, subobj.getMutationEventSource(context));
         }
 
@@ -294,7 +294,7 @@ abstract class HashedObject {
         this._mutationEventSource?.removeObserver(obs);
     }
 
-    getAllSubObjects(context?: Context): Map<string, HashedObject> {
+    getSubObjects(context?: Context, direct=false): Map<string, HashedObject> {
         
         let literal: Literal;
 
@@ -309,28 +309,53 @@ abstract class HashedObject {
 
         for (const dep of literal.dependencies) {
 
-            let path = undefined;
-            let subobj = this;
+            if (dep.type === 'literal') {
 
-            for (const part of dep.path.split('.')) {
-                if (path !== undefined) {
-                    path = path + '.';
+                if (direct && !dep.direct) {
+                    continue;
                 }
-                path = path + part;
 
-                subobj = (subobj as any)[part];
-                if (subobj instanceof HashedObject) {
-                    subobjs.set(path, subobj);
-                    break;
-                }
+                const subobj = context.objects.get(dep.hash);
+                subobjs.set(dep.path, subobj);
+    
+                /*let path = undefined;
+                let subobj = this;
+    
+                for (const part of dep.path.split('.')) {
+                    if (path === undefined) {
+                        path = '';
+                    } else {
+                        path = path + '.';
+                    }
+                    path = path + part;
+                    const old = subobj;
+    
+                    subobj = (subobj as any)[part];
+                    if (subobj === undefined) {
+                        console.log(part);
+                        console.log(old);
+                        console.log(this.getClassName());
+                        console.log(this);
+                        console.log(literal);
+                    }
+                    if (subobj instanceof HashedObject) {
+                        subobjs.set(path, subobj);
+                        break;
+                    }
+                }*/
             }
+
+            
         }
 
         return subobjs;
     }
 
     getDirectSubObjects(context?: Context): Map<string, HashedObject> {
-        
+
+        return this.getSubObjects(context, true);
+
+        /*
         let literal: Literal;
 
         if (context === undefined) {
@@ -350,7 +375,7 @@ abstract class HashedObject {
             }
         }
 
-        return subobjs;
+        return subobjs;*/
     }
 
     toLiteralContext(context?: Context): LiteralContext {
@@ -392,13 +417,9 @@ abstract class HashedObject {
                 let value = (this as any)[fieldName];
 
                 if (HashedObject.shouldLiteralizeField(value)) {
-                    let fieldPath = fieldName;
-                    if (path !== '') {
-                        fieldPath = path + '.' + fieldName;
-                    }
-                    let fieldLiteral = HashedObject.literalizeField(fieldPath, value, context);
+                    let fieldLiteral = HashedObject.literalizeField(fieldName, value, context);
                     fields[fieldName] = fieldLiteral.value;
-                    HashedObject.collectChildDeps(dependencies, fieldLiteral.dependencies);
+                    HashedObject.collectChildDeps(dependencies, path, fieldLiteral.dependencies, true);
                 }
             }
         }
@@ -476,28 +497,28 @@ abstract class HashedObject {
                 let index = 0;
                 for (const elmt of something) {
                     if (HashedObject.shouldLiteralizeField(elmt)) {
-                        let child = HashedObject.literalizeField(fieldPath, elmt, context); // should we put the index into the path? but then we can't reuse this code for sets...
+                        let child = HashedObject.literalizeField('', elmt, context); // should we put the index into the path? but then we can't reuse this code for sets...
                         value.push(child.value);
-                        HashedObject.collectChildDeps(dependencies, child.dependencies);
+                        HashedObject.collectChildDeps(dependencies, fieldPath, child.dependencies, true);
                         index = index + 1;
                     }
                 }
             } else if (something instanceof HashedSet) {
                 const hset = something as HashedSet<any>;
-                const hsetLiteral = hset.literalize(fieldPath, context);
+                const hsetLiteral = hset.literalize('', context);
                 value = hsetLiteral.value;
-                HashedObject.collectChildDeps(dependencies, hsetLiteral.dependencies);
+                HashedObject.collectChildDeps(dependencies, fieldPath, hsetLiteral.dependencies, true);
             } else if (something instanceof HashedMap) {
                 const hmap = something as HashedMap<any, any>;
-                const hmapLiteral = hmap.literalize(fieldPath, context);
+                const hmapLiteral = hmap.literalize('', context);
                 value = hmapLiteral.value;
-                HashedObject.collectChildDeps(dependencies, hmapLiteral.dependencies);
+                HashedObject.collectChildDeps(dependencies, fieldPath, hmapLiteral.dependencies, true);
             } else { // not a set, map or array
 
                 if (something instanceof HashReference) {
                     let reference = something as HashReference<any>;
 
-                    let dependency : Dependency = { path: fieldPath, hash: reference.hash, className: reference.className, type: 'reference'};
+                    let dependency : Dependency = { path: fieldPath, hash: reference.hash, className: reference.className, type: 'reference', direct: true};
                     dependencies.set(Hashing.forValue(dependency), dependency);
 
                     value = reference.literalize();
@@ -508,14 +529,14 @@ abstract class HashedObject {
                         throw new Error('Context needed to literalize HashedObject');
                     }
 
-                    let hash = hashedObject.literalizeInContext(context, fieldPath);
+                    let hash = hashedObject.literalizeInContext(context, '');
 
-                    let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClassName(), type: 'literal'};
+                    let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClassName(), type: 'literal', direct: true};
                     dependencies.set(Hashing.forValue(dependency), dependency);
 
                     const hashedDeps = (context.literals.get(hash) as Literal).dependencies.map((d: Dependency)=>[Hashing.forValue(d), d] as [Hash, Dependency])
 
-                    HashedObject.collectChildDeps(dependencies, new Map(hashedDeps));
+                    HashedObject.collectChildDeps(dependencies, fieldPath, new Map(hashedDeps), false);
 
                     value = { _type: 'hashed_object_dependency', _hash: hash };
                 } else {
@@ -525,9 +546,9 @@ abstract class HashedObject {
                         if (fieldName.length>0 && fieldName[0] !== '_') {
                             let fieldValue = (something as any)[fieldName];
                             if (HashedObject.shouldLiteralizeField(fieldValue)) {
-                                let field = HashedObject.literalizeField(fieldPath + '.' + fieldName, fieldValue, context);
+                                let field = HashedObject.literalizeField(fieldName, fieldValue, context);
                                 value[fieldName] = field.value;
-                                HashedObject.collectChildDeps(dependencies, field.dependencies);
+                                HashedObject.collectChildDeps(dependencies, fieldPath, field.dependencies, true);
                             }
                         }
                     }
@@ -777,9 +798,19 @@ abstract class HashedObject {
         return hash;
     }
 
-    static collectChildDeps(parentDeps : Map<Hash, Dependency>, childDeps : Map<Hash, Dependency>) {
-        for (const [hash, childDep] of childDeps.entries()) {
-            parentDeps.set(hash, childDep);
+    static collectChildDeps(parentDeps : Map<Hash, Dependency>, path: string, childDeps : Map<Hash, Dependency>, direct: boolean) {
+        for (const [_hash, childDep] of childDeps.entries()) {
+
+            const sep = childDep.path.length > 0 && path.length > 0? '.' : '';
+
+            const newDep = {
+                path: path + sep + childDep.path,
+                hash: childDep.hash, 
+                className: childDep.className, 
+                type: childDep.type, 
+                direct: childDep.direct && direct
+            };
+            parentDeps.set(Hashing.forValue(newDep), newDep);
         }
     }
 

@@ -97,9 +97,9 @@ describeProxy('[UND] Undo support', () => {
         
         await testMultiObjectUndoCascadeWithSync(stores);
 
-        for (const store of stores) {
+        /*for (const store of stores) {
             store.close();
-        }
+        }*/
 
         done();
     }, 50000);
@@ -111,9 +111,9 @@ describeProxy('[UND] Undo support', () => {
         
         await testMultiObjectUndoCascadeWithSync(stores);
 
-        for (const store of stores) {
+        /*for (const store of stores) {
             store.close();
-        }
+        }*/
 
         done();
     }, 100000);

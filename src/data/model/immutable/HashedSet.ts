@@ -89,9 +89,9 @@ class HashedSet<T> {
 
         let arrays = this.toArrays();
         let hashes = arrays.hashes;
-        let child = HashedObject.literalizeField(path, arrays.elements, context);
+        let child = HashedObject.literalizeField('', arrays.elements, context);
         let elements = child.value;
-        HashedObject.collectChildDeps(dependencies, child.dependencies);
+        HashedObject.collectChildDeps(dependencies, path, child.dependencies, true);
 
         let value = {_type: 'hashed_set', _hashes: hashes, _elements: elements};
 

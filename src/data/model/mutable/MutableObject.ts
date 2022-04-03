@@ -26,7 +26,7 @@ abstract class MutableObject extends HashedObject {
 
     readonly _acceptedMutationOpClasses : Array<string>;
 
-    _boundToStore : boolean;
+    private _boundToStore : boolean;
 
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
@@ -108,6 +108,10 @@ abstract class MutableObject extends HashedObject {
             this.unbindFromStore();
         }
 
+        return this._boundToStore;
+    }
+
+    isWatchingForChanges(): boolean {
         return this._boundToStore;
     }
 

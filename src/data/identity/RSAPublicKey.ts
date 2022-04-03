@@ -37,8 +37,14 @@ class RSAPublicKey extends HashedObject {
     }
 
     async validate() {
-        // TODO: self sign??
-        return true;
+        try {
+            const _rsa = new RSADefaults.impl();
+            await _rsa.loadKeyPair(this.getPublicKey());
+            return true;
+        } catch (e: any) {
+            return false;
+        }
+        
     }
 
     getClassName() {
