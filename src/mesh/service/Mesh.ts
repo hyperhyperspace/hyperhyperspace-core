@@ -12,6 +12,7 @@ import { AgentPod } from './AgentPod';
 import { AsyncStream } from 'util/streams';
 import { LinkupManager } from 'net/linkup';
 import { RNGImpl } from 'crypto/random';
+import { Logger, LogLevel } from 'util/logging';
 
 
 
@@ -99,6 +100,8 @@ enum SyncMode {
 }
 
 class Mesh {
+
+    static syncCommandsLog = new Logger('mesh-sync-commands', LogLevel.INFO);
 
     pod: AgentPod;
 
@@ -196,11 +199,23 @@ class Mesh {
         }
 
     }
+
+    /*getConnectedPeers(peerGroupId: string): Array<PeerInfo> {
+        let agent = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId)) as PeerGroupAgent;
+
+        if (agent === undefined) {
+            return [];
+        } else {
+            return agent.getPeers();
+        }
+    }*/
         
     // Object synchronization
 
     syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string, usageToken?: UsageToken): UsageToken {
         
+        Mesh.syncCommandsLog.debug('requested sync of ' + obj.getLastHash() + ' with ' + peerGroupId + ' in mode ' + mode);
+
         let peerGroup = this.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId)) as PeerGroupAgent | undefined;
         if (peerGroup === undefined) {
             throw new Error("Cannot sync object with mesh " + peerGroupId + ", need to join it first.");
@@ -250,6 +265,8 @@ class Mesh {
                 const peerGroupId = usageInfo.peerGroupId;
                 const hash        = usageInfo.objHash;
                 const gossipId    = usageInfo.gossipId;
+
+                Mesh.syncCommandsLog.debug('requested STOP sync of ' + hash + ' with ' + peerGroupId);
         
                 let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
         
@@ -319,6 +336,12 @@ class Mesh {
         }
         
     }
+
+    // FIXME: findObjectByHash uses an instance of ObjectDiscoveryAgent constructed without any config params.
+    //        That fixes the number of bits used for discovery to 36, which is the default. This is particularily
+    //        irksome in findObjectByHashSuffix, that does the same (one would expect it to use as many bits as
+    //        are present in the received suffix!). To fix it, either change ObjectDiscoveryAgent to use all the
+    //        received bits, or pass the number of bits explicitly when calling the constructor.
 
     findObjectByHash(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false, includeErrors=false) : AsyncStream<ObjectDiscoveryReply> {
         const suffix = Hashing.toHex(hash);
@@ -394,6 +417,9 @@ class Mesh {
         }
 
         let hash = obj.hash();
+
+        Mesh.syncCommandsLog.trace('adding root ' + hash);
+
         let oldMode = roots.get(hash);
 
 
@@ -418,6 +444,8 @@ class Mesh {
     }
 
     private removeRootSync(gossip: StateGossipAgent, objHash: Hash) {
+
+        Mesh.syncCommandsLog.trace('removing root ' + objHash);
 
         let roots = this.rootObjects.get(gossip.gossipId);
         let rootStores = this.rootObjectStores.get(gossip.gossipId);
@@ -493,6 +521,8 @@ class Mesh {
 
         let hash = obj.hash();
 
+        Mesh.syncCommandsLog.trace('adding full object sync for  ' + hash + '(a ' + obj.getClassName() + ')');
+
         let dependencies = this.allDependencyClosures.get(gossipId);
 
         if (dependencies === undefined) {
@@ -531,12 +561,15 @@ class Mesh {
             
             for (const [thash, target] of targets.entries()) {
 
+                Mesh.syncCommandsLog.trace('adding sync of subobject ' + thash + ' (a ' + target.getClassName() + ') of ' + hash);
+
                 this.addSingleObjectSync(gossip, thash, target);
                 
                 dependencies.add(root, thash);
                 rootAncestors.add(thash, root);
 
                 if (mode === SyncMode.recursive) {
+                    Mesh.syncCommandsLog.trace('tracking ops for ' + thash + ' (a ' + target.getClassName() + ')');
                     this.watchForNewOps(gossip, target);
                     this.trackOps(gossip, target, root);
                 }
@@ -659,7 +692,6 @@ class Mesh {
                                 }
                             }
                         }
-                        
                 }
             };
 

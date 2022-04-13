@@ -21,12 +21,22 @@ class LinkupAddress {
             url = url.substring(0, url.length-1);
         }
 
-        let urlParts = url.split('/');
-        let linkupId = urlParts.pop();
-        urlParts.push('');
-        let serverUrl = urlParts.join('/');
+        let protoParts = url.split('://');
 
-        return new LinkupAddress(serverUrl, linkupId as string);
+        let proto = '';
+
+        if (protoParts.length > 1) {
+            proto = protoParts.shift() as string + '://';
+        }
+
+        url = protoParts.join('://');
+
+        let urlParts = url.split('/');
+        let serverUrl = urlParts.shift() as string;
+        //urlParts.push('');
+        let linkupId = urlParts.join('/');
+
+        return new LinkupAddress(proto + serverUrl, linkupId as string);
     }
 
 }

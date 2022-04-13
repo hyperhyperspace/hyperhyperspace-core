@@ -117,12 +117,12 @@ class MembershipAttestationOp<T> extends MutationOp {
         }
 
         if (!addOp.getTargetObject().equals(this.getTargetObject())) {
-            console.log('addOp for MembershipAttestationOp ' + this.hash() + ' has a different target')
+            CausalSet.validationLog.debug('addOp for MembershipAttestationOp ' + this.hash() + ' has a different target')
             return false;
         }
 
         if (this.targetOpNonCausalHash === undefined) {
-            console.log('targetOpNonCausalHash is missing for MembershipAttestationOp ' + this.hash());
+            CausalSet.validationLog.debug('targetOpNonCausalHash is missing for MembershipAttestationOp ' + this.hash());
             return false;
         }
 

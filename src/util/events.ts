@@ -1,3 +1,5 @@
+import { Logger } from 'util/logging';
+
 type hash = string;
 type hashable = { hash(): hash; };
 
@@ -22,6 +24,8 @@ interface EventFilter<T extends hashable> {
 type Observer<T extends hashable> = { filter?: EventFilter<T>, callback: EventCallback<T> };
 
 class EventRelay<T extends hashable> {
+    
+    static logger = new Logger('event-relay');
 
     emitter: T;
     emitterHash: hash;
@@ -55,9 +59,11 @@ class EventRelay<T extends hashable> {
 
     addUpstreamRelay(name: string, upstream: EventRelay<T>) {
 
+        EventRelay.logger.debug('adding upsteram ' + name + ' (' + upstream.emitterHash + ') to ' + this.emitterHash);
+
         if (!this.wouldCreateACycle(upstream.emitterHash)) {
-            
-            this.upstreamRelays.set(name, [upstream, { callback: (upstreamEv: Event<T>) => {
+
+            const observer = { callback: (upstreamEv: Event<T>) => {
 
                 const upstreamEmitters = upstreamEv.path === undefined? [] : Array.from(upstreamEv.path)
 
@@ -70,9 +76,17 @@ class EventRelay<T extends hashable> {
                     data: upstreamEv.data                
                 };
 
+                EventRelay.logger.debug('upstream from ' + this.emitterHash + ' name: ' + name);
+
                 this.emit(ev);
 
-            }}]);
+            }};
+            
+            this.upstreamRelays.set(name, [upstream, observer]);
+
+            upstream.addObserver(observer);
+        } else {
+            EventRelay.logger.debug('ooops.... cycle detected!');
         }
     }
 
@@ -101,9 +115,17 @@ class EventRelay<T extends hashable> {
     }
 
     emit(ev: Event<T>) {
+ 
+        EventRelay.logger.debug('emitting from ' + this.emitterHash);
+        EventRelay.logger.trace(ev);
+        EventRelay.logger.trace('got ' + this.observers.size + ' observers');
+
         for (const obs of this.observers) {
             if (obs.filter === undefined || obs.filter.accept(ev)) {
+
                 obs.callback(ev);
+            } else {
+                EventRelay.logger.trace('failed filter!');
             }
         }
     }

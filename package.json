@@ -38,8 +38,8 @@
     "typescript": "4.4.4"
   },
   "dependencies": {
-
     "broadcast-channel": "^3.5.3",
+    "buffer": "^6.0.3",
     "chacha-js": "^2.1.1",
     "chacha20-universal": "^1.0.4",
     "fast-text-encoding": "^1.0.3",

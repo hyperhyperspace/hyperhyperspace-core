@@ -111,6 +111,11 @@ class RefUpdateOp<T> extends MutationOp {
             this.value = value;
             this.sequence = sequence === undefined? 0 : sequence + 1;
             this.timestamp = Timestamps.uniqueTimestamp();
+            
+            const author = target.getAuthor();
+            if (author !== undefined) {
+                this.setAuthor(author);
+            }
         }
         
     }

@@ -2,7 +2,7 @@ import { RNGImpl } from 'crypto/random';
 import { PeerGroupAgent } from 'mesh/agents/peer';
 import { TestPeerGroupPods } from '../mock/TestPeerGroupPods';
 import { describeProxy } from 'config';
-import { Logger, LogLevel } from 'util/logging';
+//import { Logger, LogLevel } from 'util/logging';
 
 describeProxy('[PGM] Peer group management', () => {
     test('[PGM01] 2-peer group set up (wrtc)', async (done) => {
@@ -52,6 +52,12 @@ describeProxy('[PGM] Peer group management', () => {
         await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery');
 
     }, 400000);
+
+    test('[PGM09] 4-peer group clique set up (wrtc) with peer discovery and a shared secret', async (done) => {
+
+        await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery-secret');
+
+    }, 400000);
 });
 
 async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number) {
@@ -87,14 +93,15 @@ async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' =
     done();
 }
 
-async function fourPeerCliqueGroupTest(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number) {
+async function fourPeerCliqueGroupTest(done: () => void, network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'linkup-discovery-secret'|'no-discovery', basePort?: number) {
 
     let peerGroupId = new RNGImpl().randomHexString(64);
     let pods = await TestPeerGroupPods.generate(peerGroupId, 4, 4, 3, network, discovery, basePort);
 
     let control0 = pods[0].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerGroupId)) as PeerGroupAgent;
 
-    control0.controlLog = new Logger('mesh-debug', LogLevel.INFO);
+    //control0.controlLog = new Logger('mesh-debug-control', LogLevel.TRACE);
+    //control0.peersLog   = new Logger('mesh-debug-peers', LogLevel.TRACE);
 
     let checks = 0;
     let stats = control0.getStats();

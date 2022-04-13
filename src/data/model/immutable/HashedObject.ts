@@ -16,7 +16,7 @@ import { Mesh } from 'mesh/service';
 import { Resources } from 'spaces/spaces';
 
 import { Literal, Dependency } from '../literals/LiteralUtils';
-import { Logger } from 'util/logging';
+import { Logger, LogLevel } from 'util/logging';
 import { ClassRegistry } from '../literals/ClassRegistry';
 import { EventRelay } from 'util/events';
 
@@ -42,7 +42,7 @@ abstract class HashedObject {
         ClassRegistry.register(name, clazz);
     }
     
-    static validationLog = new Logger('validation');
+    static validationLog = new Logger('validation', LogLevel.DEBUG);
 
     private id?     : string;
     private author? : Identity;
@@ -252,12 +252,24 @@ abstract class HashedObject {
         return Hashing.forValue('#' + this.getId() + '.' + fieldName);
     }
 
-    setResources(resources: Resources) : void {
+    setResources(resources: Resources): void {
         this._resources = resources;
+
+        for (const [_path, subobj] of this.getSubObjects()) {
+            subobj._resources = resources;
+        }
     }
 
     getResources(): Resources | undefined {
         return this._resources;
+    }
+
+    forgetResources(): void {
+        this._resources = undefined;
+
+        for (const [_path, subobj] of this.getSubObjects()) {
+            subobj._resources = undefined;
+        }
     }
 
     getMutationEventSource(context?: Context): EventRelay<HashedObject> {
@@ -888,9 +900,9 @@ abstract class HashedObject {
         return result;
     }
 
-    async loadAllChanges() {
+    async loadAllChanges(loadBatchSize=128) {
         for (const [_path, obj] of this.getDirectSubObjects().entries()) {
-            await obj.loadAllChanges();
+            await obj.loadAllChanges(loadBatchSize);
         }
     }
 

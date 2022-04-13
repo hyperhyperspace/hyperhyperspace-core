@@ -51,7 +51,9 @@ class IdentityPeer implements Peer {
         const address = LinkupAddress.fromURL(ep);
         this.linkupServer = address.serverURL;
         const parts = address.linkupId.split('/');
+
         this.identityHash = Hashing.fromHex(parts.shift() as string);
+
         this.info = parts.length > 0? parts.join('/') : undefined;
 
         if (store !== undefined) {

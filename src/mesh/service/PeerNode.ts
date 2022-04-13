@@ -29,7 +29,7 @@ class PeerNode {
 
     }
 
-    async broadcast(obj: HashedObject, linkupServers?: Array<string>, localEndpoints?: Array<string>): Promise<void> {
+    async broadcast(obj: HashedObject, linkupServers?: Array<string>, localEndpoints?: Array<string>, broadcastedSuffixBits?: number): Promise<void> {
 
         if (linkupServers === undefined) {
             linkupServers = this.resources.config.linkupServers;
@@ -39,7 +39,7 @@ class PeerNode {
             localEndpoints = this.resources.getPeersForDiscovery().map((pi:PeerInfo) => pi.endpoint);
         }
 
-        const token = this.resources.mesh.startObjectBroadcast(obj, linkupServers, localEndpoints);
+        const token = this.resources.mesh.startObjectBroadcast(obj, linkupServers, localEndpoints, broadcastedSuffixBits);
 
         this.broadcastTokens.set(obj.getLastHash(), token);
     }

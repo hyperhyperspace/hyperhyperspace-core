@@ -99,7 +99,12 @@ class Store {
         // and hence saveWithContext didn't visit all subobjects setting hashes and stores.
         for (const [ctxHash, ctxObject] of context.objects.entries()) {
             ctxObject.setLastHash(ctxHash);
-            ctxObject.setStore(this);
+            if (this.resources === undefined) {
+                ctxObject.setStore(this);
+            } else {
+                ctxObject.setResources(this.resources);
+            }
+            
         }
 
         if (flushMutations) {

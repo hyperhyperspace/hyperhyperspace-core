@@ -1,5 +1,8 @@
 //import { WebRTCConnection } from './sync/transport';
 
+if ((globalThis as any).Buffer === undefined) {
+    (globalThis as any).Buffer = require('buffer/').Buffer;
+}
 
 export * from './data/identity';
 export * from './data/model';
@@ -16,6 +19,7 @@ export * from './crypto/random';
 export * from './crypto/hmac';
 export * from './crypto/wordcoding';
 export * from './crypto/sign';
+export * from './crypto/keygen';
 
 export * from './net/linkup';
 export * from './net/transport';

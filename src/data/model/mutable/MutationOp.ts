@@ -54,7 +54,6 @@ abstract class MutationOp extends HashedObject {
                 return false
             } else if (! ((prevOp as MutationOp).targetObject as MutableObject).equals(this.targetObject)) { 
                 MutationOp.validationLog.debug('a prevOp for ' + this.hash() + ' points to another object: ' + prevOp.targetObject?.hash());
-                console.log('offending is of type ' + prevOp.getClassName());
                 return false;
             }
         }

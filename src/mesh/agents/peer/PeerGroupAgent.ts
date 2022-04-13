@@ -156,6 +156,7 @@ class PeerGroupAgent implements Agent {
     stats: CumulativeStats;
 
     controlLog = PeerGroupAgent.controlLog;
+    peersLog = PeerGroupAgent.peersLog;
 
     constructor(peerGroupId: string, localPeer: PeerInfo, peerSource: PeerSource, params?: Partial<Params>) {
         this.peerGroupId = peerGroupId;
@@ -378,7 +379,7 @@ class PeerGroupAgent implements Agent {
 
     private async queryForOnlinePeers() {
 
-        PeerGroupAgent.peersLog.trace("Considering querying for peers on " + this.peerGroupId);
+        this.peersLog.trace("Considering querying for peers on " + this.peerGroupId);
 
         if (this.connectionsPerEndpoint.size < this.params.minPeers) {
             let candidates = await this.peerSource.getPeers(this.params.minPeers * 5);
@@ -386,7 +387,8 @@ class PeerGroupAgent implements Agent {
             let fallbackEndpoints = new Array<Endpoint>();
             const now = Date.now();
 
-            PeerGroupAgent.peersLog.debug('Looking for peers, got ' + candidates.length + ' candidates');
+            this.peersLog.debug('Looking for peers, got ' + candidates.length + ' candidates');
+            this.peersLog.trace(candidates.map((k: PeerInfo) => k.endpoint + '--> ' + k.identityHash ));
 
             for (const candidate of candidates) {
 
@@ -435,7 +437,7 @@ class PeerGroupAgent implements Agent {
             }
 
             if (endpoints.length > 0) {
-                PeerGroupAgent.peersLog.debug('Querying for online endpoints: '  + endpoints);
+                this.peersLog.debug('Querying for online endpoints: '  + endpoints);
 
                 this.getNetworkAgent().queryForListeningAddresses(
                                     LinkupAddress.fromURL(this.localPeer.endpoint), 
@@ -444,7 +446,7 @@ class PeerGroupAgent implements Agent {
 
             
         } else {
-            PeerGroupAgent.peersLog.trace('Skipping querying for peers on ' + this.peerGroupId);
+            this.peersLog.trace('Skipping querying for peers on ' + this.peerGroupId);
         }
     }
 
