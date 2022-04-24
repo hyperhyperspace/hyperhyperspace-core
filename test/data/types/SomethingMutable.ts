@@ -1,4 +1,5 @@
 import { MutableObject, MutationOp, Hash, HashedObject } from 'data/model';
+import { MultiMap } from 'util/multimap';
 
 class SomethingMutable extends MutableObject {
 
@@ -30,6 +31,14 @@ class SomethingMutable extends MutableObject {
     async mutate(_op: MutationOp): Promise<boolean> {
         this._operations.set(_op.hash(), _op);
         return true;
+    }
+
+    getMutableContents(): MultiMap<Hash, HashedObject> {
+        return new MultiMap();
+    }
+
+    getMutableContentByHash(): Set<HashedObject> {
+        return new Set();
     }
 
     getOperations() : Set<MutationOp>{

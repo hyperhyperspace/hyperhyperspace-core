@@ -232,7 +232,7 @@ async function testMutationOpAutoLoad(store: Store) {
 
     let sm2 = await store.load(hash) as SomethingMutable;
 
-    sm2.watchForChanges(true);
+    sm2.watchForChanges();
 
     await sm.testOperation('hello');
     await sm.testOperation('world');

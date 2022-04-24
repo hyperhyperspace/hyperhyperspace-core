@@ -45,6 +45,10 @@ class HashedSet<T> {
         return this.hashedElements.values();
     }
 
+    entries() : IterableIterator<[Hash, T]> {
+        return this.hashedElements.entries();
+    }
+
     toArrays() : {hashes: string[], elements: T[]} {
         let hashes = Array.from(this.hashedElements.keys());
         hashes.sort();

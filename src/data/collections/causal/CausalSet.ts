@@ -141,14 +141,19 @@ abstract class CausalSet<T> extends MutableObject {
 
     acceptedTypes?: HashedSet<string>;
     acceptedElementHashes?: HashedSet<Hash>;
-    
-    _allElements: Map<Hash, T>;
 
+    // valid: all additions and deletions that have NOT been invalidated.
+    _validAddOpsPerElmt     : MultiMap<Hash, Hash>;
+    _validDeleteOpsPerAddOp : MultiMap<Hash, Hash>;
+
+
+    // current: all valid additions that have no valid deletions (i.e. the actual set members!)
     _currentAddOps        : Map<Hash, AddOp<T>>;
     _currentAddOpsPerElmt : MultiMap<Hash, Hash>;
 
-    _validAddOpsPerElmt     : MultiMap<Hash, Hash>;
-    _validDeleteOpsPerAddOp : MultiMap<Hash, Hash>;
+    // the actual elements (incl. the delted ones! deletions may be undone)
+    _allElements: Map<Hash, T>;
+
 
     constructor(acceptedTypes?: Array<string>, acceptedElements?: Array<any>) {
         super(CausalSet.opClasses, true);
@@ -168,14 +173,21 @@ abstract class CausalSet<T> extends MutableObject {
         
         this._allElements = new Map();
 
+        // valid: all additions and deletions that have NOT been invalidated.
+        this._validAddOpsPerElmt     = new MultiMap();
+        this._validDeleteOpsPerAddOp = new MultiMap();
+
         this._currentAddOps        = new Map();
         this._currentAddOpsPerElmt = new MultiMap();
 
-        this._validAddOpsPerElmt     = new MultiMap();
-        this._validDeleteOpsPerAddOp = new MultiMap();
+        
     }
 
     protected async add(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+
+        if (!(elmt instanceof HashedObject) && !HashedObject.isLiteral(elmt)) {
+            throw new Error('CausalSets can contain either a class deriving from HashedObject or a pure literal (a constant, without any HashedObjects within).');
+        }
         
         const addOp = new AddOp(this, elmt);
 
@@ -419,6 +431,35 @@ abstract class CausalSet<T> extends MutableObject {
 
     init(): void {
         
+    }
+
+    getMutableContents(): MultiMap<Hash, HashedObject> {
+        const contents = new MultiMap<Hash, HashedObject>();
+
+        for (const hash of this._currentAddOpsPerElmt.keys()) {
+            const elmt = this._allElements.get(hash);
+
+            if (elmt instanceof HashedObject) {
+                contents.add(hash, elmt);
+            }
+        }
+
+        return contents;
+    }
+
+    getMutableContentByHash(hash: Hash): Set<HashedObject> {
+
+        const found = new Set<HashedObject>();
+        
+        if (this._validAddOpsPerElmt.hasKey(hash)) {
+            const elmt = this._allElements.get(hash);
+
+            if (elmt instanceof HashedObject) {
+                found.add(elmt);
+            }    
+        }
+
+        return found;
     }
 
     protected createAddAuthorizer(elmt: T, _author?: Identity): Authorizer {

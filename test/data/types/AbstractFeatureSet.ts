@@ -299,6 +299,14 @@ abstract class AbstractFeatureSet extends MutableObject {
         return true;
     }
 
+    getMutableContents(): MultiMap<Hash, HashedObject> {
+        return new MultiMap();
+    }
+
+    getMutableContentByHash(): Set<HashedObject> {
+        return new Set();
+    }
+
     getFeatureNames() {
         if (this.featureNames === undefined) {
             throw new Error('FeatureSet ' + this.hash() + ' is missing its set of feature names.');

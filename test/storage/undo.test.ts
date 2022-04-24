@@ -183,7 +183,7 @@ async function testBasicUndoCycle(store: Store) {
     await permissions.addUser(temporaryUserId, adminId);
     await store.save(permissions);
 
-    permissions.watchForChanges(true);
+    permissions.watchForChanges();
 
     expect(permissions.isUser(userId)).toBeTruthy();
     expect(permissions.isUser(temporaryUserId)).toBeTruthy();
@@ -356,13 +356,13 @@ async function testMultiObjectUndoCascade(store: Store) {
     const permissionsClone = await store.load(permissions.hash()) as PermissionTest;
     await permissionsClone.loadAllChanges();
 
-    permissions.watchForChanges(true);
+    permissions.watchForChanges();
 
     const features = new PermissionedFeatureSet(permissions);
 
     await store.save(features);
 
-    features.watchForChanges(true);
+    features.watchForChanges();
 
     const useFeatureOpFail = features.useFeatureIfEnabled('anon-read', 'sample-usage-key');
 
@@ -452,7 +452,7 @@ async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
     // for setting features later
     await remoteStore.save(adminKeyPair);
 
-    permissions.watchForChanges(true);
+    permissions.watchForChanges();
 
     const features = new PermissionedFeatureSet(permissions);
 
@@ -462,7 +462,7 @@ async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
 
     await localStore.save(features);
 
-    features.watchForChanges(true);
+    features.watchForChanges();
 
     // set up sync in pods
 
@@ -497,7 +497,7 @@ async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
     
     i = 0;
     while (i<100 && featuresClone === undefined) {
-        featuresClone  = await remoteStore.load(features.hash()) as PermissionedFeatureSet|undefined;
+        featuresClone  = await remoteStore.load(features.hash(), false) as PermissionedFeatureSet|undefined;
         await new Promise(r => setTimeout(r, 50));
         i = i + 1;
     }
@@ -589,7 +589,7 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     // for setting features later
     await remoteStore.save(adminKeyPair);
 
-    messages.config?.authorized?.watchForChanges(true);
+    messages.config?.authorized?.watchForChanges();
 
     await localStore.save(messages);
 
@@ -598,7 +598,7 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
     await localStore.save(messages.config as FeatureSet);
 
 
-    messages.config?.watchForChanges(true);
+    messages.config?.watchForChanges();
 
     // set up sync in pods
 

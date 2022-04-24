@@ -15,9 +15,17 @@ import { CascadedInvalidateOp } from '../causal/CascadedInvalidateOp';
 import { OpHeader } from '../../history/OpHeader';
 
 import { MutationOp } from './MutationOp';
+import { EventRelay, Observer } from 'util/events';
+import { MutationEvent } from 'data/model';
 
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
+
+enum MutableContentEvents {
+    AddObject    = 'add-object',
+    RemoveObject = 'remove-object'
+};
+
 
 abstract class MutableObject extends HashedObject {
 
@@ -26,7 +34,7 @@ abstract class MutableObject extends HashedObject {
 
     readonly _acceptedMutationOpClasses : Array<string>;
 
-    private _boundToStore : boolean;
+    
 
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
@@ -43,6 +51,8 @@ abstract class MutableObject extends HashedObject {
     // If anyone using this mutable object needs to be notified whenever it changes,
     // an external mutation callback should be registered below.
     _externalMutationCallbacks : Set<(mut: MutationOp) => void>;
+
+    _cascadeMutableContentObserver : Observer<HashedObject>;
 
     constructor(acceptedOpClasses : Array<string>, supportsUndo=false) {
         super();
@@ -70,6 +80,22 @@ abstract class MutableObject extends HashedObject {
         };
 
         this._externalMutationCallbacks = new Set();
+
+        this._cascadeMutableContentObserver = (ev: MutationEvent) => {
+
+            if (ev.emitter === this) {
+
+                if (this.isCascadingMutableContentEvents()) {
+                    if (ev.action === MutableContentEvents.AddObject) {
+                        MutableObject.addEventRelayForElmt(this._mutationEventSource, ev.data.hash(), ev.data);
+                    } else if (ev.action === MutableContentEvents.RemoveObject) {
+                        MutableObject.removeEventRelayForElmt(this._mutationEventSource, ev.data.hash(), ev.data);
+                    }
+                }
+
+            }
+
+        }
     }
 
     supportsUndo() {
@@ -77,6 +103,8 @@ abstract class MutableObject extends HashedObject {
     }
 
     abstract mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean>;
+    abstract getMutableContents(): MultiMap<Hash, HashedObject>;
+    abstract getMutableContentByHash(hash: Hash): Set<HashedObject>;
 
     /*
     // override if appropiate
@@ -101,18 +129,28 @@ abstract class MutableObject extends HashedObject {
         this._externalMutationCallbacks.delete(cb);
     }
 
-    watchForChanges(auto: boolean): boolean {
+    toggleWatchForChanges(auto: boolean): boolean {
+
+        const before = super.toggleWatchForChanges(auto);
+
         if (auto) {
             this.bindToStore();
         } else {
             this.unbindFromStore();
         }
 
-        return this._boundToStore;
+        return before;
     }
 
-    isWatchingForChanges(): boolean {
-        return this._boundToStore;
+    private bindToStore() {
+        // NOTE: watchReferences is idempotent
+        this.getStore().watchReferences('targetObject', this.getLastHash(), this._opCallback);
+        this._boundToStore = true;
+    }
+
+    private unbindFromStore() {
+        this.getStore().removeReferencesWatch('targetObject', this.getLastHash(), this._opCallback);
+        this._boundToStore = false;
     }
 
     // getOpHeader will correclty ge the headers for ops that are still unsaved too
@@ -174,17 +212,6 @@ abstract class MutableObject extends HashedObject {
 
     }
 
-    private bindToStore() {
-        // NOTE: watchReferences is idempotent
-        this.getStore().watchReferences('targetObject', this.getLastHash(), this._opCallback);
-        this._boundToStore = true;
-    }
-
-    private unbindFromStore() {
-        this.getStore().removeReferencesWatch('targetObject', this.getLastHash(), this._opCallback);
-        this._boundToStore = false;
-    }
-
     // TODO: if this object is bound to the store while the load takes place, we could take measures
     //       to try to avoid loading objects twice if they arrive while the load takes place.
     //       As it is now, the implementation should prepare for the event of an op being loaded twice.
@@ -242,7 +269,8 @@ abstract class MutableObject extends HashedObject {
     }
 
     async loadAndWatchForChanges(loadBatchSize=128) {
-        this.watchForChanges(true);
+
+        await super.loadAndWatchForChanges(loadBatchSize);
         await this.loadAllChanges(loadBatchSize);
     }
 
@@ -558,6 +586,75 @@ abstract class MutableObject extends HashedObject {
         return this.isAcceptedMutationOpClass(op);
     }
 
+    toggleCascadeMutableContentEvents(enabled: boolean): boolean {
+        const before = super.toggleCascadeMutableContentEvents(enabled);
+
+        this.updateCascadeMutableContentRelays(this._mutationEventSource);
+
+        return before;
+    }
+
+    protected createMutationEventSource(): EventRelay<HashedObject> {
+
+        const ownMutationEventSource = super.createMutationEventSource();
+
+        this.updateCascadeMutableContentRelays(ownMutationEventSource);
+
+        return ownMutationEventSource;
+
+    }
+
+    private updateCascadeMutableContentRelays(ownMutationEventSource?: EventRelay<HashedObject>) {
+
+        if (ownMutationEventSource !== undefined) {
+
+            if (this.isCascadingMutableContentEvents()) {
+                ownMutationEventSource.addObserver(this._cascadeMutableContentObserver);
+
+                this.addEventRelaysForContents(ownMutationEventSource);
+            } else {
+                ownMutationEventSource.removeObserver(this._cascadeMutableContentObserver);
+
+                this.removeEventRelaysForContents(ownMutationEventSource);
+            }
+        }
+    }
+
+    private static addEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
+        if (own !== undefined && elmt instanceof HashedObject) {
+            own.addUpstreamRelay('contents[' + hash + ']', elmt.getMutationEventSource())
+            console.log('adding event relay for contents[' + hash + '] on ' + hash);
+        }
+    }
+
+    private static removeEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
+        if (own !== undefined && elmt instanceof HashedObject) {
+            own.removeUpstreamRelay('contents[' + hash + ']');
+        }
+    }
+
+    private addEventRelaysForContents(own: EventRelay<HashedObject>|undefined) {
+
+        if (own !== undefined) {
+            for (const [hash, aliases] of this.getMutableContents().entries()) {
+                for (const elmt of aliases) {
+                    MutableObject.addEventRelayForElmt(own, hash, elmt);
+                }
+            }    
+        }
+    }
+
+    private removeEventRelaysForContents(own: EventRelay<HashedObject>|undefined) {
+
+        if (own !== undefined) {
+            for (const [hash, aliases] of this.getMutableContents().entries()) {
+                for (const elmt of aliases) {
+                    MutableObject.addEventRelayForElmt(own, hash, elmt);
+                }
+            }    
+        }
+    }
+
     createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {
         return new HeaderBasedSyncAgent(peerGroupAgent, this, this.getResources() as Resources, this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
         //return new TerminalOpsSyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
@@ -571,6 +668,26 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses;
     }
 
+    setResources(resources: Resources): void {
+        super.setResources(resources);
+
+        for (const aliases of this.getMutableContents().values()) {
+            for (const obj of aliases) {
+                obj.setResources(resources);
+            }
+        }
+
+    }
+
+    forgetResources(): void {
+        super.forgetResources();
+
+        for (const aliases of this.getMutableContents().values()) {
+            for (const obj of aliases) {
+                obj.forgetResources();
+            }
+        }
+    }
 }
 
-export { MutableObject }
+export { MutableObject, MutableContentEvents }

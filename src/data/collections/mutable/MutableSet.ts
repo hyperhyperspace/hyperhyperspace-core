@@ -1,4 +1,4 @@
-import { MutableObject } from '../../model/mutable/MutableObject';
+import { MutableContentEvents, MutableObject } from '../../model/mutable/MutableObject';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Hash } from '../../model/hashing/Hashing';
 import { MutationOp } from 'data/model/mutable/MutationOp';
@@ -6,12 +6,16 @@ import { HashedSet } from 'data/model/immutable/HashedSet';
 import { HashReference } from 'data/model/immutable/HashReference';
 import { Types } from '../Types';
 import { Logger, LogLevel } from 'util/logging';
-import { EventRelay } from 'util/events';
-import { Context } from 'data/model';
+import { MultiMap } from 'util/multimap';
 
 type ElmtHash = Hash;
 
 // a simple mutable set with a single writer
+
+enum MutableSetEvents {
+    Add    = 'add',
+    Delete = 'delete'
+}
 
 abstract class MutableSetOp<T> extends MutationOp {
 
@@ -233,6 +237,13 @@ class MutableSet<T> extends MutableObject {
     }
 
     async add(element: T) {
+
+        if (!(element instanceof HashedObject)) {
+            if (!HashedObject.isLiteral(element)) {
+                throw new Error('MutableSets can contain either a class deriving from HashedObject or a pure literal (a constant, without any HashedObjects within).');
+            }
+        }
+
         let op = new AddOp(this, element);
         await this.applyNewOp(op);
     }
@@ -273,6 +284,10 @@ class MutableSet<T> extends MutableObject {
         return this._elements.values();
     }
 
+    valueHashes() {
+        return this._elements.keys();
+    }
+
     mutate(op: MutationOp): Promise<boolean> {
 
         let mutated = false;
@@ -297,11 +312,15 @@ class MutableSet<T> extends MutableObject {
 
             current.add(addOp.createReference());
 
-            this._elements.set(hash, addOp.element as T)
+            
 
             if (mutated) {
-                this._mutationEventSource?.emit({emitter: this, action: 'add', data: addOp.element});
-                MutableSet.addEventRelayForElmt(this._mutationEventSource, hash, op.element);
+                this._elements.set(hash, addOp.element as T);
+                this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Add, data: addOp.element});
+                if (addOp.element instanceof HashedObject) {
+                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: addOp.element});
+                }
+                
                 /*if (this._addElementCallback !== undefined) {
                     try {
                         this._addElementCallback(addOp.element as T);
@@ -335,8 +354,10 @@ class MutableSet<T> extends MutableObject {
                     const deleted = this._elements.get(hash) as T;
                     this._elements.delete(hash);
                     this._currentAddOpRefs.delete(hash);
-                    this._mutationEventSource?.emit({emitter: this, action: 'delete', data: deleted});
-                    MutableSet.removeEventRelayForElmt(this._mutationEventSource, hash, deleted);
+                    this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Delete, data: deleted});
+                    if (deleted instanceof HashedObject) {
+                        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: deleted});
+                    }
                     /*if (this._deleteElementCallback !== undefined) {
                         try {
                             this._deleteElementCallback(deleted);
@@ -354,6 +375,31 @@ class MutableSet<T> extends MutableObject {
         return Promise.resolve(mutated);
     }
 
+    getMutableContents(): MultiMap<Hash, HashedObject> {
+        const contents = new MultiMap<Hash, HashedObject>();
+
+        for (const [hash, elmt] of this._elements) {
+            if (elmt instanceof HashedObject) {
+                contents.add(hash, elmt);
+            }
+        }
+
+        return contents;
+    }
+
+    getMutableContentByHash(hash: Hash): Set<HashedObject> {
+
+        const found = new Set<HashedObject>();
+
+        const elmt = this._elements.get(hash);
+
+        if (elmt instanceof HashedObject) {
+            found.add(elmt);
+        }
+
+        return found;
+    }
+
     /*onAddition(callback: (elem: T) => void) {
         this._addElementCallback = callback;
     }
@@ -365,31 +411,6 @@ class MutableSet<T> extends MutableObject {
     getClassName(): string {
         return MutableSet.className;
     }
-
-    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
-
-        const source = super.createMutationEventSource(context);
-
-        for (const [hash, elmt] of this._elements.entries()) {
-            MutableSet.addEventRelayForElmt(source, hash, elmt);
-        }
-
-        return source;
-
-    }
-
-    private static addEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
-        if (own !== undefined && elmt instanceof HashedObject) {
-            own.addUpstreamRelay('['+hash+']', elmt.getMutationEventSource())
-        }
-    }
-
-    private static removeEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
-        if (own !== undefined && elmt instanceof HashedObject) {
-            own.removeUpstreamRelay('['+hash+']');
-        }
-    }
-
 }
 
 DeleteOp.registerClass(DeleteOp.className, DeleteOp);
@@ -397,4 +418,4 @@ AddOp.registerClass(AddOp.className, AddOp);
 MutableSet.registerClass(MutableSet.className, MutableSet);
 
 
-export { MutableSet, AddOp as MutableSetAddOp, DeleteOp as MutableSetDeleteOp };
+export { MutableSet, AddOp as MutableSetAddOp, DeleteOp as MutableSetDeleteOp, MutableSetEvents };

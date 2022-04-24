@@ -1,5 +1,5 @@
 import { HashedObject } from 'data/model';
-import { Observer, Event, EventFilter, location } from 'util/events';
+import { Observer, Event, location } from 'util/events';
 
 type MutatedField    = location<HashedObject>
 type MutatedPath     = MutatedField[];
@@ -184,7 +184,7 @@ type MutationEventFilterParameters = {
     classNames?: string
 };
 
-class MutationEventFilter implements EventFilter<HashedObject> {
+class MutationEventFilter {
 
     mutatedPathFilter?: MutatedPathFilter;
     action?: string;
@@ -231,15 +231,23 @@ class MutationEventFilter implements EventFilter<HashedObject> {
 }
 
 class MutationEvents {
-    static getOriginEmitter<T extends HashedObject> (ev: MutationEvent): T {
 
-        let origin = ev.emitter;
+    // counting in hops from the origin emitter (idx==0 is the original one, -1 is the closest to it, etc.)
+    static getRelayEmitterByIdx<T extends HashedObject> (ev: MutationEvent, idx?: number): T|undefined {
 
-        if (ev.path !== undefined && ev.path.length > 0) {
-            origin = ev.path[0].emitter;
+        if (idx === undefined) {
+            return undefined;
         }
 
-        return origin as T;
+        if (idx === 0) {
+            return ev.emitter as T;
+        } else {
+            if (ev.path === undefined || ev.path.length < idx) {
+                return undefined;
+            } else {
+                return ev.path[ev.path.length - idx].emitter as T;
+            }
+        }
     }
 }
 

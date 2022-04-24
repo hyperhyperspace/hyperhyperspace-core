@@ -3,17 +3,19 @@ import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
 import { MutableObject } from '../../model';
 
-import {Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
+import { Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
 import { DedupMultiMap } from 'util/dedupmultimap';
 import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
 import { Types } from 'data/collections';
-import { EventRelay, location } from 'util/events';
-import { ClassRegistry, Context } from 'data/model/literals';
+import { location } from 'util/events';
+import { ClassRegistry } from 'data/model/literals';
+import { MutableContentEvents } from 'data/model/mutable/MutableObject';
+import { MultiMap } from 'util/multimap';
 
 // a simple mutable list with a single writer
 
-// can work with or without duplicates (in the latter, inserting an element already in the set has no)
+// can work with or without duplicates (in the latter, inserting an element already in the set has no effect)
 
 abstract class MutableArrayOp<T> extends MutationOp {
 
@@ -29,7 +31,7 @@ abstract class MutableArrayOp<T> extends MutationOp {
     }
 
     init(): void {
-        throw new Error('Method not implemented.');
+
     }
 
     async validate(references: Map<Hash, HashedObject>) {
@@ -217,7 +219,7 @@ class MutableArray<T> extends MutableObject {
     _ordinals : Array<Ordinal>;
 
     constructor(duplicates=true) {
-        super([InsertOp.className, DeleteOp.className]);
+        super(MutableArray.opClasses);
 
         this.duplicates = duplicates;
         this.setRandomId();
@@ -276,7 +278,7 @@ class MutableArray<T> extends MutableObject {
             // will "move" to there after the delete. Hence the size of the list will never decrease,
             // and from the outside it will look like the element was just repositioned.
 
-            if (oldInsertionOps !== undefined) {
+            if (oldInsertionOps !== undefined && oldInsertionOps.size > 0) {
                 const deleteOp = new DeleteOp(this, elementHash, oldInsertionOps.values());
                 await this.applyNewOp(deleteOp);
             }
@@ -339,6 +341,11 @@ class MutableArray<T> extends MutableObject {
         return Array.from(this._contents);
     }
 
+    contentHashes() {
+        this.rebuild();
+        return Array.from(this._hashes);
+    }
+
     lookup(idx: number) {
         this.rebuild();
         return this._contents[idx];
@@ -349,11 +356,14 @@ class MutableArray<T> extends MutableObject {
         return this._hashes[idx];
     }
 
-    indexOf(element: T) {
+    indexOf(element?: T) {
         return this.indexOfByHash(HashedObject.hashElement(element));
     }
 
-    indexOfByHash(hash: Hash) {
+    indexOfByHash(hash?: Hash) {
+        if (hash === undefined) {
+            return -1;
+        }
         this.rebuild();
         return this._hashes.indexOf(hash);
     }
@@ -395,27 +405,24 @@ class MutableArray<T> extends MutableObject {
             this._elementsPerOrdinal.add(ordinal, elementHash);
             this._ordinalsPerElement.add(elementHash, ordinal);
 
-            this._elements.set(elementHash, element);
-
             let wasNotBefore = false;
 
             if (this._currentInsertOpRefs.get(elementHash).size === 0) {
                 wasNotBefore = true;
+                this._elements.set(elementHash, element);
+                this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: element});
             }
 
             this._currentInsertOpRefs.add(elementHash, op.createReference());
             this._currentInsertOpOrds.set(opHash, ordinal);
 
+            this._needToRebuild = true;
+
             if (this.duplicates || wasNotBefore) {
                 this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element} as InsertEvent<T>);
-                if (wasNotBefore) {
-                    MutableArray.addEventRelayForElmt(this._mutationEventSource, elementHash, element);
-                }
             } else {
                 this._mutationEventSource?.emit({emitter: this, action: 'move', data: element} as MoveEvent<T>);
             }
-
-            this._needToRebuild = true;
 
         } else if (op instanceof DeleteOp) {
 
@@ -444,23 +451,24 @@ class MutableArray<T> extends MutableObject {
 
             let current = this._currentInsertOpRefs.get(elementHash);
 
-            const wasDeleted = current.size === 0; 
+            const wasDeleted = current.size === 0;
+
+            this._needToRebuild = true;
+
             if (wasDeleted) {
                 if (wasBefore) {
+                    this._elements.delete(elementHash);
                     const element = this._elements.get(elementHash);
-                    MutableArray.removeEventRelayForElmt(this._mutationEventSource, elementHash, element);
+                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: element});
                 }
 
-                this._elements.delete(elementHash);
+                
             }
 
             if ((this.duplicates && deletedOrdinal) || (!this.duplicates && wasBefore && wasDeleted)) {
                 this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash} as DeleteEvent<T>);
                 
             }
-                
-
-            this._needToRebuild = true;
 
         } else {
             throw new Error('Invalid op type for MutableArray:' + op?.getClassName());
@@ -502,6 +510,33 @@ class MutableArray<T> extends MutableObject {
         }
     }
 
+    getMutableContents(): MultiMap<Hash, HashedObject> {
+
+        const contents = new MultiMap<Hash, HashedObject>();
+
+        for (const [hash, elmt] of this._elements.entries()) {
+            if (elmt instanceof HashedObject) {
+                contents.add(hash, elmt);
+            }
+        }
+
+        return contents;
+    }
+
+    getMutableContentByHash(hash: Hash): Set<HashedObject> {
+
+        const found = new Set<HashedObject>();
+
+        const elmt = this._elements.get(hash);
+
+        if (elmt instanceof HashedObject) {
+            found.add(elmt);
+        }
+
+        return found;
+    }
+
+
     getClassName(): string {
         return MutableArray.className;
     }
@@ -513,31 +548,6 @@ class MutableArray<T> extends MutableObject {
         references;
         return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
     }
-
-    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
-
-        const source = super.createMutationEventSource(context);
-
-        for (const [hash, elmt] of this._elements.entries()) {
-            MutableArray.addEventRelayForElmt(source, hash, elmt);
-        }
-
-        return source;
-
-    }
-
-    private static addEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
-        if (own !== undefined && elmt instanceof HashedObject) {
-            own.addUpstreamRelay('['+hash+']', elmt.getMutationEventSource())
-        }
-    }
-
-    private static removeEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
-        if (own !== undefined && elmt instanceof HashedObject) {
-            own.removeUpstreamRelay('['+hash+']');
-        }
-    }
-
 
 }
 

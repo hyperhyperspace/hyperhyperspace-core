@@ -81,7 +81,7 @@ class Store {
     //                         as well. (All mutable dependencies are flushed if required - this
     //                         applies only to their mutation ops)
 
-    async save(object: HashedObject, flushMutations=true) : Promise<void> {
+    async save(object: HashedObject, saveMutations=true) : Promise<void> {
         let context = object.toContext();
         let hash    = context.rootHashes[0] as Hash;
 
@@ -107,7 +107,7 @@ class Store {
             
         }
 
-        if (flushMutations) {
+        if (saveMutations) {
 
             if (object instanceof MutableObject) {
                 let queuedOps = await object.saveQueuedOps(); // see (* note 1) above
@@ -157,7 +157,7 @@ class Store {
             let dep = context.literals.get(depHash);
 
             if (dep === undefined) {
-                let storedDep = await this.load(depHash);
+                let storedDep = await this.load(depHash, false);
 
                 if (storedDep === undefined) {
                     missing.add(depHash);
@@ -207,7 +207,7 @@ class Store {
 
         }
         
-        const loaded = await this.load(hash);
+        const loaded = await this.load(hash, false);
 
         if (loaded === undefined) { 
 
@@ -377,8 +377,8 @@ class Store {
         return this.backend.load(hash);
     }
     
-    async loadRef<T extends HashedObject>(ref: HashReference<T>) : Promise<T | undefined> {
-        let obj = await this.load(ref.hash);
+    async loadRef<T extends HashedObject>(ref: HashReference<T>, loadMutations=true) : Promise<T | undefined> {
+        let obj = await this.load(ref.hash, loadMutations);
 
         if (obj !== undefined && ref.className !== obj.getClassName()) {
             throw new Error('Error loading reference to ' + ref.className + ': object with hash ' + ref.hash + ' has class ' + obj.getClassName() + ' instead.');
@@ -387,13 +387,39 @@ class Store {
         return obj as T | undefined;
     }
 
-    async load(hash: Hash) : Promise<HashedObject | undefined> {
+    // convenience
+    async loadWithoutMutations(hash: Hash): Promise<HashedObject | undefined> {
+        return this.load(hash, false);
+    }
+
+    // convenience
+    async loadAndWatchForChanges(hash: Hash): Promise<HashedObject | undefined> {
+        return this.load(hash, true, true);
+    }
+
+    async load(hash: Hash, loadMutations=true, watchForChanges=false) : Promise<HashedObject | undefined> {
+
+        if (!loadMutations && watchForChanges) {
+            throw Error('Trying to load ' + hash + ' from the store, but loadMotations=false and watchForChanges=true. This combination does not make sense.');
+        }
 
         let context = new Context();
 
         context.resources = this.resources;
 
-        return this.loadWithContext(hash, context);
+        const object = await this.loadWithContext(hash, context);
+
+        if (loadMutations && object !== undefined) {
+
+            if (watchForChanges) {
+                object.watchForChanges();
+            }
+
+            await object.loadAllChanges();
+        }
+
+
+        return object;
     }
 
     private async loadWithContext(hash: Hash, context: Context) : Promise<HashedObject | undefined> {
@@ -568,7 +594,7 @@ class Store {
             pending.delete(value);
             closure.add(value);
 
-            let obj = await this.load(value) as HashedObject;
+            let obj = await this.load(value, false) as HashedObject;
             let children = next(obj);
 
             for (const hash of children.values()) {

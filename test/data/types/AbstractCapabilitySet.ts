@@ -189,6 +189,14 @@ abstract class AbstractCapabilitySet extends MutableObject {
         return mutated;
     }
 
+    getMutableContents(): MultiMap<Hash, HashedObject> {
+        return new MultiMap();
+    }
+
+    getMutableContentByHash(): Set<HashedObject> {
+        return new Set();
+    }
+
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
 

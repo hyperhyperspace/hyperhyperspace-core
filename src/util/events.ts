@@ -1,4 +1,18 @@
-import { Logger } from 'util/logging';
+import { Logger, LogLevel } from 'util/logging';
+
+/* EventRelays can emit events, and have other EventRelays upstream and downstream of them.
+ * 
+ * Users of event relays can attach observers, and emit events on EventRelays. Observers can
+ * accept or reject events. When an event is emitted, it is sent downstream until it is
+ * accepted. Observers accept an event by returning true. When an event reachs a relay, all
+ * its observers all invoked (even if some of them return true). When none do, the event is sent
+ * to all the downstream relays.
+ * 
+ * One relay is attached upstream of another through a 'location', a record that contains the
+ * emitter relay and a 'name' (a string). Thus as an event is relayed, a path of pairs
+ * (emitter, name) is formed.
+ */
+
 
 type hash = string;
 type hashable = { hash(): hash; };
@@ -13,25 +27,20 @@ type Event<T extends hashable> = {
     data: any;
 }
 
-type EventCallback<T extends hashable> = (ev: Event<T>) => void;
+type EventCallback<T extends hashable> = (ev: Event<T>) => boolean|void;
 
-
-interface EventFilter<T extends hashable> {
-
-    accept(ev: Event<T>): boolean;
-}
-
-type Observer<T extends hashable> = { filter?: EventFilter<T>, callback: EventCallback<T> };
+type Observer<T extends hashable> = EventCallback<T>;
 
 class EventRelay<T extends hashable> {
     
-    static logger = new Logger('event-relay');
+    static logger = new Logger('event-relay', LogLevel.INFO);
 
     emitter: T;
     emitterHash: hash;
     upstreamRelays: Map<string, [EventRelay<T>, Observer<T>]>;
 
     observers: Set<Observer<T>>;
+    donwstreamObservers: Set<Observer<T>>;
     
 
     constructor(source: T, upstreamRelays: Map<string, EventRelay<T>>) {
@@ -46,6 +55,7 @@ class EventRelay<T extends hashable> {
         }
 
         this.observers = new Set();
+        this.donwstreamObservers = new Set();
 
     }
 
@@ -57,13 +67,22 @@ class EventRelay<T extends hashable> {
         this.observers.delete(obs);
     }
 
+    addDownstreamObserver(obs: Observer<T>) {
+        this.donwstreamObservers.add(obs);
+    }
+
+    removeDownstreamObserver(obs: Observer<T>) {
+        this.donwstreamObservers.delete(obs);
+    }
+
     addUpstreamRelay(name: string, upstream: EventRelay<T>) {
 
-        EventRelay.logger.debug('adding upsteram ' + name + ' (' + upstream.emitterHash + ') to ' + this.emitterHash);
+        EventRelay.logger.debug('adding upstream ' + name + ' (' + upstream.emitterHash + ') to ' + this.emitterHash);
 
-        if (!this.wouldCreateACycle(upstream.emitterHash)) {
+        //if (!this.wouldCreateACycle(upstream.emitterHash)) {
+        if (!upstream.wouldCreateACycle(this.emitterHash)) {
 
-            const observer = { callback: (upstreamEv: Event<T>) => {
+            const observer = (upstreamEv: Event<T>) => {
 
                 const upstreamEmitters = upstreamEv.path === undefined? [] : Array.from(upstreamEv.path)
 
@@ -80,18 +99,32 @@ class EventRelay<T extends hashable> {
 
                 this.emit(ev);
 
-            }};
+                return false;
+
+            };
             
             this.upstreamRelays.set(name, [upstream, observer]);
 
-            upstream.addObserver(observer);
+            upstream.addDownstreamObserver(observer);
         } else {
-            EventRelay.logger.debug('ooops.... cycle detected!');
+            EventRelay.logger.debug('ooops.... cycle detected! skipping');
         }
     }
 
     removeUpstreamRelay(name: string) {
-        this.upstreamRelays.delete(name);
+
+        const existing = this.upstreamRelays.get(name);
+
+        if (existing !== undefined) {
+
+            const [upstream, observer] = existing;
+
+            upstream.removeDownstreamObserver(observer);
+
+            this.upstreamRelays.delete(name);
+        }
+
+        
     }
 
     hasUpstreamRelay(name: string) {
@@ -101,11 +134,13 @@ class EventRelay<T extends hashable> {
     private wouldCreateACycle(emitterHash: hash) {
 
         if (this.emitterHash === emitterHash) {
+            console.log('clash: ' + this.emitterHash);
             return true;
         }
 
-        for (const [source, _observer] of this.upstreamRelays.values()) {
-            if (source.wouldCreateACycle(emitterHash)) {
+        for (const [upstream, _observer] of this.upstreamRelays.values()) {
+            if (upstream.wouldCreateACycle(emitterHash)) {
+                console.log('clash path: ' + upstream.emitterHash);
                 return true;
             }
         }
@@ -117,18 +152,25 @@ class EventRelay<T extends hashable> {
     emit(ev: Event<T>) {
  
         EventRelay.logger.debug('emitting from ' + this.emitterHash);
-        EventRelay.logger.trace(ev);
+        EventRelay.logger.trace('event is:', ev);
         EventRelay.logger.trace('got ' + this.observers.size + ' observers');
 
-        for (const obs of this.observers) {
-            if (obs.filter === undefined || obs.filter.accept(ev)) {
+        let accepted = false;
 
-                obs.callback(ev);
-            } else {
-                EventRelay.logger.trace('failed filter!');
+        for (const obs of this.observers) {
+            const acceptedByObs = obs(ev);
+            accepted = accepted || (acceptedByObs !== undefined && acceptedByObs);
+        }
+
+        if (!accepted) {
+
+            EventRelay.logger.debug('not accepted, cascading...');
+
+            for (const obs of this.donwstreamObservers) {
+                obs(ev);
             }
         }
     }
 }
 
-export { Event, EventRelay, EventCallback, EventFilter, Observer, location, hashable }
+export { Event, EventRelay, EventCallback, Observer, location, hashable }

@@ -1,11 +1,11 @@
-import { MutableObject } from '../../model/mutable/MutableObject';
+import { MutableContentEvents, MutableObject } from '../../model/mutable/MutableObject';
 import { MutationOp } from '../../model/mutable/MutationOp';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
 import { Types } from '../Types';
 import { Hash } from 'data/model/hashing/Hashing';
-import { ClassRegistry, Context } from 'data/model';
-import { EventRelay } from 'util/events';
+import { ClassRegistry } from 'data/model';
+import { MultiMap } from 'util/multimap';
 
 class MutableReference<T> extends MutableObject {
 
@@ -28,6 +28,13 @@ class MutableReference<T> extends MutableObject {
     }
 
     async setValue(value: T) {
+
+        if (!(value instanceof HashedObject)) {
+            if (!HashedObject.isLiteral(value)) {
+                throw new Error('MutableReferences can contain either a class deriving from HashedObject or a pure literal (a constant, without any HashedObjects within).');
+            }
+        }
+
         let op = new RefUpdateOp<T>(this, value, this._sequence);
         await this.applyNewOp(op);
     }
@@ -53,21 +60,41 @@ class MutableReference<T> extends MutableObject {
 
                  this._mutationEventSource?.emit({emitter: this, action: 'update', data: refUpdateOp.getValue()});
 
-                 if (oldVal !== undefined && oldVal instanceof HashedObject) {
-                     this._mutationEventSource?.removeUpstreamRelay('[content]');
-                 }
-
-                 if (this._value instanceof HashedObject) {
-                    this._mutationEventSource?.addUpstreamRelay('[content]', this._value.getMutationEventSource());
-                 }
-                 
-
+                if (oldVal !== this._value) {
+                    if (oldVal instanceof HashedObject) {
+                        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: oldVal});
+                    }
+                    if (this._value instanceof HashedObject) {
+                        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: this._value});
+                    }
+                }
             }
         }
 
         return Promise.resolve(mutated);
     }
+
+    getMutableContents(): MultiMap<Hash, HashedObject> {
+        const contents = new MultiMap<Hash, HashedObject>();
+
+        if (this._value instanceof HashedObject) {
+            contents.add(this._value.hash(), this._value);
+        }
+
+        return contents;
+    }
     
+    getMutableContentByHash(hash: Hash): Set<HashedObject> {
+        
+        const found = new Set<HashedObject>();
+        
+        if (this._value instanceof HashedObject && this._value.hash() === hash) {
+            found.add(this._value);
+        }
+
+        return found;
+    }
+
     getClassName(): string {
         return MutableReference.className;
     }
@@ -80,18 +107,6 @@ class MutableReference<T> extends MutableObject {
         references;
 
         return Types.isTypeConstraint(this.typeConstraints);
-    }
-    
-    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
-
-        const source = super.createMutationEventSource(context);
-
-        if (this._value !== undefined && this._value instanceof HashedObject) {
-            source.addUpstreamRelay('[content]', this._value.getMutationEventSource());
-        }
-
-        return source;
-
     }
 }
 

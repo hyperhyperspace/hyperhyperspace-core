@@ -26,14 +26,12 @@ import { MutationObserver } from '../mutable';
 const BITS_FOR_ID = 128;
 
 /* HashedObject: Base class for objects than need to be storable in the
-                 Hyper Hyper Space global content-addressed database.
+                 Hyper Hyper Space content-addressed database.
 
  Defines how an object will be serialized, hashed, who it was authored by,
  whether it needs an id (randomized or derived from a parent object's id)
  and which objects should be preloaded when loading operations that mutate
  this object and its subobjects. */
-
-//let done = false;
 
 abstract class HashedObject {
 
@@ -53,10 +51,15 @@ abstract class HashedObject {
 
     private _resources? : Resources;
 
+    // while this object is immutable, its fields may be mutable, hence:
+    protected _boundToStore : boolean;
     protected _mutationEventSource?: EventRelay<HashedObject>;
+    protected _cascadeMutableContentEvents: boolean;
 
     constructor() {
         this._signOnSave = false;
+        this._boundToStore = false;
+        this._cascadeMutableContentEvents = true;
     } 
 
     abstract getClassName() : string;
@@ -255,8 +258,8 @@ abstract class HashedObject {
     setResources(resources: Resources): void {
         this._resources = resources;
 
-        for (const [_path, subobj] of this.getSubObjects()) {
-            subobj._resources = resources;
+        for (const subobj of this.getDirectSubObjects().values()) {
+            subobj.setResources(resources);
         }
     }
 
@@ -267,16 +270,16 @@ abstract class HashedObject {
     forgetResources(): void {
         this._resources = undefined;
 
-        for (const [_path, subobj] of this.getSubObjects()) {
-            subobj._resources = undefined;
+        for (const subobj of this.getDirectSubObjects().values()) {
+            subobj.forgetResources();
         }
     }
 
-    getMutationEventSource(context?: Context): EventRelay<HashedObject> {
+    getMutationEventSource(): EventRelay<HashedObject> {
 
         if (this._mutationEventSource === undefined) {
 
-            this._mutationEventSource = this.createMutationEventSource(context);
+            this._mutationEventSource = this.createMutationEventSource();
             
         }
 
@@ -284,15 +287,12 @@ abstract class HashedObject {
 
     }
 
-    protected createMutationEventSource(context?: Context): EventRelay<HashedObject> {
-        if (context === undefined) {
-            context = this.toContext();
-        }    
+    protected createMutationEventSource(): EventRelay<HashedObject> {
 
         const subObservers = new Map<string, EventRelay<HashedObject>>();
 
-        for (const [fieldName, subobj] of this.getDirectSubObjects(context)) {
-            subObservers.set(fieldName, subobj.getMutationEventSource(context));
+        for (const [fieldName, subobj] of this.getDirectSubObjects().entries()) {
+            subObservers.set(fieldName, subobj.getMutationEventSource());
         }
 
         return new EventRelay(this, subObservers);
@@ -304,6 +304,33 @@ abstract class HashedObject {
 
     removeMutationObserver(obs: MutationObserver) {
         this._mutationEventSource?.removeObserver(obs);
+    }
+
+    cascadeMutableContentEvents() {
+        return this.toggleCascadeMutableContentEvents(true);
+    }
+
+    dontCascadeMutableContentEvents() {
+        return this.toggleCascadeMutableContentEvents(false);
+    }
+
+    isCascadingMutableContentEvents() {
+        return this._cascadeMutableContentEvents;
+    }
+
+    toggleCascadeMutableContentEvents(enabled: boolean): boolean {
+
+        const before = this._cascadeMutableContentEvents;
+        
+        this._cascadeMutableContentEvents = enabled;
+
+        for (const subobj of this.getDirectSubObjects().values()) {
+            if (subobj instanceof HashedObject) {
+                subobj.toggleCascadeMutableContentEvents(enabled);
+            }
+        }
+
+        return before;
     }
 
     getSubObjects(context?: Context, direct=false): Map<string, HashedObject> {
@@ -363,9 +390,59 @@ abstract class HashedObject {
         return subobjs;
     }
 
-    getDirectSubObjects(context?: Context): Map<string, HashedObject> {
+    static collectDirectSubobjects(path: string, value: any, subobjects: Map<string, HashedObject>) {
 
-        return this.getSubObjects(context, true);
+        let typ = typeof(value);
+
+        // We're only concerned with 'object' typed stuff, since scalars, strings, etc. cannot yield
+        // any HashedObject-derived subobjects.
+
+        if (typ === 'object') {
+            if (value instanceof HashedObject) {
+                subobjects.set(path, value);
+            } else if (Array.isArray(value)) {
+                for (const [idx, elmt] of value.entries()) {
+                    HashedObject.collectDirectSubobjects(path + '[' + idx + ']', elmt, subobjects);
+                }
+            } else if (value instanceof HashedSet) {
+                for (const [hash, elmt] of value.entries()) {
+                    HashedObject.collectDirectSubobjects(path + '[' + hash + ']', elmt, subobjects);
+                }
+            } else if (value instanceof HashedMap) {
+                for (const [key, elmt] of value.entries()) {
+                    HashedObject.collectDirectSubobjects(path + '[' + key + ']', elmt, subobjects);
+                }
+            } else if (value instanceof HashReference) {
+                // do nothing
+            } else { // value is a plain object dictionary
+                for (const fieldName of Object.keys(value)) {
+
+                    let fieldValue = (value as any)[fieldName];
+
+                    const sep = fieldName.length > 0 && path.length > 0? '.' : '';
+                    const newPath = path + sep + fieldName;
+
+                    HashedObject.collectDirectSubobjects(newPath, fieldValue, subobjects);                    
+                }
+            }
+        }
+    }
+
+    getDirectSubObjects(): Map<string, HashedObject> {
+
+        //return this.getSubObjects(context, true);
+
+        const subobjects = new Map<string, HashedObject>();
+
+        for (const fieldName of Object.keys(this)) {
+            if (fieldName.length > 0 && fieldName[0] !== '_') {
+                let value = (this as any)[fieldName];
+
+                HashedObject.collectDirectSubobjects(fieldName, value, subobjects);
+            }
+        }
+
+        return subobjects;
 
         /*
         let literal: Literal;
@@ -506,13 +583,12 @@ abstract class HashedObject {
         } else if (typ === 'object') {
             if (Array.isArray(something)) {
                 value = [];
-                let index = 0;
+                
                 for (const elmt of something) {
                     if (HashedObject.shouldLiteralizeField(elmt)) {
                         let child = HashedObject.literalizeField('', elmt, context); // should we put the index into the path? but then we can't reuse this code for sets...
                         value.push(child.value);
                         HashedObject.collectChildDeps(dependencies, fieldPath, child.dependencies, true);
-                        index = index + 1;
                     }
                 }
             } else if (something instanceof HashedSet) {
@@ -887,25 +963,43 @@ abstract class HashedObject {
     // load / store
 
     async loadAndWatchForChanges(loadBatchSize=128): Promise<void> {
-        for (const [_path, obj] of this.getDirectSubObjects().entries()) {
+
+        this.watchForChanges();
+
+        for (const obj of this.getDirectSubObjects().values()) {
             await obj.loadAndWatchForChanges(loadBatchSize);
         }
     }
 
-    watchForChanges(auto: boolean): boolean {
-        let result = false;
-        for (const [_path, obj] of this.getDirectSubObjects().entries()) {
-                result = result || obj.watchForChanges(auto);
+    watchForChanges() {
+        return this.toggleWatchForChanges(true);
+    }
+
+    dontWatchForChanges() {
+        return this.toggleWatchForChanges(false);
+    }
+
+    toggleWatchForChanges(enabled: boolean): boolean {
+
+        const before = this._boundToStore;
+
+        this._boundToStore = enabled;
+
+        for (const obj of this.getDirectSubObjects().values()) {
+            obj.toggleWatchForChanges(enabled);
         }
-        return result;
+        return before;
+    }
+
+    isWatchingForChanges(): boolean {
+        return this._boundToStore;
     }
 
     async loadAllChanges(loadBatchSize=128) {
-        for (const [_path, obj] of this.getDirectSubObjects().entries()) {
+        for (const obj of this.getDirectSubObjects().values()) {
             await obj.loadAllChanges(loadBatchSize);
         }
     }
-
 }
 
 export { HashedObject };

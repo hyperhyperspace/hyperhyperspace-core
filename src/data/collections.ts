@@ -1,4 +1,4 @@
-export { MutableSet } from './collections/mutable/MutableSet';
+export { MutableSet, MutableSetEvents } from './collections/mutable/MutableSet';
 export { MutableReference } from './collections/mutable/MutableReference';
 export * from './collections/mutable/MutableArray';
 export * from './collections/causal/CausalSet';
