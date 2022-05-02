@@ -87,9 +87,9 @@ abstract class MutableObject extends HashedObject {
 
                 if (this.isCascadingMutableContentEvents()) {
                     if (ev.action === MutableContentEvents.AddObject) {
-                        MutableObject.addEventRelayForElmt(this._mutationEventSource, ev.data.hash(), ev.data);
+                        MutableObject.addEventRelayForElmt(this._mutationEventSource, ev.data.getLastHash(), ev.data);
                     } else if (ev.action === MutableContentEvents.RemoveObject) {
-                        MutableObject.removeEventRelayForElmt(this._mutationEventSource, ev.data.hash(), ev.data);
+                        MutableObject.removeEventRelayForElmt(this._mutationEventSource, ev.data.getLastHash(), ev.data);
                     }
                 }
 
@@ -306,7 +306,7 @@ abstract class MutableObject extends HashedObject {
 
         if (!this._allAppliedOps.has(hash) && !this._unappliedOps.has(hash)) {
             op = await this.getStore().load(hash) as MutationOp;
-
+            
             this._unappliedOps.set(hash, op);
             
             this.applyPendingOpsFromStore();
@@ -577,7 +577,7 @@ abstract class MutableObject extends HashedObject {
     }
 
     isAcceptedMutationOpClass(op: MutationOp): boolean {
-        return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0 && op.getTargetObject().equals(this);
+        return this._acceptedMutationOpClasses.indexOf(op.getClassName()) >= 0/* && op.getTargetObject().equals(this)*/;
     }
 
     // Override if necessary
@@ -623,13 +623,14 @@ abstract class MutableObject extends HashedObject {
     private static addEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
         if (own !== undefined && elmt instanceof HashedObject) {
             own.addUpstreamRelay('contents[' + hash + ']', elmt.getMutationEventSource())
-            console.log('adding event relay for contents[' + hash + '] on ' + hash);
+            //console.log('adding event relay for contents[' + hash + '] on ' + own.emitterHash);
         }
     }
 
     private static removeEventRelayForElmt(own: EventRelay<HashedObject>|undefined, hash: Hash, elmt: any) {
         if (own !== undefined && elmt instanceof HashedObject) {
             own.removeUpstreamRelay('contents[' + hash + ']');
+            //console.log('removing event relay for contents[' + hash + '] on ' + own.emitterHash);
         }
     }
 
@@ -680,7 +681,13 @@ abstract class MutableObject extends HashedObject {
     }
 
     forgetResources(): void {
+
+        if (this.isWatchingForChanges()) {
+            this.dontWatchForChanges();
+        }
+        
         super.forgetResources();
+
 
         for (const aliases of this.getMutableContents().values()) {
             for (const obj of aliases) {

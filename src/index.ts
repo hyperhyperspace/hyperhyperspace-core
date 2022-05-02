@@ -37,3 +37,4 @@ export * from './util/strings';
 export * from './util/logging';
 export * from './util/multimap';
 export * from './util/events';
+export * from './util/concurrency';

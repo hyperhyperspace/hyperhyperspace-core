@@ -100,7 +100,13 @@ class Store {
         for (const [ctxHash, ctxObject] of context.objects.entries()) {
             ctxObject.setLastHash(ctxHash);
             if (this.resources === undefined) {
-                ctxObject.setStore(this);
+                const objResources = ctxObject.getResources()
+                if (objResources === undefined || objResources.store !== this) {
+                    // refuse to modify a Resources object (that may be in use in other places)
+                    // if the object indeed had resources with a different store, discard them and
+                    // use a new resources object that just has this store.
+                    ctxObject.setResources({ store: this} as any as Resources);
+                }
             } else {
                 ctxObject.setResources(this.resources);
             }

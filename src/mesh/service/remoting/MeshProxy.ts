@@ -72,7 +72,7 @@ class MeshProxy {
                             this.commandForwardingFn({
                                 type: 'forward-get-peers-reply',
                                 requestId: req.requestId,
-                                peers: value,
+                                peers: value.map((pi: PeerInfo) => { return {endpoint: pi.endpoint, identityHash: pi.identityHash, identity: pi.identity?.toLiteralContext()}; }),
                                 error: false
                         });
                         },

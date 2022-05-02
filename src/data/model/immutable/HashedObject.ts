@@ -89,10 +89,8 @@ abstract class HashedObject {
             throw new Error('Trying to set the author of an object, but the received identity does not have an attached key pair to sign it.');
         }
 
-        if (!author.equals(this.author)) {
-            this.author = author;
-            this._signOnSave = true;
-        }
+        this.author = author;
+        this._signOnSave = true;
         
     }
 

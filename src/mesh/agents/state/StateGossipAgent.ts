@@ -526,7 +526,7 @@ class StateGossipAgent extends PeeringAgentBase {
             }
             
         } else {
-            throw new Error('Cannot find receiving agent.');
+            throw new Error('Cannot find receiving agent for id: ' + agentId);
         }
 
     }

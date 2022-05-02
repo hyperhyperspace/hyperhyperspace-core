@@ -393,7 +393,7 @@ class MutableArray<T> extends MutableObject {
 
     async mutate(op: MutationOp): Promise<boolean> {
 
-        const opHash = op.hash();
+        const opHash = op.getLastHash();
 
         if (op instanceof InsertOp) {
 
@@ -410,13 +410,16 @@ class MutableArray<T> extends MutableObject {
             if (this._currentInsertOpRefs.get(elementHash).size === 0) {
                 wasNotBefore = true;
                 this._elements.set(elementHash, element);
-                this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: element});
             }
 
-            this._currentInsertOpRefs.add(elementHash, op.createReference());
+            this._currentInsertOpRefs.add(elementHash, new HashReference(op.getLastHash(), op.getClassName()));
             this._currentInsertOpOrds.set(opHash, ordinal);
 
             this._needToRebuild = true;
+
+            if (wasNotBefore) {
+                this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: element});
+            }
 
             if (this.duplicates || wasNotBefore) {
                 this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element} as InsertEvent<T>);
@@ -457,8 +460,8 @@ class MutableArray<T> extends MutableObject {
 
             if (wasDeleted) {
                 if (wasBefore) {
-                    this._elements.delete(elementHash);
                     const element = this._elements.get(elementHash);
+                    this._elements.delete(elementHash);
                     this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: element});
                 }
 

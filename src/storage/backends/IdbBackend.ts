@@ -209,6 +209,8 @@ class IdbBackend implements Backend {
         await tx.objectStore(IdbBackend.META_STORE).put(seqInfo);
         await tx.objectStore(IdbBackend.OBJ_STORE).put(storable);
 
+        await tx.done;
+
         await IdbBackend.fireCallbacks(this.name, literal);
     }
     

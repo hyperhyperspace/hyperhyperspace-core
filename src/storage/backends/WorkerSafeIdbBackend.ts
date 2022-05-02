@@ -24,7 +24,7 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
                 
                 if (ev.data.broadcastId !== undefined &&
                     ev.data.broadcastId !== WorkerSafeIdbBackend.broadcastId) {
-                    
+
                     IdbBackend.fireCallbacks(ev.data.dbName, ev.data.literal);
                 
                 }

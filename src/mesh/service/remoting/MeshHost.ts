@@ -91,7 +91,7 @@ type FindObjectByHashSuffix = {
 type ForwardGetPeersReply = {
     type: 'forward-get-peers-reply'
     requestId: string,
-    peers: PeerInfo[],
+    peers: {endpoint: Endpoint, identityHash: Hash, identity?: LiteralContext}[],
     error: boolean
 }
 
@@ -361,7 +361,12 @@ class MeshHost {
                 if (reply.error) {
                     ex.reject('Received rejection through remoting');
                 } else {
-                    ex.resolve(reply.peers);
+                    ex.resolve(reply.peers.map((pi: {endpoint: Endpoint, identityHash: Hash, identity?: LiteralContext}) => {
+
+                        const identity = (pi.identity === undefined? undefined : HashedObject.fromLiteralContext(pi.identity) as Identity)
+
+                        return {endpoint: pi.endpoint, identityHash: pi.identityHash, identity: identity};
+                    }));
                 }
             }
         } else if (command.type === 'forward-get-peer-for-endpoint-reply') {

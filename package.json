@@ -44,7 +44,7 @@
     "chacha20-universal": "^1.0.4",
     "fast-text-encoding": "^1.0.3",
     "get-random-values": "^1.2.0",
-    "idb": "^5.0.4",
+    "idb": "^7.0.1",
     "jsencrypt": "3.0.0-rc.1",
     "jshashes": "^1.0.8",
     "node-rsa": "^1.1.1",
