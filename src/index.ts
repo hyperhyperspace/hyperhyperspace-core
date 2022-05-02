@@ -1,7 +1,12 @@
 //import { WebRTCConnection } from './sync/transport';
 
+import {default as buffer} from 'buffer/';
+
 if ((globalThis as any).Buffer === undefined) {
-    (globalThis as any).Buffer = require('buffer/').Buffer;
+
+    
+
+    (globalThis as any).Buffer = buffer.Buffer;//require('buffer/').Buffer;
 }
 
 export * from './data/identity';

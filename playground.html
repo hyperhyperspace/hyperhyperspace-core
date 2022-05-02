@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <title>Playground for Hyper Hyper Space</title>
 
-    <script src="https://bundle.run/buffer@6.0.3"></script>
+    <!--<script src="https://bundle.run/buffer@6.0.3"></script>-->
     <script src="./dist-browser/hhs.js"></script>
 
     <script>
 
-        globalThis.Buffer = globalThis.buffer.Buffer
+        //globalThis.Buffer = globalThis.Buffer.Buffer
 
         Object.entries(HHS).forEach(([k, v]) => (globalThis[k] = v));
 
