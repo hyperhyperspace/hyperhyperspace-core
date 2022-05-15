@@ -194,7 +194,14 @@ class Store {
             throw new Error('Object with hash ' + hash + ' is missing from context, cannot save it.');
         }
 
-        object.setStore(this);
+        if (this.resources === undefined) {
+            object.setResources({store: this} as any as Resources)
+        } else {
+            object.setResources(this.resources);
+        }
+
+        //object.setStore(this);
+
         object.setLastHash(hash);
 
         const author = object.getAuthor();
@@ -467,9 +474,16 @@ class Store {
             obj = HashedObject.fromContext(context, literal.hash);
 
             for (const ctxObj of context.objects.values()) {
-                if (!ctxObj.hasStore()) {
-                    ctxObj.setStore(this);
+
+                if (this.resources === undefined) {
+                    ctxObj.setResources({store: this} as any as Resources)
+                } else {
+                    ctxObj.setResources(this.resources);
                 }
+
+                /*if (!ctxObj.hasStore()) {
+                    ctxObj.setStore(this);
+                }*/
 
                 if (ctxObj instanceof Identity) {
                     const id = ctxObj as Identity;

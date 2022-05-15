@@ -83,6 +83,14 @@ class Identity extends HashedObject {
         return this._keyPair !== undefined;
     }
 
+    getKeyPair(): RSAKeyPair {
+        if (!this.hasKeyPair()) {
+            throw new Error('Trying to get key pair, but it is missing from Identity.');
+        }
+
+        return this._keyPair as RSAKeyPair;
+    }
+
     sign(text: string) {
 
         if (this._keyPair === undefined) {

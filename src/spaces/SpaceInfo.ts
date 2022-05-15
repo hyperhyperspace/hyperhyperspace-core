@@ -1,4 +1,4 @@
-import { HashedLiteral, HashedObject } from 'data/model';
+import { HashedLiteral, HashedObject, Hashing } from 'data/model';
 import { ObjectBroadcastAgent } from 'mesh/agents/discovery';
 import { SpaceEntryPoint } from './SpaceEntryPoint';
 
@@ -60,6 +60,8 @@ class SpaceInfo extends HashedObject {
         for (const bitLength of SpaceInfo.bitLengths) {
             hashSuffixes.push(new HashedLiteral(ObjectBroadcastAgent.hexSuffixFromHash(hash, bitLength)));
         }
+
+        hashSuffixes.push(new HashedLiteral(Hashing.toHex(hash)));
 
         return hashSuffixes;
     }

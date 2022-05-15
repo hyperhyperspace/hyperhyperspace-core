@@ -35,6 +35,7 @@ class Space {
         this.resources = resources;
 
         if (init.entryPoint !== undefined) {
+
             this.entryPoint = this.saveSpaceInfo(init.entryPoint).then(() => {
                  return Promise.resolve(init.entryPoint as (HashedObject & SpaceEntryPoint));
             })
@@ -45,7 +46,7 @@ class Space {
                 if (obj !== undefined) {
                     return obj as HashedObject & SpaceEntryPoint;
                 } else {
-                    if (resources.config.peersForDiscovery === undefined) {
+                    /*if (resources.config.peersForDiscovery === undefined) {
                         throw new Error('Trying to open space for missing object ' + init.hash + ', but config.peersForDiscovery is undefined.');
                     }
 
@@ -55,7 +56,8 @@ class Space {
                     const discovery = 
                         this.resources.mesh.findObjectByHash(init.hash as Hash, linkupServers, discoveryEndpoint);
 
-                    return this.processDiscoveryReply(discovery);
+                    return this.processDiscoveryReply(discovery);*/
+                    return this.lookupOrDiscover(Hashing.toHex(init.hash as Hash));
                 }
             });
         } else if (init.wordCode !== undefined) {
