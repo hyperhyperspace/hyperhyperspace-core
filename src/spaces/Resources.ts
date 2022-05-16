@@ -114,7 +114,11 @@ class Resources {
             endpointParserForDiscovery: init?.config?.endpointParserForDiscovery
         }
 
-        return new Resources({store: init?.store, mesh: init?.mesh, config: config, aliasing: init?.aliasing});
+        const resources = new Resources({store: init?.store, mesh: init?.mesh, config: config, aliasing: init?.aliasing});
+
+        init?.store?.setResources(resources);
+
+        return resources;
     }
 
 }
