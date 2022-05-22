@@ -6,7 +6,8 @@ import { MeshCommand,
     StartObjectBroadcast, StopObjectBroadcast,
     FindObjectByHash, FindObjectByHashSuffix, 
     CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply,
-    PeerSourceRequest } from './MeshHost';
+    PeerSourceRequest, 
+    Shutdown} from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject } from 'data/model';
@@ -312,6 +313,12 @@ class MeshProxy {
         this.commandForwardingFn(cmd);
 
         return new BufferedAsyncStream<ObjectDiscoveryReply>(src);
+    }
+
+    shutdown() {
+        const cmd: Shutdown = { type: 'shutdown' };
+
+        this.commandForwardingFn(cmd);
     }
 
     findObjectByHashRetry(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {

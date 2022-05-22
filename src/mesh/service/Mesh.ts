@@ -135,6 +135,8 @@ class Mesh {
 
     // configuration
 
+    wasShutdown: boolean;
+
 
     constructor(networkProxy?: NetworkAgentProxyConfig) {
         this.pod = new AgentPod();
@@ -159,6 +161,8 @@ class Mesh {
         this.allNewOpCallbacks     = new Map()
         this.allRootAncestors      = new Map();
         this.allDependencyClosures = new Map();
+
+        this.wasShutdown = false;
         
     }
 
@@ -380,6 +384,14 @@ class Mesh {
 
     getSyncAgentFor(peerGroupId: PeerGroupId, mutHash: Hash): StateSyncAgent|undefined {
         return this.syncAgents.get(peerGroupId)?.get(mutHash);
+    }
+
+    shutdown() {
+        this.wasShutdown = true;
+
+        for (const agent of this.pod.agents.values()) {
+            agent.shutdown();
+        }
     }
 
     private getDiscoveryAgentFor(hashSuffix: string): ObjectDiscoveryAgent {

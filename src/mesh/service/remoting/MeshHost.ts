@@ -12,7 +12,7 @@ import { Store } from 'storage/store';
 type MeshCommand = JoinPeerGroup | LeavePeerGroup |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
                    StartObjectBroadcast | StopObjectBroadcast |
-                   FindObjectByHash | FindObjectByHashSuffix | 
+                   FindObjectByHash | FindObjectByHashSuffix |  Shutdown |
                    ForwardGetPeersReply | ForwardGetPeerForEndpointReply;
 
 type JoinPeerGroup = {
@@ -88,6 +88,10 @@ type FindObjectByHashSuffix = {
     streamId?: string // used when retry is false
 }
 
+type Shutdown = {
+    type: 'shutdown'
+}
+
 type ForwardGetPeersReply = {
     type: 'forward-get-peers-reply'
     requestId: string,
@@ -154,6 +158,7 @@ class MeshHost {
             type === 'stop-object-broadcast' ||
             type === 'find-object-by-hash' ||
             type === 'find-object-by-hash-suffix' ||
+            type === 'shutdown' ||
             type === 'object-discovery-reply' ||
             type === 'object-discovery-end' ||
             type === 'forward-get-peers-reply' ||
@@ -351,6 +356,8 @@ class MeshHost {
                     );
                 }
             }
+        } else if (command.type === 'shutdown') {
+            this.mesh.shutdown();
         } else if (command.type === 'forward-get-peers-reply') {
 
             const reply = command as ForwardGetPeersReply;
@@ -445,7 +452,7 @@ export { MeshHost, MeshCommand,
          JoinPeerGroup, LeavePeerGroup,
          SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
          StartObjectBroadcast, StopObjectBroadcast,
-         FindObjectByHash, FindObjectByHashSuffix,
+         FindObjectByHash, FindObjectByHashSuffix, Shutdown,
          CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply, 
          ForwardGetPeersReply, ForwardGetPeerForEndpointReply,
          PeerSourceRequest, GetPeersRequest, GetPeerForEndpointRequest };
