@@ -314,20 +314,28 @@ class MeshHost {
 
                     try {
                         while (!replyStream.atEnd()) {
-                            const discov = await replyStream.next();
 
-                            let reply: LiteralObjectDiscoveryReply = {
-                                type: 'object-discovery-reply',
-                                streamId: streamId as string,
-                                source: discov.source, 
-                                destination: discov.destination,
-                                hash: discov.hash, 
-                                objContext: discov.object?.toLiteralContext(), 
-                                error: discov.error,
-                                timestamp: discov.timestamp
-                            };
+                            try {
+                                const discov = await replyStream.next();
 
-                            this.streamedReplyCb(reply)
+                                let reply: LiteralObjectDiscoveryReply = {
+                                    type: 'object-discovery-reply',
+                                    streamId: streamId as string,
+                                    source: discov.source, 
+                                    destination: discov.destination,
+                                    hash: discov.hash, 
+                                    objContext: discov.object?.toLiteralContext(), 
+                                    error: discov.error,
+                                    timestamp: discov.timestamp
+                                };
+    
+                                this.streamedReplyCb(reply)
+                            } catch (e) {
+                                if (e !== 'end') {
+                                    throw e;
+                                }
+                            }
+                            
 
                         }
 
