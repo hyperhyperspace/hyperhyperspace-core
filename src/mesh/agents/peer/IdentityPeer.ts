@@ -6,7 +6,6 @@ import { PeerInfo } from './PeerGroupAgent';
 import { Store } from 'storage/store';
 import { Endpoint } from '../network/NetworkAgent';
 
-
 class IdentityPeer implements Peer {
 
     static fromIdentity(id: Identity, linkupServer = LinkupManager.defaultLinkupServer, info?: string) : IdentityPeer {
@@ -39,7 +38,7 @@ class IdentityPeer implements Peer {
             throw new Error('Missing peer information.');
         }
 
-        let linkupId = Hashing.toHex(this.identityHash);
+        let linkupId = LinkupAddress.verifiedIdPrefix + Hashing.toHex(this.identityHash);
         if (this.info !== undefined) {
             linkupId = linkupId + '/' + this.info;
         }
@@ -52,7 +51,8 @@ class IdentityPeer implements Peer {
         this.linkupServer = address.serverURL;
         const parts = address.linkupId.split('/');
 
-        this.identityHash = Hashing.fromHex(parts.shift() as string);
+        const idStr = parts.shift() as string;
+        this.identityHash = Hashing.fromHex(idStr.slice(LinkupAddress.verifiedIdPrefix.length));
 
         this.info = parts.length > 0? parts.join('/') : undefined;
 

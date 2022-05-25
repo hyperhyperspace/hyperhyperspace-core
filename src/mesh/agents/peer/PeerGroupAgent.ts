@@ -215,7 +215,7 @@ class PeerGroupAgent implements Agent {
 
         const networkAgent = this.getNetworkAgent();
 
-        networkAgent.listen(this.localPeer.endpoint);
+        networkAgent.listen(this.localPeer.endpoint, this.localPeer.identity);
 
         for(const ci of this.getNetworkAgent().getAllConnectionsInfo()) {
             if (ci.localEndpoint === this.localPeer.endpoint && 

@@ -95,7 +95,8 @@ class LinkupManagerProxy {
         
         const cmd: ListenForMessagesNewCall = {
             type: 'listen-for-messages-new-call',
-            recipient: recipient.url()
+            recipient: recipient.url(),
+            idContext: recipient.identity === undefined? undefined : recipient.identity.toLiteralContext()
         };
 
         this.messagesNewCallCallbacks.add(cmd.recipient, callback);
@@ -109,6 +110,7 @@ class LinkupManagerProxy {
         const cmd: ListenForMessagesOnCall = {
             type: 'listen-for-messages-on-call',
             recipient: recipient.url(),
+            idContext: recipient.identity === undefined? undefined : recipient.identity.toLiteralContext(),
             callId: callId
         };
 
@@ -121,7 +123,8 @@ class LinkupManagerProxy {
         
         const cmd: ListenForRawMessages = {
             type: 'listen-for-raw-messages',
-            recipient: recipient.url()
+            recipient: recipient.url(),
+            idContext: recipient.identity === undefined? undefined : recipient.identity.toLiteralContext()
         };
 
         this.rawMessageCallbacks.add(cmd.recipient, callback);

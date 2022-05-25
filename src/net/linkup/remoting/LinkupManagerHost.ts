@@ -1,3 +1,5 @@
+import { Identity } from 'data/identity';
+import { HashedObject, LiteralContext } from 'data/model';
 import { Endpoint } from 'mesh/agents/network';
 import { LinkupAddress } from '../LinkupAddress';
 import { LinkupManager } from '../LinkupManager';
@@ -10,19 +12,21 @@ type LinkupManagerCommand = ListenForMessagesNewCall | ListenForMessagesOnCall |
 
 type ListenForMessagesNewCall = {
     type: 'listen-for-messages-new-call',
-    recipient: Endpoint
-    
+    recipient: Endpoint,
+    idContext?: LiteralContext
 }
 
 type ListenForMessagesOnCall = {
     type: 'listen-for-messages-on-call',
     recipient: Endpoint,
+    idContext?: LiteralContext,
     callId: string
 }
 
 type ListenForRawMessages = {
     type: 'listen-for-raw-messages',
-    recipient: Endpoint
+    recipient: Endpoint,
+    idContext?: LiteralContext
 }
 
 type SendMessageOnCall = {
@@ -170,7 +174,13 @@ class LinkupManagerHost {
 
             const listen = cmd as ListenForMessagesNewCall;
 
-            this.linkup.listenForMessagesNewCall(LinkupAddress.fromURL(listen.recipient), this.newCallMessageCallback);
+            let identity: Identity|undefined = undefined;
+
+            if (cmd.idContext !== undefined) {
+                identity = HashedObject.fromLiteralContext(cmd.idContext) as Identity;
+            }
+
+            this.linkup.listenForMessagesNewCall(LinkupAddress.fromURL(listen.recipient, identity), this.newCallMessageCallback);
 
         } else if (cmd.type === 'listen-for-messages-on-call') {
 
@@ -187,13 +197,25 @@ class LinkupManagerHost {
                 this.eventCallback(ev);
             };
 
-            this.linkup.listenForMessagesOnCall(LinkupAddress.fromURL(listen.recipient), listen.callId, callback);
+            let identity: Identity|undefined = undefined;
+
+            if (cmd.idContext !== undefined) {
+                identity = HashedObject.fromLiteralContext(cmd.idContext) as Identity;
+            }
+
+            this.linkup.listenForMessagesOnCall(LinkupAddress.fromURL(listen.recipient, identity), listen.callId, callback);
 
         } else if (cmd.type === 'listen-for-raw-messages') {
 
             const listen = cmd as ListenForRawMessages;
 
-            this.linkup.listenForRawMessages(LinkupAddress.fromURL(listen.recipient), this.rawMessageCallback);
+            let identity: Identity|undefined = undefined;
+
+            if (cmd.idContext !== undefined) {
+                identity = HashedObject.fromLiteralContext(cmd.idContext) as Identity;
+            }
+
+            this.linkup.listenForRawMessages(LinkupAddress.fromURL(listen.recipient, identity), this.rawMessageCallback);
 
         } else if (cmd.type === 'send-message-on-call') {
 

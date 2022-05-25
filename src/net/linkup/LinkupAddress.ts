@@ -1,8 +1,14 @@
+import { Identity } from 'data/identity';
+
 class LinkupAddress {
+
+    static verifiedIdPrefix = 'verified-id-';
+
     readonly serverURL : string;
     readonly linkupId  : string;
+    readonly identity? : Identity;
 
-    constructor(serverURL: string, linkupId: string) {
+    constructor(serverURL: string, linkupId: string, identity?: Identity) {
 
         if (serverURL[serverURL.length-1] === '/') {
             serverURL = serverURL.substring(0, serverURL.length-1);
@@ -10,13 +16,14 @@ class LinkupAddress {
 
         this.serverURL = serverURL;
         this.linkupId  = linkupId;
+        this.identity  = identity;
     }
 
     url() : string {
         return this.serverURL + '/' + this.linkupId;
     }
 
-    static fromURL(url: string) {
+    static fromURL(url: string, identity?: Identity) {
         if (url[url.length-1] === '/') {
             url = url.substring(0, url.length-1);
         }
@@ -36,7 +43,7 @@ class LinkupAddress {
         //urlParts.push('');
         let linkupId = urlParts.join('/');
 
-        return new LinkupAddress(proto + serverUrl, linkupId as string);
+        return new LinkupAddress(proto + serverUrl, linkupId as string, identity);
     }
 
 }

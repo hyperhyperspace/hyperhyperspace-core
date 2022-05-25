@@ -10,6 +10,7 @@ import { SignallingServerConnection } from 'net/linkup/SignallingServerConnectio
 import { WebSocketConnection } from 'net/transport/WebSocketConnection';
 import { LinkupManagerHost, LinkupManagerEvent } from 'net/linkup';
 import { WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxy } from 'net/transport';
+import { Identity } from 'data/identity';
 
 type Endpoint = string;
 
@@ -463,12 +464,11 @@ class NetworkAgent implements Agent {
 
     // Network listen, shutdown
 
-    listen(endpoint: Endpoint) {
+    listen(endpoint: Endpoint, identity?: Identity) {
 
-        let address = LinkupAddress.fromURL(endpoint);
+        let address = LinkupAddress.fromURL(endpoint, identity);
 
         this.listening.add(endpoint);
-
 
         this.linkupManager.listenForQueryResponses(endpoint, (ep: string, addresses: Array<LinkupAddress>) => {
 

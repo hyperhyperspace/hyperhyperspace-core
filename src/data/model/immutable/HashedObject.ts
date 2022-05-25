@@ -647,6 +647,15 @@ abstract class HashedObject {
         return { value: value, dependencies: dependencies };
     }
 
+    static fromLiteralContextWithValidation(literalContext: LiteralContext, hash?: Hash) : Promise<HashedObject> {
+
+        let context = new Context();
+        context.fromLiteralContext(literalContext);
+
+        return HashedObject.fromContextWithValidation(context, hash);
+    }
+
+
 
     static fromLiteralContext(literalContext: LiteralContext, hash?: Hash) : HashedObject {
 

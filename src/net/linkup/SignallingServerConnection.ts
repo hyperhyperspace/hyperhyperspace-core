@@ -29,11 +29,13 @@ class SignallingServerConnection implements LinkupServer {
 
     listeningAddressesQueryCallback? : ListeningAddressesQueryCallback;
 
-    linkupIdsToListen : Set<string>;
+    linkupIdsToListen   : Map<string, LinkupAddress>;
 
     messageQueue     : string[];
 
     lastConnectionAttempt?: number;
+
+    challenge?: string;
 
     constructor(serverURL : string) {
 
@@ -49,7 +51,7 @@ class SignallingServerConnection implements LinkupServer {
         this.newCallMessageCallbacks = new Map();
         this.messageCallbacks        = new Map();
 
-        this.linkupIdsToListen = new Set();
+        this.linkupIdsToListen = new Map();
 
         this.messageQueue = [];
 
@@ -76,7 +78,7 @@ class SignallingServerConnection implements LinkupServer {
 
         recipientCallCallbacks.add(callback);
 
-        this.setUpListenerIfNew(recipient.linkupId);
+        this.setUpListenerIfNew(recipient);
     }
 
     listenForRawMessages(recipient: LinkupAddress, callback: (sender: LinkupAddress, recipient: LinkupAddress, message: any) => void): void {
@@ -99,7 +101,7 @@ class SignallingServerConnection implements LinkupServer {
 
         recipientRawCallbacks.add(callback);
         
-        this.setUpListenerIfNew(recipient.linkupId);
+        this.setUpListenerIfNew(recipient);
     }
 
     listenForMessagesOnCall(recipient: LinkupAddress, callId: string, callback: MessageCallback) {
@@ -129,7 +131,7 @@ class SignallingServerConnection implements LinkupServer {
 
         messageCallbacks.add(callback);
 
-        this.setUpListenerIfNew(recipient.linkupId);
+        this.setUpListenerIfNew(recipient);
     }
 
     listenForLinkupAddressQueries(callback: ListeningAddressesQueryCallback) {
@@ -238,6 +240,9 @@ class SignallingServerConnection implements LinkupServer {
                 if (this.ws !== null) {
       
                     this.ws.onmessage = (ev) => {
+
+                        console.log(ev.data);
+
                         const message = JSON.parse(ev.data);
                         const ws = this.ws as WebSocket;
             
@@ -315,6 +320,15 @@ class SignallingServerConnection implements LinkupServer {
                                 }
                                 callback(queryId, matchingLinkupAddresses);
                             }
+                        } else if (message['action'] === 'update-challenge') { 
+                            this.challenge = message['challenge'];
+
+                            for (const address of this.linkupIdsToListen.values()) {
+                                if (address.identity !== undefined) {
+                                    this.setUpListener(address);
+                                }
+                            }
+
                         } else {
                             SignallingServerConnection.logger.info('received unknown message on ' + this.serverURL + ': ' + ev.data);
                         }
@@ -339,28 +353,45 @@ class SignallingServerConnection implements LinkupServer {
     }
 
     setUpListeners() {
-        for (let linkupId of this.linkupIdsToListen) {
-            this.setUpListener(linkupId);
+        for (let address of this.linkupIdsToListen.values()) {
+            this.setUpListener(address);
         }
     }
 
-    setUpListenerIfNew(linkupId: string) {
-        if (!this.linkupIdsToListen.has(linkupId)) {
-            this.setUpListener(linkupId);
-            this.linkupIdsToListen.add(linkupId);
+    setUpListenerIfNew(address: LinkupAddress) {
+        if (!this.linkupIdsToListen.has(address.linkupId)) {
+            this.setUpListener(address);
+            this.linkupIdsToListen.set(address.linkupId, address);
         }
     }
 
     // Notice this function is idempotent
-    setUpListener(linkupId: string) {
+    setUpListener(address: LinkupAddress) {
 
         // check if we need to send a LISTEN message
         if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
             try {
-                SignallingServerConnection.logger.debug('sending listen command through websocket for linkupId ' + linkupId);    
-                this.ws.send(JSON.stringify({'action': 'listen', 'linkupId': linkupId}));
+                SignallingServerConnection.logger.debug('sending listen command through websocket for linkupId ' + address.linkupId);
+                
+                const msg = {'action': 'listen', 'linkupId': address.linkupId} as any;
+
+                if (address.identity !== undefined && 
+                    this.challenge !== undefined && 
+                    address.linkupId.slice(0, LinkupAddress.verifiedIdPrefix.length) === LinkupAddress.verifiedIdPrefix) {
+                        msg.idContext = address.identity.toLiteralContext();
+                        address.identity.sign(this.challenge).then((sig: string) => {
+                            msg.signature = sig;
+                            if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
+                                this.ws.send(JSON.stringify(msg));
+                            }
+                        })
+                } else {
+                    this.ws.send(JSON.stringify(msg));
+                }
+                
+                
             } catch (e: any) {
-                SignallingServerConnection.logger.warning('Error while trying to set up listener for ' + linkupId + ' for linkup server ' + this.serverURL);
+                SignallingServerConnection.logger.warning('Error while trying to set up listener for ' + address.linkupId + ' for linkup server ' + this.serverURL);
                 SignallingServerConnection.logger.error(e);
                 // this.checkWebsocket(); // I'm afraid this may cause a loop
             }

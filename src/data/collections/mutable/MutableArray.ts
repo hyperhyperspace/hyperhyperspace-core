@@ -1,3 +1,4 @@
+import { Types } from '../../collections';
 import { Hash } from '../../model/hashing';
 import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
@@ -7,7 +8,7 @@ import { Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
 import { DedupMultiMap } from 'util/dedupmultimap';
 import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
-import { Types } from 'data/collections';
+
 import { location } from 'util/events';
 import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
