@@ -1,6 +1,6 @@
 {
   "name": "@hyper-hyper-space/core",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "author": "Santiago Bazerque",
   "license": "MIT",
   "source": "src/index.ts",
@@ -23,7 +23,7 @@
     "compat-check": "NODE_PATH=\"dist\" node ./dist-dev/compat/model/run/check.js"
   },
   "devDependencies": {
-    "@hyper-hyper-space/node-env": "^0.11.0",
+    "@hyper-hyper-space/node-env": "^0.12.0",
     "@rollup/plugin-commonjs": "^21.0.1",
     "@rollup/plugin-node-resolve": "^13.1.1",
     "@types/jest": "^26.0.19",
