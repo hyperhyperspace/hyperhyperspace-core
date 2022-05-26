@@ -241,8 +241,6 @@ class SignallingServerConnection implements LinkupServer {
       
                     this.ws.onmessage = (ev) => {
 
-                        console.log(ev.data);
-
                         const message = JSON.parse(ev.data);
                         const ws = this.ws as WebSocket;
             
