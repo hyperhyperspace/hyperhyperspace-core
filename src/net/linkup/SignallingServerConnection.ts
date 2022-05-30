@@ -2,8 +2,19 @@ import { Logger, LogLevel } from 'util/logging';
 
 import { LinkupServer, RawMessageCallback, NewCallMessageCallback, MessageCallback, ListeningAddressesQueryCallback } from './LinkupServer';
 import { LinkupAddress } from './LinkupAddress';
+import { RNGImpl } from 'crypto/random';
 
 const CONN_BACKOFF_TIME = 15000;
+
+/*
+ * On instanceIds: when connecting to a linkup server, the SignallingServerConnection class will
+ *                 create a randm "instanceId" value. When several peers are listening for 
+ *                 connections on the same endpoint (e.g. several devices owner by the same person) 
+ *                 and another peer initiates a connection, each of these peers will include a
+ *                 different instanceId. This enables the initiator to tell them appart in the
+ *                 WebRTC signalling phase, and to choose if he wants to connect to just one of
+ *                 them, a few, etc.
+ */
 
 class SignallingServerConnection implements LinkupServer {
 
@@ -19,7 +30,8 @@ class SignallingServerConnection implements LinkupServer {
         return serverURL.slice(SignallingServerConnection.WRTC_URL_PREFIX.length);
     }
 
-    readonly serverURL : string;
+    readonly serverURL  : string;
+    readonly instanceId : string; // see note above
 
     ws : WebSocket | null;
 
@@ -44,6 +56,7 @@ class SignallingServerConnection implements LinkupServer {
         }
 
         this.serverURL = serverURL;
+        this.instanceId  = new RNGImpl().randomHexString(128);
 
         this.ws = null;
 
@@ -153,6 +166,7 @@ class SignallingServerConnection implements LinkupServer {
                     'action'         :  'send',
                     'linkupId'       :  recipient.linkupId,
                     'callId'         :  callId,
+                    'instanceId'     :  this.instanceId,
                     'data'           :  data,
                     'replyServerUrl' :  sender.serverURL,
                     'replyLinkupId'  :  sender.linkupId,
@@ -269,7 +283,7 @@ class SignallingServerConnection implements LinkupServer {
                                     if (callMessageCallbacks !== undefined) {
                                         callMessageCallbacks.forEach((callback: MessageCallback) => {
                                             SignallingServerConnection.logger.debug('Delivering linkup message to ' + linkupId + ' on call ' + message['callId']);
-                                            callback(message['data']);
+                                            callback(message['instanceId'], message['data']);
                                             found = true;
                                         });
                                     }
@@ -281,7 +295,7 @@ class SignallingServerConnection implements LinkupServer {
                                     if (linkupIdCallbacks !== undefined) {
                                         linkupIdCallbacks.forEach((callback: NewCallMessageCallback) => {
                                             SignallingServerConnection.logger.debug('Calling default callback for linkupId ' + linkupId + ', unlistened callId is ' + callId);
-                                            callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), callId, message['data']);
+                                            callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), callId, message['instanceId'], message['data']);
                                             found = true;
                                         })
                                     }

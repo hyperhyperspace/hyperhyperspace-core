@@ -8,7 +8,7 @@ import { WebRTCConnection } from 'net/transport/WebRTCConnection';
 import { RNGImpl } from 'crypto/random';
 import { SignallingServerConnection } from 'net/linkup/SignallingServerConnection';
 import { WebSocketConnection } from 'net/transport/WebSocketConnection';
-import { LinkupManagerHost, LinkupManagerEvent } from 'net/linkup';
+import { LinkupManagerHost, LinkupManagerEvent, NewCallMessageCallback } from 'net/linkup';
 import { WebRTCConnectionCommand, WebRTCConnectionEvent, WebRTCConnectionProxy } from 'net/transport';
 import { Identity } from 'data/identity';
 
@@ -78,6 +78,7 @@ type ConnectionInfo = {
     localEndpoint: Endpoint,
     remoteEndpoint: Endpoint, 
     connId : ConnectionId, 
+    remoteInstanceId?: string, // see the note in instanceIds in class SignallingServerConnection
     status: ConnectionStatus,
     timestamp: number,
     requestedBy: Set<AgentId>
@@ -121,13 +122,13 @@ class NetworkAgent implements Agent {
     connections  : Map<ConnectionId, Connection>;
 
     connectionInfo : Map<ConnectionId, ConnectionInfo>;
-    deferredInitialMessages : Map<ConnectionId, Array<any>>;
+    deferredInitialMessages : Map<ConnectionId, Array<{instanceId: string, message: any}>>;
     
     messageCallback : (data: any, conn: Connection) => void;
 
     connectionReadyCallback : (conn: Connection) => void;
 
-    newConnectionRequestCallback : (sender: LinkupAddress, receiver: LinkupAddress, callId: string, message: any) => void;
+    newConnectionRequestCallback : NewCallMessageCallback;
 
     linkupMessageCallback : (sender: LinkupAddress, receiver: LinkupAddress, message: any) => void;
 
@@ -209,6 +210,9 @@ class NetworkAgent implements Agent {
                 if (connInfo.status !== ConnectionStatus.Ready) {
                     this.connections.set(connectionId, conn);
                     connInfo.status = ConnectionStatus.Ready;
+                    if (connInfo.remoteInstanceId === undefined) {
+                        connInfo.remoteInstanceId = conn.remoteInstanceId;
+                    }
                     const ev: ConnectionStatusChangeEvent = {
                         type: NetworkEventType.ConnectionStatusChange, 
                         content: {
@@ -227,7 +231,7 @@ class NetworkAgent implements Agent {
             }
         }
 
-        this.newConnectionRequestCallback = (sender: LinkupAddress, receiver: LinkupAddress, connectionId: string, message: any) => {
+        this.newConnectionRequestCallback = (sender: LinkupAddress, receiver: LinkupAddress, connectionId: string, instanceId: string, message: any) => {
 
             let connInfo = this.connectionInfo.get(connectionId);
 
@@ -237,7 +241,8 @@ class NetworkAgent implements Agent {
                 connInfo = {
                     localEndpoint: receiver.url(),
                     remoteEndpoint: sender.url(), 
-                    connId: connectionId, 
+                    connId: connectionId,
+                    remoteInstanceId: instanceId,
                     status: ConnectionStatus.Received,
                     timestamp: Date.now(),
                     requestedBy: new Set()
@@ -246,13 +251,22 @@ class NetworkAgent implements Agent {
                 this.connectionInfo.set(connectionId, connInfo);
             }
 
+            /*if (connInfo.localEndpoint === receiver.url() &&
+                connInfo.remoteEndpoint === sender.url() &&
+                connInfo.remoteEndpoint !== instanceId) {
+
+                    console.log('MISMATCH')
+                    CONSOL
+            }*/
+
             if (connInfo.localEndpoint === receiver.url() &&
-                connInfo.remoteEndpoint === sender.url()) {
+                connInfo.remoteEndpoint === sender.url() &&
+                connInfo.remoteInstanceId === instanceId) {
 
                     if (connInfo.status === ConnectionStatus.Establishing) {
-                        this.acceptReceivedConnectionMessages(connectionId, message);
+                        this.acceptReceivedConnectionMessages(connectionId, instanceId, message);
                     } else if (connInfo.status === ConnectionStatus.Received) {
-                        this.deferReceivedConnectionMessage(connectionId, message);
+                        this.deferReceivedConnectionMessage(connectionId, instanceId, message);
 
                         if (isNew) {
                             let ev: ConnectionStatusChangeEvent = {
@@ -389,7 +403,7 @@ class NetworkAgent implements Agent {
     }
     */
 
-    private acceptReceivedConnectionMessages(connId: ConnectionId, message?: any) {
+    private acceptReceivedConnectionMessages(connId: ConnectionId, instanceId?: string, message?: any) {
 
         let messages = this.deferredInitialMessages.get(connId);
 
@@ -397,18 +411,19 @@ class NetworkAgent implements Agent {
             messages = [];
         }
 
-        if (message !== undefined) {
-            messages.push(message);
+        if (message !== undefined && instanceId !== undefined) {
+            messages.push({instanceId: instanceId, message: message});
         }
 
         
-        for (const message of messages) {
+        for (const {message, instanceId } of messages) {
             let conn = this.connections.get(connId);
 
             if (conn === undefined) {
                 let connInfo = this.connectionInfo.get(connId) as ConnectionInfo;
     
                 if (connInfo !== undefined) {
+
                     const receiver = LinkupAddress.fromURL(connInfo.localEndpoint);
                     const sender   = LinkupAddress.fromURL(connInfo.remoteEndpoint);
 
@@ -434,13 +449,13 @@ class NetworkAgent implements Agent {
 
                 if (conn instanceof WebRTCConnection || conn instanceof WebRTCConnectionProxy || conn instanceof WebSocketConnection) {
                     conn.setMessageCallback(this.messageCallback);
-                    conn.answer(message);
+                    conn.answer(instanceId, message);
                 }
             } else {
                 if (conn instanceof WebRTCConnection || conn instanceof WebRTCConnectionProxy) {
-                    conn.receiveSignallingMessage(message);
+                    conn.receiveSignallingMessage(instanceId, message);
                 } else if (conn instanceof WebSocketConnection) {
-                    conn.answer(message);
+                    conn.answer(instanceId, message);
                 }
             }
 
@@ -450,16 +465,16 @@ class NetworkAgent implements Agent {
         }
     }
 
-    private deferReceivedConnectionMessage(connId: ConnectionId, message: any) {
+    private deferReceivedConnectionMessage(connId: ConnectionId, instanceId: string, message: any) {
 
         let messages = this.deferredInitialMessages.get(connId);
 
         if (messages === undefined) {
-            messages = new Array<any>();
+            messages = new Array<{instanceId: string, message: any}>();
             this.deferredInitialMessages.set(connId, messages);
         }
 
-        messages.push(message);
+        messages.push({message: message, instanceId: instanceId});
     }
 
     // Network listen, shutdown
@@ -534,7 +549,8 @@ class NetworkAgent implements Agent {
             { 
                 localEndpoint: local, 
                 remoteEndpoint: remote, 
-                connId: callId, status: ConnectionStatus.Establishing, 
+                connId: callId, 
+                status: ConnectionStatus.Establishing, 
                 timestamp: Date.now(),
                 requestedBy: new Set([requestedBy])
             });

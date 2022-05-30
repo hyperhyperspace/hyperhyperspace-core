@@ -4,6 +4,7 @@ interface Connection {
 
     readonly localAddress: LinkupAddress;
     readonly remoteAddress: LinkupAddress;
+    readonly remoteInstanceId?: string;
 
     getConnectionId() : string;
     initiatedLocally(): boolean;

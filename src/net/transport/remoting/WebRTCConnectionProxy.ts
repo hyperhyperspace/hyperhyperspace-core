@@ -132,20 +132,22 @@ class WebRTCConnectionProxy implements Connection {
         this.commandForwardingFn(cmd);
     }
 
-    answer(message: any) {
+    answer(instanceId: string, message: any) {
         const cmd: AnswerConnection = {
             type: 'answer-connection',
             connId: this.callId,
+            instanceId: instanceId,
             message: message
         };
 
         this.commandForwardingFn(cmd);
     }
 
-    receiveSignallingMessage(message: any) {
+    receiveSignallingMessage(instanceId: string, message: any) {
         const cmd: ReceiveSignalling = {
             type: 'receive-signalling',
             connId: this.callId,
+            instanceId: instanceId,
             message: message
         };
 

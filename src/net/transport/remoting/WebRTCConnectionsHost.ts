@@ -27,12 +27,14 @@ type OpenConnection = {
 type AnswerConnection = {
     type: 'answer-connection',
     connId: string,
+    instanceId: string,
     message: any
 }
 
 type ReceiveSignalling = {
     type: 'receive-signalling',
     connId: string,
+    instanceId: string,
     message: any
 }
 
@@ -180,11 +182,11 @@ class WebRTCConnectionsHost {
 
         } else if (cmd.type === 'answer-connection') { 
 
-            this.connections.get(cmd.connId)?.answer(cmd.message);
+            this.connections.get(cmd.connId)?.answer(cmd.instanceId, cmd.message);
 
         } else if (cmd.type === 'receive-signalling') { 
 
-            this.connections.get(cmd.connId)?.receiveSignallingMessage(cmd.message);
+            this.connections.get(cmd.connId)?.receiveSignallingMessage(cmd.instanceId, cmd.message);
 
         } else if (cmd.type === 'close-connection') {
 

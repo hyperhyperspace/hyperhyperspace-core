@@ -20,13 +20,14 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
 
         let int:any = undefined;
 
-        linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdMessage: any) => {
+        linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdInstanceId: string, rcvdMessage: any) => {
             
             expect(sender.linkupId).toEqual(address2.linkupId);
             expect(sender.serverURL).toEqual(address2.serverURL);
             expect(recipient.linkupId).toEqual(address1.linkupId);
             expect(recipient.serverURL).toEqual(address1.serverURL);
             expect(rcvdCallId).toEqual(callId);
+            expect(rcvdInstanceId).toBeDefined();
             expect(rcvdMessage).toEqual(message);
             if (int !== undefined) { clearInterval(int); }
             linkupManager1.shutdown();
@@ -61,18 +62,21 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
 
         let int:any = undefined;
 
-        linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdMessage: any) => {
+        linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdInstanceId: string, rcvdMessage: any) => {
+            
             expect(sender.linkupId).toEqual(address2.linkupId);
             expect(sender.serverURL).toEqual(address2.serverURL);
             expect(recipient.linkupId).toEqual(address1.linkupId);
             expect(recipient.serverURL).toEqual(address1.serverURL);
             expect(rcvdCallId).toEqual(callId);
+            expect(rcvdInstanceId).toBeDefined();
             expect(rcvdMessage).toEqual(message);
             linkupManager1.sendMessageOnCall(address1, address2, callId, reply);
             
         });
 
-        linkupManager2.listenForMessagesOnCall(address2, callId, (message: string) => {
+        linkupManager2.listenForMessagesOnCall(address2, callId, (instanceId: string, message: string) => {
+            expect(instanceId).toBeDefined();
             expect(message).toEqual(reply);
             if (int !== undefined) { clearInterval(int); }
             linkupManager1.shutdown();
@@ -148,13 +152,14 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
     
             let int:any = undefined;
     
-            linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdMessage: any) => {
+            linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdInstanceId: string, rcvdMessage: any) => {
                 
                 expect(sender.linkupId).toEqual(address2.linkupId);
                 expect(sender.serverURL).toEqual(address2.serverURL);
                 expect(recipient.linkupId).toEqual(address1.linkupId);
                 expect(recipient.serverURL).toEqual(address1.serverURL);
                 expect(rcvdCallId).toEqual(callId);
+                expect(rcvdInstanceId).toBeDefined();
                 expect(rcvdMessage).toEqual(message);
                 if (int !== undefined) { clearInterval(int); }
                 linkupManager1Host.linkup.shutdown();
@@ -210,18 +215,21 @@ describeProxy('[LNK] Single-host LinkupManager', () => {
     
             let int:any = undefined;
     
-            linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdMessage: any) => {
+            linkupManager1.listenForMessagesNewCall(address1, (sender: LinkupAddress, recipient: LinkupAddress, rcvdCallId: string, rcvdInstanceId: string, rcvdMessage: any) => {
                 expect(sender.linkupId).toEqual(address2.linkupId);
                 expect(sender.serverURL).toEqual(address2.serverURL);
                 expect(recipient.linkupId).toEqual(address1.linkupId);
                 expect(recipient.serverURL).toEqual(address1.serverURL);
                 expect(rcvdCallId).toEqual(callId);
+                expect(rcvdInstanceId).toBeDefined();
                 expect(rcvdMessage).toEqual(message);
                 linkupManager1.sendMessageOnCall(address1, address2, callId, reply);
                 
             });
     
-            linkupManager2.listenForMessagesOnCall(address2, callId, (message: string) => {
+            linkupManager2.listenForMessagesOnCall(address2, callId, (instanceId: string, message: string) => {
+
+                expect(instanceId).toBeDefined();
                 expect(message).toEqual(reply);
                 if (int !== undefined) { clearInterval(int); }
                 linkupManager1Host.linkup.shutdown();

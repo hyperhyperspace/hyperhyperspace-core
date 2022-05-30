@@ -89,7 +89,7 @@ class WebSocketListener implements LinkupServer {
 
                         if (callbacks.size > 0) {
                             for (const callback of callbacks) {
-                                callback(sender, recipient, connId, {ws: socket, reverse: reverse});
+                                callback(sender, recipient, connId, undefined as any, {ws: socket, reverse: reverse});
                                 parseOK = true;
                             }
                         } else {

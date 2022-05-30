@@ -4,6 +4,7 @@ import { Logger, LogLevel } from '../../util/logging';
 //import 'poly/webrtcpoly';
 
 import { Connection } from './Connection';
+import { MessageCallback } from 'net/linkup/LinkupServer';
 
 /* A WebRTC Connection is used to create a bi-directional
    DataChannel between two hosts. A LinkupManager object 
@@ -40,7 +41,9 @@ class WebRTCConnection implements Connection {
     onready : () => void;
     channelStatusChangeCallback : ((status: string, conn: Connection) => void) | undefined;
 
-    private handleSignallingMessage : (message: any) => void;
+    remoteInstanceId?: string;
+
+    private handleSignallingMessage : MessageCallback;
 
     constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void, channelStatusChangeCallback?: (status: string, conn: Connection) => void) {
 
@@ -76,24 +79,30 @@ class WebRTCConnection implements Connection {
 
         this.channelStatusChangeCallback = channelStatusChangeCallback;
 
-        this.handleSignallingMessage = (message) => {
+        this.handleSignallingMessage = (instanceId: string, message: any) => {
 
-            var signal  = message['signal'];
-            var data    = message['data'];
-    
-            WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' is handling ' + signal + ' from ' + this.remoteAddress?.serverURL + ' on call ' + data['callId']);
-            WebRTCConnection.logger.trace('received data is ' + JSON.stringify(data));
-            switch (signal) {
-                case RTC_CONN_DESCRIPTION:
-                    this.handleReceiveConnectionDescription(data['callId'], data['channelName'], data['description']);
-                break;
-                case ICE_CANDIDATE:
-                    WebRTCConnection.iceLogger.debug('received ICE candidate:');
-                    WebRTCConnection.iceLogger.debug(data['candidate']);
-                    this.handleReceiveIceCandidate(data['candidate']);
-                break;
+            if (this.remoteInstanceId === undefined) {
+                this.remoteInstanceId = instanceId;
             }
-            };
+
+            if (this.remoteInstanceId === instanceId) {
+                var signal  = message['signal'];
+                var data    = message['data'];
+        
+                WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' is handling ' + signal + ' from ' + this.remoteAddress?.serverURL + ' on call ' + data['callId']);
+                WebRTCConnection.logger.trace('received data is ' + JSON.stringify(data));
+                switch (signal) {
+                    case RTC_CONN_DESCRIPTION:
+                        this.handleReceiveConnectionDescription(data['callId'], data['channelName'], data['description']);
+                    break;
+                    case ICE_CANDIDATE:
+                        WebRTCConnection.iceLogger.debug('received ICE candidate:');
+                        WebRTCConnection.iceLogger.debug(data['candidate']);
+                        this.handleReceiveIceCandidate(data['candidate']);
+                    break;
+                }
+            }
+        };
     }
 
     getConnectionId() {
@@ -166,18 +175,19 @@ class WebRTCConnection implements Connection {
      the initial message, the connection will configure the
      listener to pass along all following signalling messages. */
 
-    answer(message: any) {
+    answer(instanceId: string, message: any) {
         this.init();
 
         this.initiator   = false;
+        this.remoteInstanceId = instanceId;
 
-        this.handleSignallingMessage(message);
+        this.handleSignallingMessage(instanceId, message);
     }
 
     /* Sometimes the receiving end defers accepting the connection a bit,
        and several signalling messages crop up. */
-    receiveSignallingMessage(message: any) {
-        this.handleSignallingMessage(message);
+    receiveSignallingMessage(instanceId: string, message: any) {
+        this.handleSignallingMessage(instanceId, message);
     }
 
     close() {
@@ -218,7 +228,7 @@ class WebRTCConnection implements Connection {
     private init(ICEServers? : any) {
         let servers     = ICEServers === undefined ? {iceServers : [{urls : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}]} : ICEServers;
 
-        this.connection     = new RTCPeerConnection(servers);//WebRTCShim.getNewRTCPeerConnection(servers);
+        this.connection     = new RTCPeerConnection(servers);
         this.gatheredICE    = false;
 
         this.connection.onicecandidate = (ev) => {
@@ -294,9 +304,7 @@ class WebRTCConnection implements Connection {
         } else {
             WebRTCConnection.logger.error('Received message for callId ' + callId + ' but connection was undefined on ' + this.localAddress.linkupId);
         }
-        
 
-        
 
         if (! this.initiator) {
             this.setUpLinkupListener()

@@ -40,7 +40,7 @@ class LinkupManagerProxy {
                     const recipient = LinkupAddress.fromURL(newCall.recipient);
 
                     try {
-                        cb(sender, recipient, newCall.callId, newCall.message);
+                        cb(sender, recipient, newCall.callId, newCall.instanceId, newCall.message);
                     } catch (e) {
                         console.log('Error in callback invocation within LinkupManagerProxy: ', e);
                     }
@@ -82,7 +82,7 @@ class LinkupManagerProxy {
                 for (const cb of this.messagesOnCallCallbacks.get(msg.recipient + '/' + msg.callId)) {
 
                     try {
-                        cb(msg.message);
+                        cb(msg.instanceId, msg.message);
                     } catch (e) {
                         console.log('Error in callback invocation within LinkupManagerProxy: ', e);
                     }

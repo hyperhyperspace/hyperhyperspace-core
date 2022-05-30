@@ -64,6 +64,7 @@ type NewCallMessageEvent = {
     sender: Endpoint,
     recipient: Endpoint,
     callId: string,
+    instanceId: string
     message: any
 }
 
@@ -84,6 +85,7 @@ type MessageOnCallEvent = {
     type: 'message-on-call',
     recipient: Endpoint,
     callId: string,
+    instanceId: string,
     message: any
 }
 
@@ -128,13 +130,14 @@ class LinkupManagerHost {
         this.eventCallback = eventCallback;
 
         this.newCallMessageCallback = 
-            (sender: LinkupAddress, recipient: LinkupAddress, callId: string, message: any) => {
+            (sender: LinkupAddress, recipient: LinkupAddress, callId: string, instanceId: string, message: any) => {
 
                 const ev: NewCallMessageEvent = {
                     type: 'new-call-message',
                     sender: sender.url(),
                     recipient: recipient.url(),
                     callId: callId,
+                    instanceId: instanceId,
                     message: message
                 }
 
@@ -186,11 +189,12 @@ class LinkupManagerHost {
 
             const listen = cmd as ListenForMessagesOnCall;
 
-            const callback = (msg: any) => {
+            const callback: MessageCallback = (instanceId: string, msg: any) => {
                 const ev: MessageOnCallEvent = {
                     type: 'message-on-call',
                     recipient: listen.recipient,
                     callId: listen.callId,
+                    instanceId: instanceId,
                     message: msg
                 };
 

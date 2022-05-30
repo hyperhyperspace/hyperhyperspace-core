@@ -19,6 +19,8 @@ class WebSocketConnection implements Connection {
     localAddress: LinkupAddress;
     remoteAddress: LinkupAddress;
 
+    remoteInstanceId?: string;
+
     ws?: WebSocket;    
 
     initiated: boolean;
@@ -93,9 +95,12 @@ class WebSocketConnection implements Connection {
         this.ws.onmessage = this.onmessage;
     }
 
-    answer(message: any) {
+    answer(instanceId: string, message: any) {
 
         if (this.ws === undefined) {
+
+            this.remoteInstanceId = instanceId;
+
             if (!this.reverse &&
                 SignallingServerConnection.isWebRTCBased(this.localAddress.url()) && 
                 message.reverseconnection !== undefined &&

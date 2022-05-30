@@ -452,6 +452,12 @@ class PeerGroupAgent implements Agent {
 
     // Connection deduplication logic.
 
+    // Note: ATM the PeerGroupAgent will aggressively deduplicate all connections that go to the
+    //       same endpoint. In the future, we could use the "instanceId" field in the NetworkAgent's
+    //       connectionInfo to tell when these connections are actually going to the same devices 
+    //       (besides belonging to the same identity), and may not prune connections up to a given
+    //       number of different devices.
+
     private deduplicateConnections() {
         
         for (const [endpoint, connIds] of this.connectionsPerEndpoint.entries()) {
