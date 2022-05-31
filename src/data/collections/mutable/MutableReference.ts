@@ -211,4 +211,4 @@ class RefUpdateOp<T> extends MutationOp {
 ClassRegistry.register(MutableReference.className, MutableReference);
 ClassRegistry.register(RefUpdateOp.className, RefUpdateOp);
 
-export { MutableReference };
+export { MutableReference, RefUpdateOp };
