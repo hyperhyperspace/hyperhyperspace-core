@@ -20,7 +20,7 @@ type ObjectDiscoveryReplyParams = {maxAge?: number, linkupServers?: string[], lo
 
 class ObjectDiscoveryAgent implements Agent {
 
-    static log = new Logger(ObjectDiscoveryAgent.name, LogLevel.DEBUG);
+    static log = new Logger(ObjectDiscoveryAgent.name, LogLevel.INFO);
 
     static agentIdForHexHashSuffix(suffix: string) {
         return 'object-discovery-for-' + suffix;
