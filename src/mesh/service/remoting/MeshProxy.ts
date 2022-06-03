@@ -14,7 +14,7 @@ import { Context, Hash, HashedObject } from 'data/model';
 import { AsyncStream, BufferedAsyncStream, BufferingAsyncStreamSource } from 'util/streams';
 import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 import { Endpoint } from 'mesh/agents/network';
-import { LinkupManager, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
+import { LinkupAddress, LinkupManager, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
 import { WebRTCConnectionEvent, WebRTCConnectionsHost } from 'net/transport';
 
 class MeshProxy {
@@ -267,7 +267,7 @@ class MeshProxy {
         this.commandForwardingFn(cmd);
     }
 
-    findObjectByHash(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
+    findObjectByHash(hash: Hash, linkupServers: string[], replyAddress: LinkupAddress, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
         const streamId = new RNGImpl().randomHexString(64);
 
         const src = new BufferingAsyncStreamSource<ObjectDiscoveryReply>()    
@@ -278,7 +278,8 @@ class MeshProxy {
             type: 'find-object-by-hash',
             hash: hash,
             linkupServers: linkupServers,
-            replyEndpoint: replyEndpoint,
+            replyEndpoint: replyAddress.url(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
             count: count,
             maxAge: maxAge,
             strictEndpoints: strictEndpoints,
@@ -291,7 +292,7 @@ class MeshProxy {
         return new BufferedAsyncStream<ObjectDiscoveryReply>(src);
     }
 
-    findObjectByHashSuffix(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
+    findObjectByHashSuffix(hashSuffix: string, linkupServers: string[], replyAddress: LinkupAddress, count=1, maxAge=30, strictEndpoints=false) : AsyncStream<ObjectDiscoveryReply> {
         const streamId = new RNGImpl().randomHexString(64);
 
         const src = new BufferingAsyncStreamSource<ObjectDiscoveryReply>()    
@@ -302,7 +303,8 @@ class MeshProxy {
             type: 'find-object-by-hash-suffix',
             hashSuffix: hashSuffix,
             linkupServers: linkupServers,
-            replyEndpoint: replyEndpoint,
+            replyEndpoint: replyAddress.url(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
             count: count,
             maxAge: maxAge,
             strictEndpoints: strictEndpoints,
@@ -321,12 +323,13 @@ class MeshProxy {
         this.commandForwardingFn(cmd);
     }
 
-    findObjectByHashRetry(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {
+    findObjectByHashRetry(hash: Hash, linkupServers: string[], replyAddress: LinkupAddress, count=1): void {
         const cmd: FindObjectByHash = {
             type: 'find-object-by-hash',
             hash: hash,
             linkupServers: linkupServers,
-            replyEndpoint: replyEndpoint,
+            replyEndpoint: replyAddress.url(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
             count: count,
             retry: true,
         }
@@ -334,12 +337,13 @@ class MeshProxy {
         this.commandForwardingFn(cmd);
     }
 
-    findObjectByHashSuffixRetry(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {    
+    findObjectByHashSuffixRetry(hashSuffix: string, linkupServers: string[], replyAddress: LinkupAddress, count=1): void {    
         const cmd: FindObjectByHashSuffix = {
             type: 'find-object-by-hash-suffix',
             hashSuffix: hashSuffix,
             linkupServers: linkupServers,
-            replyEndpoint: replyEndpoint,
+            replyEndpoint: replyAddress.url(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
             count: count,
             retry: true,
         }

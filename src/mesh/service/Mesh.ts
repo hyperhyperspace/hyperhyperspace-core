@@ -10,7 +10,7 @@ import { ObjectBroadcastAgent, ObjectDiscoveryAgent, ObjectDiscoveryReply, Objec
 
 import { AgentPod } from './AgentPod';
 import { AsyncStream } from 'util/streams';
-import { LinkupManager } from 'net/linkup';
+import { LinkupAddress, LinkupManager } from 'net/linkup';
 import { RNGImpl } from 'crypto/random';
 import { Logger, LogLevel } from 'util/logging';
 
@@ -347,16 +347,16 @@ class Mesh {
     //        are present in the received suffix!). To fix it, either change ObjectDiscoveryAgent to use all the
     //        received bits, or pass the number of bits explicitly when calling the constructor.
 
-    findObjectByHash(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false, includeErrors=false) : AsyncStream<ObjectDiscoveryReply> {
+    findObjectByHash(hash: Hash, linkupServers: string[], replyAddress: LinkupAddress, count=1, maxAge=30, strictEndpoints=false, includeErrors=false) : AsyncStream<ObjectDiscoveryReply> {
         const suffix = Hashing.toHex(hash);
-        return this.findObjectByHashSuffix(suffix, linkupServers, replyEndpoint, count, maxAge, strictEndpoints, includeErrors);
+        return this.findObjectByHashSuffix(suffix, linkupServers, replyAddress, count, maxAge, strictEndpoints, includeErrors);
     }
 
-    findObjectByHashSuffix(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1, maxAge=30, strictEndpoints=false, includeErrors=false) : AsyncStream<ObjectDiscoveryReply> {
+    findObjectByHashSuffix(hashSuffix: string, linkupServers: string[], replyAddress: LinkupAddress, count=1, maxAge=30, strictEndpoints=false, includeErrors=false) : AsyncStream<ObjectDiscoveryReply> {
         
         const discoveryAgent = this.getDiscoveryAgentFor(hashSuffix);
 
-        discoveryAgent.query(linkupServers, replyEndpoint, count);
+        discoveryAgent.query(linkupServers, replyAddress, count);
 
         let params: ObjectDiscoveryReplyParams = {};
 
@@ -364,7 +364,7 @@ class Mesh {
 
         if (strictEndpoints) {
             params.linkupServers = linkupServers;
-            params.localEndpoints = [replyEndpoint];
+            params.localEndpoints = [replyAddress.url()];
         }
 
         params.includeErrors = includeErrors;
@@ -372,14 +372,14 @@ class Mesh {
         return discoveryAgent.getReplyStream(params);
     }
 
-    findObjectByHashRetry(hash: Hash, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {
+    findObjectByHashRetry(hash: Hash, linkupServers: string[], replyAddress: LinkupAddress, count=1): void {
         const suffix = Hashing.toHex(hash);
-        this.findObjectByHashSuffixRetry(suffix, linkupServers, replyEndpoint, count);
+        this.findObjectByHashSuffixRetry(suffix, linkupServers, replyAddress, count);
     }
 
-    findObjectByHashSuffixRetry(hashSuffix: string, linkupServers: string[], replyEndpoint: Endpoint, count=1): void {
+    findObjectByHashSuffixRetry(hashSuffix: string, linkupServers: string[], replyAddress: LinkupAddress, count=1): void {
         const discoveryAgent = this.getDiscoveryAgentFor(hashSuffix);
-        discoveryAgent.query(linkupServers, replyEndpoint, count);
+        discoveryAgent.query(linkupServers, replyAddress, count);
     }
 
     getSyncAgentFor(peerGroupId: PeerGroupId, mutHash: Hash): StateSyncAgent|undefined {

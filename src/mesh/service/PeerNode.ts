@@ -1,6 +1,7 @@
 
 import { Hash, HashedObject } from 'data/model';
 import { ObjectDiscoveryPeerSource, PeerInfo } from 'mesh/agents/peer';
+import { LinkupAddress } from 'net/linkup';
 import { Resources } from 'spaces/spaces';
 import { MultiMap } from 'util/multimap';
 import { PeerGroupInfo, SyncMode, UsageToken } from './Mesh';
@@ -109,7 +110,7 @@ class PeerNode {
 
     private async discoveryPeerGroupInfo(obj: HashedObject) : Promise<PeerGroupInfo> {
         let localPeer = this.resources.getPeersForDiscovery()[0];
-        let peerSource = new ObjectDiscoveryPeerSource(this.resources.mesh, obj, this.resources.config.linkupServers, localPeer.endpoint, this.resources.getEndointParserForDiscovery());
+        let peerSource = new ObjectDiscoveryPeerSource(this.resources.mesh, obj, this.resources.config.linkupServers, LinkupAddress.fromURL(localPeer.endpoint, localPeer.identity), this.resources.getEndointParserForDiscovery());
 
         return {
             id: PeerNode.discoveryPeerGroupInfoId(obj),

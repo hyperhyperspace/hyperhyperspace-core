@@ -512,8 +512,8 @@ class NetworkAgent implements Agent {
         this.linkupManager.listenForMessagesNewCall(address, this.newConnectionRequestCallback);
     }
 
-    listenForLinkupMessages(endpoint: Endpoint) {
-        let address = LinkupAddress.fromURL(endpoint);
+    listenForLinkupMessages(endpoint: Endpoint, identity?: Identity) {
+        let address = LinkupAddress.fromURL(endpoint, identity);
         this.linkupMessageListening.add(endpoint);
         this.linkupManager.listenForRawMessages(address, this.linkupMessageCallback);
     }

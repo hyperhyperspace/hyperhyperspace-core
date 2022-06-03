@@ -19,7 +19,7 @@ type ObjectBroadcastReply = {
 
 class ObjectBroadcastAgent implements Agent {
 
-    static log = new Logger(ObjectBroadcastAgent.name, LogLevel.INFO);
+    static log = new Logger(ObjectBroadcastAgent.name, LogLevel.DEBUG);
 
     static defaultBroadcastedSuffixBits = 36;
 

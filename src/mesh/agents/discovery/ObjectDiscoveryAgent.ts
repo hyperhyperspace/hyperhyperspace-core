@@ -20,7 +20,7 @@ type ObjectDiscoveryReplyParams = {maxAge?: number, linkupServers?: string[], lo
 
 class ObjectDiscoveryAgent implements Agent {
 
-    static log = new Logger(ObjectDiscoveryAgent.name, LogLevel.INFO);
+    static log = new Logger(ObjectDiscoveryAgent.name, LogLevel.DEBUG);
 
     static agentIdForHexHashSuffix(suffix: string) {
         return 'object-discovery-for-' + suffix;
@@ -70,7 +70,7 @@ class ObjectDiscoveryAgent implements Agent {
         this.pod = pod;
     }
 
-    query(linkupServers: string[], localEndpoint: Endpoint, count=1) {
+    query(linkupServers: string[], localAddress: LinkupAddress, count=1) {
 
         if (this.pod === undefined) {
             throw new Error('This ObjectDiscoveryAgent has not been registered to a mesh so it cannot accept queries yet.');
@@ -87,9 +87,12 @@ class ObjectDiscoveryAgent implements Agent {
             
         }
 
+        const localEndpoint = localAddress.url();
+        const localIdentity = localAddress.identity;
+
         if (!this.localEndpoints.has(localEndpoint)) {
             ObjectDiscoveryAgent.log.trace('listening on ' + localEndpoint);
-            this.getNetworkAgent().listenForLinkupMessages(localEndpoint);
+            this.getNetworkAgent().listenForLinkupMessages(localEndpoint, localIdentity);
             this.localEndpoints.add(localEndpoint);
         }
 

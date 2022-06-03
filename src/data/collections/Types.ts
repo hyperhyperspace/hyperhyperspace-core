@@ -1,6 +1,8 @@
 import { HashedSet } from 'data/model';
 import { HashedObject } from '../model/immutable/HashedObject';
 
+// FIXME: the types thing should be a HashedSet, not a friggin array. What was I thinking?
+
 abstract class Types {
     
     static HashedObject = 'HashedObject';

@@ -9,7 +9,7 @@ import { PeerSource } from 'mesh/agents/peer';
 
 import { RNGImpl } from 'crypto/random';
 import { Identity, RSAKeyPair } from 'data/identity';
-import { LinkupManager } from 'net/linkup';
+import { LinkupAddress, LinkupManager } from 'net/linkup';
 import { HashedLiteral } from 'data/model';
 import { Mesh } from 'mesh/service';
 import { RemotingMesh } from './RemotingMesh';
@@ -92,9 +92,9 @@ class TestPeerGroupPods {
                 
                 if (discovery === 'linkup-discovery-secret') {
                     //const secretPeerSource = new SecretBasedPeerSource(peerSource, secret as string);
-                    peerSourceToUse = new ObjectDiscoveryPeerSource(mesh, object, [LinkupManager.defaultLinkupServer], peers[i].endpoint, SecretBasedPeerSource.makeSecureEndpointParser((ep: string) => peerSource.getPeerForEndpoint(ep), secret as string) /*(ep: string) => secretPeerSource.getPeerForEndpoint(ep)*/);
+                    peerSourceToUse = new ObjectDiscoveryPeerSource(mesh, object, [LinkupManager.defaultLinkupServer], LinkupAddress.fromURL(peers[i].endpoint, peers[i].identity), SecretBasedPeerSource.makeSecureEndpointParser((ep: string) => peerSource.getPeerForEndpoint(ep), secret as string) /*(ep: string) => secretPeerSource.getPeerForEndpoint(ep)*/);
                 } else {
-                    peerSourceToUse = new ObjectDiscoveryPeerSource(mesh, object, [LinkupManager.defaultLinkupServer], peers[i].endpoint, (ep: string) => peerSource.getPeerForEndpoint(ep));
+                    peerSourceToUse = new ObjectDiscoveryPeerSource(mesh, object, [LinkupManager.defaultLinkupServer], LinkupAddress.fromURL(peers[i].endpoint, peers[i].identity), (ep: string) => peerSource.getPeerForEndpoint(ep));
                 }
 
                 

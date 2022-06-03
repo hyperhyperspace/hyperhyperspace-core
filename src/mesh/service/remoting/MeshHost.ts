@@ -8,6 +8,7 @@ import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 import { RNGImpl } from 'crypto/random';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { Store } from 'storage/store';
+import { LinkupAddress } from 'net/linkup';
 
 type MeshCommand = JoinPeerGroup | LeavePeerGroup |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
@@ -21,8 +22,8 @@ type JoinPeerGroup = {
     peerGroupId: string,
     localPeerEndpoint: Endpoint;
     localPeerIdentityHash: Hash;
-    localPeerIdentity?: LiteralContext | undefined,
-    localPeerIdentityKeyPair?: LiteralContext | undefined,
+    localPeerIdentity?: LiteralContext,
+    localPeerIdentityKeyPair?: LiteralContext,
     //localPeer: PeerInfo,
     config?: PeerGroupAgentConfig;
     usageToken?: UsageToken
@@ -67,6 +68,7 @@ type FindObjectByHash = {
     hash: Hash,
     linkupServers: Array<string>,
     replyEndpoint: Endpoint,
+    replyIdentity?: LiteralContext,
     count?: number,
     maxAge?: number,
     strictEndpoints?: boolean,
@@ -80,6 +82,7 @@ type FindObjectByHashSuffix = {
     hashSuffix: string,
     linkupServers: Array<string>,
     replyEndpoint: Endpoint,
+    replyIdentity?: LiteralContext,
     count?: number,
     maxAge?: number,
     includeErrors?: boolean,
@@ -293,6 +296,9 @@ class MeshHost {
                    command.type === 'find-object-by-hash-suffix') {
             const find = command as FindObjectByHash | FindObjectByHashSuffix;
 
+            const id = find.replyIdentity === undefined? undefined : HashedObject.fromLiteralContext(find.replyIdentity) as Identity;
+            const replyAddress = LinkupAddress.fromURL(find.replyEndpoint, id);
+
             if (!find.retry) {
 
                 const streamId = command.streamId;
@@ -300,11 +306,11 @@ class MeshHost {
 
                 if (command.type === 'find-object-by-hash') {
                     replyStream = this.mesh.findObjectByHash(
-                        (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints, find.includeErrors
+                        (find as FindObjectByHash).hash, find.linkupServers, replyAddress, find.count, find.maxAge, find.strictEndpoints, find.includeErrors
                     );
                 } else {
                     replyStream = this.mesh.findObjectByHashSuffix(
-                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count, find.maxAge, find.strictEndpoints, find.includeErrors
+                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, replyAddress, find.count, find.maxAge, find.strictEndpoints, find.includeErrors
                     );
                 }
                 
@@ -356,11 +362,11 @@ class MeshHost {
             } else {
                 if (command.type === 'find-object-by-hash') {
                     this.mesh.findObjectByHashRetry(
-                        (find as FindObjectByHash).hash, find.linkupServers, find.replyEndpoint, find.count
+                        (find as FindObjectByHash).hash, find.linkupServers, replyAddress, find.count
                     );
                 } else {
                     this.mesh.findObjectByHashSuffixRetry(
-                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, find.replyEndpoint, find.count
+                        (find as FindObjectByHashSuffix).hashSuffix, find.linkupServers, replyAddress, find.count
                     );
                 }
             }

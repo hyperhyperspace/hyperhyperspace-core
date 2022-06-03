@@ -101,6 +101,8 @@ class WebRTCConnection implements Connection {
                         this.handleReceiveIceCandidate(data['candidate']);
                     break;
                 }
+            } else {
+                WebRTCConnection.logger.debug('discarding signalling message: expected remote instance id to be ' + this.remoteInstanceId + ' but got ' + instanceId);
             }
         };
     }
@@ -141,6 +143,13 @@ class WebRTCConnection implements Connection {
         a WebRTCConnection object and call the open() method. */
 
     open(channelName='mesh-network-channel') {
+
+        if (this.initiator === true) {
+            WebRTCConnection.logger.warning('Opening connection ' + this.callId + ' a second time, this is not right, ignoring.');
+            
+            return;
+        }
+
         this.init();
         this.initiator   = true;
         this.channelName = channelName;
@@ -156,10 +165,16 @@ class WebRTCConnection implements Connection {
         
         this.setUpChannel();
 
+        const conn = this.connection;
+
         this.connection?.createOffer().then(
             (description) => {
                 if (this.connection?.signalingState !== 'closed') {
-                    this.connection?.setLocalDescription(description);
+                    this.connection?.setLocalDescription(description).catch((reason: any) => {
+                        WebRTCConnection.logger.debug('failed to set local description while in ' + this.connection?.signalingState);
+                        WebRTCConnection.logger.debug('conn has changed: ' + (conn !== this.connection));
+                        WebRTCConnection.logger.debug('reason:', JSON.stringify(reason));
+                    });
                 }
                 this.signalConnectionDescription(description);
             },
@@ -251,7 +266,7 @@ class WebRTCConnection implements Connection {
 
     private signalConnectionDescription(description: RTCSessionDescriptionInit) {
         this.signalSomething(RTC_CONN_DESCRIPTION,
-                            {'callId':          this.callId,
+                            {'callId':      this.callId,
                              'channelName': this.channelName,
                              'description': description
                             });
@@ -295,7 +310,7 @@ class WebRTCConnection implements Connection {
                 }
     
                 this.connection.setRemoteDescription(description).catch((reason: any) => {
-                    WebRTCConnection.logger.warning('Failed to set remote description, reason: ' + JSON.stringify(reason));
+                    WebRTCConnection.logger.debug('Failed to set remote description, reason: ' + JSON.stringify(reason)); //TODO: warning? investigate more?
                  });    
             } else {
                 WebRTCConnection.logger.debug('A remote description arrived untimely (signalingState=="closed") and will be ignored.');
@@ -313,14 +328,15 @@ class WebRTCConnection implements Connection {
                     try {
                         this.connection?.setLocalDescription(description);
                     } catch (e) {
-                        WebRTCConnection.logger.warning('Failed to set local description, error:', e);
-                        WebRTCConnection.logger.warning('Description object was:', description);
+                        WebRTCConnection.logger.debug('Failed to set local description, error:', e); // TODO: warning? investigate more?
+                        WebRTCConnection.logger.debug('Description object was:', description);
                     }
                     
                     this.signalConnectionDescription(description);
                 },
                 (error) => {
-                    WebRTCConnection.logger.error('error generating answer: ' + error + ' for callId ' + this.callId + ' on ' + this.localAddress.linkupId);
+                    // TODO: warning? investigate more?
+                    WebRTCConnection.logger.debug('error generating answer: ' + error + ' for callId ' + this.callId + ' on ' + this.localAddress.linkupId);
                 }
             );
         }

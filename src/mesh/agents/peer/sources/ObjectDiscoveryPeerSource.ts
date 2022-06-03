@@ -2,6 +2,7 @@ import { Hash, HashedObject } from 'data/model';
 import { ObjectDiscoveryReply } from 'mesh/agents/discovery/ObjectDiscoveryAgent';
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
 import { Mesh } from 'mesh/service/Mesh';
+import { LinkupAddress } from 'net/linkup';
 import { AsyncStream } from 'util/streams';
 import { PeerInfo } from '../PeerGroupAgent';
 import { PeerSource } from '../PeerSource';
@@ -14,19 +15,19 @@ class ObjectDiscoveryPeerSource implements PeerSource {
     parseEndpoint: (ep: Endpoint) => Promise<PeerInfo | undefined>;
 
     linkupServers: string[];
-    replyEndpoint: Endpoint;
+    replyAddress: LinkupAddress;
     timeoutMillis: number;
     
     hash: Hash;
     replyStream?: AsyncStream<ObjectDiscoveryReply>;
 
-    constructor(mesh: Mesh, object: HashedObject, linkupServers: string[], replyEndpoint: Endpoint, parseEndpoint: (ep: Endpoint) => Promise<PeerInfo | undefined>, timeout=3) {
+    constructor(mesh: Mesh, object: HashedObject, linkupServers: string[], replyAddress: LinkupAddress, parseEndpoint: (ep: Endpoint) => Promise<PeerInfo | undefined>, timeout=3) {
         this.mesh = mesh;
         this.object = object;
         this.parseEndpoint = parseEndpoint;
 
         this.linkupServers = linkupServers;
-        this.replyEndpoint = replyEndpoint;
+        this.replyAddress = replyAddress;
         this.timeoutMillis = timeout * 1000;
 
         this.hash = object.hash();
@@ -94,11 +95,11 @@ class ObjectDiscoveryPeerSource implements PeerSource {
     }
 
     private tryObjectDiscovery(count: number) : AsyncStream<ObjectDiscoveryReply> {
-        return this.mesh.findObjectByHash(this.hash, this.linkupServers, this.replyEndpoint, count);
+        return this.mesh.findObjectByHash(this.hash, this.linkupServers, this.replyAddress, count);
     }
 
     private retryObjectDiscovery(count: number) {
-        this.mesh.findObjectByHashRetry(this.hash, this.linkupServers, this.replyEndpoint, count);
+        this.mesh.findObjectByHashRetry(this.hash, this.linkupServers, this.replyAddress, count);
     }
 }
 

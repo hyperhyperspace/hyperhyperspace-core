@@ -5,6 +5,7 @@ import { AsyncStream } from 'util/streams';
 import { SpaceEntryPoint } from './SpaceEntryPoint';
 import { Resources } from './Resources';
 import { SpaceInfo } from './SpaceInfo';
+import { LinkupAddress } from 'net/linkup';
 
 type SpaceInit = {entryPoint?: HashedObject & SpaceEntryPoint, hash?: Hash, wordCode?: string[], wordCodeLang?: string };
 
@@ -115,11 +116,11 @@ class Space {
         }
 
         const linkupServers = this.resources.config.linkupServers;
-        const discoveryEndpoint = this.resources.config.peersForDiscovery[0].endpoint;
+        const discoveryAddress = LinkupAddress.fromURL(this.resources.config.peersForDiscovery[0].endpoint, this.resources.config.peersForDiscovery[0].identity);
 
 
         const discovery =
-            this.resources.mesh.findObjectByHashSuffix(suffix, linkupServers, discoveryEndpoint);
+            this.resources.mesh.findObjectByHashSuffix(suffix, linkupServers, discoveryAddress);
 
         return this.processDiscoveryReply(discovery);
     }
