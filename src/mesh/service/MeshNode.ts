@@ -8,7 +8,7 @@ import { PeerGroupInfo, SyncMode, UsageToken } from './Mesh';
 
 type Key = string;
 
-class PeerNode {
+class MeshNode {
 
     resources: Resources;
 
@@ -62,7 +62,7 @@ class PeerNode {
             peerGroup = await this.discoveryPeerGroupInfo(obj);
         }
 
-        const peerGroupKey = PeerNode.generateKey([peerGroup.id]);
+        const peerGroupKey = MeshNode.generateKey([peerGroup.id]);
 
         let peerGroupToken = this.peerGroupTokens.get(peerGroupKey);
         
@@ -71,7 +71,7 @@ class PeerNode {
             this.peerGroupTokens.set(peerGroupKey, peerGroupToken);
         }
 
-        const syncKey = PeerNode.generateKey([obj.hash(), peerGroup.id, gossipId]);
+        const syncKey = MeshNode.generateKey([obj.hash(), peerGroup.id, gossipId]);
 
         let syncToken = this.syncTokens.get(syncKey);
 
@@ -84,10 +84,10 @@ class PeerNode {
 
     async stopSync(obj: HashedObject, peerGroupId?: string, gossipId?: string) : Promise<void> {
         if (peerGroupId === undefined) {
-            peerGroupId = PeerNode.discoveryPeerGroupInfoId(obj);
+            peerGroupId = MeshNode.discoveryPeerGroupInfoId(obj);
         }
 
-        const syncKey   = PeerNode.generateKey([obj.hash(), peerGroupId, gossipId]);
+        const syncKey   = MeshNode.generateKey([obj.hash(), peerGroupId, gossipId]);
         const syncToken = this.syncTokens.get(syncKey);
 
         if (syncToken !== undefined) {
@@ -95,7 +95,7 @@ class PeerNode {
             this.resources.mesh.stopSyncObjectWithPeerGroup(syncToken);
             this.syncTokens.delete(syncKey);
 
-            const peerGroupKey   = PeerNode.generateKey([peerGroupId]);
+            const peerGroupKey   = MeshNode.generateKey([peerGroupId]);
             const peerGroupToken = this.peerGroupTokens.get(peerGroupKey)
 
             if (peerGroupToken !== undefined) {
@@ -113,7 +113,7 @@ class PeerNode {
         let peerSource = new ObjectDiscoveryPeerSource(this.resources.mesh, obj, this.resources.config.linkupServers, LinkupAddress.fromURL(localPeer.endpoint, localPeer.identity), this.resources.getEndointParserForDiscovery());
 
         return {
-            id: PeerNode.discoveryPeerGroupInfoId(obj),
+            id: MeshNode.discoveryPeerGroupInfoId(obj),
             localPeer: localPeer,
             peerSource: peerSource
         };
@@ -158,4 +158,4 @@ class PeerNode {
 
 }
 
-export { PeerNode }
+export { MeshNode }
