@@ -6,28 +6,43 @@ import { Types } from '../Types';
 import { Hash } from 'data/model/hashing/Hashing';
 import { ClassRegistry } from 'data/model';
 import { MultiMap } from 'util/multimap';
+import { Identity } from 'data/identity';
 
 class MutableReference<T> extends MutableObject {
 
     static className = 'hhs/v0/MutableReference';
 
+    writer?: Identity;
     typeConstraints?: Array<string>;
 
     _sequence?: number;
     _timestamp?: string;
     _value?: T;
 
-    constructor() {
+    constructor(config = {writer: undefined as (undefined | Identity)}) {
         super([RefUpdateOp.className]);
 
+        this.writer = config.writer;
         this.setRandomId();
+    }
+
+    setWriter(writer?: Identity) {
+        this.writer = writer;
+    }
+
+    getWriter() {
+        return this.writer;
+    }
+
+    hasWriter() {
+        return this.writer !== undefined;
     }
 
     getValue() : T | undefined {
         return this._value;
     }
 
-    async setValue(value: T) {
+    setValue(value: T) {
 
         if (!(value instanceof HashedObject)) {
             if (!HashedObject.isLiteral(value)) {
@@ -36,7 +51,7 @@ class MutableReference<T> extends MutableObject {
         }
 
         let op = new RefUpdateOp<T>(this, value, this._sequence);
-        await this.applyNewOp(op);
+        return this.applyNewOp(op);
     }
 
     mutate(op: MutationOp): Promise<boolean> {
@@ -106,7 +121,7 @@ class MutableReference<T> extends MutableObject {
     async validate(references: Map<Hash, HashedObject>) {
         references;
 
-        return Types.isTypeConstraint(this.typeConstraints);
+        return Types.isTypeConstraint(this.typeConstraints) && (this.writer === undefined || this.writer instanceof Identity);
     }
 }
 
@@ -119,17 +134,16 @@ class RefUpdateOp<T> extends MutationOp {
     value?: T;
 
 
-    constructor(target?: MutableReference<T>, value?: T, sequence?: number) {
-        super(target);
+    constructor(targetObject?: MutableReference<T>, value?: T, sequence?: number) {
+        super(targetObject);
 
-        if (target !== undefined) {
+        if (targetObject !== undefined) {
             this.value = value;
             this.sequence = sequence === undefined? 0 : sequence + 1;
             this.timestamp = Timestamps.uniqueTimestamp();
             
-            const author = target.getAuthor();
-            if (author !== undefined) {
-                this.setAuthor(author);
+            if (targetObject.writer !== undefined) {
+                this.setAuthor(targetObject.writer);
             }
         }
         
@@ -149,8 +163,14 @@ class RefUpdateOp<T> extends MutationOp {
             return false;
         }
 
-        if (this.getTargetObject().getAuthor() !== undefined && !(this.getTargetObject().getAuthor()?.equals(this.getAuthor()))) {
-            MutableObject.validationLog.debug('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target authored by ' + this.getTargetObject().getAuthor()?.hash() + '.');
+        const targetObject = this.getTargetObject();
+
+        if (!(targetObject instanceof MutableReference)) {
+            return false;
+        }
+
+        if (targetObject.writer !== undefined && !(targetObject.writer.equals(this.getAuthor()))) {
+            MutableObject.validationLog.debug('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target whose writer is ' + targetObject.writer.hash() + '.');
             return false;
         }
 
@@ -177,12 +197,6 @@ class RefUpdateOp<T> extends MutationOp {
         if (this.value === undefined) {
             MutableObject.validationLog.debug('The field value is mandatory in class REfUpdateop');
             return false;
-        }
-
-        if (this.targetObject === undefined || 
-            this.targetObject.getClassName() !== MutableReference.className ) {
-                MutableObject.validationLog.debug('A RefUpdateOp can only have a MutableReference as its target.');
-                return false;
         }
 
         let constraints = (this.targetObject as MutableReference<T>).typeConstraints;

@@ -13,20 +13,20 @@ import { location } from 'util/events';
 import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
+import { Identity } from 'data/identity';
 
 // a simple mutable list with a single writer
 
-// can work with or without duplicates (in the latter, inserting an element already in the set has no effect)
+// can work with or without duplicates (in the latter case, inserting an element already in the set has no effect)
 
 abstract class MutableArrayOp<T> extends MutationOp {
 
-    constructor(target?: MutableArray<T>) {
-        super(target);
+    constructor(targetObject?: MutableArray<T>) {
+        super(targetObject);
 
-        if (target !== undefined) {
-            let author = target.getAuthor();
-            if (author !== undefined) {
-                this.setAuthor(author);
+        if (targetObject !== undefined) {
+            if (targetObject.writer !== undefined) {
+                this.setAuthor(targetObject.writer);
             }
         }
     }
@@ -41,11 +41,13 @@ abstract class MutableArrayOp<T> extends MutationOp {
             return false;
         }
 
-        if (! (this.getTargetObject() instanceof MutableArray)) {
+        const targetObject = this.getTargetObject();
+
+        if (! (targetObject instanceof MutableArray)) {
             return false;
         }
 
-        if (this.getTargetObject().getAuthor() !== undefined && !(this.getTargetObject().getAuthor()?.equals(this.getAuthor()))) {
+        if (targetObject.writer !== undefined && !(targetObject.writer.equals(this.getAuthor()))) {
             return false;
         }
 
@@ -202,8 +204,9 @@ class MutableArray<T> extends MutableObject {
     static opClasses = [InsertOp.className, DeleteOp.className];
     static logger    = new Logger(MutableArray.className, LogLevel.INFO);
     
-
     duplicates: boolean;
+
+    writer?: Identity;
     typeConstraints?: Array<string>;
 
     _elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
@@ -219,10 +222,12 @@ class MutableArray<T> extends MutableObject {
     _hashes   : Array<Hash>;
     _ordinals : Array<Ordinal>;
 
-    constructor(duplicates=true) {
+    constructor(config={duplicates: true, writer: undefined as (undefined|Identity)}) {
         super(MutableArray.opClasses);
 
-        this.duplicates = duplicates;
+        this.duplicates = config.duplicates;
+        this.writer     = config.writer;
+        
         this.setRandomId();
 
         this._elementsPerOrdinal = new ArrayMap();
@@ -236,6 +241,18 @@ class MutableArray<T> extends MutableObject {
         this._contents = [];
         this._hashes   = [];
         this._ordinals = [];
+    }
+
+    setWriter(writer?: Identity) {
+        this.writer = writer;
+    }
+
+    getWriter() {
+        return this.writer;
+    }
+
+    hasWriter() {
+        return this.writer !== undefined;
     }
 
     async insertAt(element: T, idx: number) {
@@ -276,7 +293,7 @@ class MutableArray<T> extends MutableObject {
             // Note: in the "no duplciates" case, the delete -if necessary- has to come after the 
             // insert (taking care to exclude the newly inserted element). Then, if the new position
             // comes after the old one, the insert will initially have no effect, and the element 
-            // will "move" to there after the delete. Hence the size of the list will never decrease,
+            // will "move" over there after the delete. Hence the size of the list will never decrease,
             // and from the outside it will look like the element was just repositioned.
 
             if (oldInsertionOps !== undefined && oldInsertionOps.size > 0) {
@@ -550,7 +567,7 @@ class MutableArray<T> extends MutableObject {
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
         references;
-        return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
+        return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints) && (this.writer === undefined || this.writer instanceof Identity); 
     }
 
 }

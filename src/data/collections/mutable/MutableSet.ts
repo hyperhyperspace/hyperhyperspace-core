@@ -7,6 +7,7 @@ import { HashReference } from 'data/model/immutable/HashReference';
 import { Types } from '../Types';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
+import { Identity } from 'data/identity';
 
 type ElmtHash = Hash;
 
@@ -19,13 +20,12 @@ enum MutableSetEvents {
 
 abstract class MutableSetOp<T> extends MutationOp {
 
-    constructor(target?: MutableSet<T>) {
-        super(target);
+    constructor(targetObject?: MutableSet<T>) {
+        super(targetObject);
 
-        if (target !== undefined) {
-            let author = target.getAuthor();
-            if (author !== undefined) {
-                this.setAuthor(author);
+        if (targetObject !== undefined) {
+            if (targetObject.writer !== undefined) {
+                this.setAuthor(targetObject.writer);
             }
         }
     }
@@ -40,11 +40,13 @@ abstract class MutableSetOp<T> extends MutationOp {
             return false;
         }
 
-        if (! (this.getTargetObject() instanceof MutableSet)) {
+        const targetObject = this.getTargetObject();
+
+        if (! (targetObject instanceof MutableSet)) {
             return false;
         }
 
-        if (this.getTargetObject().getAuthor() !== undefined && !(this.getTargetObject().getAuthor()?.equals(this.getAuthor()))) {
+        if (targetObject.writer !== undefined && !(targetObject.writer.equals(this.getAuthor()))) {
             return false;
         }
 
@@ -59,8 +61,8 @@ class AddOp<T> extends MutableSetOp<T> {
 
     element?: T;
 
-    constructor(target?: MutableSet<T>, element?: T) {
-        super(target);
+    constructor(targetObject?: MutableSet<T>, element?: T) {
+        super(targetObject);
 
         if (element !== undefined) {
             this.element = element;
@@ -203,6 +205,7 @@ class MutableSet<T> extends MutableObject {
 
     _logger: Logger;
 
+    writer?: Identity;
     typeConstraints?: Array<string>;
 
     _elements: Map<ElmtHash, T>;
@@ -213,11 +216,12 @@ class MutableSet<T> extends MutableObject {
     /*_addElementCallback?    : (element: T) => void;
     _deleteElementCallback? : (element: T) => void;*/
 
-    constructor() {
+    constructor(config={writer: undefined as (Identity | undefined)}) {
         super(MutableSet.opClasses);
 
         this._logger = MutableSet.logger;
 
+        this.writer = config.writer;
         this.setRandomId();
 
         this._elements = new Map();
@@ -231,9 +235,21 @@ class MutableSet<T> extends MutableObject {
 
     }
 
+    setWriter(writer?: Identity) {
+        this.writer = writer;
+    }
+
+    getWriter() {
+        return this.writer;
+    }
+
+    hasWriter() {
+        return this.writer !== undefined;
+    }
+
     async validate(references: Map<Hash, HashedObject>) {
         references;
-        return Types.isTypeConstraint(this.typeConstraints);
+        return Types.isTypeConstraint(this.typeConstraints) && (this.writer === undefined || this.writer instanceof Identity);
     }
 
     async add(element: T) {

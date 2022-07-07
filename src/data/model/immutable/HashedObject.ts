@@ -85,9 +85,14 @@ abstract class HashedObject {
     }
 
     setAuthor(author: Identity) {
-        if (!author.hasKeyPair()) {
-            throw new Error('Trying to set the author of an object, but the received identity does not have an attached key pair to sign it.');
-        }
+        
+        //if (!author.hasKeyPair()) {
+        //    throw new Error('Trying to set the author of an object, but the received identity does not have an attached key pair to sign it.');
+        //}
+
+        // Note: There are legitimate uses for setting the author to an identity whose
+        //       keypair is not known (e.g., figuring out what such an object's hash
+        //       would be).
 
         this.author = author;
         this._signOnSave = true;
@@ -96,6 +101,10 @@ abstract class HashedObject {
 
     getAuthor() {
         return this.author;
+    }
+
+    hasAuthor() {
+        return this.author !== undefined;
     }
 
     hasLastSignature() : boolean {
@@ -151,7 +160,7 @@ abstract class HashedObject {
     getStore() : Store {
 
         if (!this.hasStore()) {
-            throw new Error('Attempted to get store from object resources, but one is not present in instance of ' + this._lastHash);
+            throw new Error('Attempted to get store from object resources, but one is not present in instance of ' + this.getClassName());
         }
 
         return this._resources?.store as Store;
@@ -263,6 +272,10 @@ abstract class HashedObject {
 
     getResources(): Resources | undefined {
         return this._resources;
+    }
+
+    hasResources(): boolean {
+        return this._resources !== undefined;
     }
 
     forgetResources(): void {
@@ -968,6 +981,18 @@ abstract class HashedObject {
     }
 
     // load / store
+
+    async save(store?: Store) : Promise<void> {
+        if (store === undefined) {
+            store = this.getStore();
+        } else {
+            if (this.getResources() === undefined) {
+                this.setStore(store);
+            }
+        }
+
+        return store.save(this);
+    }
 
     async loadAndWatchForChanges(loadBatchSize=128): Promise<void> {
 

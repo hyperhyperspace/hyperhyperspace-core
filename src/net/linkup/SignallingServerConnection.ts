@@ -336,7 +336,10 @@ class SignallingServerConnection implements LinkupServer {
                             this.challenge = message['challenge'];
 
                             for (const address of this.linkupIdsToListen.values()) {
-                                if (address.identity !== undefined) {
+                                
+                                if (address.identity !== undefined && 
+                                    address.linkupId.slice(0, LinkupAddress.verifiedIdPrefix.length) === LinkupAddress.verifiedIdPrefix) {
+                                    
                                     this.setUpListener(address);
                                 }
                             }
@@ -439,7 +442,9 @@ class SignallingServerConnection implements LinkupServer {
     }
 
     close() {
-        this.ws?.close();
+        if (this.ws?.readyState === WebSocket.CONNECTING && this.ws?.readyState === WebSocket.CONNECTING) {
+            this.ws?.close();
+        }
     }
 
 }

@@ -7,7 +7,8 @@ import { MeshCommand,
     FindObjectByHash, FindObjectByHashSuffix, 
     CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply,
     PeerSourceRequest, 
-    Shutdown} from './MeshHost';
+    Shutdown,
+    PeerInfoContext} from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject } from 'data/model';
@@ -92,10 +93,24 @@ class MeshProxy {
                 if (source !== undefined) {
                     source.getPeerForEndpoint(req.endpoint).then(
                         (value: PeerInfo|undefined) => {
+
+                            let peerInfoContext: PeerInfoContext|undefined = undefined;
+
+                            if (value !== undefined) {
+                                peerInfoContext = {
+                                    endpoint: value.endpoint,
+                                    identityHash: value.identityHash
+                                };
+
+                                if (value.identity !== undefined) {
+                                    peerInfoContext.identity = value.identity.toLiteralContext();
+                                }
+                            }
+
                             this.commandForwardingFn({
                                 type: 'forward-get-peer-for-endpoint-reply',
                                 requestId: req.requestId,
-                                peerInfo: value,
+                                peerInfoContext: peerInfoContext,
                                 error: false
                         });
                         },
@@ -103,7 +118,7 @@ class MeshProxy {
                             this.commandForwardingFn({
                                 type: 'forward-get-peer-for-endpoint-reply',
                                 requestId: req.requestId,
-                                peerInfo: undefined,
+                                peerInfoContext: undefined,
                                 error: true
                             });
                         })

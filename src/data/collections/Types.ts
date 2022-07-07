@@ -51,6 +51,9 @@ abstract class Types {
         let satisfies = true;
 
         if (types !== undefined) {
+
+            satisfies = false;
+
             for (const typ of types) {
                 if (Types.hasType(value, typ)) {
                     satisfies = true;
@@ -63,10 +66,8 @@ abstract class Types {
     }
     
     static hasType(value: any, typ: string): boolean {
-        if (typ === 'string') {
-            return (typeof value) === 'string';
-        } else if (typ === 'number') {
-            return (typeof value) === 'number';
+        if (typ === 'string' || typ === 'number' || typ === 'boolean') {
+            return (typeof value) === typ;
         } else {
             return (value instanceof HashedObject && (typ === Types.HashedObject || typ === value.getClassName()));
         }

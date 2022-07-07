@@ -105,9 +105,11 @@ type ForwardGetPeersReply = {
 type ForwardGetPeerForEndpointReply = {
     type: 'forward-get-peer-for-endpoint-reply'
     requestId: string,
-    peerInfo: PeerInfo | undefined,
+    peerInfoContext: PeerInfoContext | undefined,
     error: boolean
 }
+
+type PeerInfoContext = { endpoint: Endpoint, identityHash: Hash, identity?: LiteralContext };
 
 type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply;
 
@@ -400,7 +402,27 @@ class MeshHost {
                 if (reply.error) {
                     ex.reject('Received rejection through remoting');
                 } else {
-                    ex.resolve(reply.peerInfo);
+
+                    let peerInfo: PeerInfo | undefined = undefined;
+
+                    if (reply.peerInfoContext !== undefined) {
+                        peerInfo = { 
+                            endpoint: reply.peerInfoContext.endpoint, 
+                            identityHash: reply.peerInfoContext.identityHash
+                        };
+
+                        if (reply.peerInfoContext.identity !== undefined) {
+                            const identity = HashedObject.fromLiteralContext(reply.peerInfoContext.identity);
+
+                            if (!(identity instanceof Identity)) {
+                                ex.reject('Received an invalid identity through remoting');
+                            } else {
+                                peerInfo.identity = identity;
+                            }
+                        }
+                    }
+
+                    ex.resolve(peerInfo);
                 }
             }
         }
@@ -469,4 +491,4 @@ export { MeshHost, MeshCommand,
          FindObjectByHash, FindObjectByHashSuffix, Shutdown,
          CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply, 
          ForwardGetPeersReply, ForwardGetPeerForEndpointReply,
-         PeerSourceRequest, GetPeersRequest, GetPeerForEndpointRequest };
+         PeerSourceRequest, GetPeersRequest, GetPeerForEndpointRequest, PeerInfoContext };

@@ -364,6 +364,9 @@ abstract class MutableObject extends HashedObject {
         } else {
 
             op.setTargetObject(this);
+            if (this.hasResources() && ! op.hasResources()) {
+                op.setResources(this.getResources() as Resources);
+            }
 
             let prevOps = op.getPrevOpsIfPresent();
 
@@ -511,7 +514,9 @@ abstract class MutableObject extends HashedObject {
         if (store === undefined) {
             store = this.getStore();
         } else {
-            this.setStore(store);
+            if (this.getResources() === undefined) {
+                this.setStore(store);
+            }
         }
 
         if (this._unsavedOps.length === 0) {

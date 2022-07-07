@@ -6,7 +6,7 @@ import { HashedObject, HashedSet, Hash } from 'data/model';
 import { Endpoint } from '../../network/NetworkAgent';
 import { Peer } from '../Peer';
 
-type HashBasedPeerContainer<T extends HashedObject & Peer> = { items: (IterableIterator<T> | Map<Hash, T> | MutableSet<T> | HashedSet<T>), parseEndpoint:(ep: Endpoint) => Hash | undefined};
+type PeerContainer<T extends HashedObject & Peer> = { items: (IterableIterator<T> | Map<Hash, T> | MutableSet<T> | HashedSet<T>), parseEndpoint:(ep: Endpoint) => Hash | undefined};
 
 
 /* Internal representation: the iterables are indexed by their hashes,      */
@@ -14,21 +14,21 @@ type HashBasedPeerContainer<T extends HashedObject & Peer> = { items: (IterableI
 
 type HashedPeers<T extends HashedObject & Peer> = { items: Map<Hash, T> | MutableSet<T> | HashedSet<T>, parseEndpoint: (ep: Endpoint) => Hash | undefined};
 
-class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
+class ContainerBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
 
     sources: HashedPeers<T>[];
     
-    constructor(sources: HashBasedPeerContainer<T>[]) {
+    constructor(sources: PeerContainer<T>[]) {
 
         if (sources === undefined) {
             sources = [];
         }
 
-        this.sources = sources.map(HashBasedPeerSource.toHashedPeerContainer);
+        this.sources = sources.map(ContainerBasedPeerSource.toHashedPeerContainer);
     }
 
-    addSource(source: HashBasedPeerContainer<T>) {
-        this.sources.push(HashBasedPeerSource.toHashedPeerContainer(source));
+    addSource(source: PeerContainer<T>) {
+        this.sources.push(ContainerBasedPeerSource.toHashedPeerContainer(source));
     }
 
 
@@ -48,7 +48,7 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
     async getPeerForEndpoint(endpoint: Endpoint): Promise<PeerInfo | undefined> {
 
         for (const source of this.sources) {
-            let peerInfo = await HashBasedPeerSource.lookupEndpointInSource(endpoint, source);
+            let peerInfo = await ContainerBasedPeerSource.lookupEndpointInSource(endpoint, source);
 
             if (peerInfo !== undefined) {
                 return peerInfo;
@@ -111,7 +111,7 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
         return result;
     }
 
-    private static toHashedPeerContainer<T extends HashedObject & Peer>(c: HashBasedPeerContainer<T>) : HashedPeers<T> {
+    private static toHashedPeerContainer<T extends HashedObject & Peer>(c: PeerContainer<T>) : HashedPeers<T> {
 
         let items = c.items instanceof HashedSet || c.items instanceof MutableSet || c.items instanceof Map?
             c.items : new Map<Hash, T>(Array.from(c.items).map((t:T) => [t.hash(), t]));
@@ -122,4 +122,4 @@ class HashBasedPeerSource<T extends HashedObject & Peer> implements PeerSource {
 
 }
 
-export { HashBasedPeerSource, HashBasedPeerContainer };
+export { ContainerBasedPeerSource, PeerContainer };
