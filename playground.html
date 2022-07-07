@@ -57,7 +57,7 @@
                     throw new Error('Cannot start sync: a local store has not been configured.')
                 }
 
-                this._node = new PeerNode(resources);
+                this._node = new MeshNode(resources);
 
                 this._node.broadcast(this);
                 this._node.sync(this);
