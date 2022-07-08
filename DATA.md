@@ -6,11 +6,7 @@ An HHS application persists data into a local store, that is similar to a key-va
 
 The store is implemented in [src/data/storage/Store.ts](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/storage/Store.ts). It works as an object store, and is type-aware. This enables it to perform same basic sanity checks on the data it is receiving, based on the type it is expecting.
 
-Note: to try these examples out, you need to install Hyper Hyper Space's core library. We recommend using the alias ```hhs``` for the core module, like this:
-
-```bash
-yarn add hhs@npm:@hyper-hyper-space/core
-```
+Note: to try these examples out, you need to install Hyper Hyper Space's core library.
 
 ### Content-based addressing
 
@@ -19,7 +15,7 @@ Stored objects can be retrieved from the store by using a hash of their contents
 To indicate a given class is meant to be stored, a base class [HashedObject](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/model/HashedObject.ts) is provided. Take a look at the example below (to work around Typescript type erasure on compilation, we'll add some explicit type information).
 
 ```js
-import { Hash, HashedObject } from 'hhs';
+import { Hash, HashedObject } from '@hyper-hyper-space/core';
 
 class Person extends HashedObject {
 
@@ -38,7 +34,7 @@ class Person extends HashedObject {
     }
 
     validate(_references: Map<Hash, HashedObject>) {
-        return this.name !== undefined && age !== undefined;
+        return (typeof this.name) === string && (typeof this.age) === number;
     }
 
     getClassName() {
@@ -49,7 +45,7 @@ class Person extends HashedObject {
 ClassRegistry.register(Person.className, Person);
 ```
 
-Notice that Typescript's compile time checks are not very helpful in this scenario: we want to be able to send instances of ```Person``` over an untrusted network, so we need to validate them in runtime as they are received. In this case, we are making the instance members ```name``` and ```birthday``` mandatory. The store will refuse to accept an instance of ```Person``` whose contents do not comply to its ```validate``` method. We're also declaring a meta-type name ```hhs-example/Person``` and later declaring that Person is our implementation for that type. The peer on the other end of the network may be using another implementation of this ```hhs-example/Person``` meta-type, and this explicit declaration enables interoperation.
+Notice that Typescript's compile time checks are not very helpful in this scenario: we want to be able to share instances of ```Person``` with untrusted peers, so we need to validate them in runtime as they are received. In this case, we are making the instance members ```name``` and ```birthday``` mandatory. The store will refuse to accept an instance of ```Person``` whose contents do not comply to its ```validate``` method. We're also declaring a meta-type name ```hhs-example/Person``` and later declaring that Person is our implementation for that type. The peer on the other end of the network may be using another implementation of this ```hhs-example/Person``` meta-type, and this explicit declaration enables interoperation.
 
 If this library is implemented using a programming language with a richer type system in the future, some of these annotations could be automatically derived.
 
@@ -95,7 +91,7 @@ However, what we've described so far presents a problem: while we can modify any
 
 To cope with mutability, HHS uses operation-based [CRDT](https://crdt.tech/)s. To this effect, a [MutableObject](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/model/MutableObject.ts) base class is introduced. Types derived from ```MutableObject``` create operation objects as they change, that are in themselves also immutable, and save these operations to the store. The properties of CRDTs ensure us that, if operations on the same object are created concurrently by several peers on HHS, the final state of the object will be the same on all peers, no matter when or how the operations reach them.
 
-You can see examples of a [MutableReference](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/containers/MutableReference.ts) and a [MutableSet](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/containers/MutableSet.ts) in the [containers](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/containers/) folder in the source.
+You can see examples of a [MutableReference](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/collections/mutable/MutableReference.ts) and a [MutableSet](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/collections/mutable/MutableSet.ts) in the [colletions/mutable](https://github.com/hyperhyperspace/hyperhyperspace-core/blob/master/src/data/collections/mutable) folder in the source.
 
 Our ```Country``` implementation would look like this now:
 
@@ -136,7 +132,7 @@ store.save(me);
 
 ```
 
-Object authorship is established an verified using identities:
+Object authorship is established and verified using identities:
 
 ```js
 let ms = new MutableSet<Person>();
