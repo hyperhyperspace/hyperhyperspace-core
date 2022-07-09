@@ -29,6 +29,10 @@ class BrowserRNG implements RNG {
         return result.toUpperCase();
     }
     
+    randomByte(): number {
+        return Number.parseInt(this.randomHex8bitsWord(), 16);
+    }
+
     private randomHex8bitsWord() {
 
         let result = (((globalThis?.window?.crypto?.getRandomValues !== undefined)? window.crypto.getRandomValues(new Uint8Array(1)) : (getRandomValues(new Uint8Array(1))))[0].toString(16));

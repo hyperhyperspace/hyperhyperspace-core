@@ -13,6 +13,9 @@ import { AsyncStream } from 'util/streams';
 import { LinkupAddress, LinkupManager } from 'net/linkup';
 import { RNGImpl } from 'crypto/random';
 import { Logger, LogLevel } from 'util/logging';
+import { Identity } from 'data/identity';
+import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn/ObjectSpawnAgent';
+import { ObjectInvokeAgent } from 'mesh/agents/spawn/ObjectInvokeAgent';
 
 
 
@@ -380,6 +383,35 @@ class Mesh {
     findObjectByHashSuffixRetry(hashSuffix: string, linkupServers: string[], replyAddress: LinkupAddress, count=1): void {
         const discoveryAgent = this.getDiscoveryAgentFor(hashSuffix);
         discoveryAgent.query(linkupServers, replyAddress, count);
+    }
+
+
+    // object spawning
+
+    addObjectSpawnCallback(receiver: Identity, linkupServers: Array<string>, callback: SpawnCallback, spawnId=ObjectSpawnAgent.defaultSpawnId) {
+        const agentId = ObjectSpawnAgent.agentIdFor(receiver, spawnId);
+        
+        let objectSpawnAgent = this.pod.getAgent(agentId) as ObjectSpawnAgent;
+
+        if (objectSpawnAgent === undefined) {
+            objectSpawnAgent = new ObjectSpawnAgent(receiver, spawnId);
+            this.pod.registerAgent(objectSpawnAgent);
+        }
+
+        objectSpawnAgent.addSpawnCallback(linkupServers, callback);
+    }
+
+    sendObjectSpawnRequest(object: HashedObject, receiver: Identity, receiverLinkupServers: Array<string>, sender: Identity, senderEndpoint: Endpoint = new LinkupAddress(LinkupManager.defaultLinkupServer, LinkupAddress.undisclosedLinkupId).url(), spawnId=ObjectSpawnAgent.defaultSpawnId) {
+        const agentId = ObjectInvokeAgent.agentIdFor(sender, spawnId);
+
+        let objectInvokeAgent = this.pod.getAgent(agentId) as ObjectInvokeAgent;
+
+        if (objectInvokeAgent === undefined) {
+            objectInvokeAgent = new ObjectInvokeAgent(sender, spawnId);
+            this.pod.registerAgent(objectInvokeAgent);
+        }
+
+        objectInvokeAgent.sendRequest(object, receiver, receiverLinkupServers, senderEndpoint);
     }
 
     getSyncAgentFor(peerGroupId: PeerGroupId, mutHash: Hash): StateSyncAgent|undefined {

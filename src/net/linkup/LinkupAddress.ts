@@ -3,6 +3,7 @@ import { Identity } from 'data/identity';
 class LinkupAddress {
 
     static verifiedIdPrefix = 'verified-id-';
+    static undisclosedLinkupId = 'undisclosed';
 
     readonly serverURL : string;
     readonly linkupId  : string;

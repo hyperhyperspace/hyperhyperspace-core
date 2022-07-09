@@ -103,7 +103,7 @@ class Resources {
         if (init?.config?.id !== undefined) {
             localId = init?.config.id;
         } else {
-            let key = await RSAKeyPair.generate(1024);
+            let key = await RSAKeyPair.generate(2048);
             localId = Identity.fromKeyPair({name: 'auto-generated id ' + new RNGImpl().randomHexString(64)}, key);
         }
 

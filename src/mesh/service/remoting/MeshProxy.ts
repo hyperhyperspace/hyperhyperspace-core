@@ -8,7 +8,9 @@ import { MeshCommand,
     CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply,
     PeerSourceRequest, 
     Shutdown,
-    PeerInfoContext} from './MeshHost';
+    PeerInfoContext,
+    AddObjectSpawnCallback,
+    SendObjectSpawnRequest} from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject } from 'data/model';
@@ -17,11 +19,14 @@ import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 import { Endpoint } from 'mesh/agents/network';
 import { LinkupAddress, LinkupManager, LinkupManagerCommand, LinkupManagerProxy } from 'net/linkup';
 import { WebRTCConnectionEvent, WebRTCConnectionsHost } from 'net/transport';
+import { Identity } from 'data/identity';
+import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn';
 
 class MeshProxy {
 
     commandForwardingFn: (cmd: MeshCommand) => void;
     discoveryStreamSources: Map<string, BufferingAsyncStreamSource<ObjectDiscoveryReply>>;
+    spawnCallbacks: Map<string, SpawnCallback>;
     commandStreamedReplyIngestFn: (reply: CommandStreamedReply) => void;
 
     linkup?: LinkupManagerProxy;
@@ -30,9 +35,12 @@ class MeshProxy {
     peerSources: Map<string, PeerSource>;
     peerSourceRequestIngestFn: (req: PeerSourceRequest) => void;
 
+    
+
     constructor(meshCommandFwdFn: (cmd: MeshCommand) => void, linkupCommandFwdFn?: (cmd: LinkupManagerCommand) => void, webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void) {
         this.commandForwardingFn = meshCommandFwdFn;
         this.discoveryStreamSources = new Map();
+        this.spawnCallbacks = new Map();
 
         if (linkupCommandFwdFn !== undefined) {
             this.linkup = new LinkupManagerProxy(linkupCommandFwdFn);
@@ -60,6 +68,14 @@ class MeshProxy {
                 const endReply = reply as DiscoveryEndReply;
                 this.discoveryStreamSources.get(endReply.streamId)?.end();
                 this.discoveryStreamSources.delete(endReply.streamId)
+            } else if (reply.type === 'object-spawn-callback') {
+                const cb = this.spawnCallbacks.get(reply.callbackId);
+
+                if (cb !== undefined) {
+                    const object = HashedObject.fromLiteralContext(reply.object);
+                    const sender = HashedObject.fromLiteralContext(reply.sender) as Identity;
+                    cb(object, sender, reply.senderEndpoint);
+                }
             }
         }
 
@@ -366,6 +382,38 @@ class MeshProxy {
         this.commandForwardingFn(cmd);
     }
 
+    addObjectSpawnCallback(receiver: Identity, linkupServers: Array<string>, callback: SpawnCallback, spawnId=ObjectSpawnAgent.defaultSpawnId) {
+        
+        const callbackId = new RNGImpl().randomHexString(128);
+
+        this.spawnCallbacks.set(callbackId, callback);
+        
+        const cmd: AddObjectSpawnCallback = {
+            type: 'add-object-spawn-callback',
+            callbackId: callbackId,
+            linkupServers: linkupServers,
+            receiver: receiver.toLiteralContext(),
+            spawnId: spawnId
+        }
+
+        this.commandForwardingFn(cmd);
+    }
+
+    sendObjectSpawnRequest(object: HashedObject, receiver: Identity, receiverLinkupServers: Array<string>, sender: Identity, senderEndpoint: Endpoint = new LinkupAddress(LinkupManager.defaultLinkupServer, LinkupAddress.undisclosedLinkupId).url(), spawnId=ObjectSpawnAgent.defaultSpawnId) {
+
+        const cmd: SendObjectSpawnRequest = {
+            type: 'send-object-spawn-callback',
+            object: object.toLiteralContext(),
+            receiver: receiver.toLiteralContext(),
+            receiverLinkupServers: receiverLinkupServers,
+            sender: sender.toLiteralContext(),
+            senderEndpoint: senderEndpoint,
+            spawnId: spawnId
+        }
+
+        this.commandForwardingFn(cmd);
+
+    }
 
 
 }

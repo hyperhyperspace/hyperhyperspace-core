@@ -9,12 +9,14 @@ import { RNGImpl } from 'crypto/random';
 import { Identity, RSAKeyPair } from 'data/identity';
 import { Store } from 'storage/store';
 import { LinkupAddress } from 'net/linkup';
+import { SpawnCallback } from 'mesh/agents/spawn';
 
 type MeshCommand = JoinPeerGroup | LeavePeerGroup |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
                    StartObjectBroadcast | StopObjectBroadcast |
                    FindObjectByHash | FindObjectByHashSuffix |  Shutdown |
-                   ForwardGetPeersReply | ForwardGetPeerForEndpointReply;
+                   ForwardGetPeersReply | ForwardGetPeerForEndpointReply |
+                   AddObjectSpawnCallback | SendObjectSpawnRequest;
 
 type JoinPeerGroup = {
     type: 'join-peer-group';
@@ -91,6 +93,24 @@ type FindObjectByHashSuffix = {
     streamId?: string // used when retry is false
 }
 
+type AddObjectSpawnCallback = {
+    type: 'add-object-spawn-callback',
+    receiver: LiteralContext,
+    linkupServers: Array<string>,
+    spawnId: string,
+    callbackId: string
+}
+
+type SendObjectSpawnRequest = {
+    type: 'send-object-spawn-callback',
+    object: LiteralContext,
+    receiver: LiteralContext,
+    receiverLinkupServers: Array<string>,
+    sender: LiteralContext,
+    senderEndpoint: string,
+    spawnId: string
+}
+
 type Shutdown = {
     type: 'shutdown'
 }
@@ -111,7 +131,7 @@ type ForwardGetPeerForEndpointReply = {
 
 type PeerInfoContext = { endpoint: Endpoint, identityHash: Hash, identity?: LiteralContext };
 
-type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply;
+type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply | ObjectSpawnCallback;
 
 type LiteralObjectDiscoveryReply = {
     type: 'object-discovery-reply'
@@ -127,6 +147,14 @@ type LiteralObjectDiscoveryReply = {
 type DiscoveryEndReply = {
     type: 'object-discovery-end';
     streamId: string;
+}
+
+type ObjectSpawnCallback = {
+    type: 'object-spawn-callback',
+    callbackId: string,
+    object: LiteralContext,
+    sender: LiteralContext,
+    senderEndpoint: string
 }
 
 
@@ -145,8 +173,6 @@ type GetPeerForEndpointRequest = {
     endpoint: Endpoint,
     requestId: string
 };
-
-
 
 class MeshHost {
 
@@ -191,6 +217,8 @@ class MeshHost {
     pendingPeersRequests: Map<string, {resolve: (value: PeerInfo[] | PromiseLike<PeerInfo[]>) => void, reject: (reason?: any) => void}>;
     pendingPeerForEndpointRequests: Map<string, {resolve: (value: (PeerInfo | undefined) | PromiseLike<PeerInfo | undefined>) => void, reject: (reason?: any) => void}>;
 
+    spawnCallbacks: Map<string, SpawnCallback>;
+
     stores: Map<string, Map<string, Store>>;
 
     constructor(mesh: Mesh, streamedReplyCb: (resp: CommandStreamedReply) => void, peerSourceReqCb: (req: PeerSourceRequest) => void) {
@@ -199,6 +227,7 @@ class MeshHost {
         this.peerSourceReqCb = peerSourceReqCb;
         this.pendingPeersRequests = new Map();
         this.pendingPeerForEndpointRequests = new Map();
+        this.spawnCallbacks = new Map();
         this.stores = new Map();
     }
 
@@ -372,6 +401,38 @@ class MeshHost {
                     );
                 }
             }
+        } else if (command.type === 'add-object-spawn-callback') {
+
+            let cb = this.spawnCallbacks.get(command.callbackId);
+
+            if (cb === undefined) {
+                cb = (object: HashedObject, sender: Identity, senderEndpoint: string) => {
+                    const msg: ObjectSpawnCallback = {
+                        type: 'object-spawn-callback',
+                        callbackId: command.callbackId,
+                        object: object.toLiteralContext(),
+                        sender: sender.toLiteralContext(),
+                        senderEndpoint: senderEndpoint
+                    }
+
+                    this.streamedReplyCb(msg);
+                }
+
+                this.spawnCallbacks.set(command.callbackId, cb);
+            }
+
+            const receiver = HashedObject.fromLiteralContext(command.receiver) as Identity;
+            
+            this.mesh.addObjectSpawnCallback(receiver, command.linkupServers, cb, command.spawnId);
+
+        } else if (command.type === 'send-object-spawn-callback') {
+
+            const object   = HashedObject.fromLiteralContext(command.object);
+            const receiver = HashedObject.fromLiteralContext(command.receiver) as Identity;
+            const sender   = HashedObject.fromLiteralContext(command.sender) as Identity;
+            
+            this.mesh.sendObjectSpawnRequest(object, receiver, command.receiverLinkupServers, sender, command.senderEndpoint, command.spawnId);
+
         } else if (command.type === 'shutdown') {
             this.mesh.shutdown();
         } else if (command.type === 'forward-get-peers-reply') {
@@ -488,7 +549,8 @@ export { MeshHost, MeshCommand,
          JoinPeerGroup, LeavePeerGroup,
          SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
          StartObjectBroadcast, StopObjectBroadcast,
-         FindObjectByHash, FindObjectByHashSuffix, Shutdown,
-         CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply, 
+         FindObjectByHash, FindObjectByHashSuffix, AddObjectSpawnCallback, SendObjectSpawnRequest,
+         Shutdown,
+         CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply, ObjectSpawnCallback,
          ForwardGetPeersReply, ForwardGetPeerForEndpointReply,
          PeerSourceRequest, GetPeersRequest, GetPeerForEndpointRequest, PeerInfoContext };
