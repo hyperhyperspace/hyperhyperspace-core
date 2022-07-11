@@ -22,6 +22,8 @@ import { WebRTCConnectionEvent, WebRTCConnectionsHost } from 'net/transport';
 import { Identity } from 'data/identity';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn';
 
+/* Access a mesh remotely, see the MeshHost class. */
+
 class MeshProxy {
 
     commandForwardingFn: (cmd: MeshCommand) => void;
@@ -382,7 +384,7 @@ class MeshProxy {
         this.commandForwardingFn(cmd);
     }
 
-    addObjectSpawnCallback(receiver: Identity, linkupServers: Array<string>, callback: SpawnCallback, spawnId=ObjectSpawnAgent.defaultSpawnId) {
+    addObjectSpawnCallback(callback: SpawnCallback, receiver: Identity, linkupServers: Array<string>, spawnId=ObjectSpawnAgent.defaultSpawnId) {
         
         const callbackId = new RNGImpl().randomHexString(128);
 
@@ -399,7 +401,7 @@ class MeshProxy {
         this.commandForwardingFn(cmd);
     }
 
-    sendObjectSpawnRequest(object: HashedObject, receiver: Identity, receiverLinkupServers: Array<string>, sender: Identity, senderEndpoint: Endpoint = new LinkupAddress(LinkupManager.defaultLinkupServer, LinkupAddress.undisclosedLinkupId).url(), spawnId=ObjectSpawnAgent.defaultSpawnId) {
+    sendObjectSpawnRequest(object: HashedObject, sender: Identity, receiver: Identity, senderEndpoint: Endpoint = new LinkupAddress(LinkupManager.defaultLinkupServer, LinkupAddress.undisclosedLinkupId).url(), receiverLinkupServers: Array<string>, spawnId=ObjectSpawnAgent.defaultSpawnId) {
 
         const cmd: SendObjectSpawnRequest = {
             type: 'send-object-spawn-callback',

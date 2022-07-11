@@ -1,7 +1,10 @@
 
+import { Identity } from 'data/identity';
 import { Hash, HashedObject } from 'data/model';
+import { Endpoint } from 'mesh/agents/network';
 import { ObjectDiscoveryPeerSource, PeerInfo } from 'mesh/agents/peer';
-import { LinkupAddress } from 'net/linkup';
+import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn';
+import { LinkupAddress, LinkupManager } from 'net/linkup';
 import { Resources } from 'spaces/spaces';
 import { MultiMap } from 'util/multimap';
 import { PeerGroupInfo, SyncMode, UsageToken } from './Mesh';
@@ -106,6 +109,14 @@ class MeshNode {
                 }
             }
         }
+    }
+
+    addObjectSpawnCallback(callback: SpawnCallback, receiver: Identity, linkupServers=this.resources.config.linkupServers, spawnId=ObjectSpawnAgent.defaultSpawnId) {
+        this.resources.mesh.addObjectSpawnCallback(callback, receiver, linkupServers, spawnId);
+    }
+
+    sendObjectSpawnRequest(object: HashedObject, sender: Identity, receiver: Identity, senderEndpoint: Endpoint = new LinkupAddress(LinkupManager.defaultLinkupServer, LinkupAddress.undisclosedLinkupId).url(), receiverLinkupServers=this.resources.config.linkupServers, spawnId=ObjectSpawnAgent.defaultSpawnId) {
+        this.resources.mesh.sendObjectSpawnRequest(object, sender, receiver, senderEndpoint, receiverLinkupServers, spawnId)
     }
 
     private async discoveryPeerGroupInfo(obj: HashedObject) : Promise<PeerGroupInfo> {

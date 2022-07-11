@@ -11,6 +11,20 @@ import { Store } from 'storage/store';
 import { LinkupAddress } from 'net/linkup';
 import { SpawnCallback } from 'mesh/agents/spawn';
 
+/* Run a mesh remotely, and access it through a MeshProxy */
+
+/* This was added to be able to run the mesh in a WebWorker, so all the sync work is done
+ * in a different thread and doesn't interfere with UI rendering.
+ * 
+ * WebRTC, however, doesn't work in WebWorkers, so the actuall p2p networking is done in the
+ * main thread, and bridged over to the worker.
+ * 
+ * MeshHost and MeshProxy just do the marshalling / forwarding part over functiosn that are
+ * parametrized, WebWorkerMeshHost and WebWorkerMeshProxy provide implementations of those
+ * functions for the WebWorker case.
+ * 
+ * Ah, the things we do for you, Hyper Hyper Space. */
+
 type MeshCommand = JoinPeerGroup | LeavePeerGroup |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
                    StartObjectBroadcast | StopObjectBroadcast |
@@ -423,7 +437,7 @@ class MeshHost {
 
             const receiver = HashedObject.fromLiteralContext(command.receiver) as Identity;
             
-            this.mesh.addObjectSpawnCallback(receiver, command.linkupServers, cb, command.spawnId);
+            this.mesh.addObjectSpawnCallback(cb, receiver, command.linkupServers, command.spawnId);
 
         } else if (command.type === 'send-object-spawn-callback') {
 
@@ -431,7 +445,7 @@ class MeshHost {
             const receiver = HashedObject.fromLiteralContext(command.receiver) as Identity;
             const sender   = HashedObject.fromLiteralContext(command.sender) as Identity;
             
-            this.mesh.sendObjectSpawnRequest(object, receiver, command.receiverLinkupServers, sender, command.senderEndpoint, command.spawnId);
+            this.mesh.sendObjectSpawnRequest(object, receiver, sender, command.senderEndpoint, command.receiverLinkupServers, command.spawnId);
 
         } else if (command.type === 'shutdown') {
             this.mesh.shutdown();

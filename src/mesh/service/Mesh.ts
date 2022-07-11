@@ -388,7 +388,7 @@ class Mesh {
 
     // object spawning
 
-    addObjectSpawnCallback(receiver: Identity, linkupServers: Array<string>, callback: SpawnCallback, spawnId=ObjectSpawnAgent.defaultSpawnId) {
+    addObjectSpawnCallback(callback: SpawnCallback, receiver: Identity, linkupServers: Array<string>, spawnId=ObjectSpawnAgent.defaultSpawnId) {
         const agentId = ObjectSpawnAgent.agentIdFor(receiver, spawnId);
         
         let objectSpawnAgent = this.pod.getAgent(agentId) as ObjectSpawnAgent;
@@ -401,7 +401,7 @@ class Mesh {
         objectSpawnAgent.addSpawnCallback(linkupServers, callback);
     }
 
-    sendObjectSpawnRequest(object: HashedObject, receiver: Identity, receiverLinkupServers: Array<string>, sender: Identity, senderEndpoint: Endpoint = new LinkupAddress(LinkupManager.defaultLinkupServer, LinkupAddress.undisclosedLinkupId).url(), spawnId=ObjectSpawnAgent.defaultSpawnId) {
+    sendObjectSpawnRequest(object: HashedObject, sender: Identity, receiver: Identity, senderEndpoint: Endpoint = new LinkupAddress(LinkupManager.defaultLinkupServer, LinkupAddress.undisclosedLinkupId).url(), receiverLinkupServers: Array<string>, spawnId=ObjectSpawnAgent.defaultSpawnId) {
         const agentId = ObjectInvokeAgent.agentIdFor(sender, spawnId);
 
         let objectInvokeAgent = this.pod.getAgent(agentId) as ObjectInvokeAgent;
@@ -413,6 +413,9 @@ class Mesh {
 
         objectInvokeAgent.sendRequest(object, receiver, receiverLinkupServers, senderEndpoint);
     }
+
+
+
 
     getSyncAgentFor(peerGroupId: PeerGroupId, mutHash: Hash): StateSyncAgent|undefined {
         return this.syncAgents.get(peerGroupId)?.get(mutHash);

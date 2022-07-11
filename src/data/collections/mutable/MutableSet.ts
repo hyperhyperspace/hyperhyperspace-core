@@ -88,7 +88,6 @@ class AddOp<T> extends MutableSetOp<T> {
 
         if (!Types.satisfies(this.element, constraints)) {
             return false;
-            //throw new Error('MutableSet/AddOp contains a value with an unexpected type.')
         }
 
         if (!(this.element instanceof HashedObject) || HashedObject.isLiteral(this.element)) {
