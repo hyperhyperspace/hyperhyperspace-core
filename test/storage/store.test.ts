@@ -206,7 +206,7 @@ async function testMutationOps(store: Store) {
 
     let hash = sm.getLastHash();
 
-    let sm2 = await store.load(hash) as SomethingMutable;
+    let sm2 = await store.load(hash, false) as SomethingMutable;
 
     await sm2.loadAllChanges();
 
@@ -230,7 +230,7 @@ async function testMutationOpAutoLoad(store: Store) {
 
     let hash = sm.getLastHash();
 
-    let sm2 = await store.load(hash) as SomethingMutable;
+    let sm2 = await store.load(hash, false) as SomethingMutable;
 
     sm2.watchForChanges();
 
@@ -270,7 +270,7 @@ async function testPrevOpGeneration(store: Store) {
     await sm.testOperation('hello');
 
     let hash = sm.getLastHash();
-    let sm2 = await store.load(hash) as SomethingMutable;
+    let sm2 = await store.load(hash, false) as SomethingMutable;
     await sm2.testOperation('another');
     await store.save(sm2);
     
@@ -282,7 +282,7 @@ async function testPrevOpGeneration(store: Store) {
     await store.save(sm);
     
 
-    let sm3 = await store.load(hash) as SomethingMutable;
+    let sm3 = await store.load(hash, false) as SomethingMutable;
     await sm3.loadAllChanges();
 
     let world: SomeMutation|undefined = undefined;
@@ -323,7 +323,7 @@ async function testHistoryGeneration(store: Store) {
 
     let hash = sm.getLastHash();
 
-    let sm2 = await store.load(hash) as SomethingMutable;
+    let sm2 = await store.load(hash, false) as SomethingMutable;
 
     await sm2.loadAllChanges();
 

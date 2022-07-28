@@ -26,6 +26,8 @@ enum MutableContentEvents {
     RemoveObject = 'remove-object'
 };
 
+const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject];
+
 
 abstract class MutableObject extends HashedObject {
 
@@ -33,9 +35,7 @@ abstract class MutableObject extends HashedObject {
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     readonly _acceptedMutationOpClasses : Array<string>;
-
     
-
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
     _activeCascInvsPerOp       : MultiMap<Hash, Hash>;
@@ -305,8 +305,12 @@ abstract class MutableObject extends HashedObject {
         let op: MutationOp;
 
         if (!this._allAppliedOps.has(hash) && !this._unappliedOps.has(hash)) {
-            op = await this.getStore().load(hash) as MutationOp;
+            op = await this.getStore().load(hash, false, false) as MutationOp;
             
+            if (op === undefined) {
+                MutableObject.controlLog.warning('Attempting to apply op ' + hash + ' to object ' + this.hash() + ' (' + this.getClassName() + '), but it is missing from the store! Store backend: ' + this.getStore().getName() + ' using ' + this.getStore().getBackendName());
+            }
+
             this._unappliedOps.set(hash, op);
             
             this.applyPendingOpsFromStore();
@@ -553,7 +557,7 @@ abstract class MutableObject extends HashedObject {
             }
         }
 
-        return this.getStore().load(opHash) as Promise<MutationOp|undefined>;
+        return this.getStore().load(opHash, false, false) as Promise<MutationOp|undefined>;
     }
 
     protected setCurrentPrevOps(op: MutationOp): void {
@@ -675,7 +679,19 @@ abstract class MutableObject extends HashedObject {
     }
 
     setResources(resources: Resources): void {
+
+        let reBindToStore = false;
+
+        if (this._boundToStore && resources.store !== this.getResources()?.store) {
+            reBindToStore = true;
+            this.unbindFromStore();
+        }
+
         super.setResources(resources);
+
+        if (reBindToStore) {
+            this.bindToStore();
+        }
 
         for (const aliases of this.getMutableContents().values()) {
             for (const obj of aliases) {
@@ -699,6 +715,18 @@ abstract class MutableObject extends HashedObject {
                 obj.forgetResources();
             }
         }
+    }
+
+    isOwnEvent(ev: MutationEvent) {
+        return ev.emitter === this
+    }
+
+    isOwnContentChangeEvent(ev: MutationEvent) {
+        return this.isOwnEvent(ev) && MutableObject.isContentChangeEvent(ev);
+    }
+
+    static isContentChangeEvent(ev: MutationEvent) {
+        return ContentChangeEventActions.indexOf(ev.action) >= 0;
     }
 }
 

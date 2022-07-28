@@ -177,7 +177,7 @@ async function testBasicUndoCycle(store: Store) {
     await permissions.addUser(userId, adminId);
     await store.save(permissions);
 
-    const permissionsClone = await store.load(permissions.hash()) as PermissionTest;
+    const permissionsClone = await store.load(permissions.hash(), false) as PermissionTest;
     await permissionsClone.loadAllChanges();
 
     await permissions.addUser(temporaryUserId, adminId);
@@ -284,14 +284,14 @@ async function testBasicUndoCycleWithSync(stores: Store[]) {
 
     let i = 0;
 
-    while (await remoteStore.load(permissions.hash()) === undefined && i < 200) {
+    while (await remoteStore.load(permissions.hash(), false) === undefined && i < 200) {
         await new Promise(r => setTimeout(r, 100));
         i = i + 1;
     }
 
     // load a clone of the permissions object from the 'remote' store
 
-    const permissionsClone = await remoteStore.load(permissions.hash()) as PermissionTest;
+    const permissionsClone = await remoteStore.load(permissions.hash(), false) as PermissionTest;
     await permissionsClone.loadAndWatchForChanges();
 
     // wait until the user permission for userId is replicated
@@ -353,7 +353,7 @@ async function testMultiObjectUndoCascade(store: Store) {
     await permissions.addAdmin(adminId);
     await store.save(permissions);
 
-    const permissionsClone = await store.load(permissions.hash()) as PermissionTest;
+    const permissionsClone = await store.load(permissions.hash(), false) as PermissionTest;
     await permissionsClone.loadAllChanges();
 
     permissions.watchForChanges();
@@ -374,7 +374,7 @@ async function testMultiObjectUndoCascade(store: Store) {
 
     expect(useFeatureOp !== undefined).toBeTruthy();
 
-    const featuresClone = await store.load(features.hash()) as PermissionedFeatureSet;
+    const featuresClone = await store.load(features.hash(), false) as PermissionedFeatureSet;
     featuresClone.users = permissionsClone;
 
     expect(featuresClone.useFeatureIfEnabled('anon-write', 'another-usage-key') === undefined).toBeTruthy();
@@ -483,7 +483,7 @@ async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
     
     let i = 0;
     while (i<200 && permissionsClone === undefined) {
-        permissionsClone = await remoteStore.load(permissions.hash()) as PermissionTest|undefined;
+        permissionsClone = await remoteStore.load(permissions.hash(), false) as PermissionTest|undefined;
         await new Promise(r => setTimeout(r, 100));
         i = i + 1;
     }

@@ -43,7 +43,7 @@ class Space {
             
         } else if (init.hash !== undefined) {
 
-            this.entryPoint = this.resources.store.load(init.hash).then((obj: HashedObject | undefined) => {
+            this.entryPoint = this.resources.store.load(init.hash, false, false).then((obj: HashedObject | undefined) => {
                 if (obj !== undefined) {
                     return obj as HashedObject & SpaceEntryPoint;
                 } else {

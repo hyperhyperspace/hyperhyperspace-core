@@ -335,6 +335,9 @@ class HistoryFragment {
         // fullfilled by removing it from a set in missingOpHistories. If the set ever empties, this
         // op can be iterated over (all its prevOps have already been visited). 
 
+        /*console.log('starting causal closure from:')
+        console.log(Array.from(startingOpHeaders))*/
+
         const closure = new Set<Hash>();
         const missingPrevOpHeaders = new Map<Hash, Set<Hash>>();
         const result = new Array<Hash>();
@@ -351,6 +354,11 @@ class HistoryFragment {
             }
         }
         */
+
+        /*const iteration = Array.from(this.iterateFrom(startingOpHeaders, 'forward', 'full'));
+
+        console.log('iteration is:')
+        console.log(iteration);*/
 
         for (const opHeader of this.iterateFrom(startingOpHeaders, 'forward', 'full')) {
             
@@ -383,9 +391,14 @@ class HistoryFragment {
                     }
                 }
                 
+            } else {
+                //console.log('filter out ' + hash);
             }
 
         }
+
+        /*console.log('finished causal closure from:')
+        console.log(Array.from(startingOpHeaders))*/
 
         return result;
 

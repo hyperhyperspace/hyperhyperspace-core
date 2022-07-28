@@ -7,6 +7,7 @@ class FullHistoryWalk extends HistoryWalk implements IterableIterator<OpHeader> 
 
     next(): IteratorResult<OpHeader, any> {
         if (this.queue.length > 0) {
+
             const hash = this.dequeue();
             for (const succ of this.goFrom(hash)) {
 

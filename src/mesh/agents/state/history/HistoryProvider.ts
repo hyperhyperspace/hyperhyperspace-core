@@ -357,15 +357,15 @@ class HistoryProvider {
                     full = !await packer.addObject(hash);
 
                     if (full) {
-                        this.opXferLog.trace('Cannot pack ' + hash + ', no room.')
+                        this.opXferLog.trace('OP_NO_ROOM   : mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' op=' + hash);
                         break;
                     } else {
-                        this.opXferLog.trace('Packed ' + hash + '. ' + packer.content.length + ' literals packed so far.');
                         sendingOps.push(hash);
+                        this.opXferLog.debug('OP_SEND      : mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' op=' + hash);
                     }
     
                 } else {
-                    this.opXferLog.debug('Cannot pack ' + hash + ': it is an allowed omision.\nreference chain is: ' + packer.allowedOmissions.get(hash));
+                    this.opXferLog.debug('OP_OMIT      : mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' op=' + hash + ' (chain: ' + packer.allowedOmissions.get(hash) + ')');
                 }
             }
         }
@@ -399,9 +399,10 @@ class HistoryProvider {
                         break;
                     } else {
                         sendingOps.push(opHistory.opHash);
+                        this.opXferLog.debug('OP_SEND_EXTRA: mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' op=' + opHistory.opHash);
                     }    
                 } else {
-                    this.opXferLog.debug('Omitting one inferred op due tu allowed omission: ' + opHistory.opHash);
+                    this.opXferLog.debug('OP_OMIT_EXTRA: mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' op=' + opHistory.opHash + ' (chain: ' + packer.allowedOmissions.get(opHistory.opHash) + ')');
                 }
 
             }
@@ -417,8 +418,6 @@ class HistoryProvider {
             
             if (packer.omissions.size > 0) {
 
-                //console.log('omitting ' + packer.omissions.size + ' references');
-
                 resp.omittedObjs = [];
                 resp.omittedObjsReferenceChains = [];
                 resp.omittedObjsOwnershipProofs = [];
@@ -426,8 +425,9 @@ class HistoryProvider {
 
                     resp.omittedObjs.push(hash);
                     resp.omittedObjsReferenceChains.push(refChain);
-                    const dep = await this.syncAgent.store.load(hash) as HashedObject;
-                    resp.omittedObjsOwnershipProofs.push(dep.hash(req.omissionProofsSecret))
+                    const dep = await this.syncAgent.store.load(hash, false, false) as HashedObject;
+                    resp.omittedObjsOwnershipProofs.push(dep.hash(req.omissionProofsSecret));
+                    this.opXferLog.debug('LIT_OMIT     : mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' lit=' + hash + ' (chain: ' + packer.allowedOmissions.get(hash) + ')');
 
                 }
             }
@@ -460,11 +460,15 @@ class HistoryProvider {
                     if (nextIdx < respInfo.literalsToSend.length) {
                         try {
                             if (!this.sendLiteral(respInfo, nextIdx, respInfo.literalsToSend[nextIdx])) {
+                                this.opXferLog.debug('LIT_STOP buf : mut=' + this.syncAgent.mutableObjHash + ' req=' + requestId + ' nextIdx=' + nextIdx);
                                 break;
                             }
                         } catch (e) {
+                            this.opXferLog.debug('LIT_STOP err : mut=' + this.syncAgent.mutableObjHash + ' req=' + requestId + ' nextIdx=' + nextIdx);
                             break;
                         }
+
+                        this.opXferLog.debug('LIT_SEND     : mut=' + this.syncAgent.mutableObjHash + ' req=' + requestId + ' lit=' + respInfo.literalsToSend[nextIdx].hash  + ' nextIdx=' + nextIdx);
     
                         respInfo.nextLiteralIdx = nextIdx + 1;
                         sent = sent + 1;
@@ -478,9 +482,6 @@ class HistoryProvider {
                 }
             }
         }
-
-
-
 
         //TODO: check if timer for sending should be enabled?
 
@@ -523,7 +524,11 @@ class HistoryProvider {
         this.dequeueResponse(respInfo);
 
         if (await this.createResponse(respInfo)) {
-            this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), respInfo.response);
+            const sent = this.syncAgent.sendMessageToPeer(respInfo.remote, this.syncAgent.getAgentId(), respInfo.response);
+
+            if (!sent) {
+                this.controlLog.debug('Failure sending response message for ' + reqId);
+            }
             
             if (respInfo.response?.literalCount as number > 0) {
                 this.startStreamingResponse(respInfo);
@@ -532,8 +537,10 @@ class HistoryProvider {
             if (this.isResponseComplete(respInfo)) {
                 this.removeResponse(respInfo);
             }
+
         } else {
             this.removeResponse(respInfo);
+            this.controlLog.debug('Failed to create response for ' + reqId);
         }
         
     }

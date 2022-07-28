@@ -21,7 +21,6 @@ import { ClassRegistry } from '../literals/ClassRegistry';
 import { EventRelay } from 'util/events';
 
 import { MutationObserver } from '../mutable';
-//import { __spreadArrays } from 'tslib';
 
 const BITS_FOR_ID = 128;
 
@@ -263,7 +262,9 @@ abstract class HashedObject {
     }
 
     setResources(resources: Resources): void {
+
         this._resources = resources;
+
 
         for (const subobj of this.getDirectSubObjects().values()) {
             subobj.setResources(resources);
@@ -1020,6 +1021,7 @@ abstract class HashedObject {
         for (const obj of this.getDirectSubObjects().values()) {
             obj.toggleWatchForChanges(enabled);
         }
+
         return before;
     }
 

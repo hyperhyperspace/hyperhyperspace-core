@@ -210,7 +210,7 @@ class IdbBackend implements Backend {
         await tx.objectStore(IdbBackend.OBJ_STORE).put(storable);
 
         await tx.done;
-
+        
         await IdbBackend.fireCallbacks(this.name, literal);
     }
     

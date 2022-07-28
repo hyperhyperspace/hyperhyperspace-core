@@ -113,7 +113,8 @@ type Params = {
     minPeers: number,
     maxPeers: number,
     peerConnectionTimeout: number,
-    peerConnectionAttemptInterval: number
+    peerConnectionAttemptInterval: number,
+    peerDiscoveryAttemptInterval: number,
     tickInterval: number
 };
 
@@ -141,6 +142,8 @@ class PeerGroupAgent implements Agent {
 
     connections: Map<ConnectionId, PeerConnection>;
     connectionsPerEndpoint: Map<Endpoint, Array<ConnectionId>>;
+
+    peerDiscoveryTimestamp?: number;
 
     connectionAttemptTimestamps: Map<Endpoint, number>;
     onlineQueryTimestamps: Map<Endpoint, number>;
@@ -180,6 +183,7 @@ class PeerGroupAgent implements Agent {
             maxPeers: params.maxPeers || 12,
             peerConnectionTimeout: params.peerConnectionTimeout || 20,
             peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 20,
+            peerDiscoveryAttemptInterval: params.peerDiscoveryAttemptInterval || 30,
             tickInterval: params.tickInterval || 5
         };
 
@@ -379,75 +383,84 @@ class PeerGroupAgent implements Agent {
 
     private async queryForOnlinePeers() {
 
-        this.peersLog.trace("Considering querying for peers on " + this.peerGroupId);
+        const now = Date.now();
 
-        if (this.connectionsPerEndpoint.size < this.params.minPeers) {
-            let candidates = await this.peerSource.getPeers(this.params.minPeers * 5);
-            let endpoints = new Array<Endpoint>();
-            let fallbackEndpoints = new Array<Endpoint>();
-            const now = Date.now();
+        if (this.peerDiscoveryTimestamp === undefined || now > this.peerDiscoveryTimestamp + this.params.peerDiscoveryAttemptInterval * 1000) {
 
-            this.peersLog.debug('Looking for peers, got ' + candidates.length + ' candidates');
-            this.peersLog.trace(candidates.map((k: PeerInfo) => k.endpoint + '--> ' + k.identityHash ));
+            this.peerDiscoveryTimestamp = now;
+            this.peersLog.trace("Considering querying for peers on " + this.peerGroupId);
 
-            for (const candidate of candidates) {
-
-                if (this.localPeer.endpoint === candidate.endpoint) {
-                    continue;
+            if (this.connectionsPerEndpoint.size < this.params.minPeers) {
+                let candidates = await this.peerSource.getPeers(this.params.minPeers * 5);
+                let endpoints = new Array<Endpoint>();
+                let fallbackEndpoints = new Array<Endpoint>();
+                const now = Date.now();
+    
+                this.peersLog.debug('Looking for peers for ' + this.peerGroupId + ', got ' + candidates.length + ' candidates');
+                this.peersLog.trace(candidates.map((k: PeerInfo) => k.endpoint + '--> ' + k.identityHash ));
+    
+                for (const candidate of candidates) {
+    
+                    if (this.localPeer.endpoint === candidate.endpoint) {
+                        continue;
+                    }
+    
+                    if (this.connectionsPerEndpoint.get(candidate.endpoint) !== undefined) {
+                        continue;
+                    }
+    
+                    const lastQueryTimestamp = this.onlineQueryTimestamps.get(candidate.endpoint);
+                    if (lastQueryTimestamp !== undefined &&
+                        now < lastQueryTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
+    
+                        continue;
+                    }
+    
+                    const lastAttemptTimestamp = this.connectionAttemptTimestamps.get(candidate.endpoint);
+    
+                    if (fallbackEndpoints.length < this.params.minPeers - this.connectionsPerEndpoint.size) {
+                        fallbackEndpoints.push(candidate.endpoint);
+                    }
+    
+                    if (lastAttemptTimestamp !== undefined &&
+                        now < lastAttemptTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
+    
+                        continue
+                    }
+    
+                    // we haven't queried nor attempted to connect to this endpoint recently, 
+                    // and we are not connected / connecting now, so query:
+                    endpoints.push(candidate.endpoint);
+    
+                    if (endpoints.length >= this.params.minPeers - this.connectionsPerEndpoint.size) {
+                        break;
+                    }
                 }
-
-                if (this.connectionsPerEndpoint.get(candidate.endpoint) !== undefined) {
-                    continue;
+    
+                if (endpoints.length < this.params.minPeers) {
+                    endpoints = fallbackEndpoints;
                 }
-
-                const lastQueryTimestamp = this.onlineQueryTimestamps.get(candidate.endpoint);
-                if (lastQueryTimestamp !== undefined &&
-                    now < lastQueryTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
-
-                    continue;
+    
+                for (const endpoint of endpoints) {
+                    this.onlineQueryTimestamps.set(endpoint, now);
                 }
-
-                const lastAttemptTimestamp = this.connectionAttemptTimestamps.get(candidate.endpoint);
-
-                if (fallbackEndpoints.length < this.params.minPeers - this.connectionsPerEndpoint.size) {
-                    fallbackEndpoints.push(candidate.endpoint);
+    
+                if (endpoints.length > 0) {
+                    this.peersLog.debug(this.peerGroupId + ' is querying for online endpoints: '  + endpoints);
+    
+                    this.getNetworkAgent().queryForListeningAddresses(
+                                        LinkupAddress.fromURL(this.localPeer.endpoint), 
+                                        endpoints.map((ep: Endpoint) => LinkupAddress.fromURL(ep)));
                 }
-
-                if (lastAttemptTimestamp !== undefined &&
-                    now < lastAttemptTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
-
-                    continue
-                }
-
-                // we haven't queried nor attempted to connect to this endpoint recently, 
-                // and we are not connected / connecting now, so query:
-                endpoints.push(candidate.endpoint);
-
-                if (endpoints.length >= this.params.minPeers - this.connectionsPerEndpoint.size) {
-                    break;
-                }
+    
+                
+            } else {
+                this.peersLog.trace('Skipping querying for peers on ' + this.peerGroupId);
             }
 
-            if (endpoints.length < this.params.minPeers) {
-                endpoints = fallbackEndpoints;
-            }
-
-            for (const endpoint of endpoints) {
-                this.onlineQueryTimestamps.set(endpoint, now);
-            }
-
-            if (endpoints.length > 0) {
-                this.peersLog.debug('Querying for online endpoints: '  + endpoints);
-
-                this.getNetworkAgent().queryForListeningAddresses(
-                                    LinkupAddress.fromURL(this.localPeer.endpoint), 
-                                    endpoints.map((ep: Endpoint) => LinkupAddress.fromURL(ep)));
-            }
-
-            
-        } else {
-            this.peersLog.trace('Skipping querying for peers on ' + this.peerGroupId);
         }
+
+        
     }
 
     // Connection deduplication logic.
@@ -725,19 +738,19 @@ class PeerGroupAgent implements Agent {
 
     private async onOnlineEndpointDiscovery(ep: Endpoint) {
 
-        this.controlLog.debug(() => (this.localPeer.endpoint + ' has discovered that ' + ep + ' is online.'));
+        this.controlLog.debug(() => (this.peerGroupId + ': ' + this.localPeer.endpoint + ' has discovered that ' + ep + ' is online.'));
 
         
         let peer = await this.peerSource.getPeerForEndpoint(ep);
         
         if (this.shouldConnectToPeer(peer)) {
-            this.controlLog.debug(() => (this.localPeer.endpoint + ' will initiate peer connection to ' + ep + '.'));
+            this.controlLog.debug(() => (this.peerGroupId + ': ' + this.localPeer.endpoint + ' will initiate peer connection to ' + ep + '.'));
             let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as PeerInfo).endpoint, this.getAgentId());
             this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.Connecting);
             this.connectionAttemptTimestamps.set(ep, Date.now());
             this.stats.connectionInit += 1;
         } else {
-            this.controlLog.debug(() => (this.localPeer.endpoint + ' will NOT initiate peer connection to ' + ep + '.'));
+            this.controlLog.debug(() => (this.peerGroupId + ': ' + this.localPeer.endpoint + ' will NOT initiate peer connection to ' + ep + '.'));
         }
     }
 
@@ -749,7 +762,7 @@ class PeerGroupAgent implements Agent {
             this.controlLog.trace(this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
 
             if (await this.shouldAcceptPeerConnection(peer)) {
-                this.controlLog.debug('Will accept requested connection ' + connId + '!');
+                this.controlLog.debug(this.peerGroupId + ': will accept requested connection ' + connId + '!');
                 this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.ReceivingConnection);
                 this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
                 this.stats.connectionAccpt += 1;
@@ -796,15 +809,15 @@ class PeerGroupAgent implements Agent {
 
             if (await this.shouldAcceptPeerConnection(peer)) {
 
-                this.controlLog.debug('Will accept offer ' + connId + '!');
+                this.controlLog.debug(this.peerGroupId + ': will accept offer ' + connId + '!');
                 // Act as if we had just received the connection, process offer below.
-                this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.WaitingForOffer);
+                pc = this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.WaitingForOffer);
                 accept = true;
                 reply  = true;
 
             } else {
 
-                this.controlLog.debug('Will NOT accept offer ' + connId + '!');
+                this.controlLog.debug(this.peerGroupId + ': will NOT accept offer ' + connId + '!');
                 if (peer !== undefined && 
                     peer.identityHash === remoteIdentityHash &&
                     this.peerGroupId === peerGroupId) {
@@ -856,7 +869,7 @@ class PeerGroupAgent implements Agent {
             }
             
         } else {
-            PeerGroupAgent.controlLog.debug('Dropping connection ' + connId + ': offer was rejected');
+            PeerGroupAgent.controlLog.debug(this.peerGroupId + ': dropping connection ' + connId + ': offer was rejected');
             this.removePeerConnection(connId);
             this.getNetworkAgent().releaseConnectionIfExists(connId, this.getAgentId());
         }

@@ -1,16 +1,16 @@
 import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
-import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp, HashedSet } from 'data/model';
+import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp, HashedSet, LiteralUtils } from 'data/model';
 import { Hash } from 'data/model/hashing/Hashing';
 
 import { MultiMap } from 'util/multimap';
-import { Identity } from 'data/identity/Identity';
-import { RSAKeyPair } from 'data/identity/RSAKeyPair';
 import { Logger, LogLevel } from 'util/logging';
+import { LRUCache } from 'util/caching';
 
 import { Resources } from 'spaces/spaces';
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { InvalidateAfterOp } from 'data/model/causal/InvalidateAfterOp';
 import { CascadedInvalidateOp } from 'data/model/causal/CascadedInvalidateOp';
+import { Identity, RSAKeyPair } from 'data/identity';
 
 //type PackedFlag   = 'mutable'|'op'|'reversible'|'undo';
 //type PackedLiteral = { hash : Hash, value: any, author?: Hash, signature?: string,
@@ -53,17 +53,44 @@ class Store {
 
     private resources?: Resources;
 
+    private keyPairs: Map<Hash, RSAKeyPair>;
+
+    private initKeyPairs: Promise<void>;
+    private cache: LRUCache<Hash, Literal>;
+
     constructor(backend : Backend) {
 
         this.backend = backend;
 
         this.backend.setStoredObjectCallback(async (literal: Literal) => {
+
+            if (LiteralUtils.getClassName(literal) === RSAKeyPair.className) {
+                let kp = HashedObject.fromLiteral(literal);
+                this.keyPairs.set(literal.hash, kp as RSAKeyPair);
+            }
+
             await this.fireCallbacks(literal);
         });
 
         this.classCallbacks = new MultiMap();
         this.referencesCallbacks = new MultiMap();
         this.classReferencesCallbacks = new MultiMap();
+
+        this.keyPairs = new Map();
+
+        this.initKeyPairs = this.doInitKeypairs();
+        this.cache = new LRUCache(1024);
+
+        this.cache.evict('a');
+    }
+
+    private async doInitKeypairs() {
+
+        const results = await this.loadByClass(RSAKeyPair.className);
+
+        for (const kp of results.objects as Array<RSAKeyPair>) {
+            this.keyPairs.set(kp.getLastHash(), kp);
+        }
     }
 
     setResources(resources: Resources) {
@@ -186,7 +213,11 @@ class Store {
     }
 
     // low level save: no mutation flush, no hash/store setting in objects
-    async saveWithContext(hash: Hash, context: Context) : Promise<void> {
+    async saveWithContext(hash: Hash, context: Context, saved=new Set<Hash>()) : Promise<void> {
+
+        if (saved.has(hash)) {
+            return;
+        }
 
         const object = context.objects.get(hash);
 
@@ -205,24 +236,36 @@ class Store {
         object.setLastHash(hash);
 
         const author = object.getAuthor();
+        const loadedLit = await this.backend.load(hash);
 
-        if (author !== undefined) {
+        if (loadedLit !== undefined) { 
 
-            if (object.shouldSignOnSave()) {
-
-                object.setLastSignature(await author.sign(hash));
-                (context.literals.get(hash) as Literal).signature = object.getLastSignature();
+            if (object.shouldSignOnSave() && loadedLit.signature) {
+                object.setLastSignature(loadedLit.signature);
             }
 
-            if (!object.hasLastSignature()) {
-                throw new Error('Cannot save ' + hash + ', its signature is missing');
+        } else {
+
+            if (author !== undefined) {
+
+                if (object.shouldSignOnSave()) {
+
+                    if (!author.hasKeyPair()) {
+                        const kp = await this.load(author.getKeyPairHash(), false);
+                        if (kp instanceof RSAKeyPair) {
+                            author.addKeyPair(kp);
+                        }
+                    }
+    
+                    object.setLastSignature(await author.sign(hash));
+                    (context.literals.get(hash) as Literal).signature = object.getLastSignature();
+                }
+    
+                if (!object.hasLastSignature()) {
+                    throw new Error('Cannot save ' + hash + ', its signature is missing');
+                }
+    
             }
-
-        }
-        
-        const loaded = await this.load(hash, false);
-
-        if (loaded === undefined) { 
 
             const literal = context.literals.get(hash);
 
@@ -233,7 +276,7 @@ class Store {
             if (literal !== undefined) {
                 for (let dependency of literal.dependencies) {
                     if (dependency.type === 'literal') {
-                        await this.saveWithContext(dependency.hash, context);
+                        await this.saveWithContext(dependency.hash, context, saved);
                     }
                 }    
             }
@@ -264,7 +307,12 @@ class Store {
                 };
             }
 
+            if (object.getClassName() === RSAKeyPair.className) {
+                this.keyPairs.set(object.getLastHash(), object as RSAKeyPair);
+            }
+
             await this.backend.store(literal, history);
+            saved.add(hash);
 
             if (object instanceof MutationOp) {
 
@@ -289,7 +337,7 @@ class Store {
                                 //console.log('WILL CASCADE')
                                 const casc = CascadedInvalidateOp.create(object, inv);
                                 casc.toContext(context);
-                                await this.saveWithContext(casc.getLastHash(), context);
+                                await this.saveWithContext(casc.getLastHash(), context, saved);
                             }  else {
                                 //console.log('WILL NOT CASCADE')
                             }
@@ -324,7 +372,7 @@ class Store {
                             //console.log(conseqOp);
                             const casc = CascadedInvalidateOp.create(conseqOp, object);
                             casc.toContext(context);
-                            await this.saveWithContext(casc.getLastHash(), context);
+                            await this.saveWithContext(casc.getLastHash(), context, saved);
                         }
                     }
                 
@@ -333,7 +381,7 @@ class Store {
                     for (const conseqOp of consequences.values()) {
                         const casc = CascadedInvalidateOp.create(conseqOp, object);
                         casc.toContext(context);
-                        await this.saveWithContext(casc.getLastHash(), context);
+                        await this.saveWithContext(casc.getLastHash(), context, saved);
                     }
 
                 }
@@ -387,7 +435,17 @@ class Store {
     }
 
     async loadLiteral(hash: Hash): Promise<Literal | undefined> {
-        return this.backend.load(hash);
+
+        let literal = this.cache.get(hash);
+
+        if (literal === undefined) {
+            literal = await this.backend.load(hash);
+            if (literal !== undefined) {
+                this.cache.set(literal?.hash, literal);
+            }
+        }
+
+        return literal;
     }
     
     async loadRef<T extends HashedObject>(ref: HashReference<T>, loadMutations=true) : Promise<T | undefined> {
@@ -412,6 +470,8 @@ class Store {
 
     async load(hash: Hash, loadMutations=true, watchForChanges=false) : Promise<HashedObject | undefined> {
 
+        await this.initKeyPairs;
+
         if (!loadMutations && watchForChanges) {
             throw Error('Trying to load ' + hash + ' from the store, but loadMotations=false and watchForChanges=true. This combination does not make sense.');
         }
@@ -430,7 +490,6 @@ class Store {
 
             await object.loadAllChanges();
         }
-
 
         return object;
     }
@@ -481,19 +540,16 @@ class Store {
                     ctxObj.setResources(this.resources);
                 }
 
-                /*if (!ctxObj.hasStore()) {
-                    ctxObj.setStore(this);
-                }*/
-
                 if (ctxObj instanceof Identity) {
                     const id = ctxObj as Identity;
                     if (!id.hasKeyPair()) {
-                        let kp = await this.load(id.getKeyPairHash());
+                        let kp = this.keyPairs.get(id.getKeyPairHash());
                         if (kp !== undefined && kp instanceof RSAKeyPair) {
                             id.addKeyPair(kp);
                         }
                     }
                 }
+                
             }
 
             

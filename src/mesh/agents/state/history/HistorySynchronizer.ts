@@ -498,7 +498,12 @@ class HistorySynchronizer {
         let sent = this.sendRequest(reqInfo);
         
         if (sent) {
-            this.checkRequestTimeoutsTimer();    
+            
+            for (const hash of msg.requestedOps || []) {
+                this.opXferLog.debug('OP_REQ       : mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' op=' + hash);
+            }
+            
+            this.checkRequestTimeoutsTimer();
         } else {
             this.cleanupRequest(reqInfo);
         }
@@ -541,7 +546,9 @@ class HistorySynchronizer {
                     }
             }
 
+            
             const opHeaders = remoteHistory.causalClosure(startingOps, max, undefined, (h: Hash) => !this.requestsForOp.hasKey((remoteHistory.contents.get(h) as OpHeader).opHash))
+
             const ops = opHeaders.map( (opHeaderHash: Hash) => 
                                        (remoteHistory.contents.get(opHeaderHash) as OpHeader).opHash);
 
@@ -704,7 +711,7 @@ class HistorySynchronizer {
                     for (const opHistory of req.currentState.values()) {
                         if (await this.opHistoryIsMissingFromStore(opHistory)) {
                             this.requestsBlockedByOpHeader.add(opHistory, req.requestId);
-                            this.controlLog.debug('\n'+this.logPrefix+'\nRequest ' + req.requestId + ' is blocked by missing op w/history ' + opHistory)
+                            this.controlLog.debug('\n'+this.logPrefix+'\nRequest ' + req.requestId + ' is blocked by missing op ' + this.discoveredHistory.contents.get(opHistory)?.opHash)
                         } else {
                             reqInfo.missingCurrentState.delete(opHistory);
                         }
@@ -737,12 +744,12 @@ class HistorySynchronizer {
 
             if (reqInfo === undefined) {
                 if (this.lastCancelledRequests.indexOf(msg.requestId) < 0) {
-                    this.opXferLog.warning('\n'+this.logPrefix+'\nReceived literal for unknown request ' + msg.requestId);
+                    this.opXferLog.debug('LIT_RCV_ERROR: mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' lit=' + msg.literal?.hash  + ' idx=' + msg.sequence + ' UNKNOWN REQUEST');
                 } else {
-                    this.opXferLog.debug('\n'+this.logPrefix+'\nReceived literal for cancelled request ' + msg.requestId);
+                    this.opXferLog.debug('LIT_RCV_ERROR: mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' lit=' + msg.literal?.hash  + ' idx=' + msg.sequence + ' CANCELLED REQUEST');
                 }
             } else if (reqInfo.remote !== remote) {
-                this.opXferLog.warning('\n'+this.logPrefix+'\nReceived literal claiming to come from ' + reqInfo.remote + ', but it actually came from ' + msg.requestId);
+                this.opXferLog.debug('LIT_RCV_ERROR: mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' lit=' + msg.literal?.hash  + ' idx=' + msg.sequence + ' WRONG SENDER: should be ' + reqInfo.remote + ', but it actually came from ' + msg.requestId);
             }
 
             return;
@@ -762,14 +769,14 @@ class HistorySynchronizer {
                     reqInfo.request.requestedTerminalOpHistory !== undefined &&
                     reqInfo.request.requestedTerminalOpHistory.length > 0)) {
 
-                        this.opXferLog.trace('\n'+this.logPrefix+'\nWill enqueue literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId + ' (status is ' + reqInfo.status + ')');
+                        this.opXferLog.trace('LIT_RCV_QUEUE: mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' lit=' + msg.literal?.hash  + ' idx=' + msg.sequence + ' RESP NOT YET ACCEPT');
                         enqueue = true;
 
                 }
 
             } else { // reqInfo.status === 'accepted-response'
 
-                this.opXferLog.trace('\n'+this.logPrefix+'\nWill process literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId);
+                this.opXferLog.trace('LIT_RCV_ACCPT: mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' lit=' + msg.literal?.hash  + ' idx=' + msg.sequence + ' OK');
                 
                 enqueue = true;
                 process = true;
@@ -789,11 +796,11 @@ class HistorySynchronizer {
             }
 
             if (!enqueue && !process) {
-                this.opXferLog.warning('\n'+this.logPrefix+'\nWill ignore literal number ' + msg.sequence + ' for request ' + reqInfo.request.requestId);
+                this.opXferLog.warning('LIT_RCV_IGNOR: mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' lit=' + msg.literal?.hash  + ' idx=' + msg.sequence);
             }
 
         } else {
-            this.opXferLog.warning('\n'+this.logPrefix+'\nIgnored received literal for request ' + reqInfo.request.requestId + ', all literals were already received.');
+            this.opXferLog.warning('LIT_RCV_IGNOR: mut=' + this.syncAgent.mutableObjHash + ' req=' + msg.requestId + ' lit=' + msg.literal?.hash  + ' idx=' + msg.sequence + ' SUPERFLUOUS');
         }
 
     }
@@ -898,7 +905,7 @@ class HistorySynchronizer {
                 resp.omittedObjs.length === resp.omittedObjsOwnershipProofs.length &&
                 reqInfo.receivedObjects !== undefined) {
 
-                this.opXferLog.trace('\n'+this.logPrefix+'\nHave to load ' + resp.omittedObjs.length + ' omitted deps for ' + req.requestId);
+                this.opXferLog.trace('LIT_RCV_OMIT : mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' have to load ' + resp.omittedObjs.length);
 
                 for (const idx of resp.omittedObjs.keys()) {
 
@@ -906,7 +913,7 @@ class HistorySynchronizer {
                     const hash = resp.omittedObjs[idx];
                     const omissionProof = resp.omittedObjsOwnershipProofs[idx];
     
-                    const dep = await this.syncAgent.store.load(hash);
+                    const dep = await this.syncAgent.store.load(hash, false, false);
                     
                     if (dep !== undefined && dep.hash(reqInfo.request.omissionProofsSecret) === omissionProof) {
                         if (reqInfo.receivedObjects?.objects?.get(dep.hash()) === undefined) {
@@ -914,9 +921,8 @@ class HistorySynchronizer {
                         }
                     }
                 }
-    
-                this.opXferLog.trace('\n'+this.logPrefix+'\nDone loading ' + resp.omittedObjs.length + ' omitted deps for ' + req.requestId);
-            
+
+                this.opXferLog.trace('LIT_RCV_OMIT : mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' loaded ' + resp.omittedObjs.length);
             }
 
             reqInfo.status = 'accepted-response';
@@ -993,12 +999,10 @@ class HistorySynchronizer {
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     
                     await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
-
+                    
                     // FIXME: there's no validation of the op matching the actual causal history op
                     // TODO:  validate, remove op and all history following if op does not match
-
-                    this.opXferLog.debug('\n'+this.logPrefix+'\nReceived op ' + literal.hash + ' from request ' + reqInfo.request.requestId + '(was requested: ' + (reqInfo.request.requestedOps !== undefined && reqInfo.request.requestedOps.indexOf(literal.hash) >= 0) + ') ');
-
+                    this.opXferLog.debug('OP_RCV       : mut=' + this.syncAgent.mutableObjHash + ' req=' + reqInfo.request.requestId + ' op=' + literal.hash + '(was requested: ' + (reqInfo.request.requestedOps !== undefined && reqInfo.request.requestedOps.indexOf(literal.hash) >= 0) + ')');
                     const removed = this.checkRequestRemoval(reqInfo);
 
                     if (removed) {
@@ -1027,7 +1031,7 @@ class HistorySynchronizer {
 
     private markOpAsFetched(opHeader: OpHeader) {
 
-        this.opXferLog.debug('\n'+this.logPrefix+'\nMarking op ' + opHeader.opHash + ' as fetched (op history is ' + opHeader.headerHash + ').')
+        this.opXferLog.debug('OP_RCV_MARK  : mut=' + this.syncAgent.mutableObjHash + ' op=' + opHeader.opHash + '(op history is ' + opHeader.headerHash + ')');
 
         const opHeaderHash = opHeader.headerHash;
         const opHash        = opHeader.opHash;
@@ -1362,7 +1366,7 @@ class HistorySynchronizer {
 
                 const ownershipProof = resp.omittedObjsOwnershipProofs[idx];
 
-                const dep = await this.syncAgent.store.load(hash);
+                const dep = await this.syncAgent.store.load(hash, false, false);
 
                 if (dep === undefined || dep.hash(reqInfo.request.omissionProofsSecret) !== ownershipProof) {
                     omittedObjsOk = false;
@@ -1450,7 +1454,7 @@ class HistorySynchronizer {
             detail: detail
         }
         
-        this.requestLog.debug('Cancelling request ' + reqInfo.request.requestId);
+        this.requestLog.debug('Cancelling request ' + reqInfo.request.requestId + ' reson=' + reason + ' (' + detail + ')');
 
         this.syncAgent.sendMessageToPeer(reqInfo.remote, this.syncAgent.getAgentId(), msg);
     }

@@ -726,7 +726,7 @@ class Mesh {
 
         if (!newOpCallbacks.has(hash)) {
             let callback = async (opHash: Hash) => {
-                let op = await mut.getStore().load(opHash);
+                let op = await mut.getStore().load(opHash, false, false);
                 if (op !== undefined && 
                     mut.getAcceptedMutationOpClasses().indexOf(op.getClassName()) >= 0) {
                         let mutOp = op as MutationOp;

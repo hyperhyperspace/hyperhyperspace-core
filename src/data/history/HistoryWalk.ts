@@ -14,7 +14,7 @@ abstract class HistoryWalk {
     visited : Set<Hash>;
 
     queue         : Array<Hash>;
-    queueContents : Set<Hash>;
+    queueContents : Map<Hash, number>;
 
     filter? : (opHeader: Hash) => boolean;
 
@@ -28,10 +28,10 @@ abstract class HistoryWalk {
 
         
         this.queue         = [];
-        this.queueContents = new Set();
+        this.queueContents = new Map();
 
         this.filter = filter;
-        
+
         for (const hash of initial.values()) {
             if (this.fragment.contents.has(hash) && (filter === undefined || filter(hash))) {
                 this.enqueueIfNew(hash);
@@ -47,27 +47,43 @@ abstract class HistoryWalk {
         return this;
     }
 
-
     protected enqueueIfNew(what: Hash) {
-        if (!this.visited.has(what) && !this.queueContents.has(what)) {
+        if (!this.queueContents.has(what)) {
             this.enqueue(what);
         }
     }
 
 
     protected enqueue(what: Hash) {
-        this.queue.push(what);
-        this.queueContents.add(what);
+       
+
+        //if (!this.visited.has(what)) {
+            this.queue.push(what);
+            const count = this.queueContents.get(what) || 0;
+            this.queueContents.set(what, count+1);
+        //}
     }
 
     protected dequeue(): Hash {
         const result = this.queue.shift() as Hash;
-        this.queueContents.delete(result);
+        
+        const count = this.queueContents.get(result) as number;
+        if (count === 1) {
+            this.queueContents.delete(result);
+        } else {
+            this.queueContents.set(result, count - 1);
+        }
 
         return result;
     }
 
     protected goFrom(opHeaderHash: Hash) {
+
+        if (this.visited.has(opHeaderHash)) {
+            return new Set<Hash>();
+        }
+
+        this.visited.add(opHeaderHash);
 
         let unfiltered: Set<Hash>;
 
@@ -82,10 +98,11 @@ abstract class HistoryWalk {
         } else {
             const filtered = new Set<Hash>();
             for (const hash of unfiltered.values()) {
-                if (this.filter(hash)) {
+                if (this.filter === undefined || this.filter(hash)) {
                     filtered.add(hash);
                 }
             }
+
             return filtered;
         }
         
