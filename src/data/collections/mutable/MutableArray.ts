@@ -385,6 +385,11 @@ class MutableArray<T> extends MutableObject {
         this.rebuild();
         return this._hashes.indexOf(hash);
     }
+    
+    valueAt(idx: number) {
+        this.rebuild();
+        return this._contents[idx];
+    }
 
     private async delete(hash: Hash, ordinal?: Ordinal) {
 

@@ -678,7 +678,10 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses;
     }
 
-    setResources(resources: Resources): void {
+    setResources(resources: Resources, seen = new Set<HashedObject>()): void {
+        if (seen.has(this)) return;
+        
+        seen.add(this);
 
         let reBindToStore = false;
 
@@ -695,7 +698,7 @@ abstract class MutableObject extends HashedObject {
 
         for (const aliases of this.getMutableContents().values()) {
             for (const obj of aliases) {
-                obj.setResources(resources);
+                obj.setResources(resources, seen);
             }
         }
 
