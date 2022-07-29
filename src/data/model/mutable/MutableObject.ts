@@ -603,28 +603,28 @@ abstract class MutableObject extends HashedObject {
         return before;
     }
 
-    protected createMutationEventSource(): EventRelay<HashedObject> {
+    protected createMutationEventSource(seen=new Set<HashedObject>()): EventRelay<HashedObject> {
 
-        const ownMutationEventSource = super.createMutationEventSource();
+        const ownMutationEventSource = super.createMutationEventSource(seen);
 
-        this.updateCascadeMutableContentRelays(ownMutationEventSource);
+        this.updateCascadeMutableContentRelays(ownMutationEventSource, seen);
 
         return ownMutationEventSource;
 
     }
 
-    private updateCascadeMutableContentRelays(ownMutationEventSource?: EventRelay<HashedObject>) {
+    private updateCascadeMutableContentRelays(ownMutationEventSource?: EventRelay<HashedObject>, seen=new Set<HashedObject>()) {
 
         if (ownMutationEventSource !== undefined) {
 
             if (this.isCascadingMutableContentEvents()) {
                 ownMutationEventSource.addObserver(this._cascadeMutableContentObserver);
 
-                this.addEventRelaysForContents(ownMutationEventSource);
+                this.addEventRelaysForContents(ownMutationEventSource, seen);
             } else {
                 ownMutationEventSource.removeObserver(this._cascadeMutableContentObserver);
 
-                this.removeEventRelaysForContents(ownMutationEventSource);
+                this.removeEventRelaysForContents(ownMutationEventSource, seen);
             }
         }
     }
@@ -643,23 +643,29 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    private addEventRelaysForContents(own: EventRelay<HashedObject>|undefined) {
+    private addEventRelaysForContents(own: EventRelay<HashedObject>|undefined, seen=new Set<HashedObject>()) {
 
         if (own !== undefined) {
             for (const [hash, aliases] of this.getMutableContents().entries()) {
                 for (const elmt of aliases) {
-                    MutableObject.addEventRelayForElmt(own, hash, elmt);
+                    if (!seen.has(elmt)) {
+                        seen.add(elmt);
+                        MutableObject.addEventRelayForElmt(own, hash, elmt);
+                    }
                 }
             }    
         }
     }
 
-    private removeEventRelaysForContents(own: EventRelay<HashedObject>|undefined) {
+    private removeEventRelaysForContents(own: EventRelay<HashedObject>|undefined, seen=new Set<HashedObject>()) {
 
         if (own !== undefined) {
             for (const [hash, aliases] of this.getMutableContents().entries()) {
                 for (const elmt of aliases) {
-                    MutableObject.addEventRelayForElmt(own, hash, elmt);
+                    if (!seen.has(elmt)) {
+                        seen.add(elmt);
+                        MutableObject.addEventRelayForElmt(own, hash, elmt);
+                    }
                 }
             }    
         }

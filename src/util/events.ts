@@ -134,13 +134,11 @@ class EventRelay<T extends hashable> {
     private wouldCreateACycle(emitterHash: hash) {
 
         if (this.emitterHash === emitterHash) {
-            console.log('clash: ' + this.emitterHash);
             return true;
         }
 
         for (const [upstream, _observer] of this.upstreamRelays.values()) {
             if (upstream.wouldCreateACycle(emitterHash)) {
-                console.log('clash path: ' + upstream.emitterHash);
                 return true;
             }
         }

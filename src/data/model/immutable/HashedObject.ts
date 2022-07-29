@@ -288,11 +288,11 @@ abstract class HashedObject {
         }
     }
 
-    getMutationEventSource(): EventRelay<HashedObject> {
+    getMutationEventSource(seen?: Set<HashedObject>): EventRelay<HashedObject> {
 
         if (this._mutationEventSource === undefined) {
 
-            this._mutationEventSource = this.createMutationEventSource();
+            this._mutationEventSource = this.createMutationEventSource(seen);
             
         }
 
@@ -300,12 +300,16 @@ abstract class HashedObject {
 
     }
 
-    protected createMutationEventSource(): EventRelay<HashedObject> {
+    protected createMutationEventSource(seen=new Set<HashedObject>()): EventRelay<HashedObject> {
+
+        seen.add(this);
 
         const subObservers = new Map<string, EventRelay<HashedObject>>();
 
         for (const [fieldName, subobj] of this.getDirectSubObjects().entries()) {
-            subObservers.set(fieldName, subobj.getMutationEventSource());
+            if (!seen.has(subobj)) {
+                subObservers.set(fieldName, subobj.getMutationEventSource(seen));
+            }
         }
 
         return new EventRelay(this, subObservers);
