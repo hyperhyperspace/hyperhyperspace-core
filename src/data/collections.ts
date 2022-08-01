@@ -1,3 +1,4 @@
+export * from './collections/mutable/GrowOnlySet';
 export * from './collections/mutable/MutableSet';
 export * from './collections/mutable/MutableReference';
 export * from './collections/mutable/MutableArray';

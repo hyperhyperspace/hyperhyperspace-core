@@ -8,6 +8,7 @@ import { Types } from '../Types';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
+import { ClassRegistry } from 'data/model';
 
 type ElmtHash = Hash;
 
@@ -428,9 +429,9 @@ class MutableSet<T> extends MutableObject {
     }
 }
 
-DeleteOp.registerClass(DeleteOp.className, DeleteOp);
-AddOp.registerClass(AddOp.className, AddOp);
-MutableSet.registerClass(MutableSet.className, MutableSet);
+ClassRegistry.register(DeleteOp.className, DeleteOp);
+ClassRegistry.register(AddOp.className, AddOp);
+ClassRegistry.register(MutableSet.className, MutableSet);
 
 
 export { MutableSet, AddOp as MutableSetAddOp, DeleteOp as MutableSetDeleteOp, MutableSetEvents };
