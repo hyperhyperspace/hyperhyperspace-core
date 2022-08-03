@@ -125,7 +125,9 @@ class Store {
         // The following is necessary in case the object (or a subobject) was already in the store,
         // and hence saveWithContext didn't visit all subobjects setting hashes and stores.
         for (const [ctxHash, ctxObject] of context.objects.entries()) {
+            
             ctxObject.setLastHash(ctxHash);
+            
             if (this.resources === undefined) {
                 const objResources = ctxObject.getResources()
                 if (objResources === undefined || objResources.store !== this) {
@@ -137,7 +139,14 @@ class Store {
             } else {
                 ctxObject.setResources(this.resources);
             }
-            
+
+            if (ctxObject instanceof Identity && !ctxObject.hasKeyPair()) {
+                const kp = this.keyPairs.get(ctxObject.getKeyPairHash());
+
+                if (kp !== undefined) {
+                    ctxObject.addKeyPair(kp);
+                }
+            }
         }
 
         if (saveMutations) {

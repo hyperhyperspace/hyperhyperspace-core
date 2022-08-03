@@ -91,7 +91,7 @@ class AddOp<T> extends MutableSetOp<T> {
             return false;
         }
 
-        if (!(this.element instanceof HashedObject) || HashedObject.isLiteral(this.element)) {
+        if (!(this.element instanceof HashedObject || HashedObject.isLiteral(this.element))) {
             return false;
         }
 

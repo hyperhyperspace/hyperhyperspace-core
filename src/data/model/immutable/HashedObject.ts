@@ -44,9 +44,10 @@ abstract class HashedObject {
     private id?     : string;
     private author? : Identity;
     
-    private _signOnSave  : boolean;
-    private _lastHash?        : Hash;
-    private _lastSignature?   : string;
+    private _derivedFields   : Set<string>;
+    private _signOnSave      : boolean;
+    private _lastHash?       : Hash;
+    private _lastSignature?  : string;
 
     private _resources? : Resources;
 
@@ -56,6 +57,7 @@ abstract class HashedObject {
     protected _cascadeMutableContentEvents: boolean;
 
     constructor() {
+        this._derivedFields = new Set();
         this._signOnSave = false;
         this._boundToStore = false;
         this._cascadeMutableContentEvents = true;
@@ -72,6 +74,11 @@ abstract class HashedObject {
 
     setId(id: string) {
         this.id = id;
+
+        for (const fieldName of this._derivedFields) {
+            const obj = (this as any)[fieldName];
+            obj?.setId(this.getDerivedFieldId(fieldName));
+        }
     }
 
     setRandomId() {
@@ -245,7 +252,21 @@ abstract class HashedObject {
         return clone;
     }
 
-    addDerivedField(fieldName: string, object: HashedObject) {
+    addDerivedField(fieldName: string, object?: HashedObject) {
+        this._derivedFields.add(fieldName);
+
+        // to keep backwards compat for now:
+        if (object !== undefined) {
+            this.setDerivedField(fieldName, object);
+        }
+    }
+
+    setDerivedField(fieldName: string, object: HashedObject) {
+
+        if (!this._derivedFields.has(fieldName)) {
+            throw new Error('Trying to set the value of a derived field that was not added. Add derived fields (independently of they being set) to ensure the correct behaviour of setId on loaded objects.');
+        }
+
         object.setId(this.getDerivedFieldId(fieldName));
         (this as any)[fieldName] = object;
     }

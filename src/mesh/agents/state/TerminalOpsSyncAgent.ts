@@ -286,7 +286,6 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
             for (const hash of timeoutedIncompleteOps) {
                 this.incompleteOps.delete(hash);
-                console.log('timeouted incomplete op: ' + hash);
             }
 
             //FIXME: issue retry for tiemouted incomplete op

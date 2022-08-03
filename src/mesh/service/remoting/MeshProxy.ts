@@ -395,8 +395,11 @@ class MeshProxy {
             callbackId: callbackId,
             linkupServers: linkupServers,
             receiver: receiver.toLiteralContext(),
+            receiverKeyPair: receiver.getKeyPair().toLiteralContext(),
             spawnId: spawnId
         }
+
+        console.log('proxy forwarding addObjectSpawnCallback msg to host')
 
         this.commandForwardingFn(cmd);
     }
@@ -409,6 +412,7 @@ class MeshProxy {
             receiver: receiver.toLiteralContext(),
             receiverLinkupServers: receiverLinkupServers,
             sender: sender.toLiteralContext(),
+            senderKeyPair: sender.getKeyPair().toLiteralContext(),
             senderEndpoint: senderEndpoint,
             spawnId: spawnId
         }

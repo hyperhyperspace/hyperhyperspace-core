@@ -6,6 +6,10 @@ import { Types } from 'data/collections';
 
 type ElmtHash = Hash;
 
+enum GrowOnlySetEvents {
+    Add    = 'add'
+}
+
 class AddOp<T> extends MutationOp {
 
     static className = 'hhs/v0/GrowOnlySet/AddOp';
@@ -50,7 +54,7 @@ class AddOp<T> extends MutationOp {
             return false;
         }
 
-        if (!(this.element instanceof HashedObject) || HashedObject.isLiteral(this.element)) {
+        if (!(this.element instanceof HashedObject || HashedObject.isLiteral(this.element))) {
             return false;
         }
 
@@ -133,6 +137,8 @@ class GrowOnlySet<T> extends MutableObject {
             if (elmt instanceof HashedObject) {
                 this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: elmt});
             }
+
+            this._mutationEventSource?.emit({emitter: this, action: GrowOnlySetEvents.Add, data: elmt});
         }
 
         return Promise.resolve(mutated);
@@ -204,4 +210,4 @@ class GrowOnlySet<T> extends MutableObject {
 ClassRegistry.register(AddOp.className, AddOp);
 ClassRegistry.register(GrowOnlySet.className, GrowOnlySet);
 
-export { GrowOnlySet, AddOp as GrowOnlySetAddOp };
+export { GrowOnlySet, GrowOnlySetEvents, AddOp as GrowOnlySetAddOp };

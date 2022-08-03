@@ -110,6 +110,7 @@ type FindObjectByHashSuffix = {
 type AddObjectSpawnCallback = {
     type: 'add-object-spawn-callback',
     receiver: LiteralContext,
+    receiverKeyPair: LiteralContext,
     linkupServers: Array<string>,
     spawnId: string,
     callbackId: string
@@ -121,6 +122,7 @@ type SendObjectSpawnRequest = {
     receiver: LiteralContext,
     receiverLinkupServers: Array<string>,
     sender: LiteralContext,
+    senderKeyPair: LiteralContext,
     senderEndpoint: string,
     spawnId: string
 }
@@ -207,14 +209,18 @@ class MeshHost {
             type === 'object-discovery-reply' ||
             type === 'object-discovery-end' ||
             type === 'forward-get-peers-reply' ||
-            type === 'forward-get-peer-for-endpoint-reply');
+            type === 'forward-get-peer-for-endpoint-reply' || 
+            type === 'add-object-spawn-callback' ||
+            type === 'send-object-spawn-callback'
+            );
     }
 
     static isStreamedReply(msg: any): boolean {
         const type = msg?.type;
 
         return (type === 'object-discovery-reply' ||
-                type === 'object-discovery-end');
+                type === 'object-discovery-end'   || 
+                type === 'object-spawn-callback');
     }
 
     static isPeerSourceRequest(msg: any): boolean {
@@ -436,6 +442,8 @@ class MeshHost {
             }
 
             const receiver = HashedObject.fromLiteralContext(command.receiver) as Identity;
+
+            receiver.addKeyPair(HashedObject.fromLiteralContext(command.receiverKeyPair) as RSAKeyPair);
             
             this.mesh.addObjectSpawnCallback(cb, receiver, command.linkupServers, command.spawnId);
 
@@ -444,8 +452,10 @@ class MeshHost {
             const object   = HashedObject.fromLiteralContext(command.object);
             const receiver = HashedObject.fromLiteralContext(command.receiver) as Identity;
             const sender   = HashedObject.fromLiteralContext(command.sender) as Identity;
+
+            sender.addKeyPair(HashedObject.fromLiteralContext(command.senderKeyPair) as RSAKeyPair);
             
-            this.mesh.sendObjectSpawnRequest(object, receiver, sender, command.senderEndpoint, command.receiverLinkupServers, command.spawnId);
+            this.mesh.sendObjectSpawnRequest(object, sender, receiver, command.senderEndpoint, command.receiverLinkupServers, command.spawnId);
 
         } else if (command.type === 'shutdown') {
             this.mesh.shutdown();
