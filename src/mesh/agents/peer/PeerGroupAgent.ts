@@ -15,6 +15,7 @@ import { LinkupAddress } from 'net/linkup/LinkupAddress';
 import { Hash } from 'data/model';
 import { Identity } from 'data/identity';
 import { Logger, LogLevel } from 'util/logging';
+import { Lock } from 'util/concurrency';
 
 type PeerInfo = { endpoint: Endpoint, identityHash: Hash, identity?: Identity };
 
@@ -161,6 +162,11 @@ class PeerGroupAgent implements Agent {
     controlLog = PeerGroupAgent.controlLog;
     peersLog = PeerGroupAgent.peersLog;
 
+    tickLock: Lock;
+
+    startup = Date.now();
+    firstPeer?: number;
+
     constructor(peerGroupId: string, localPeer: PeerInfo, peerSource: PeerSource, params?: Partial<Params>) {
         this.peerGroupId = peerGroupId;
         this.localPeer = localPeer;
@@ -179,19 +185,31 @@ class PeerGroupAgent implements Agent {
         }
 
         this.params = {
-            minPeers: params.minPeers || 6,
+            minPeers: params.minPeers || 3,
             maxPeers: params.maxPeers || 12,
             peerConnectionTimeout: params.peerConnectionTimeout || 20,
-            peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 20,
-            peerDiscoveryAttemptInterval: params.peerDiscoveryAttemptInterval || 30,
-            tickInterval: params.tickInterval || 5
+            peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 10,
+            peerDiscoveryAttemptInterval: params.peerDiscoveryAttemptInterval || 15,
+            tickInterval: params.tickInterval || 0.5
         };
 
         this.tick = async () => {
-            this.cleanUp();
-            this.queryForOnlinePeers();
-            this.deduplicateConnections();
+
+            if (this.tickLock.acquire()) {
+                try {
+                    this.cleanUp();
+                    this.queryForOnlinePeers();
+                    this.deduplicateConnections();
+                } finally {
+                    this.tickLock.release();
+                }
+    
+            }
+
         };
+
+        this.tickLock = new Lock();
+
 
         this.stats = { connectionInit: 0, connectionAccpt: 0, connectionTimeouts: 0 };
     }
@@ -211,6 +229,7 @@ class PeerGroupAgent implements Agent {
     ready(pod: AgentPod): void {
         this.controlLog.debug('Started PeerControlAgent on local ' + this.localPeer.endpoint + ' (id=' + this.localPeer.identityHash + ') for peerGroupId ' + this.peerGroupId);
         this.pod = pod;
+        this.startup = Date.now();
         this.init();
     }
 
@@ -362,11 +381,13 @@ class PeerGroupAgent implements Agent {
             if (pc.status === PeerConnectionStatus.Ready) {
                 if (!this.getNetworkAgent().checkConnection(pc.connId)) {
                     this.removePeerConnection(pc.connId);
+                    this.getNetworkAgent().releaseConnectionIfExists(pc.connId, this.getAgentId()); // SANTI NEW
                 }
             } else {                
                 if (now > pc.timestamp + this.params.peerConnectionTimeout * 1000) {
                     this.stats.connectionTimeouts += 1;
                     this.removePeerConnection(pc.connId);
+                    this.getNetworkAgent().releaseConnectionIfExists(pc.connId, this.getAgentId()); // SANTI NEW
                 }
             }
         }
@@ -385,7 +406,9 @@ class PeerGroupAgent implements Agent {
 
         const now = Date.now();
 
-        if (this.peerDiscoveryTimestamp === undefined || now > this.peerDiscoveryTimestamp + this.params.peerDiscoveryAttemptInterval * 1000) {
+        const peerDiscoveryAdjust = this.connectionsPerEndpoint.size === 0 && this.startup + 12000 < now? 0.05 : 1; 
+
+        if (this.peerDiscoveryTimestamp === undefined || now > this.peerDiscoveryTimestamp + peerDiscoveryAdjust * this.params.peerDiscoveryAttemptInterval * 1000) {
 
             this.peerDiscoveryTimestamp = now;
             this.peersLog.trace("Considering querying for peers on " + this.peerGroupId);
@@ -411,7 +434,7 @@ class PeerGroupAgent implements Agent {
     
                     const lastQueryTimestamp = this.onlineQueryTimestamps.get(candidate.endpoint);
                     if (lastQueryTimestamp !== undefined &&
-                        now < lastQueryTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
+                        now < lastQueryTimestamp + peerDiscoveryAdjust * this.params.peerConnectionAttemptInterval * 1000) {
     
                         continue;
                     }
@@ -423,7 +446,7 @@ class PeerGroupAgent implements Agent {
                     }
     
                     if (lastAttemptTimestamp !== undefined &&
-                        now < lastAttemptTimestamp + this.params.peerConnectionAttemptInterval * 1000) {
+                        now < lastAttemptTimestamp + peerDiscoveryAdjust * this.params.peerConnectionAttemptInterval * 1000) {
     
                         continue
                     }
@@ -477,8 +500,6 @@ class PeerGroupAgent implements Agent {
 
             if (connIds.length > 1) {
 
-                
-
                 // Check if there was a chosen connection.
                 let chosenConnId = this.chosenForDeduplication.get(endpoint);
     
@@ -508,7 +529,7 @@ class PeerGroupAgent implements Agent {
                     
     
                     if (ready.length > 1) {
-                        PeerGroupAgent.controlLog.trace('Connection duplication detecetd (' + ready.length + ') to ' + endpoint);
+                        PeerGroupAgent.controlLog.trace('Connection duplication detected (' + ready.length + ') to ' + endpoint);
                         ready.sort();
                         chosenConnId = ready[0];
                         this.chosenForDeduplication.set(endpoint, chosenConnId);
@@ -713,6 +734,10 @@ class PeerGroupAgent implements Agent {
 
     private secureConnection(pc: PeerConnection) {
 
+        //if (this.firstPeer === undefined) {
+        //    console.log('asking for connection securing took ' + (Date.now() - this.startup) + ' ms');
+        //}
+
         const secureConnAgent = this.getSecureConnAgent();
 
         secureConnAgent.secureForReceiving(pc.connId, this.localPeer.identity as Identity);
@@ -899,6 +924,11 @@ class PeerGroupAgent implements Agent {
     }
 
     private onConnectionAuthentication(connId: ConnectionId, identityHash: Hash, identity: Identity, identityLocation: IdentityLocation) {
+
+        //if (this.firstPeer === undefined) {
+        //    console.log('authenticated a connection in ' + (Date.now() - this.startup) + ' ms');
+        //}
+
         let pc = this.connections.get(connId);
 
         identityHash; identity; identityLocation;
@@ -1079,7 +1109,12 @@ class PeerGroupAgent implements Agent {
 
     private broadcastNewPeerEvent(peer: PeerInfo) {
         
-        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' hasa new peer: ' + peer.endpoint);
+        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' has a new peer: ' + peer.endpoint);
+
+        if (this.firstPeer === undefined) {
+            this.firstPeer = Date.now();
+            console.log('time to first peer: ' + (this.firstPeer - this.startup));
+        }
 
         let ev: NewPeerEvent = {
             type: PeerMeshEventType.NewPeer,
@@ -1093,7 +1128,7 @@ class PeerGroupAgent implements Agent {
     }
 
     private broadcastLostPeerEvent(peer: PeerInfo) {
-        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' hasa lost a peer: ' + peer.endpoint);
+        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' has lost a peer: ' + peer.endpoint);
 
         let ev: LostPeerEvent = {
             type: PeerMeshEventType.LostPeer,

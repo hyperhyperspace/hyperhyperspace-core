@@ -204,7 +204,6 @@ class NetworkAgent implements Agent {
                 NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', but conn. info not present. Attempting to close.');
                 conn.close();
             } else {
-
                 NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', status was ' + connInfo.status + ' in ' + connInfo.localEndpoint);
 
                 if (connInfo.status !== ConnectionStatus.Ready) {
@@ -348,6 +347,10 @@ class NetworkAgent implements Agent {
                 }
                 
             }
+
+            /*console.log('NetworkAgent state:')
+            console.log(this.connections)
+            console.log(this.connectionInfo)*/
         };
 
         if (proxyConfig?.linkupEventIngestFn !== undefined) {
@@ -416,7 +419,7 @@ class NetworkAgent implements Agent {
         }
 
         
-        for (const {message, instanceId } of messages) {
+        for (const {message, instanceId} of messages) {
             let conn = this.connections.get(connId);
 
             if (conn === undefined) {
@@ -539,46 +542,82 @@ class NetworkAgent implements Agent {
 
         this.connLogger.debug(local + ' is asking for connection to ' + remote);
 
-        const localAddress  = LinkupAddress.fromURL(local);
-        const remoteAddress = LinkupAddress.fromURL(remote);
+        
 
-        const callId = new RNGImpl().randomHexString(BITS_FOR_CONN_ID);
+        let callId: string|undefined = undefined;
 
-        this.connectionInfo.set(
-            callId, 
-            { 
-                localEndpoint: local, 
-                remoteEndpoint: remote, 
-                connId: callId, 
-                status: ConnectionStatus.Establishing, 
-                timestamp: Date.now(),
-                requestedBy: new Set([requestedBy])
-            });
-
-
-        let conn: WebRTCConnection | WebRTCConnectionProxy | WebSocketConnection;
-
-        if (SignallingServerConnection.isWebRTCBased(remoteAddress.url())) {
-            if (SignallingServerConnection.isWebRTCBased(localAddress.url())) {
-                if (this.proxyConfig?.webRTCCommandFn === undefined) {
-                    conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
-                } else {
-                    const connProxy = new WebRTCConnectionProxy(localAddress, remoteAddress, callId, this.connectionReadyCallback, this.proxyConfig?.webRTCCommandFn);
-                    this.connProxies?.set(callId, connProxy);
-                    conn = connProxy;
-                }    
-            } else {
-                conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback, this.linkupManager);
+        /*for (const [id, info] of this.connectionInfo.entries()) {
+            if (info.localEndpoint === local && info.remoteEndpoint === remote && info.status === ConnectionStatus.Ready) {
+                callId = id;
+                info.requestedBy.add(requestedBy);
+                break;
             }
-        } else {
-            conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback);
         }
 
-        conn.setMessageCallback(this.messageCallback);
+        if (callId === undefined) {
+            for (const [id, info] of this.connectionInfo.entries()) {
+                if (info.localEndpoint === local && info.remoteEndpoint === remote && info.status === ConnectionStatus.Establishing) {
+                    callId = id;
+                    info.requestedBy.add(requestedBy);
+                    break;
+                }
+            }
+        }
 
-        this.connections.set(callId, conn);
+        if (callId === undefined) {
+            for (const [id, info] of this.connectionInfo.entries()) {
+                if (info.localEndpoint === local && info.remoteEndpoint === remote && info.status === ConnectionStatus.Received) {
+                    callId = id;
+                    this.acceptConnection(id, requestedBy);
+                    break;
+                }
+            }
+        }*/
 
-        conn.open();
+
+        if (callId === undefined) {
+            callId = new RNGImpl().randomHexString(BITS_FOR_CONN_ID);
+
+            const localAddress  = LinkupAddress.fromURL(local);
+            const remoteAddress = LinkupAddress.fromURL(remote);
+
+            this.connectionInfo.set(
+                callId, 
+                { 
+                    localEndpoint: local, 
+                    remoteEndpoint: remote, 
+                    connId: callId, 
+                    status: ConnectionStatus.Establishing, 
+                    timestamp: Date.now(),
+                    requestedBy: new Set([requestedBy])
+                });
+    
+    
+            let conn: WebRTCConnection | WebRTCConnectionProxy | WebSocketConnection;
+    
+            if (SignallingServerConnection.isWebRTCBased(remoteAddress.url())) {
+                if (SignallingServerConnection.isWebRTCBased(localAddress.url())) {
+                    if (this.proxyConfig?.webRTCCommandFn === undefined) {
+                        conn = new WebRTCConnection(this.linkupManager, localAddress, remoteAddress, callId, this.connectionReadyCallback);
+                    } else {
+                        const connProxy = new WebRTCConnectionProxy(localAddress, remoteAddress, callId, this.connectionReadyCallback, this.proxyConfig?.webRTCCommandFn);
+                        this.connProxies?.set(callId, connProxy);
+                        conn = connProxy;
+                    }    
+                } else {
+                    conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback, this.linkupManager);
+                }
+            } else {
+                conn = new WebSocketConnection(callId, localAddress, remoteAddress, this.connectionReadyCallback);
+            }
+    
+            conn.setMessageCallback(this.messageCallback);
+    
+            this.connections.set(callId, conn);
+    
+            conn.open();
+    
+        }
 
         return callId;
     }

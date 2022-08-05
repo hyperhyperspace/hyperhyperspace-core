@@ -153,7 +153,6 @@ class WebRTCConnectionsHost {
 
             this.eventCallback(ev);
         }
-
     }
 
     execute(cmd: WebRTCConnectionCommand) {

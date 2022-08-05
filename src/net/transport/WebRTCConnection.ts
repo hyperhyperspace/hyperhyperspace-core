@@ -45,6 +45,8 @@ class WebRTCConnection implements Connection {
 
     private handleSignallingMessage : MessageCallback;
 
+    startup = Date.now();
+
     constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void, channelStatusChangeCallback?: (status: string, conn: Connection) => void) {
 
         this.linkupManager = linkupManager;
@@ -75,6 +77,8 @@ class WebRTCConnection implements Connection {
         this.onready = () => {
             WebRTCConnection.logger.debug('connection from ' + this.localAddress?.linkupId + ' to ' + this.remoteAddress?.linkupId + ' is ready for call ' + this.callId);
             this.readyCallback(this);
+
+            console.log('connection establishment took ' + (Date.now() - this.startup) + ' ms (initiatior: ' + this.initiator + ')');
         };
 
         this.channelStatusChangeCallback = channelStatusChangeCallback;
@@ -207,8 +211,15 @@ class WebRTCConnection implements Connection {
 
     close() {
         WebRTCConnection.logger.debug('Closing connection ' + this.callId);
+
+        if (this.channel !== undefined) {
+            this.channel.close();
+            this.channel = undefined;
+        }
+
         if (this.connection !== undefined) {
             this.connection.close();
+            this.connection = undefined;
         }
     }
 

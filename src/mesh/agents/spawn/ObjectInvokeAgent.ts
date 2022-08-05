@@ -12,7 +12,7 @@ import { ObjectSpawnAgent, ObjectSpawnRequest, ObjectSpawnRequestEnvelope } from
 
 class ObjectInvokeAgent implements Agent {
 
-    static log = new Logger(ObjectInvokeAgent.name, LogLevel.INFO);
+    static log = new Logger(ObjectInvokeAgent.name, LogLevel.DEBUG);
 
     static agentIdFor(owner: Identity, spawnId: string): string {
         return 'object-invoke-for' + owner.getLastHash() + '-with-id:' + spawnId;
