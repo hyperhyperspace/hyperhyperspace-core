@@ -4,13 +4,13 @@ import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { AgentPod, AgentEvent, AgentSetChangeEvent, AgentSetChange, AgentPodEventType } from '../../service/AgentPod';
 import { AgentId } from '../../service/Agent';
 import { Endpoint } from '../network/NetworkAgent';
-//import { PeerId } from '../../network/Peer';
 
 import { HashedMap } from 'data/model/immutable';
 import { Hash, HashedObject } from 'data/model';
 import { Shuffle } from 'util/shuffling';
 import { Logger, LogLevel } from 'util/logging';
 import { PeerGroupAgent, PeerMeshEventType, NewPeerEvent, LostPeerEvent } from '../peer/PeerGroupAgent';
+import { LRUCache } from 'util/caching';
 
 
 /*
@@ -98,6 +98,7 @@ type GossipParams = {
     maxCachedPrevStates  : number,
     newStateErrorRetries : number,
     newStateErrorDelay   : number,
+    maxStateSendingFreq  : number,
     maxGossipDelay       : number
  };
 
@@ -111,6 +112,11 @@ type AgentStateUpdateEvent = {
     type: GossipEventTypes.AgentStateUpdate,
     content: { agentId: AgentId, state: HashedObject }
 }
+
+enum SendingReason {
+    Gossip = 'gossip',
+    Request = 'request'
+};
 
 class StateGossipAgent extends PeeringAgentBase {
 
@@ -130,6 +136,7 @@ class StateGossipAgent extends PeeringAgentBase {
         maxCachedPrevStates  : 50,
         newStateErrorRetries : 3,
         newStateErrorDelay   : 1500,
+        maxStateSendingFreq  : 5,
         maxGossipDelay       : 5000
     };
 
@@ -146,6 +153,8 @@ class StateGossipAgent extends PeeringAgentBase {
 
     previousStatesCache: Map<AgentId, Array<Hash>>;
 
+    sentStateCache: LRUCache<string, {timestamp: number, stateHash: Hash}>;
+
     peerMessageLog = StateGossipAgent.peerMessageLog;
     controlLog     = StateGossipAgent.controlLog;
 
@@ -161,6 +170,8 @@ class StateGossipAgent extends PeeringAgentBase {
         this.remoteStateObjects = new Map();
 
         this.previousStatesCache = new Map();
+
+        this.sentStateCache = new LRUCache(512);
     }
 
     getAgentId(): string {
@@ -406,7 +417,7 @@ class StateGossipAgent extends PeeringAgentBase {
         }
 
         if (gossip.type === GossipType.RequestStateObject) {
-            this.sendStateObject(source, gossip.agentId);    
+            this.sendStateObject(source, gossip.agentId, SendingReason.Request);    
         }
     }
 
@@ -544,26 +555,39 @@ class StateGossipAgent extends PeeringAgentBase {
         this.sendMessageToPeer(ep, this.getAgentId(), fullStateMessage);
     }
 
-    private sendStateObject(peerEndpoint: Endpoint, agentId: AgentId) {
+    private sendStateObject(peerEndpoint: Endpoint, agentId: AgentId, why: SendingReason = SendingReason.Gossip) {
         
         const state = this.localStateObjects.get(agentId);
 
         if (state !== undefined) {
             const timestamp = Date.now();
-            let literal = state.toLiteral();
+            const stateLiteral = state.toLiteral();
+
+            // const lastSentKey = peerEndpoint + '_' + agentId.replaceAll('_', '__'); // no replaceAll for crying out loud
+            const lastSentKey = peerEndpoint + '_' + agentId.replace(new RegExp('_', 'g'), '__');
+
+            const lastSent = this.sentStateCache.get(lastSentKey);
+
+            const requested = why === SendingReason.Request;
+
+            if (requested || lastSent === undefined || lastSent.stateHash !== stateLiteral.hash || 
+                timestamp > lastSent.timestamp + this.params.maxStateSendingFreq * 1000) {
             
-            let stateUpdateMessage : SendStateObject = {
-                type      : GossipType.SendStateObject,
-                agentId   : agentId,
-                state     : literal,
-                timestamp : timestamp
-            };
-    
-            this.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.peerGroupAgent.getLocalPeer().endpoint + ' to ' + peerEndpoint);
-            let result = this.sendMessageToPeer(peerEndpoint, this.getAgentId(), stateUpdateMessage);
-    
-            if (!result) {
-                this.controlLog.debug('Sending state failed!');
+                let stateUpdateMessage : SendStateObject = {
+                    type      : GossipType.SendStateObject,
+                    agentId   : agentId,
+                    state     : stateLiteral,
+                    timestamp : timestamp
+                };
+        
+                this.peerMessageLog.debug('Sending state for ' + agentId + ' from ' + this.peerGroupAgent.getLocalPeer().endpoint + ' to ' + peerEndpoint);
+                let sent = this.sendMessageToPeer(peerEndpoint, this.getAgentId(), stateUpdateMessage);
+        
+                if (sent) {
+                    this.sentStateCache.set(lastSentKey, {timestamp: timestamp, stateHash: stateLiteral.hash});
+                } else {
+                    this.controlLog.debug('Sending state failed!');
+                }
             }
         } else {
             this.controlLog.warning('Attempting to send our own state to ' + peerEndpoint + ' for agent ' + agentId + ', but no state object found');
