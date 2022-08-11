@@ -145,10 +145,14 @@ class OpHeader {
 
     literalize(): OpHeaderLiteral {
 
+        const prevOpHeaders = Array.from(this.prevOpHeaders);
+
+        prevOpHeaders.sort();
+
         const literal: OpHeaderLiteral = { 
             headerHash: this.headerHash,
             opHash: this.opHash,
-            prevOpHeaders: Array.from(this.prevOpHeaders),
+            prevOpHeaders: prevOpHeaders,
             computedHeight: this.computedProps.height,
             computedSize: this.computedProps.size
         };
