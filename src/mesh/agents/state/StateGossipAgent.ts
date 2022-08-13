@@ -92,14 +92,15 @@ interface RequestStateObject {
 type GossipMessage = SendFullState | SendStateObject | RequestFullState | RequestStateObject;
 
 type GossipParams = { 
-    peerGossipFraction   : number,
-    peerGossipProb       : number,
-    minGossipPeers       : number,
-    maxCachedPrevStates  : number,
-    newStateErrorRetries : number,
-    newStateErrorDelay   : number,
-    maxStateSendingFreq  : number,
-    maxGossipDelay       : number
+    peerGossipFraction     : number,
+    peerGossipProb         : number,
+    minGossipPeers         : number,
+    maxCachedPrevStates    : number,
+    newStateErrorRetries   : number,
+    newStateErrorDelay     : number,
+    maxStateSendingRepeats : number,
+    maxStateSendingFreq    : number,
+    maxGossipDelay         : number
  };
 
 type PeerState = Map<AgentId, Hash>;
@@ -130,14 +131,15 @@ class StateGossipAgent extends PeeringAgentBase {
     // tunable working parameters
 
     params: GossipParams = {
-        peerGossipFraction   : 0.2,
-        peerGossipProb       : 0.5,
-        minGossipPeers       : 4,
-        maxCachedPrevStates  : 50,
-        newStateErrorRetries : 3,
-        newStateErrorDelay   : 1500,
-        maxStateSendingFreq  : 5,
-        maxGossipDelay       : 5000
+        peerGossipFraction     : 0.2,
+        peerGossipProb         : 0.5,
+        minGossipPeers         : 4,
+        maxCachedPrevStates    : 50,
+        newStateErrorRetries   : 3,
+        newStateErrorDelay     : 1500,
+        maxStateSendingRepeats : 100,
+        maxStateSendingFreq    : 5,
+        maxGossipDelay         : 5000
     };
 
     gossipId: string;
@@ -153,7 +155,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
     previousStatesCache: Map<AgentId, Array<Hash>>;
 
-    sentStateCache: LRUCache<string, {timestamp: number, stateHash: Hash}>;
+    sentStateCache: LRUCache<string, {timestamp: number, stateHash: Hash, repeats: number}>;
 
     peerMessageLog = StateGossipAgent.peerMessageLog;
     controlLog     = StateGossipAgent.controlLog;
@@ -571,6 +573,7 @@ class StateGossipAgent extends PeeringAgentBase {
             const requested = why === SendingReason.Request;
 
             if (requested || lastSent === undefined || lastSent.stateHash !== stateLiteral.hash || 
+                lastSent.repeats < this.params.maxStateSendingRepeats || 
                 timestamp > lastSent.timestamp + this.params.maxStateSendingFreq * 1000) {
             
                 let stateUpdateMessage : SendStateObject = {
@@ -584,7 +587,7 @@ class StateGossipAgent extends PeeringAgentBase {
                 let sent = this.sendMessageToPeer(peerEndpoint, this.getAgentId(), stateUpdateMessage);
         
                 if (sent) {
-                    this.sentStateCache.set(lastSentKey, {timestamp: timestamp, stateHash: stateLiteral.hash});
+                    this.sentStateCache.set(lastSentKey, {timestamp: timestamp, stateHash: stateLiteral.hash, repeats: (lastSent?.repeats || 0) + 1});
                 } else {
                     this.controlLog.debug('Sending state failed!');
                 }
