@@ -574,10 +574,9 @@ class StateGossipAgent extends PeeringAgentBase {
 
             const isRepeat           = lastSent !== undefined && lastSent.stateHash === stateLiteral.hash;
             const elapsedSendingFreq = lastSent !== undefined && timestamp > lastSent.timestamp + this.params.maxStateSendingFreq * 1000;
-            const shouldSendRepeat   = lastSent !== undefined && !elapsedSendingFreq && lastSent.repeats < this.params.maxStateSendingRepeats;
+            const shouldSendRepeat   = lastSent !== undefined && lastSent.repeats < this.params.maxStateSendingRepeats;
 
-            if (requested || lastSent === undefined || !isRepeat || 
-                elapsedSendingFreq || shouldSendRepeat ) {
+            if (requested || !isRepeat || elapsedSendingFreq || shouldSendRepeat ) {
             
                 let stateUpdateMessage : SendStateObject = {
                     type      : GossipType.SendStateObject,
@@ -599,6 +598,7 @@ class StateGossipAgent extends PeeringAgentBase {
                     this.controlLog.debug('Sending state failed!');
                 }
             }
+            
         } else {
             this.controlLog.warning('Attempting to send our own state to ' + peerEndpoint + ' for agent ' + agentId + ', but no state object found');
         }
