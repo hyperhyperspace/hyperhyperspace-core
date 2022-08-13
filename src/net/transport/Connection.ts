@@ -9,6 +9,8 @@ interface Connection {
     getConnectionId() : string;
     initiatedLocally(): boolean;
 
+    
+
     setMessageCallback(messageCallback: (message: any, conn: Connection) => void): void;
 
     channelIsOperational(): boolean;

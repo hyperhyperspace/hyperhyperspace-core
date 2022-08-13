@@ -16,6 +16,8 @@ const CONN_BACKOFF_TIME = 15000;
  *                 them, a few, etc.
  */
 
+type InstanceId = string;
+
 class SignallingServerConnection implements LinkupServer {
 
     static logger = new Logger(SignallingServerConnection.name, LogLevel.ERROR);
@@ -31,7 +33,7 @@ class SignallingServerConnection implements LinkupServer {
     }
 
     readonly serverURL  : string;
-    readonly instanceId : string; // see note above
+    readonly instanceId : InstanceId; // see note above
 
     ws : WebSocket | null;
 
@@ -71,6 +73,10 @@ class SignallingServerConnection implements LinkupServer {
         this.checkWebsocket();
     }
     
+    getInstanceId() {
+        return this.instanceId;
+    }
+
     listenForMessagesNewCall(recipient: LinkupAddress, callback: NewCallMessageCallback) : void {
 
         if (recipient.serverURL !== this.serverURL) {
@@ -449,4 +455,4 @@ class SignallingServerConnection implements LinkupServer {
 
 }
 
-export { SignallingServerConnection };
+export { SignallingServerConnection, InstanceId };

@@ -193,7 +193,7 @@ describeProxy('[TRA] Transports', () => {
                 expect(sender.linkupId).toEqual(address1.linkupId);
                 expect(conn.getConnectionId()).toEqual(theCallId);
                 expect(conn.initiatedLocally()).toBeFalsy();
-            });
+            }, linkupManager2);
 
             conn2.setMessageCallback((message: any, _conn: Connection) => {
                 expect(message).toEqual("hola");

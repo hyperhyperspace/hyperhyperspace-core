@@ -493,7 +493,11 @@ class SecureNetworkAgent implements Agent {
         let remote = this.getConnectionSecuredForSending(connId, recipient);
         let local  = this.getConnectionSecuredForReceiving(connId, sender);
 
+        
         if (remote?.verified() && local?.verified()) {
+
+            console.log(sender + 'sending to ' + recipient + ' (agent is ' + agentId + '):')
+            console.log(content)
 
             let secureMessagePayload: SecureMessagePayload = {
                 senderIdentityHash: sender,

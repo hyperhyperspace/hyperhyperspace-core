@@ -1,4 +1,5 @@
 import { LinkupAddress } from './LinkupAddress';
+import { InstanceId } from './SignallingServerConnection';
 
 type NewCallMessageCallback = (sender: LinkupAddress, recipient: LinkupAddress, callId: string, instanceId: string, message: any) => void;
 type MessageCallback        = (instanceId: string, message: any) => void;
@@ -8,6 +9,9 @@ type ListeningAddressesQueryCallback  = (queryId: string, matches: Array<LinkupA
 type RawMessageCallback = (sender: LinkupAddress, recipient: LinkupAddress, message: any) => void;
 
 interface LinkupServer {
+
+    getInstanceId(): InstanceId;
+
     listenForMessagesNewCall(recipient: LinkupAddress, callback: NewCallMessageCallback): void;
     listenForMessagesOnCall(recipient: LinkupAddress, callId: string, callback: MessageCallback): void;
     listenForLinkupAddressQueries(callback: ListeningAddressesQueryCallback): void;

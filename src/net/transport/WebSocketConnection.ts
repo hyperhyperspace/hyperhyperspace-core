@@ -50,8 +50,8 @@ class WebSocketConnection implements Connection {
         this.incomingMessages = [];
 
         this.onmessage = (ev) => {
-            //WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' received message from ' + this.remoteAddress?.linkupId + ' on call ' + this.callId);
-            //WebRTCConnection.logger.trace('message is ' + ev.data);
+            WebSocketConnection.logger.debug(this.localAddress?.linkupId + ' received message from ' + this.remoteAddress?.linkupId + ' on call ' + this.connectionId);
+            WebSocketConnection.logger.trace('message is ' + ev.data);
             if (this.messageCallback != null) {
                 this.messageCallback(ev.data, this);
             } else {
@@ -60,9 +60,11 @@ class WebSocketConnection implements Connection {
         };
 
         this.onopen = () => {
-            //WebRTCConnection.logger.debug('connection from ' + this.localAddress?.linkupId + ' to ' + this.remoteAddress?.linkupId + ' is ready for call ' + this.callId);
+            WebSocketConnection.logger.debug('connection from ' + this.localAddress?.linkupId + ' to ' + this.remoteAddress?.linkupId + ' is ready for call ' + this.connectionId);
             this.readyCallback(this);
         };
+
+        //this.remoteInstanceId = 'websocket-listener';
     }
 
     open() {
@@ -76,7 +78,9 @@ class WebSocketConnection implements Connection {
                 WebSocketConnection.logger.warning(() => 'Trying to connect to ' + this.remoteAddress.url() + ' form a websocket connection, but no linkupServer was provided. This is not possible - ignoring.');
             }
         } else {
+            this.remoteInstanceId = 'websocket-listener';
             this.createWebsocket();
+            
             WebSocketConnection.logger.trace('Starting websocket connection from ' + this.localAddress.url() + ' to ' + this.remoteAddress.url());
         }
         
@@ -88,8 +92,8 @@ class WebSocketConnection implements Connection {
         Params.CONN_ID + '=' + encodeURIComponent(this.connectionId) + '&' + 
         Params.SENDER  + '=' + encodeURIComponent(this.localAddress.url()) + '&' +
         Params.RECIPIENT + '=' + encodeURIComponent(this.remoteAddress.url()) + 
-        (reverse? '&' + Params.REVERSE + '=true' : ''));
-
+        (reverse? '&' + Params.REVERSE + '=true' : '') + 
+        (reverse? '&' + Params.INSTANCE_ID + '=' + encodeURIComponent((this.linkupManager as LinkupManager).getInstanceIdForAddress(this.localAddress)) : ''));
 
         this.ws.onopen    = this.onopen;
         this.ws.onmessage = this.onmessage;
@@ -97,30 +101,41 @@ class WebSocketConnection implements Connection {
 
     answer(instanceId: string, message: any) {
 
+        /*if (instanceId === undefined) {
+            instanceId = 'websocket-listener';
+        }
+
+        if (this.remoteInstanceId === undefined) {
+            if (instanceId !== undefined) {
+                this.remoteInstanceId = instanceId;
+            } else {
+                this.remoteInstanceId = 'websocket-listener';
+            }                
+        }*/
+
         if (this.ws === undefined) {
 
-            this.remoteInstanceId = instanceId;
-
-            if (!this.reverse &&
+            if (/*!this.reverse &&*/
                 SignallingServerConnection.isWebRTCBased(this.localAddress.url()) && 
                 message.reverseconnection !== undefined &&
                 message.reverseconnection === 'true') {
-                WebSocketConnection.logger.trace(() => 'Creating websocket to ' + this.remoteAddress.url() + ' for reverse connection');
-                this.reverse = true;
-                this.initiated = false;
-                this.createWebsocket(true);
-            }
-
-            if (message.ws !== undefined) {
+                    WebSocketConnection.logger.trace(() => 'Creating websocket to ' + this.remoteAddress.url() + ' for reverse connection');
+                    this.reverse = true;
+                    this.initiated = false;
+                    this.remoteInstanceId = message.remoteInstanceId;
+                    this.createWebsocket(true);
+            } else if (message.ws !== undefined) {
                 this.ws = message.ws as WebSocket;
                 this.ws.onmessage = this.onmessage;
-                this.readyCallback(this);
                 if (!this.reverse) {
                     this.initiated = false;
+                    this.remoteInstanceId = 'websocket-listener';
                     WebSocketConnection.logger.trace(() => 'Received websocket connection from ' + this.remoteAddress.url());
                 } else {
+                    this.remoteInstanceId = instanceId;
                     WebSocketConnection.logger.trace(() => 'Received reverse websocket connection back at origin');
                 }
+                this.readyCallback(this);
             }
         }
     }

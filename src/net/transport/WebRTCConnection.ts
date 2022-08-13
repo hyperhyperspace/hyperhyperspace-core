@@ -75,10 +75,8 @@ class WebRTCConnection implements Connection {
         };
 
         this.onready = () => {
-            WebRTCConnection.logger.debug('connection from ' + this.localAddress?.linkupId + ' to ' + this.remoteAddress?.linkupId + ' is ready for call ' + this.callId);
+            WebRTCConnection.logger.debug('connection from ' + this.localAddress?.linkupId + ' to ' + this.remoteAddress?.linkupId + ' is ready for call ' + this.callId + ', estab. took ' + (Date.now() - this.startup) + ' ms (initiatior: ' + this.initiator + ')');
             this.readyCallback(this);
-
-            console.log('connection establishment took ' + (Date.now() - this.startup) + ' ms (initiatior: ' + this.initiator + ')');
         };
 
         this.channelStatusChangeCallback = channelStatusChangeCallback;
@@ -129,7 +127,7 @@ class WebRTCConnection implements Connection {
     }
 
     channelIsOperational() {
-        return this.channel !== undefined && this.channel.readyState === 'open';
+        return this.connection !== undefined && this.channel !== undefined && this.channel.readyState === 'open';
     }
 
     setMessageCallback(messageCallback: (message: any, conn: Connection) => void) {
@@ -198,7 +196,6 @@ class WebRTCConnection implements Connection {
         this.init();
 
         this.initiator   = false;
-        this.remoteInstanceId = instanceId;
 
         this.handleSignallingMessage(instanceId, message);
     }
@@ -228,8 +225,8 @@ class WebRTCConnection implements Connection {
         WebRTCConnection.logger.debug(this.localAddress?.linkupId + ' sending msg to ' + this.remoteAddress?.linkupId + ' through channel ' + this.channelName + ' on call ' + this.callId);
 
         if (this.channel === undefined) {
-            WebRTCConnection.logger.warning('Attemting to send over missing channel in connection ' + this.callId + ' at ' + Date.now());
-            throw new Error('Attemting to send over missing channel in connection ' + this.callId + ' at ' + Date.now())
+            WebRTCConnection.logger.warning('Attempting to send over missing channel in connection ' + this.callId + ' at ' + Date.now());
+            throw new Error('Attempting to send over missing channel in connection ' + this.callId + ' at ' + Date.now())
         }
         
         this.channel.send(message);
@@ -252,22 +249,26 @@ class WebRTCConnection implements Connection {
     }
 
     private init(ICEServers? : any) {
-        let servers     = ICEServers === undefined ? {iceServers : [{urls : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}]} : ICEServers;
 
-        this.connection     = new RTCPeerConnection(servers);
-        this.gatheredICE    = false;
+        if (this.connection === undefined) {
 
-        this.connection.onicecandidate = (ev) => {
-            WebRTCConnection.iceLogger.debug('onicecandidate was called with:');
-            WebRTCConnection.iceLogger.debug(JSON.stringify(ev.candidate));
-            if (ev.candidate == null) {
-                this.gatheredICE = true;
-                WebRTCConnection.logger.debug(this.callId + ' is done gathering ICE candiadtes');
-            } else {
-                this.signalIceCandidate(ev.candidate);
-            }
-        };
+            let servers     = ICEServers === undefined ? {iceServers : [{urls : ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302']}]} : ICEServers;
 
+            this.connection     = new RTCPeerConnection(servers);
+            this.gatheredICE    = false;
+
+            this.connection.onicecandidate = (ev) => {
+                WebRTCConnection.iceLogger.debug('onicecandidate was called with:');
+                WebRTCConnection.iceLogger.debug(JSON.stringify(ev.candidate));
+                if (ev.candidate == null) {
+                    this.gatheredICE = true;
+                    WebRTCConnection.logger.debug(this.callId + ' is done gathering ICE candiadtes');
+                } else {
+                    this.signalIceCandidate(ev.candidate);
+                }
+            };
+
+        }
     }
 
     private setUpLinkupListener() {
@@ -308,7 +309,7 @@ class WebRTCConnection implements Connection {
                 this.channelName = channelName;
             }
         } else {
-            WebRTCConnection.logger.error('Received message for callId ' + callId + ' but expected ' + this.callId);
+            WebRTCConnection.logger.warning('Received message for callId ' + callId + ' but expected ' + this.callId);
         }
 
         if (this.connection !== undefined) {
@@ -328,7 +329,7 @@ class WebRTCConnection implements Connection {
             }
 
         } else {
-            WebRTCConnection.logger.error('Received message for callId ' + callId + ' but connection was undefined on ' + this.localAddress.linkupId);
+            WebRTCConnection.logger.debug('A remote description arrived untimely (this.connection===undefined) and will be ignored.');
         }
 
 

@@ -16,6 +16,7 @@ import { Hash } from 'data/model';
 import { Identity } from 'data/identity';
 import { Logger, LogLevel } from 'util/logging';
 import { Lock } from 'util/concurrency';
+import { LRUCache } from 'util/caching';
 
 type PeerInfo = { endpoint: Endpoint, identityHash: Hash, identity?: Identity };
 
@@ -144,10 +145,12 @@ class PeerGroupAgent implements Agent {
     connections: Map<ConnectionId, PeerConnection>;
     connectionsPerEndpoint: Map<Endpoint, Array<ConnectionId>>;
 
+    instanceIdPerEndpoint: Map<Endpoint, string>;
+
     peerDiscoveryTimestamp?: number;
 
     connectionAttemptTimestamps: Map<Endpoint, number>;
-    onlineQueryTimestamps: Map<Endpoint, number>;
+    onlineQueryTimestamps: LRUCache<Endpoint, number>;// Map<Endpoint, number>;
     chosenForDeduplication: Map<Endpoint, ConnectionId>;
 
     pod?: AgentPod;
@@ -176,8 +179,10 @@ class PeerGroupAgent implements Agent {
         this.connections = new Map();
         this.connectionsPerEndpoint = new Map();
 
+        this.instanceIdPerEndpoint = new Map();
+
         this.connectionAttemptTimestamps = new Map();
-        this.onlineQueryTimestamps = new Map();
+        this.onlineQueryTimestamps = new LRUCache(128);
         this.chosenForDeduplication = new Map();
 
         if (params === undefined) {
@@ -190,7 +195,7 @@ class PeerGroupAgent implements Agent {
             peerConnectionTimeout: params.peerConnectionTimeout || 20,
             peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 10,
             peerDiscoveryAttemptInterval: params.peerDiscoveryAttemptInterval || 15,
-            tickInterval: params.tickInterval || 0.5
+            tickInterval: params.tickInterval || 1
         };
 
         this.tick = async () => {
@@ -227,7 +232,7 @@ class PeerGroupAgent implements Agent {
     }
 
     ready(pod: AgentPod): void {
-        this.controlLog.debug('Started PeerControlAgent on local ' + this.localPeer.endpoint + ' (id=' + this.localPeer.identityHash + ') for peerGroupId ' + this.peerGroupId);
+        this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': Started PeerControlAgent (id=' + this.localPeer.identityHash + ')');
         this.pod = pod;
         this.startup = Date.now();
         this.init();
@@ -290,7 +295,7 @@ class PeerGroupAgent implements Agent {
             }
         }
 
-        this.controlLog.trace(this.localPeer.endpoint + ' sending message to all (' + count + ') peers.');
+        this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': sending message to all (' + count + ') peers.');
 
         return count;
     }
@@ -320,15 +325,15 @@ class PeerGroupAgent implements Agent {
                     peerMsg
                 );
     
-                this.controlLog.trace(this.localPeer.endpoint + ' sending peer message to ' + ep);
+                this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': sending peer message to ' + ep);
                 return true;    
             } catch (e) {
 
-                this.controlLog.warning('Could not send message', e);
+                this.controlLog.warning(this.peerGroupId + '/' + this.localPeer.endpoint + ': Could not send message', e);
                 return false;
             }
         } else {
-            this.controlLog.trace(this.localPeer.endpoint + ' could not send peer message to ' + ep);
+            this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': could not send peer message to ' + ep);
             return false;
         }
     }
@@ -406,12 +411,12 @@ class PeerGroupAgent implements Agent {
 
         const now = Date.now();
 
-        const peerDiscoveryAdjust = this.connectionsPerEndpoint.size === 0 && this.startup + 12000 < now? 0.05 : 1; 
+        const peerDiscoveryAdjust = this.connectionsPerEndpoint.size < this.params.minPeers && now < this.startup + 20000? 0.05 : 1; 
 
         if (this.peerDiscoveryTimestamp === undefined || now > this.peerDiscoveryTimestamp + peerDiscoveryAdjust * this.params.peerDiscoveryAttemptInterval * 1000) {
 
             this.peerDiscoveryTimestamp = now;
-            this.peersLog.trace("Considering querying for peers on " + this.peerGroupId);
+            this.peersLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': considering querying for peers');
 
             if (this.connectionsPerEndpoint.size < this.params.minPeers) {
                 let candidates = await this.peerSource.getPeers(this.params.minPeers * 5);
@@ -419,7 +424,7 @@ class PeerGroupAgent implements Agent {
                 let fallbackEndpoints = new Array<Endpoint>();
                 const now = Date.now();
     
-                this.peersLog.debug('Looking for peers for ' + this.peerGroupId + ', got ' + candidates.length + ' candidates');
+                this.peersLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': looking for peers, got ' + candidates.length + ' candidates');
                 this.peersLog.trace(candidates.map((k: PeerInfo) => k.endpoint + '--> ' + k.identityHash ));
     
                 for (const candidate of candidates) {
@@ -469,7 +474,7 @@ class PeerGroupAgent implements Agent {
                 }
     
                 if (endpoints.length > 0) {
-                    this.peersLog.debug(this.peerGroupId + ' is querying for online endpoints: '  + endpoints);
+                    this.peersLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': is querying for online endpoints: '  + endpoints);
     
                     this.getNetworkAgent().queryForListeningAddresses(
                                         LinkupAddress.fromURL(this.localPeer.endpoint), 
@@ -478,7 +483,7 @@ class PeerGroupAgent implements Agent {
     
                 
             } else {
-                this.peersLog.trace('Skipping querying for peers on ' + this.peerGroupId);
+                this.peersLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': skipping querying for peers');
             }
 
         }
@@ -529,7 +534,7 @@ class PeerGroupAgent implements Agent {
                     
     
                     if (ready.length > 1) {
-                        PeerGroupAgent.controlLog.trace('Connection duplication detected (' + ready.length + ') to ' + endpoint);
+                        PeerGroupAgent.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': Connection duplication detected (' + ready.length + ') to ' + endpoint);
                         ready.sort();
                         chosenConnId = ready[0];
                         this.chosenForDeduplication.set(endpoint, chosenConnId);
@@ -592,7 +597,7 @@ class PeerGroupAgent implements Agent {
         if (allConnIds !== undefined) {
             for (const connId of allConnIds) {
                 if (connId !== chosenConnId) {
-                    PeerGroupAgent.controlLog.debug(() => 'Closing connection due to deduplication: ' + connId + ' (the chosen one is ' + chosenConnId + ')');
+                    PeerGroupAgent.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': Closing connection due to deduplication: ' + connId + ' (the chosen one is ' + chosenConnId + ')');
                     this.getNetworkAgent().releaseConnection(connId, this.getAgentId());
                     this.removePeerConnection(connId);
                 }
@@ -650,7 +655,7 @@ class PeerGroupAgent implements Agent {
             }
         } else {
             PeerGroupAgent.controlLog.trace(
-                () => 'will not connect, resons: ' + 
+                () => this.peerGroupId + '/' + this.localPeer.endpoint + ': will not connect, resons: ' + 
                 '\np!==undefined => ' + (p !== undefined) + 
                 '\nthis.connectionsPerEndpoint.size < this.params.minPeers => ' + (this.connectionsPerEndpoint.size < this.params.minPeers) + 
                 '\nthis.connectionsPerEndpoint.get(p.endpoint) === undefined => ' + (p !== undefined && this.connectionsPerEndpoint.get(p.endpoint) === undefined) + 
@@ -662,17 +667,20 @@ class PeerGroupAgent implements Agent {
     }
 
     // Returns a peer corresponding to ep if we should accept the connection, undefined otherwise
-    private async shouldAcceptPeerConnection(p?: PeerInfo) {
+    private shouldAcceptPeerConnection(connId: ConnectionId, p?: PeerInfo) {
 
-        if (p===undefined) {
+        if (p === undefined) {
             return false;
         } else {
             const conns = this.connectionsPerEndpoint.get(p.endpoint);
             const alreadyConnected = conns !== undefined && conns.length > 0;
 
+            const isSameInstance = this.checkConnectionRemoteInstance(connId);
+
             return (this.connectionsPerEndpoint.size + (alreadyConnected? 0 : 1) <= this.params.maxPeers && // - we're below maximum peers
                     this.findWorkingConnectionId(p.endpoint) === undefined &&                               // - there's not a working conn to ep
-                    this.localPeer.endpoint !== p.endpoint);                                                // - ep is not us);
+                    this.localPeer.endpoint !== p.endpoint &&                                               // - ep is not us
+                    isSameInstance);                                                                        // - if we're connected to an instance already, respect it
         }
                                                                        
     }
@@ -681,28 +689,42 @@ class PeerGroupAgent implements Agent {
 
     private addPeerConnection(connId: ConnectionId, peer: PeerInfo, status: PeerConnectionStatus) {
 
-        if (this.connections.get(connId) !== undefined) {
-            PeerGroupAgent.controlLog.warning(() => 'Trying to add connection ' + connId + ', but it already exists.')
-            throw new Error('Trying to add connection ' + connId + ', but it already exists.');
+        const existing = this.connections.get(connId);
+
+        if (existing !== undefined) {
+            PeerGroupAgent.controlLog.warning(this.peerGroupId + '/' + this.localPeer.endpoint + ': Trying to add connection ' + connId + ', but it already exists.');
+            PeerGroupAgent.controlLog.warning('old status: ' + existing.status + ', new status: ' + status);
+
+            //existing.status = status; // confused about this
+
+            return existing;
+        } else {
+
+            if (this.attemptToSetRemoteInstance(connId)) {
+                let pc: PeerConnection = {
+                    connId: connId,
+                    peer: peer,
+                    status: status,
+                    timestamp: Date.now()
+                };
+    
+                this.connections.set(connId, pc);
+                let conns = this.connectionsPerEndpoint.get(peer.endpoint);
+                if (conns === undefined) {
+                    conns = [];
+                    this.connectionsPerEndpoint.set(peer.endpoint, conns);
+                }
+    
+                conns.unshift(connId);
+    
+                return pc;
+            } else {
+                PeerGroupAgent.controlLog.error(this.peerGroupId + '/' + this.localPeer.endpoint + ': Trying to add connection ' + connId + ', but already connected to a different instance');
+                throw new Error('Trying to add connection ' + connId + ', but already connected to a different instance');
+            }
+
+            
         }
-
-        let pc: PeerConnection = {
-            connId: connId,
-            peer: peer,
-            status: status,
-            timestamp: Date.now()
-        };
-
-        this.connections.set(connId, pc);
-        let conns = this.connectionsPerEndpoint.get(peer.endpoint);
-        if (conns === undefined) {
-            conns = [];
-            this.connectionsPerEndpoint.set(peer.endpoint, conns);
-        }
-
-        conns.unshift(connId);
-
-        return pc;
     }
 
     private removePeerConnection(connId: ConnectionId) {
@@ -725,6 +747,7 @@ class PeerGroupAgent implements Agent {
             }
             
             if (pc.status === PeerConnectionStatus.Ready && conns === undefined ) {
+                this.instanceIdPerEndpoint.delete(pc.peer.endpoint);
                 this.broadcastLostPeerEvent(pc.peer);
             }
         }
@@ -763,19 +786,22 @@ class PeerGroupAgent implements Agent {
 
     private async onOnlineEndpointDiscovery(ep: Endpoint) {
 
-        this.controlLog.debug(() => (this.peerGroupId + ': ' + this.localPeer.endpoint + ' has discovered that ' + ep + ' is online.'));
+        const queryStart = this.onlineQueryTimestamps.get(ep);
+        const queryTime  = queryStart === undefined? 'unknown' : (Date.now()-queryStart) + 'ms';
+
+        this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': has discovered that ' + ep + ' is online. Query time: ' + queryTime);
 
         
         let peer = await this.peerSource.getPeerForEndpoint(ep);
         
         if (this.shouldConnectToPeer(peer)) {
-            this.controlLog.debug(() => (this.peerGroupId + ': ' + this.localPeer.endpoint + ' will initiate peer connection to ' + ep + '.'));
+            this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': will initiate peer connection to ' + ep + '.');
             let connId = this.getNetworkAgent().connect(this.localPeer.endpoint, (peer as PeerInfo).endpoint, this.getAgentId());
             this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.Connecting);
             this.connectionAttemptTimestamps.set(ep, Date.now());
             this.stats.connectionInit += 1;
         } else {
-            this.controlLog.debug(() => (this.peerGroupId + ': ' + this.localPeer.endpoint + ' will NOT initiate peer connection to ' + ep + '.'));
+            this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': will NOT initiate peer connection to ' + ep + '.');
         }
     }
 
@@ -784,13 +810,15 @@ class PeerGroupAgent implements Agent {
         if (this.localPeer.endpoint === local) {
             let peer = await this.peerSource.getPeerForEndpoint(remote);
 
-            this.controlLog.trace(this.localPeer.endpoint + ' is receiving a conn. request from ' + remote + ', connId is ' + connId);
+            this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': receiving a conn. request from ' + remote + ', connId is ' + connId);
 
-            if (await this.shouldAcceptPeerConnection(peer)) {
-                this.controlLog.debug(this.peerGroupId + ': will accept requested connection ' + connId + '!');
+            if (this.shouldAcceptPeerConnection(connId, peer)) {
+                this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': will accept requested connection ' + connId + '!');
                 this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.ReceivingConnection);
                 this.getNetworkAgent().acceptConnection(connId, this.getAgentId());
                 this.stats.connectionAccpt += 1;
+            } else {
+                this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': will NOT accept requested connection ' + connId + '!');
             }
         }
 
@@ -799,23 +827,31 @@ class PeerGroupAgent implements Agent {
     private onConnectionEstablishment(connId: ConnectionId, local: Endpoint, remote: Endpoint) {
         let pc = this.connections.get(connId);
 
-        this.controlLog.trace(() => this.localPeer.endpoint + ' is receiving a connection from ' + remote + ' connId is ' + connId);
+        this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': receiving a connection from ' + remote + ' connId is ' + connId);
 
         if (pc !== undefined && this.localPeer.endpoint === local && pc.peer.endpoint === remote) {
-            if (pc.status === PeerConnectionStatus.Connecting) {
-                this.sendOffer(pc);
-                pc.status = PeerConnectionStatus.OfferSent;
-            } else if (pc.status === PeerConnectionStatus.ReceivingConnection) {
-                pc.status = PeerConnectionStatus.WaitingForOffer;
+
+            if (this.checkConnectionRemoteInstance(connId)) {
+                if (pc.status === PeerConnectionStatus.Connecting) {
+                    this.sendOffer(pc);
+                    pc.status = PeerConnectionStatus.OfferSent;
+                } else if (pc.status === PeerConnectionStatus.ReceivingConnection) {
+                    pc.status = PeerConnectionStatus.WaitingForOffer;
+                }
+            } else {
+                this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': rejecting a established connection from ' + remote + ', connId is ' + connId + ', because we are already connected to another instance of the same peer');
+                this.removePeerConnection(connId);
+                this.getNetworkAgent().releaseConnectionIfExists(connId, this.getAgentId());
             }
+
         } else {
-            this.controlLog.trace(() => 'Unknown connection ' + connId + ', ignoring. pc=' + pc + ' local=' + local + ' remote='+ remote);
+            this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': Unknown connection ' + connId + ', ignoring. pc=' + pc + ' local=' + local + ' remote='+ remote);
         }
     }
 
     private async onReceivingOffer(connId: ConnectionId, source: Endpoint, destination: Endpoint, peerGroupId: string, remoteIdentityHash: Hash) {
         
-        this.controlLog.trace(() => (this.localPeer.endpoint + ' is receiving peering offer from ' + source));
+        this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': receiving peering offer from ' + source);
 
 
         // do this here so we get atomicity below.
@@ -825,16 +861,17 @@ class PeerGroupAgent implements Agent {
         let accept = false;
         let pc = this.connections.get(connId);
         
-        // Maybe the PeerControlAgent, upong starting in another node, found an existint connection
+
+        // Maybe the PeerControlAgent, upong starting in another node, found an existing connection
         // to us, and wants to start a PeerConnection over it. So we have no previous state referring
         // to connection establishment, and we just receive the offer over an existing one.
         if (pc === undefined) {
 
-            this.controlLog.trace('Found no previous state');
+            this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': found no previous state for ' + connId);
 
-            if (await this.shouldAcceptPeerConnection(peer)) {
+            if (this.shouldAcceptPeerConnection(connId, peer)) {
 
-                this.controlLog.debug(this.peerGroupId + ': will accept offer ' + connId + '!');
+                this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': will accept offer ' + connId + '!');
                 // Act as if we had just received the connection, process offer below.
                 pc = this.addPeerConnection(connId, peer as PeerInfo, PeerConnectionStatus.WaitingForOffer);
                 accept = true;
@@ -842,7 +879,7 @@ class PeerGroupAgent implements Agent {
 
             } else {
 
-                this.controlLog.debug(this.peerGroupId + ': will NOT accept offer ' + connId + '!');
+                this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': will NOT accept offer ' + connId + '!');
                 if (peer !== undefined && 
                     peer.identityHash === remoteIdentityHash &&
                     this.peerGroupId === peerGroupId) {
@@ -854,20 +891,28 @@ class PeerGroupAgent implements Agent {
                 }
             }
         } else { // pc !== undefined
-                 // OK, we had previous state - if everything checks up, accept.
+                // OK, we had previous state - if everything checks up, accept.
 
-            this.controlLog.trace('Found previous state:' + pc.status);
+            this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': found previous state:' + pc.status);
             if (peerGroupId === this.peerGroupId &&
-                pc.status === PeerConnectionStatus.WaitingForOffer &&
+                (pc.status === PeerConnectionStatus.WaitingForOffer ||
+                pc.status === PeerConnectionStatus.OfferSent) &&
                 source === pc.peer.endpoint &&
                 destination === this.localPeer.endpoint &&
                 remoteIdentityHash === pc.peer.identityHash) {
                 
-                this.controlLog.trace('Everything checks out!');
+                
                 reply  = true;
-                accept = true;
+                accept = this.checkConnectionRemoteInstance(connId);
+
+                if (accept) {
+                    this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': everything checks out for ' + connId + '!');
+                } else {
+                    this.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': dropping ' + connId + ': already connected to another instance');
+                }
+
             } else {
-                this.controlLog.trace('The request is invalid.');
+                this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': the request is invalid.');
             }
         }
 
@@ -894,7 +939,7 @@ class PeerGroupAgent implements Agent {
             }
             
         } else {
-            PeerGroupAgent.controlLog.debug(this.peerGroupId + ': dropping connection ' + connId + ': offer was rejected');
+            PeerGroupAgent.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': dropping connection ' + connId + ': offer was rejected');
             this.removePeerConnection(connId);
             this.getNetworkAgent().releaseConnectionIfExists(connId, this.getAgentId());
         }
@@ -903,7 +948,7 @@ class PeerGroupAgent implements Agent {
     private onReceivingOfferReply(connId: ConnectionId, source: Endpoint, destination: Endpoint, peerGroupId: string, remoteIdentityHash: Hash, accepted: boolean) {
         let pc = this.connections.get(connId);
 
-        this.controlLog.trace(this.localPeer.endpoint + ' is receiving offer reply from ' + source);
+        this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': receiving offer reply from ' + source);
 
         if (pc !== undefined &&
             peerGroupId === this.peerGroupId &&
@@ -912,6 +957,9 @@ class PeerGroupAgent implements Agent {
             destination === this.localPeer.endpoint && 
             remoteIdentityHash === pc.peer.identityHash &&
             accepted) {
+
+                
+
                 if (!this.checkSecuredConnection(pc)) {
                     pc.status = PeerConnectionStatus.OfferAccepted;
                     this.secureConnection(pc);
@@ -956,7 +1004,7 @@ class PeerGroupAgent implements Agent {
             }
         };
 
-        this.controlLog.trace(() => (this.localPeer.endpoint + ' sending peering offer to ' + pc.peer.endpoint));
+        this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': sending peering offer to ' + pc.peer.endpoint);
 
         this.getNetworkAgent().sendMessage(pc.connId, this.getAgentId(), message);
     }
@@ -971,7 +1019,7 @@ class PeerGroupAgent implements Agent {
             }
         };
 
-        this.controlLog.trace(() => (this.localPeer.endpoint + ' sending peering offer reply to ' + this.connections.get(connId)?.peer.endpoint) + ': ' + (accept? 'ACCEPT' : 'REJECT'));
+        this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': sending peering offer reply to ' + this.connections.get(connId)?.peer.endpoint) + ': ' + (accept? 'ACCEPT' : 'REJECT');
 
         this.getNetworkAgent().sendMessage(connId, this.getAgentId(), message);
     }
@@ -1003,7 +1051,7 @@ class PeerGroupAgent implements Agent {
         
         connId; sender; recipient; type; peerGroupId;
 
-        PeerGroupAgent.controlLog.trace('Connection selection for ' + connId + ' sender=' + sender + ', recipient=' + recipient + ', type=' + type);
+        PeerGroupAgent.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': connection selection for ' + connId + ' sender=' + sender + ', recipient=' + recipient + ', type=' + type);
 
         let pc = this.connections.get(connId);
 
@@ -1105,15 +1153,62 @@ class PeerGroupAgent implements Agent {
 
     }
 
+    private checkConnectionRemoteInstance(connId: ConnectionId) {
+
+        const connInfo = this.getNetworkAgent().getConnectionInfo(connId);
+
+        if (connInfo !== undefined) {
+            const chosenInstanceId = this.instanceIdPerEndpoint.get(connInfo.remoteEndpoint);
+
+            const result = chosenInstanceId === undefined || chosenInstanceId === connInfo.remoteInstanceId;
+
+            if (!result) {
+                console.log('REASON: chosen=' + chosenInstanceId + ', remote=' + connInfo.remoteInstanceId);
+            }
+
+            return result;
+        } else {
+            console.log('REASON: connInfo is undefined');
+            return false;
+        }
+    }
+
+    private attemptToSetRemoteInstance(connId: ConnectionId) {
+        const connInfo = this.getNetworkAgent().getConnectionInfo(connId);
+
+        if (connInfo !== undefined) {
+
+            const remote           = connInfo.remoteEndpoint
+            const remoteInstanceId = connInfo.remoteInstanceId;
+
+            if (remoteInstanceId !== undefined) {
+                const chosenInstanceId = this.instanceIdPerEndpoint.get(remote);
+
+                if (chosenInstanceId === undefined) {
+                    this.instanceIdPerEndpoint.set(remote, remoteInstanceId);
+                    PeerGroupAgent.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': setting remote instance for ' + remote + ' to ' + remoteInstanceId + ' because of connId ' + connId)
+                    return true;
+                } else {
+                    return chosenInstanceId === remoteInstanceId;
+                }
+            } else {
+                return true;
+            }
+        }
+        
+
+        return false;
+    }
+
     // emitted events
 
     private broadcastNewPeerEvent(peer: PeerInfo) {
         
-        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' has a new peer: ' + peer.endpoint);
+        PeerGroupAgent.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': new peer: ' + peer.endpoint);
 
         if (this.firstPeer === undefined) {
             this.firstPeer = Date.now();
-            console.log('time to first peer: ' + (this.firstPeer - this.startup));
+            PeerGroupAgent.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': time to first peer: ' + (this.firstPeer - this.startup) + 'ms');
         }
 
         let ev: NewPeerEvent = {
@@ -1128,7 +1223,7 @@ class PeerGroupAgent implements Agent {
     }
 
     private broadcastLostPeerEvent(peer: PeerInfo) {
-        PeerGroupAgent.controlLog.debug(() => this.localPeer.endpoint + ' has lost a peer: ' + peer.endpoint);
+        PeerGroupAgent.controlLog.debug(this.peerGroupId + '/' + this.localPeer.endpoint + ': lost a peer: ' + peer.endpoint);
 
         let ev: LostPeerEvent = {
             type: PeerMeshEventType.LostPeer,

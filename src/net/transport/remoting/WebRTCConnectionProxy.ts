@@ -29,6 +29,8 @@ class WebRTCConnectionProxy implements Connection {
     closed: boolean;
     lastKnownBufferedAmount: number;
 
+    remoteInstanceId?: string;
+
     connectionEventIngestFn: (ev: WebRTCConnectionEvent) => void;
 
     constructor(local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void, commandForwardingFn: (cmd: WebRTCConnectionCommand) => void) {
@@ -49,12 +51,15 @@ class WebRTCConnectionProxy implements Connection {
             if (ev.connId === this.callId) {
                 if (ev.type === 'connection-ready') {
                     
+                    this.remoteInstanceId = ev.remoteInstanceId;
+
                     this.readyCallback(this);
                 
                 } else if (ev.type === 'connection-status-change') {
                     
                     const change = ev as ConnectionStatusChange;
                     this.cachedChannelStatus = change.status;
+                    this.remoteInstanceId = ev.remoteInstanceId;
 
                 } else if (ev.type === 'message-received') {
                     

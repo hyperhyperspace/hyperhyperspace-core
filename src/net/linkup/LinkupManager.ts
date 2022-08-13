@@ -32,7 +32,6 @@ class LinkupManager {
                 queryCallback(queryId, matches);
             }
         }
-
     }
 
     listenForMessagesNewCall(recipient: LinkupAddress, callback: NewCallMessageCallback) : void {
@@ -99,6 +98,10 @@ class LinkupManager {
             LinkupManager.logger.trace(() => 'Reporting websocket addresses as listening:' + JSON.stringify(direct));
             callback(queryId, direct);
         }
+    }
+
+    getInstanceIdForAddress(address: LinkupAddress) {
+        return (this.serverConnections.get(address.serverURL) as LinkupServer).getInstanceId();
     }
 
     private getLinkupServer(serverURL : string) : LinkupServer {

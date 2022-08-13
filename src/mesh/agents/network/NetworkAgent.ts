@@ -204,6 +204,11 @@ class NetworkAgent implements Agent {
                 NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', but conn. info not present. Attempting to close.');
                 conn.close();
             } else {
+
+                if (conn.remoteInstanceId === undefined) {
+                    NetworkAgent.connLogger.warning('Ready connection is missing instanceId: ' + connectionId, conn);
+                }
+
                 NetworkAgent.connLogger.trace(() => 'Connection ready callback invoked for ' + connectionId + ', status was ' + connInfo.status + ' in ' + connInfo.localEndpoint);
 
                 if (connInfo.status !== ConnectionStatus.Ready) {
@@ -241,7 +246,7 @@ class NetworkAgent implements Agent {
                     localEndpoint: receiver.url(),
                     remoteEndpoint: sender.url(), 
                     connId: connectionId,
-                    remoteInstanceId: instanceId,
+                    remoteInstanceId: SignallingServerConnection.isWebRTCBased(sender.url())? instanceId : undefined, // see (*) below
                     status: ConnectionStatus.Received,
                     timestamp: Date.now(),
                     requestedBy: new Set()
@@ -250,13 +255,13 @@ class NetworkAgent implements Agent {
                 this.connectionInfo.set(connectionId, connInfo);
             }
 
-            /*if (connInfo.localEndpoint === receiver.url() &&
-                connInfo.remoteEndpoint === sender.url() &&
-                connInfo.remoteEndpoint !== instanceId) {
+            // (*) If the sender is not a WebRTC address, then it's a WebSocket-based one initiating a reverse connection.
+            //     Do not use the signalling server's instanceId: WebSockets cannot be listened by several peers at the 
+            //     same time, hence instanceId is unnecessary. Since they don't always use a signaling server, they use
+            //     the string 'websocket-listener' as instanceId, so using the signaling instanceId will confuse the system.
+            //     (e.g. the PeerGroupAgent will think there are two instances and filter one of them out)
+          
 
-                    console.log('MISMATCH')
-                    CONSOL
-            }*/
 
             if (connInfo.localEndpoint === receiver.url() &&
                 connInfo.remoteEndpoint === sender.url() &&
@@ -442,10 +447,10 @@ class NetworkAgent implements Agent {
                             }
                             
                         } else {
-                            conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback);    
+                            conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback, this.linkupManager);    
                         }
                     } else {
-                        conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback);
+                        conn = new WebSocketConnection(connId, receiver, sender, this.connectionReadyCallback, this.linkupManager);
                     }
                     
                 }
@@ -546,7 +551,7 @@ class NetworkAgent implements Agent {
 
         let callId: string|undefined = undefined;
 
-        /*for (const [id, info] of this.connectionInfo.entries()) {
+        for (const [id, info] of this.connectionInfo.entries()) {
             if (info.localEndpoint === local && info.remoteEndpoint === remote && info.status === ConnectionStatus.Ready) {
                 callId = id;
                 info.requestedBy.add(requestedBy);
@@ -572,7 +577,7 @@ class NetworkAgent implements Agent {
                     break;
                 }
             }
-        }*/
+        }
 
 
         if (callId === undefined) {
@@ -634,7 +639,7 @@ class NetworkAgent implements Agent {
             // FIRST set connection status to Establishing
             connInfo.status = ConnectionStatus.Establishing;
             // THEN invoke accept (since it may set status to something else, like Ready)
-            this.acceptReceivedConnectionMessages(connId);
+            this.acceptReceivedConnectionMessages(connId, connInfo.remoteInstanceId);
         }
 
         if (connInfo.status !== ConnectionStatus.Closed) {

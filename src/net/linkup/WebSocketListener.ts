@@ -9,10 +9,11 @@ import { MultiMap } from 'util/multimap';
 
 
 enum Params {
-    CONN_ID   = 'connId',
-    SENDER    = 'sender',
-    RECIPIENT = 'recipient',
-    REVERSE   = 'reverse'
+    CONN_ID     = 'connId',
+    SENDER      = 'sender',
+    RECIPIENT   = 'recipient',
+    REVERSE     = 'reverse',
+    INSTANCE_ID = 'instanceId'
 
 }
 
@@ -82,6 +83,7 @@ class WebSocketListener implements LinkupServer {
                     const sender  = LinkupAddress.fromURL(decodeURIComponent(params[Params.SENDER]));
                     const recipient = LinkupAddress.fromURL(decodeURIComponent(params[Params.RECIPIENT]));
                     const reverse   = params[Params.REVERSE];
+                    const instanceId = params[Params.INSTANCE_ID];
 
                     if (recipient.serverURL === this.serverUrl) {
                         
@@ -89,7 +91,7 @@ class WebSocketListener implements LinkupServer {
 
                         if (callbacks.size > 0) {
                             for (const callback of callbacks) {
-                                callback(sender, recipient, connId, undefined as any, {ws: socket, reverse: reverse});
+                                callback(sender, recipient, connId, instanceId, {ws: socket, reverse: reverse, remoteInstanceId: instanceId});
                                 parseOK = true;
                             }
                         } else {
@@ -115,6 +117,10 @@ class WebSocketListener implements LinkupServer {
         };
 
         this.listener.onConnection = this.onConnection;
+    }
+
+    getInstanceId() {
+        return 'websocket-listener';
     }
     
     listenForMessagesNewCall(recipient: LinkupAddress, callback: NewCallMessageCallback): void {

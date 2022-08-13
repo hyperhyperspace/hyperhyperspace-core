@@ -26,7 +26,7 @@ type SpawnCallback = (object: HashedObject, sender: Identity, senderEndpoint: En
 
 class ObjectSpawnAgent implements Agent {
     
-    static log = new Logger(ObjectSpawnAgent.name, LogLevel.DEBUG);
+    static log = new Logger(ObjectSpawnAgent.name, LogLevel.INFO);
 
     static defaultSpawnId = 'spawn';
 
