@@ -572,9 +572,12 @@ class StateGossipAgent extends PeeringAgentBase {
 
             const requested = why === SendingReason.Request;
 
-            if (requested || lastSent === undefined || lastSent.stateHash !== stateLiteral.hash || 
-                lastSent.repeats < this.params.maxStateSendingRepeats || 
-                timestamp > lastSent.timestamp + this.params.maxStateSendingFreq * 1000) {
+            const isRepeat           = lastSent !== undefined && lastSent.stateHash === stateLiteral.hash;
+            const elapsedSendingFreq = lastSent !== undefined && timestamp > lastSent.timestamp + this.params.maxStateSendingFreq * 1000;
+            const shouldSendRepeat   = lastSent !== undefined && !elapsedSendingFreq && lastSent.repeats < this.params.maxStateSendingRepeats;
+
+            if (requested || lastSent === undefined || !isRepeat || 
+                elapsedSendingFreq || shouldSendRepeat ) {
             
                 let stateUpdateMessage : SendStateObject = {
                     type      : GossipType.SendStateObject,
@@ -587,7 +590,11 @@ class StateGossipAgent extends PeeringAgentBase {
                 let sent = this.sendMessageToPeer(peerEndpoint, this.getAgentId(), stateUpdateMessage);
         
                 if (sent) {
-                    this.sentStateCache.set(lastSentKey, {timestamp: timestamp, stateHash: stateLiteral.hash, repeats: (lastSent?.repeats || 0) + 1});
+
+                    const newRepeats   = isRepeat? (lastSent?.repeats || 0) + 1 : 1;
+                    const newTimestamp = isRepeat? lastSent?.timestamp || timestamp : timestamp; 
+
+                    this.sentStateCache.set(lastSentKey, {timestamp: newTimestamp, stateHash: stateLiteral.hash, repeats: newRepeats});
                 } else {
                     this.controlLog.debug('Sending state failed!');
                 }
