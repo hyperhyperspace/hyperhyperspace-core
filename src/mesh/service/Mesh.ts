@@ -667,6 +667,7 @@ class Mesh {
         let sync = peerGroupSyncAgents.get(mutHash);
 
         if (sync === undefined) {
+            
             sync = mut.createSyncAgent(gossip.peerGroupAgent);
             peerGroupSyncAgents.set(mutHash, sync);
             gossip.trackAgentState(sync.getAgentId());

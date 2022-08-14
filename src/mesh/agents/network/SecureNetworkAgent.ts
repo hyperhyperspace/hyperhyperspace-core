@@ -541,7 +541,7 @@ class SecureNetworkAgent implements Agent {
                         };
             
                         this.getNetworkAgent().sendMessage(connId, SecureNetworkAgent.Id, secureMessage);
-    
+                        
                         seq = seq + 1;
                     }
                 } else {
@@ -756,6 +756,8 @@ class SecureNetworkAgent implements Agent {
                                         payload: secureMessagePayload.content
                                     } 
                                 };
+
+                                //console.log('received message:', event)
 
                                 agent.receiveLocalEvent(event);
                             }

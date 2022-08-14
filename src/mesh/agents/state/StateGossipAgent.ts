@@ -157,8 +157,12 @@ class StateGossipAgent extends PeeringAgentBase {
 
     sentStateCache: LRUCache<string, {timestamp: number, stateHash: Hash, repeats: number}>;
 
+    //stateRequestRetryInterval?: any; // disabled for now
+
     peerMessageLog = StateGossipAgent.peerMessageLog;
     controlLog     = StateGossipAgent.controlLog;
+
+    
 
     constructor(topic: string, peerNetwork: PeerGroupAgent) {
         super(peerNetwork);
@@ -174,6 +178,36 @@ class StateGossipAgent extends PeeringAgentBase {
         this.previousStatesCache = new Map();
 
         this.sentStateCache = new LRUCache(512);
+
+        /*this.stateRequestRetryInterval = setInterval(() => {
+
+            for (const agentId of this.trackedAgentIds) {                
+                for (const peer of this.getPeerControl().getPeers()) {
+                    if (this.remoteState.get(peer.endpoint)?.get(agentId) === undefined) {
+                        this.requestStateObject(peer.endpoint, agentId);
+                        console.log('state hash of ' + agentId + ' was missing from ' + peer.endpoint + ', it was requested');
+                    }
+                }
+            }
+
+            for (const [ep, peerState] of this.remoteState.entries()) {
+
+                console.log('checking peer ' + ep);
+
+                const stateObjects = this.remoteStateObjects.get(ep);
+
+                for (const [agentId, hash] of peerState.entries()) {
+                    const fetchedStateHash = stateObjects?.get(agentId)?.getLastHash();
+                    console.log('checking ' + agentId + ', discovered state=' + hash + ', fetched state=' + fetchedStateHash);
+
+                    if (fetchedStateHash !== hash) {
+                        console.log('REQUESTING')
+                        this.requestStateObject(ep, agentId);
+                    }
+                }
+            }
+
+        }, 15000);*/
     }
 
     getAgentId(): string {
@@ -193,6 +227,8 @@ class StateGossipAgent extends PeeringAgentBase {
 
     trackAgentState(agentId: AgentId) {
         this.trackedAgentIds.add(agentId);
+
+        this.requestStateObjectToAllPeers(agentId);
     }
 
     untrackAgentState(agentId: AgentId) {
@@ -332,6 +368,21 @@ class StateGossipAgent extends PeeringAgentBase {
         }
     }
 
+    private requestStateObjectToAllPeers(agentId: AgentId) {
+
+        const peers = this.getPeerControl().getPeers();
+
+        this.controlLog.trace('Requesting state object for ' + agentId + ' to ' + peers.length + ' peers on ' + this.peerGroupAgent.getLocalPeer().endpoint);
+
+        for (const peer of peers.values()) {
+                try {
+                    this.requestStateObject(peer.endpoint, agentId);
+                } catch (e) {
+                    this.peerMessageLog.debug('Could not request state object from ' + peer.endpoint + ', send failed with: ' + e);
+                }
+        }
+    }
+
     private cachePreviousStateHash(agentId: AgentId, state: Hash) {
 
         let prevStates = this.previousStatesCache.get(agentId);
@@ -359,9 +410,9 @@ class StateGossipAgent extends PeeringAgentBase {
 
     }
 
-    private stateHashIsInPreviousCache(agentId: AgentId, state: Hash) {
+    private stateHashIsInPreviousCache(agentId: AgentId, state: Hash): boolean {
         const cache = this.previousStatesCache.get(agentId);
-        return (cache !== undefined) && cache.indexOf(state) >= 0;
+        return cache !== undefined && cache.indexOf(state) >= 0;
     }
 
     // handling and caching of remote states
@@ -419,6 +470,7 @@ class StateGossipAgent extends PeeringAgentBase {
         }
 
         if (gossip.type === GossipType.RequestStateObject) {
+            this.controlLog.trace('Recevied state request for ' + gossip.agentId);
             this.sendStateObject(source, gossip.agentId, SendingReason.Request);    
         }
     }
@@ -459,19 +511,22 @@ class StateGossipAgent extends PeeringAgentBase {
                                     this.requestStateObject(sender, agentId);
                                 } else {
                                     this.receiveStateObject(sender, agentId, stateObj, Date.now());
-                                    
                                 }
 
                                 
                             } catch (e) {
-                                //FIXME
+                                StateGossipAgent.controlLog.warning('Error while processing received state for ' + agentId, e);
                             }
                             
     
                             // I _think_ it's better to not gossip in this case.
+                        } else {
+                            StateGossipAgent.controlLog.trace('Not gossiping to ' + agentId + ' because ' + hash + ' is in the prev state cache');
                         }
                     }
                 }
+            } else {
+                StateGossipAgent.controlLog.debug('Received state for agentId ' + agentId + ', but it is not being tracked')
             }
 
         }
@@ -493,9 +548,11 @@ class StateGossipAgent extends PeeringAgentBase {
                 
                 try {
                     receivedOldState = ! (await this.notifyAgentOfStateArrival(sender, agentId, state, stateObj));
+
+                    StateGossipAgent.controlLog.trace('Received state for ' + agentId + ': (' + state + (receivedOldState? 'old' : 'new') + ')');
                 } catch (e) {
                     // maybe cache erroneous states so we don't process them over and over?
-                    StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender, e);
+                    StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender + ' for ' + agentId, e);
                 }
 
             }
@@ -597,6 +654,8 @@ class StateGossipAgent extends PeeringAgentBase {
                 } else {
                     this.controlLog.debug('Sending state failed!');
                 }
+            } else {
+                this.controlLog.warning('not gossiping: repeats = ' + lastSent?.repeats + ' for agent ' + agentId);
             }
             
         } else {
