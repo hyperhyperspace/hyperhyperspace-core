@@ -262,9 +262,28 @@ class MutableArray<T> extends MutableObject {
     async insertManyAt(elements: T[], idx: number) {
         this.rebuild();
 
+        // In the "no duplicates" case, any items we insert will disappear from their old positions. So
+        // we need to count how many are before position idx, and add that to idx to correct.
+
+        if (!this.duplicates) {
+
+            let delta=0;
+
+            for (const element of elements) {
+                const elementHash = HashedObject.hashElement(element);
+
+                const elmtIdx = this._hashes.indexOf(elementHash);
+
+                if (0 <= elmtIdx && elmtIdx <= idx) {
+                    delta = delta + 1;
+                }
+            }
+
+            idx = idx + delta;
+        }
+
         let after  : Ordinal|undefined = undefined;
         let before : Ordinal|undefined = undefined;
-        
 
         if (0 < idx && idx <= this._hashes.length) {
             after = this._ordinals[idx-1];
@@ -274,23 +293,26 @@ class MutableArray<T> extends MutableObject {
             before = this._ordinals[idx];
         }
 
-        let first = true;
-
         for (const element of elements) {
 
             const elementHash = HashedObject.hashElement(element);
+
+            // MEGA FIXME: This is broken. It may be the case that after === before if there are several items
+            //             with the same ordinal in the array. In that case, the items with ordinal before need
+            //             to be re-inserted using a higer ordinal to make the insertion possible (only those that
+            //             come at and after idx, that is).
             const ordinal = DenseOrder.between(after, before);
 
-            let oldInsertionOps: Set<HashReference<InsertOp<T>>>|undefined;
+            let oldInsertionOps: Set<HashReference<InsertOp<T>>>|undefined = undefined;
 
-            if (!this.duplicates && first) {
+            if (!this.duplicates) {
                 oldInsertionOps = this._currentInsertOpRefs.get(elementHash);
             }
 
             const insertOp = new InsertOp(this, element, ordinal);
             await this.applyNewOp(insertOp);
 
-            // Note: in the "no duplciates" case, the delete -if necessary- has to come after the 
+            // Note: in the "no duplicates" case, the delete -if necessary- has to come after the 
             // insert (taking care to exclude the newly inserted element). Then, if the new position
             // comes after the old one, the insert will initially have no effect, and the element 
             // will "move" over there after the delete. Hence the size of the list will never decrease,
@@ -302,7 +324,6 @@ class MutableArray<T> extends MutableObject {
             }
 
             after = ordinal;
-            first = false;
         }
     }
 
@@ -456,9 +477,11 @@ class MutableArray<T> extends MutableObject {
             const deletedOps = op.deletedOps as HashedSet<HashReference<DeleteOp<T>>>;
             
             let wasBefore = false;
+            let element: T|undefined;
 
             if (this._currentInsertOpRefs.get(elementHash).size > 0) {
                 wasBefore = true;
+                element = this._elements.get(elementHash);
             }
 
             let deletedOrdinal = false;
@@ -487,14 +510,15 @@ class MutableArray<T> extends MutableObject {
                     this._elements.delete(elementHash);
                     this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: element});
                 }
-
-                
             }
 
             if ((this.duplicates && deletedOrdinal) || (!this.duplicates && wasBefore && wasDeleted)) {
                 this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash} as DeleteEvent<T>);
-                
+            } else if (!this.duplicates && wasBefore) {
+                this._mutationEventSource?.emit({emitter: this, action: 'move', data: element} as MoveEvent<T>);
             }
+
+            
 
         } else {
             throw new Error('Invalid op type for MutableArray:' + op?.getClassName());
