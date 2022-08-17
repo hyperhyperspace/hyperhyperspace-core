@@ -4,7 +4,7 @@ import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
 import { Types } from '../Types';
 import { Hash } from 'data/model/hashing/Hashing';
-import { ClassRegistry } from 'data/model';
+import { ClassRegistry, HashedSet } from 'data/model';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
 
@@ -12,30 +12,45 @@ class MutableReference<T> extends MutableObject {
 
     static className = 'hhs/v0/MutableReference';
 
-    writer?: Identity;
+    writers?: HashedSet<Identity>;
     typeConstraints?: Array<string>;
 
     _sequence?: number;
     _timestamp?: string;
     _value?: T;
 
-    constructor(config = {writer: undefined as (undefined | Identity)}) {
+    constructor(config?: {writer?: Identity, writers?: IterableIterator<Identity>}) {
         super([RefUpdateOp.className]);
 
-        this.writer = config.writer;
+        this.writers = new HashedSet<Identity>();
+
+        if (config?.writer !== undefined) {
+            this.writers.add(config?.writer);
+        }
+
+        if (config?.writers !== undefined) {
+            for (const writer of config.writers) {
+                this.writers.add(writer);
+            }
+        }
+
+        if (this.writers.size() === 0) {
+            this.writers = undefined;
+        }
+
         this.setRandomId();
     }
 
-    setWriter(writer?: Identity) {
-        this.writer = writer;
+    addWriter(writer: Identity) {
+        this.writers?.add(writer);
     }
 
-    getWriter() {
-        return this.writer;
+    getWriters() {
+        return this.writers;
     }
 
-    hasWriter() {
-        return this.writer !== undefined;
+    hasWriters() {
+        return this.writers !== undefined;
     }
 
     getValue() : T | undefined {
@@ -121,8 +136,43 @@ class MutableReference<T> extends MutableObject {
     async validate(references: Map<Hash, HashedObject>) {
         references;
 
-        return Types.isTypeConstraint(this.typeConstraints) && (this.writer === undefined || this.writer instanceof Identity);
+        if (this.writers !== undefined) {
+            if (!(this.writers instanceof HashedSet)) {
+                return false;
+            }
+
+            if (this.writers.size() === 0) {
+                return false;
+            }
+
+            for (const writer of this.writers.values()) {
+                if (!(writer instanceof Identity)) {
+                    return false;
+                }
+            }
+        }
+
+        if (!(Types.isTypeConstraint(this.typeConstraints))) {
+            return false;
+        }
+
+        return true;
     }
+
+    hasSingleWriter() {
+        return this.writers !== undefined && this.writers.size() === 1;
+    }
+
+    // throws if there isn't exactly one writer
+    getSingleWriter() {
+        if (this.writers === undefined)  {
+            return undefined;
+        } else if (this.writers.size() > 1) {
+            throw new Error('Called getWriter() on a mutableSet, but it has more than one');
+        } else {
+            return this.writers.values().next().value;
+        }
+        }
 }
 
 class RefUpdateOp<T> extends MutationOp {
@@ -142,8 +192,8 @@ class RefUpdateOp<T> extends MutationOp {
             this.sequence = sequence === undefined? 0 : sequence + 1;
             this.timestamp = Timestamps.uniqueTimestamp();
             
-            if (targetObject.writer !== undefined) {
-                this.setAuthor(targetObject.writer);
+            if (targetObject.writers !== undefined && targetObject.writers.size() === 1) {
+                this.setAuthor(targetObject.getSingleWriter());
             }
         }
         
@@ -169,8 +219,9 @@ class RefUpdateOp<T> extends MutationOp {
             return false;
         }
 
-        if (targetObject.writer !== undefined && !(targetObject.writer.equals(this.getAuthor()))) {
-            MutableObject.validationLog.debug('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target whose writer is ' + targetObject.writer.hash() + '.');
+        const auth = this.getAuthor();
+        if (targetObject.writers !== undefined && (auth === undefined || !(targetObject.writers.has(auth)))) {
+            MutableObject.validationLog.debug('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target with other writers: ' + targetObject.hash() + '.');
             return false;
         }
 

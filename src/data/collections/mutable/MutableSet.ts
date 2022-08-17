@@ -26,7 +26,7 @@ abstract class MutableSetOp<T> extends MutationOp {
 
         if (targetObject !== undefined) {
             if (targetObject.writers !== undefined && targetObject.writers.size() === 1) {
-                this.setAuthor(targetObject.writers.values().next().value);
+                this.setAuthor(targetObject.getSingleWriter());
             }
         }
     }
@@ -251,12 +251,16 @@ class MutableSet<T> extends MutableObject {
 
     }
 
+    addWriter(writer: Identity) {
+        this.writers?.add(writer);
+    }
+
     getWriters() {
         return this.writers;
     }
 
     hasWriters() {
-        return this.writers !== undefined && this.writers.size() > 0;
+        return this.writers !== undefined;
     }
 
     async validate(references: Map<Hash, HashedObject>) {
@@ -457,6 +461,9 @@ class MutableSet<T> extends MutableObject {
         this._deleteElementCallback = callback;
     }*/
 
+    hasSingleWriter() {
+        return this.writers !== undefined && this.writers.size() === 1;
+    }
 
     // throws if there isn't exactly one writer
     getSingleWriter() {
