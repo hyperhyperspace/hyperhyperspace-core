@@ -83,7 +83,7 @@ abstract class HashedObject {
 
     setRandomId() {
         //TODO: use b64 here
-        this.id = new RNGImpl().randomHexString(BITS_FOR_ID);
+        this.setId(new RNGImpl().randomHexString(BITS_FOR_ID));
     }
 
     hasId(): boolean {
