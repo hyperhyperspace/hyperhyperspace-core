@@ -57,7 +57,7 @@ class MutableReference<T> extends MutableObject {
         return this._value;
     }
 
-    setValue(value: T) {
+    setValue(value: T, author?: Identity) {
 
         if (!(value instanceof HashedObject)) {
             if (!HashedObject.isLiteral(value)) {
@@ -65,7 +65,7 @@ class MutableReference<T> extends MutableObject {
             }
         }
 
-        let op = new RefUpdateOp<T>(this, value, this._sequence);
+        let op = new RefUpdateOp<T>(this, value, this._sequence, author);
         return this.applyNewOp(op);
     }
 
@@ -184,7 +184,7 @@ class RefUpdateOp<T> extends MutationOp {
     value?: T;
 
 
-    constructor(targetObject?: MutableReference<T>, value?: T, sequence?: number) {
+    constructor(targetObject?: MutableReference<T>, value?: T, sequence?: number, author?: Identity) {
         super(targetObject);
 
         if (targetObject !== undefined) {
@@ -192,7 +192,9 @@ class RefUpdateOp<T> extends MutationOp {
             this.sequence = sequence === undefined? 0 : sequence + 1;
             this.timestamp = Timestamps.uniqueTimestamp();
             
-            if (targetObject.writers !== undefined && targetObject.writers.size() === 1) {
+            if (author !== undefined) {
+                this.setAuthor(author);
+            } else if (targetObject.writers !== undefined && targetObject.writers.size() === 1) {
                 this.setAuthor(targetObject.getSingleWriter());
             }
         }
