@@ -1,8 +1,8 @@
-import { Identity } from 'data/identity';
-import { Hash, MutableObject, MutationOp, HashedSet, MutableContentEvents, ClassRegistry } from 'data/model';
-import { HashedObject } from '../../model/immutable/HashedObject';
 import { MultiMap } from 'util/multimap';
-import { Types } from 'data/collections';
+
+import { Identity } from '../../identity';
+import { Hash, HashedObject, MutableObject, MutationOp, HashedSet, MutableContentEvents, ClassRegistry } from '../../model';
+import { Types } from '../../collections';
 
 type ElmtHash = Hash;
 
