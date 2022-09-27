@@ -6,6 +6,8 @@ import { Authorizer } from '../../model/causal/Authorization'
 import { MultiMap } from 'util/multimap';
 import { Authorization, Verification } from '../../model/causal/Authorization';
 import { HashedSet } from '../../model/immutable/HashedSet';
+import { MutableSetEvents } from 'data/collections';
+import { MutableContentEvents } from 'data/model/mutable';
 
 /*
  * CausalSet: A set with an explicit membership op that can be used by other objects as
@@ -19,12 +21,12 @@ import { HashedSet } from '../../model/immutable/HashedSet';
 class AddOp<T> extends MutationOp {
     static className = 'hss/v0/CausalSet/AddOp';
 
-    elmt?: T;
+    element?: T;
 
-    constructor(targetObject?: CausalSet<T>, elmt?: T) {
+    constructor(targetObject?: CausalSet<T>, element?: T) {
         super(targetObject);
 
-        this.elmt = elmt;
+        this.element = element;
     }
 
     getClassName(): string {
@@ -37,11 +39,11 @@ class AddOp<T> extends MutationOp {
 
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
     
-        return await super.validate(references) && this.elmt !== undefined; 
+        return await super.validate(references) && this.element !== undefined; 
     }
 
     getElement() {
-        return this.elmt as T;
+        return this.element as T;
     }
     
 }
@@ -375,58 +377,77 @@ abstract class CausalSet<T> extends MutableObject {
 
         let addOp     : AddOp<T>|undefined;
         let addOpHash : Hash|undefined;
-        let elmtHash  : Hash|undefined;
+        let elementHash  : Hash|undefined;
 
         if (op instanceof AddOp) {
 
-            addOp     = op;
-            addOpHash = addOp.hash();
-            elmtHash  = HashedObject.hashElement(addOp.getElement());
+            addOp       = op;
+            addOpHash   = addOp.hash();
+            elementHash = HashedObject.hashElement(addOp.getElement());
 
             if (valid) {
-                this._validAddOpsPerElmt.add(elmtHash, addOpHash);
+                this._validAddOpsPerElmt.add(elementHash, addOpHash);
             } else {
-                this._validAddOpsPerElmt.delete(elmtHash, addOpHash);
+                this._validAddOpsPerElmt.delete(elementHash, addOpHash);
             }
             
             if (!cascade) {
-                this._allElements.set(elmtHash, addOp.elmt as T);
+                this._allElements.set(elementHash, addOp.element as T);
             }
 
         } else if (op instanceof DeleteOp) {
 
             const deleteOpHash = op.hash();
 
-            addOp     = op.getTargetOp() as AddOp<T>;
-            addOpHash = addOp.hash();
-            elmtHash  = HashedObject.hashElement(addOp.getElement());
+            addOp       = op.getTargetOp() as AddOp<T>;
+            addOpHash   = addOp.hash();
+            elementHash = HashedObject.hashElement(addOp.getElement());
 
             if (valid) {
-               this._validDeleteOpsPerAddOp.add(addOpHash, deleteOpHash);
+                
+                this._validDeleteOpsPerAddOp.add(addOpHash, deleteOpHash);
             } else {
-               this._validDeleteOpsPerAddOp.delete(addOpHash, deleteOpHash); 
+                this._validDeleteOpsPerAddOp.delete(addOpHash, deleteOpHash); 
             }
 
         } else {
-            // do nothing
+            throw new Error();
         }
 
-        if (elmtHash !== undefined && addOp != undefined && addOpHash !== undefined) {
+        let mutated = false;
 
-            if ( this._validAddOpsPerElmt.has(elmtHash, addOpHash) && 
-                 this._validDeleteOpsPerAddOp.get(addOpHash).size === 0 ) {
-        
-                this._currentAddOps.set(addOpHash, addOp);
-                this._currentAddOpsPerElmt.add(elmtHash, addOpHash);
-            } else {
-                this._currentAddOps.delete(addOpHash);
-                this._currentAddOpsPerElmt.delete(elmtHash, addOpHash);
-            }
+        const wasInBefore = this._currentAddOpsPerElmt.get(elementHash);
 
-            return true;
+        if ( this._validAddOpsPerElmt.has(elementHash, addOpHash) && 
+            this._validDeleteOpsPerAddOp.get(addOpHash).size === 0 ) {
+    
+            this._currentAddOps.set(addOpHash, addOp);
+            this._currentAddOpsPerElmt.add(elementHash, addOpHash);
         } else {
-            return false;
+            this._currentAddOps.delete(addOpHash);
+            this._currentAddOpsPerElmt.delete(elementHash, addOpHash);
         }
+
+        const isInNow = this._currentAddOpsPerElmt.get(elementHash);
+
+        mutated = wasInBefore !== isInNow;
+
+        if (mutated) {
+
+            if ((op instanceof AddOp && valid) || (op instanceof DeleteOp && !valid)) {
+                this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Add, data: addOp.element});
+                if (addOp.element instanceof HashedObject) {
+                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: addOp.element});
+                }    
+            } else if ((op instanceof AddOp && !valid) || (op instanceof DeleteOp && valid)) {
+                this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Delete, data: addOp.element});
+                if (addOp.element instanceof HashedObject) {
+                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: addOp.element});
+                }
+            }
+        }
+
+        return mutated;
     }
 
     init(): void {
