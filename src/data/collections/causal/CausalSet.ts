@@ -375,78 +375,83 @@ abstract class CausalSet<T> extends MutableObject {
 
     async mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean> {
 
-        let addOp     : AddOp<T>|undefined;
-        let addOpHash : Hash|undefined;
-        let elementHash  : Hash|undefined;
-
-        if (op instanceof AddOp) {
-
-            addOp       = op;
-            addOpHash   = addOp.hash();
-            elementHash = HashedObject.hashElement(addOp.getElement());
-
-            if (valid) {
-                this._validAddOpsPerElmt.add(elementHash, addOpHash);
-            } else {
-                this._validAddOpsPerElmt.delete(elementHash, addOpHash);
-            }
-            
-            if (!cascade) {
-                this._allElements.set(elementHash, addOp.element as T);
-            }
-
-        } else if (op instanceof DeleteOp) {
-
-            const deleteOpHash = op.hash();
-
-            addOp       = op.getTargetOp() as AddOp<T>;
-            addOpHash   = addOp.hash();
-            elementHash = HashedObject.hashElement(addOp.getElement());
-
-            if (valid) {
-                
-                this._validDeleteOpsPerAddOp.add(addOpHash, deleteOpHash);
-            } else {
-                this._validDeleteOpsPerAddOp.delete(addOpHash, deleteOpHash); 
-            }
-
-        } else {
-            throw new Error();
-        }
-
         let mutated = false;
 
-        const wasInBefore = this._currentAddOpsPerElmt.get(elementHash);
+        if (op instanceof AddOp || op instanceof DeleteOp) {
 
-        if ( this._validAddOpsPerElmt.has(elementHash, addOpHash) && 
-            this._validDeleteOpsPerAddOp.get(addOpHash).size === 0 ) {
-    
-            this._currentAddOps.set(addOpHash, addOp);
-            this._currentAddOpsPerElmt.add(elementHash, addOpHash);
-        } else {
-            this._currentAddOps.delete(addOpHash);
-            this._currentAddOpsPerElmt.delete(elementHash, addOpHash);
-        }
+            let addOp     : AddOp<T>|undefined;
+            let addOpHash : Hash|undefined;
+            let elementHash  : Hash|undefined;
 
-        const isInNow = this._currentAddOpsPerElmt.get(elementHash);
+            if (op instanceof AddOp) {
 
-        mutated = wasInBefore !== isInNow;
+                addOp       = op;
+                addOpHash   = addOp.hash();
+                elementHash = HashedObject.hashElement(addOp.getElement());
 
-        if (mutated) {
+                if (valid) {
+                    this._validAddOpsPerElmt.add(elementHash, addOpHash);
+                } else {
+                    this._validAddOpsPerElmt.delete(elementHash, addOpHash);
+                }
+                
+                if (!cascade) {
+                    this._allElements.set(elementHash, addOp.element as T);
+                }
 
-            if ((op instanceof AddOp && valid) || (op instanceof DeleteOp && !valid)) {
-                this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Add, data: addOp.element});
-                if (addOp.element instanceof HashedObject) {
-                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: addOp.element});
-                }    
-            } else if ((op instanceof AddOp && !valid) || (op instanceof DeleteOp && valid)) {
-                this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Delete, data: addOp.element});
-                if (addOp.element instanceof HashedObject) {
-                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: addOp.element});
+            } else if (op instanceof DeleteOp) {
+
+                const deleteOpHash = op.hash();
+
+                addOp       = op.getTargetOp() as AddOp<T>;
+                addOpHash   = addOp.hash();
+                elementHash = HashedObject.hashElement(addOp.getElement());
+
+                if (valid) {
+                    
+                    this._validDeleteOpsPerAddOp.add(addOpHash, deleteOpHash);
+                } else {
+                    this._validDeleteOpsPerAddOp.delete(addOpHash, deleteOpHash); 
+                }
+
+            } else {
+                throw new Error("This should be impossible")
+            }
+
+            
+
+            const wasInBefore = this._currentAddOpsPerElmt.get(elementHash);
+
+            if ( this._validAddOpsPerElmt.has(elementHash, addOpHash) && 
+                this._validDeleteOpsPerAddOp.get(addOpHash).size === 0 ) {
+        
+                this._currentAddOps.set(addOpHash, addOp);
+                this._currentAddOpsPerElmt.add(elementHash, addOpHash);
+            } else {
+                this._currentAddOps.delete(addOpHash);
+                this._currentAddOpsPerElmt.delete(elementHash, addOpHash);
+            }
+
+            const isInNow = this._currentAddOpsPerElmt.get(elementHash);
+
+            mutated = wasInBefore !== isInNow;
+
+            if (mutated) {
+
+                if ((op instanceof AddOp && valid) || (op instanceof DeleteOp && !valid)) {
+                    this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Add, data: addOp.element});
+                    if (addOp.element instanceof HashedObject) {
+                        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: addOp.element});
+                    }    
+                } else if ((op instanceof AddOp && !valid) || (op instanceof DeleteOp && valid)) {
+                    this._mutationEventSource?.emit({emitter: this, action: MutableSetEvents.Delete, data: addOp.element});
+                    if (addOp.element instanceof HashedObject) {
+                        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: addOp.element});
+                    }
                 }
             }
-        }
 
+        }
         return mutated;
     }
 
