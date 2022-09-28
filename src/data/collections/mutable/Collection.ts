@@ -1,6 +1,8 @@
-import { HashedSet } from '../../model/immutable/HashedSet';
-import { MutableObject, MutableObjectConfig } from '../../model/mutable/MutableObject';
+import { HashedObject, HashedSet } from '../../model/immutable';
+import { MutableObject, MutableObjectConfig, MutationOp } from '../../model/mutable';
 import { Identity } from '../../identity';
+import { Hash} from '../../model/hashing'
+
 
 type CollectionConfig = {writer?: Identity, writers?: IterableIterator<Identity>};
 
@@ -27,6 +29,28 @@ abstract class Collection extends MutableObject {
         }
 
         this.setRandomId();
+    }
+
+    async validate(references: Map<Hash, HashedObject>) {
+        references;
+
+        if (this.writers !== undefined) {
+            if (!(this.writers instanceof HashedSet)) {
+                return false;
+            }
+
+            if (this.writers.size() === 0) {
+                return false;
+            }
+
+            for (const writer of this.writers.values()) {
+                if (!(writer instanceof Identity)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     hasSingleWriter() {
@@ -57,5 +81,39 @@ abstract class Collection extends MutableObject {
     }
 }
 
-export { Collection };
+abstract class CollectionOp extends MutationOp {
+
+    constructor(targetObject?: Collection) {
+        super(targetObject);
+
+        if (targetObject !== undefined) {
+            if (targetObject.hasSingleWriter()) {
+                this.setAuthor(targetObject.getSingleWriter());
+            }
+        }
+    }
+
+    init(): void {
+
+    }
+
+    async validate(references: Map<Hash, HashedObject>) {
+
+        if (!await super.validate(references)) {
+            return false;
+        }
+
+        const targetObject = this.getTargetObject() as Collection;
+        const auth = this.getAuthor();
+
+        if (targetObject.writers !== undefined && (auth === undefined || !targetObject.writers.has(auth))) {
+            return false;
+        }
+
+        return true;
+    }
+    
+}
+
+export { Collection, CollectionOp };
 export type { CollectionConfig };

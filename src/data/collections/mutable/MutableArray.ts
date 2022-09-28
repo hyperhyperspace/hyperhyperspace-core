@@ -2,7 +2,6 @@ import { Types } from '../../collections';
 import { Hash } from '../../model/hashing';
 import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
-import { MutableObject } from '../../model';
 
 import { Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
 import { DedupMultiMap } from 'util/dedupmultimap';
@@ -13,50 +12,13 @@ import { location } from 'util/events';
 import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
-import { Identity } from 'data/identity';
+import { Collection, CollectionConfig, CollectionOp } from './Collection';
 
 // a simple mutable list with a single writer
 
 // can work with or without duplicates (in the latter case, inserting an element already in the set has no effect)
 
-abstract class MutableArrayOp<T> extends MutationOp {
-
-    constructor(targetObject?: MutableArray<T>) {
-        super(targetObject);
-
-        if (targetObject !== undefined) {
-            if (targetObject.writer !== undefined) {
-                this.setAuthor(targetObject.writer);
-            }
-        }
-    }
-
-    init(): void {
-
-    }
-
-    async validate(references: Map<Hash, HashedObject>) {
-
-        if (!await super.validate(references)) {
-            return false;
-        }
-
-        const targetObject = this.getTargetObject();
-
-        if (! (targetObject instanceof MutableArray)) {
-            return false;
-        }
-
-        if (targetObject.writer !== undefined && !(targetObject.writer.equals(this.getAuthor()))) {
-            return false;
-        }
-
-        return true;
-    }
-    
-}
-
-class InsertOp<T> extends MutableArrayOp<T> {
+class InsertOp<T> extends CollectionOp {
 
     static className = 'hhs/v0/MutableArray/InsertOp';
 
@@ -83,6 +45,12 @@ class InsertOp<T> extends MutableArrayOp<T> {
             return false;
         }
 
+        const targetObject = this.getTargetObject();
+
+        if (! (targetObject instanceof MutableArray)) {
+            return false;
+        }
+
         if (this.element === undefined || !((this.element instanceof HashedObject) || HashedObject.isLiteral(this.element))) {
             return false;
         }
@@ -101,7 +69,7 @@ class InsertOp<T> extends MutableArrayOp<T> {
     }
 }
 
-class DeleteOp<T> extends MutableArrayOp<T> {
+class DeleteOp<T> extends CollectionOp {
 
     static className = 'hhs/v0/MutableArray/DeleteOp';
 
@@ -133,6 +101,12 @@ class DeleteOp<T> extends MutableArrayOp<T> {
     async validate(references: Map<Hash, HashedObject>) {
 
         if (!await super.validate(references)) {
+            return false;
+        }
+
+        const targetObject = this.getTargetObject();
+
+        if (! (targetObject instanceof MutableArray)) {
             return false;
         }
 
@@ -198,7 +172,9 @@ class DeleteOp<T> extends MutableArrayOp<T> {
     
 }
 
-class MutableArray<T> extends MutableObject {
+type MutableArrayConfig = { duplicates: boolean }
+
+class MutableArray<T> extends Collection {
 
     static className = 'hhs/v0/MutableArray';
     static opClasses = [InsertOp.className, DeleteOp.className];
@@ -206,7 +182,6 @@ class MutableArray<T> extends MutableObject {
     
     duplicates: boolean;
 
-    writer?: Identity;
     typeConstraints?: Array<string>;
 
     _elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
@@ -222,13 +197,10 @@ class MutableArray<T> extends MutableObject {
     _hashes   : Array<Hash>;
     _ordinals : Array<Ordinal>;
 
-    constructor(config={duplicates: true, writer: undefined as (undefined|Identity)}) {
-        super(MutableArray.opClasses);
+    constructor(config: MutableArrayConfig & CollectionConfig = {duplicates: true}) {
+        super(MutableArray.opClasses, config);
 
         this.duplicates = config.duplicates;
-        this.writer     = config.writer;
-        
-        this.setRandomId();
 
         this._elementsPerOrdinal = new ArrayMap();
         this._ordinalsPerElement = new ArrayMap();
@@ -241,18 +213,6 @@ class MutableArray<T> extends MutableObject {
         this._contents = [];
         this._hashes   = [];
         this._ordinals = [];
-    }
-
-    setWriter(writer?: Identity) {
-        this.writer = writer;
-    }
-
-    getWriter() {
-        return this.writer;
-    }
-
-    hasWriter() {
-        return this.writer !== undefined;
     }
 
     async insertAt(element: T, idx: number) {
@@ -597,8 +557,12 @@ class MutableArray<T> extends MutableObject {
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
-        references;
-        return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints) && (this.writer === undefined || this.writer instanceof Identity); 
+        
+        if (!(await super.validate(references))) {
+            return false;
+        }
+
+        return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
     }
 
 }

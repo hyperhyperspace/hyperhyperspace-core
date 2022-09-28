@@ -7,9 +7,8 @@ import { HashReference } from 'data/model/immutable/HashReference';
 import { Types } from '../Types';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
-import { Identity } from 'data/identity';
 import { ClassRegistry } from 'data/model';
-import { Collection } from './Collection';
+import { Collection, CollectionConfig, CollectionOp } from './Collection';
 
 type ElmtHash = Hash;
 
@@ -20,45 +19,7 @@ enum MutableSetEvents {
     Delete = 'delete'
 }
 
-abstract class MutableSetOp<T> extends MutationOp {
-
-    constructor(targetObject?: MutableSet<T>) {
-        super(targetObject);
-
-        if (targetObject !== undefined) {
-            if (targetObject.hasSingleWriter()) {
-                this.setAuthor(targetObject.getSingleWriter());
-            }
-        }
-    }
-
-    init(): void {
-
-    }
-
-    async validate(references: Map<Hash, HashedObject>) {
-
-        if (!await super.validate(references)) {
-            return false;
-        }
-
-        const targetObject = this.getTargetObject();
-
-        if (! (targetObject instanceof MutableSet)) {
-            return false;
-        }
-
-        const auth = this.getAuthor();
-        if (targetObject.writers !== undefined && (auth === undefined || !(targetObject.writers.has(auth)))) {
-            return false;
-        }
-
-        return true;
-    }
-    
-}
-
-class AddOp<T> extends MutableSetOp<T> {
+class AddOp<T> extends CollectionOp {
 
     static className = 'hhs/v0/MutableSet/AddOp';
 
@@ -87,6 +48,12 @@ class AddOp<T> extends MutableSetOp<T> {
             return false;
         }
 
+        const targetObject = this.getTargetObject();
+
+        if (! (targetObject instanceof MutableSet)) {
+            return false;
+        }
+
         const constraints = (this.getTargetObject() as MutableSet<T>).typeConstraints;
 
         if (!Types.satisfies(this.element, constraints)) {
@@ -101,7 +68,7 @@ class AddOp<T> extends MutableSetOp<T> {
     }
 }
 
-class DeleteOp<T> extends MutableSetOp<T> {
+class DeleteOp<T> extends CollectionOp {
 
     static className = 'hhs/v0/MutableSet/DeleteOp';
 
@@ -136,6 +103,11 @@ class DeleteOp<T> extends MutableSetOp<T> {
             return false;
         }
 
+        const targetObject = this.getTargetObject();
+
+        if (! (targetObject instanceof MutableSet)) {
+            return false;
+        }
 
         if (this.elementHash === undefined) {
             
@@ -217,7 +189,7 @@ class MutableSet<T> extends Collection {
     /*_addElementCallback?    : (element: T) => void;
     _deleteElementCallback? : (element: T) => void;*/
 
-    constructor(config?: {writer?: Identity, writers?: IterableIterator<Identity>}) {
+    constructor(config?: CollectionConfig) {
         super(MutableSet.opClasses, config);
 
         this._logger = MutableSet.logger;
@@ -234,22 +206,9 @@ class MutableSet<T> extends Collection {
     }
 
     async validate(references: Map<Hash, HashedObject>) {
-        references;
 
-        if (this.writers !== undefined) {
-            if (!(this.writers instanceof HashedSet)) {
-                return false;
-            }
-
-            if (this.writers.size() === 0) {
-                return false;
-            }
-
-            for (const writer of this.writers.values()) {
-                if (!(writer instanceof Identity)) {
-                    return false;
-                }
-            }
+        if (!(await super.validate(references))) {
+            return false;
         }
 
         if (!(Types.isTypeConstraint(this.typeConstraints))) {

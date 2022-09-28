@@ -1,13 +1,13 @@
-import { MutableContentEvents, MutableObject, MutableObjectConfig } from '../../model/mutable/MutableObject';
+import { MutableContentEvents, MutableObject } from '../../model/mutable/MutableObject';
 import { MutationOp } from '../../model/mutable/MutationOp';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
 import { Types } from '../Types';
-import { Hash } from 'data/model/hashing/Hashing';
-import { ClassRegistry, HashedSet } from 'data/model';
+import { Hash } from '../../model/hashing';
+import { ClassRegistry } from '../../model';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
-import { Collection, CollectionConfig } from './Collection';
+import { Collection, CollectionConfig, CollectionOp } from './Collection';
 
 class MutableReference<T> extends Collection {
 
@@ -19,7 +19,7 @@ class MutableReference<T> extends Collection {
     _timestamp?: string;
     _value?: T;
 
-    constructor(config?: CollectionConfig & MutableObjectConfig) {
+    constructor(config?: CollectionConfig) {
         super([RefUpdateOp.className], config);
     }
 
@@ -104,22 +104,9 @@ class MutableReference<T> extends Collection {
     }
 
     async validate(references: Map<Hash, HashedObject>) {
-        references;
 
-        if (this.writers !== undefined) {
-            if (!(this.writers instanceof HashedSet)) {
-                return false;
-            }
-
-            if (this.writers.size() === 0) {
-                return false;
-            }
-
-            for (const writer of this.writers.values()) {
-                if (!(writer instanceof Identity)) {
-                    return false;
-                }
-            }
+        if (!(await super.validate(references))) {
+            return false;
         }
 
         if (!(Types.isTypeConstraint(this.typeConstraints))) {
@@ -130,7 +117,7 @@ class MutableReference<T> extends Collection {
     }
 }
 
-class RefUpdateOp<T> extends MutationOp {
+class RefUpdateOp<T> extends CollectionOp {
 
     static className = 'hhs/v0/RefUpdateOp';
 
@@ -149,8 +136,6 @@ class RefUpdateOp<T> extends MutationOp {
             
             if (author !== undefined) {
                 this.setAuthor(author);
-            } else if (targetObject.writers !== undefined && targetObject.writers.size() === 1) {
-                this.setAuthor(targetObject.getSingleWriter());
             }
         }
         
@@ -173,12 +158,6 @@ class RefUpdateOp<T> extends MutationOp {
         const targetObject = this.getTargetObject();
 
         if (!(targetObject instanceof MutableReference)) {
-            return false;
-        }
-
-        const auth = this.getAuthor();
-        if (targetObject.writers !== undefined && (auth === undefined || !(targetObject.writers.has(auth)))) {
-            MutableObject.validationLog.debug('RefUpdateOp has author ' + this.getAuthor()?.hash() + ' but points to a target with other writers: ' + targetObject.hash() + '.');
             return false;
         }
 
