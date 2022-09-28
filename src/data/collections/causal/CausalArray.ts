@@ -223,7 +223,7 @@ class MutableArray<T> extends MutableObject {
     _ordinals : Array<Ordinal>;
 
     constructor(config={duplicates: true, writer: undefined as (undefined|Identity)}) {
-        super(MutableArray.opClasses, true);
+        super(MutableArray.opClasses, {supportsUndo: true});
 
         this.duplicates = config.duplicates;
         this.writer     = config.writer;
@@ -462,7 +462,7 @@ class MutableArray<T> extends MutableObject {
 
                 this._needToRebuild = true;
 
-                if (wasNotBefore) {
+                if (wasNotBefore && element instanceof HashedObject) {
                     this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: element});
                 }
 
@@ -510,7 +510,9 @@ class MutableArray<T> extends MutableObject {
                 if (wasBefore) {
                     const element = this._elements.get(elementHash);
                     this._elements.delete(elementHash);
-                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: element});
+                    if (element instanceof HashedObject) {
+                        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: element});
+                    }
                 }
             }
 

@@ -158,7 +158,7 @@ abstract class CausalSet<T> extends MutableObject {
 
 
     constructor(acceptedTypes?: Array<string>, acceptedElements?: Array<any>) {
-        super(CausalSet.opClasses, true);
+        super(CausalSet.opClasses, {supportsUndo: true});
 
         this.setRandomId();
 

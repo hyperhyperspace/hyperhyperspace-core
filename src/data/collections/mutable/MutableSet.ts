@@ -1,4 +1,4 @@
-import { MutableContentEvents, MutableObject } from '../../model/mutable/MutableObject';
+import { MutableContentEvents } from '../../model/mutable/MutableObject';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Hash } from '../../model/hashing/Hashing';
 import { MutationOp } from 'data/model/mutable/MutationOp';
@@ -9,6 +9,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
 import { ClassRegistry } from 'data/model';
+import { Collection } from './Collection';
 
 type ElmtHash = Hash;
 
@@ -25,7 +26,7 @@ abstract class MutableSetOp<T> extends MutationOp {
         super(targetObject);
 
         if (targetObject !== undefined) {
-            if (targetObject.writers !== undefined && targetObject.writers.size() === 1) {
+            if (targetObject.hasSingleWriter()) {
                 this.setAuthor(targetObject.getSingleWriter());
             }
         }
@@ -198,7 +199,7 @@ class DeleteOp<T> extends MutableSetOp<T> {
     
 }
 
-class MutableSet<T> extends MutableObject {
+class MutableSet<T> extends Collection {
 
     static className = 'hss/v0/MutableSet';
     static opClasses = [AddOp.className, DeleteOp.className];
@@ -206,7 +207,6 @@ class MutableSet<T> extends MutableObject {
 
     _logger: Logger;
 
-    writers?: HashedSet<Identity>;  //if writers is missing, anybody can write
     typeConstraints?: Array<string>;
 
     _elements: Map<ElmtHash, T>;
@@ -218,27 +218,9 @@ class MutableSet<T> extends MutableObject {
     _deleteElementCallback? : (element: T) => void;*/
 
     constructor(config?: {writer?: Identity, writers?: IterableIterator<Identity>}) {
-        super(MutableSet.opClasses);
+        super(MutableSet.opClasses, config);
 
         this._logger = MutableSet.logger;
-
-        this.writers = new HashedSet<Identity>();
-
-        if (config?.writer !== undefined) {
-            this.writers.add(config?.writer);
-        }
-
-        if (config?.writers !== undefined) {
-            for (const writer of config.writers) {
-                this.writers.add(writer);
-            }
-        }
-
-        if (this.writers.size() === 0) {
-            this.writers = undefined;
-        }
-
-        this.setRandomId();
 
         this._elements = new Map();
         this._currentAddOpRefs = new Map();
@@ -249,18 +231,6 @@ class MutableSet<T> extends MutableObject {
 
     init(): void {
 
-    }
-
-    addWriter(writer: Identity) {
-        this.writers?.add(writer);
-    }
-
-    getWriters() {
-        return this.writers;
-    }
-
-    hasWriters() {
-        return this.writers !== undefined;
     }
 
     async validate(references: Map<Hash, HashedObject>) {
@@ -460,21 +430,6 @@ class MutableSet<T> extends MutableObject {
     onDeletion(callback: (elem: T) => void) {
         this._deleteElementCallback = callback;
     }*/
-
-    hasSingleWriter() {
-        return this.writers !== undefined && this.writers.size() === 1;
-    }
-
-    // throws if there isn't exactly one writer
-    getSingleWriter() {
-       if (this.writers === undefined)  {
-           return undefined;
-       } else if (this.writers.size() > 1) {
-           throw new Error('Called getWriter() on a mutableSet, but it has more than one');
-       } else {
-           return this.writers.values().next().value;
-       }
-    }
     
     getClassName(): string {
         return MutableSet.className;

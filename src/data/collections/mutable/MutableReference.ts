@@ -1,4 +1,4 @@
-import { MutableContentEvents, MutableObject } from '../../model/mutable/MutableObject';
+import { MutableContentEvents, MutableObject, MutableObjectConfig } from '../../model/mutable/MutableObject';
 import { MutationOp } from '../../model/mutable/MutationOp';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
@@ -7,50 +7,20 @@ import { Hash } from 'data/model/hashing/Hashing';
 import { ClassRegistry, HashedSet } from 'data/model';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
+import { Collection, CollectionConfig } from './Collection';
 
-class MutableReference<T> extends MutableObject {
+class MutableReference<T> extends Collection {
 
     static className = 'hhs/v0/MutableReference';
 
-    writers?: HashedSet<Identity>;
     typeConstraints?: Array<string>;
 
     _sequence?: number;
     _timestamp?: string;
     _value?: T;
 
-    constructor(config?: {writer?: Identity, writers?: IterableIterator<Identity>}) {
-        super([RefUpdateOp.className]);
-
-        this.writers = new HashedSet<Identity>();
-
-        if (config?.writer !== undefined) {
-            this.writers.add(config?.writer);
-        }
-
-        if (config?.writers !== undefined) {
-            for (const writer of config.writers) {
-                this.writers.add(writer);
-            }
-        }
-
-        if (this.writers.size() === 0) {
-            this.writers = undefined;
-        }
-
-        this.setRandomId();
-    }
-
-    addWriter(writer: Identity) {
-        this.writers?.add(writer);
-    }
-
-    getWriters() {
-        return this.writers;
-    }
-
-    hasWriters() {
-        return this.writers !== undefined;
+    constructor(config?: CollectionConfig & MutableObjectConfig) {
+        super([RefUpdateOp.className], config);
     }
 
     getValue() : T | undefined {
@@ -158,21 +128,6 @@ class MutableReference<T> extends MutableObject {
 
         return true;
     }
-
-    hasSingleWriter() {
-        return this.writers !== undefined && this.writers.size() === 1;
-    }
-
-    // throws if there isn't exactly one writer
-    getSingleWriter() {
-        if (this.writers === undefined)  {
-            return undefined;
-        } else if (this.writers.size() > 1) {
-            throw new Error('Called getWriter() on a mutableSet, but it has more than one');
-        } else {
-            return this.writers.values().next().value;
-        }
-        }
 }
 
 class RefUpdateOp<T> extends MutationOp {

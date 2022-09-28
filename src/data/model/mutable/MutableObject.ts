@@ -28,8 +28,9 @@ enum MutableContentEvents {
 
 const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject];
 
+type MutableObjectConfig = {supportsUndo?: boolean};
 
-abstract class MutableObject extends HashedObject {
+abstract class  MutableObject extends HashedObject {
 
     static controlLog = new Logger(MutableObject.name, LogLevel.INFO)
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
@@ -54,10 +55,10 @@ abstract class MutableObject extends HashedObject {
 
     _cascadeMutableContentObserver : Observer<HashedObject>;
 
-    constructor(acceptedOpClasses : Array<string>, supportsUndo=false) {
+    constructor(acceptedOpClasses : Array<string>, config?: MutableObjectConfig) {
         super();
 
-        if (supportsUndo) {
+        if (config?.supportsUndo || false) {
             if (acceptedOpClasses.indexOf(CascadedInvalidateOp.className) < 0) {
                 acceptedOpClasses.push(CascadedInvalidateOp.className);
             }
@@ -739,4 +740,5 @@ abstract class MutableObject extends HashedObject {
     }
 }
 
-export { MutableObject, MutableContentEvents }
+export { MutableObject, MutableContentEvents };
+export type { MutableObjectConfig };
