@@ -155,7 +155,7 @@ abstract class AbstractCapabilitySet extends MutableObject {
     _grantOps: Map<Hash, GrantCapabilityOp>;
 
     constructor() {
-        super(AbstractCapabilitySet.opClasses, true);
+        super(AbstractCapabilitySet.opClasses, {supportsUndo: true});
 
         this.setRandomId();
 
