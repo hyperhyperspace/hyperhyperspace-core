@@ -177,7 +177,7 @@ class Authorization {
                     = (b1: Authorizer, b2?: Authorizer) => {
                         return {
                             attempt : Attestation.chain(b1.attempt, b2?.attempt),
-                            verify      : Verification.chain(b1.verify, b2?.verify)
+                            verify  : Verification.chain(b1.verify, b2?.verify)
                         };
                     }
 
@@ -186,7 +186,7 @@ class Authorization {
                     = (builders: Array<Authorizer>) => {
                         return {
                             attempt : Attestation.all(builders.map(attestProj)),
-                            verify      : Verification.all(builders.map(verifyProj))
+                            verify  : Verification.all(builders.map(verifyProj))
                         }
                     };
 
@@ -195,7 +195,7 @@ class Authorization {
                     = (builders: Array<Authorizer>) => {
                         return {
                             attempt : Attestation.oneOf(builders.map(attestProj)),
-                            verify      : Verification.oneOf(builders.map(verifyProj))
+                            verify  : Verification.oneOf(builders.map(verifyProj))
                         }
                     };
 

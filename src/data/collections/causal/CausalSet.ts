@@ -6,8 +6,8 @@ import { Authorizer } from '../../model/causal/Authorization'
 import { MultiMap } from 'util/multimap';
 import { Authorization, Verification } from '../../model/causal/Authorization';
 import { HashedSet } from '../../model/immutable/HashedSet';
-import { MutableSetEvents } from 'data/collections';
-import { MutableContentEvents } from 'data/model/mutable';
+import { MutableSetEvents } from '../../collections/mutable/MutableSet';
+import { MutableContentEvents } from '../../model/mutable/MutableObject';
 
 /*
  * CausalSet: A set with an explicit membership op that can be used by other objects as
@@ -38,8 +38,39 @@ class AddOp<T> extends MutationOp {
     }
 
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
+
+        if (!(await super.validate(references))) {
+            return false;
+        }
+
+        const mut = this.getTargetObject();
+
+        if (this.element === undefined) {
+            return false;
+        }
+
+        if (!(mut instanceof CausalSet)) {
+            return false;
+        }
+
+        if (mut.acceptedElementHashes !== undefined && !mut.acceptedElementHashes.has(HashedObject.hashElement(this.element))) {
+            return false;
+        }
+
+        if (mut.acceptedTypes !== undefined && 
+              !(
+                (this.element instanceof HashedObject && mut.acceptedTypes.has(this.element.getClassName())) 
+                        ||
+                (!(this.element instanceof HashedObject) && mut.acceptedTypes.has(typeof(this.element)))
+               )
+                
+        ) {
+
+            return false;
+
+        }
     
-        return await super.validate(references) && this.element !== undefined; 
+        return true;
     }
 
     getElement() {
@@ -488,25 +519,7 @@ abstract class CausalSet<T> extends MutableObject {
         return found;
     }
 
-    protected createAddAuthorizer(elmt: T, _author?: Identity): Authorizer {
-
-        if (this.acceptedElementHashes !== undefined && !this.acceptedElementHashes.has(HashedObject.hashElement(elmt))) {
-            return Authorization.never;
-        }
-
-        if (this.acceptedTypes !== undefined && 
-              !(
-                (elmt instanceof HashedObject && this.acceptedTypes.has(elmt.getClassName())) 
-                        ||
-                (!(elmt instanceof HashedObject) && this.acceptedTypes.has(typeof(elmt)))
-               )
-                
-        ) {
-
-            return Authorization.never;
-
-        }
-
+    protected createAddAuthorizer(_elmt: T, _author?: Identity): Authorizer {
         return Authorization.always;
     }
 

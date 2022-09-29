@@ -12,7 +12,7 @@ import { Collection, CollectionConfig, CollectionOp } from './Collection';
 
 type ElmtHash = Hash;
 
-// a simple mutable set with a single writer
+// a simple mutable set with an immutable set of authorized writers
 
 enum MutableSetEvents {
     Add    = 'add',

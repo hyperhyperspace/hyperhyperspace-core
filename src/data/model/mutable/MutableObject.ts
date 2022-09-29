@@ -436,9 +436,11 @@ abstract class  MutableObject extends HashedObject {
                 targetOpHash = targetOp?.hash();
 
                 const wasValid = this.isValidOp(targetOpHash);
-                if (this.isValidOp(currentOpHash)) {
+                if (this.isValidOp(currentOpHash)) { // FIXME: this looks wrong
+                    console.log('xxx ADD xxx')
                     this._activeCascInvsPerOp.add(targetOpHash, currentOpHash);
                 } else {
+                    console.log('xxx DELETE xxx')
                     this._activeCascInvsPerOp.delete(targetOpHash, currentOpHash);
                 }
                 const isValid  = this.isValidOp(targetOpHash);
