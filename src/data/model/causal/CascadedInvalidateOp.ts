@@ -161,7 +161,7 @@ class CascadedInvalidateOp extends MutationOp {
         }
         
     }
-     // Obs: The validate() method in an UndoOp can only check if the UndoOp itself is well built. However,
+    // Obs: The validate() method in an UndoOp can only check if the UndoOp itself is well built. However,
     //      it is important to verify that the undo is consistent with the history already in the store.
     //      There is a special validateUndosInContext method for that (haven't decided where yet). 
 
