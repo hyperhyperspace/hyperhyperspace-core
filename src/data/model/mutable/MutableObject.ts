@@ -39,6 +39,11 @@ abstract class  MutableObject extends HashedObject {
     
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
+
+    // We only keep track of inv. for the op at the very end of
+    // an undo / redo chain (e.g. for each causal dep an op has,
+    // only an undo op at the very end of the chain can be in
+    // _activeCascInvsPerOp).
     _activeCascInvsPerOp       : MultiMap<Hash, Hash>;
 
 
@@ -119,7 +124,9 @@ abstract class  MutableObject extends HashedObject {
     }*/
 
     protected isValidOp(opHash: Hash): boolean {
-        return this._activeCascInvsPerOp.get(opHash).size === 0;
+        const valid = this._activeCascInvsPerOp.get(opHash).size === 0;
+
+        return valid;
     }
 
     addMutationOpCallback(cb: (mut: MutationOp) => void) {
@@ -212,31 +219,6 @@ abstract class  MutableObject extends HashedObject {
         return cache.get(opHash) as OpHeader;
 
     }
-
-    // TODO: if this object is bound to the store while the load takes place, we could take measures
-    //       to try to avoid loading objects twice if they arrive while the load takes place.
-    //       As it is now, the implementation should prepare for the event of an op being loaded twice.
-    /*
-    async loadOperations(limit?: number, start?: string) : Promise<void> {
-        if (this._loadStrategy === 'none') {
-            throw new Error("Trying to load operations from store, but load strategy was set to 'none'");
-        } else if (this._loadStrategy === 'full') {
-
-            if (limit !== undefined) {
-                throw new Error("Trying to load " + limit + " operations from store, but load strategy was set to 'full' - you should use 'lazy' instead");
-            }
-
-            if (start !== undefined) {
-                throw new Error("Trying to load operations from store starting at " + start + " but load strategy was set to 'full' - you should use 'lazy' instead");
-            }
-
-            await this.loadAllChanges();
-        } else if (this._loadStrategy === 'lazy') {
-            await this.loadLastOpsFromStore(limit, start);
-        }
-
-    }
-    */
 
     async loadAllChanges(batchSize=128) {
 
@@ -418,76 +400,24 @@ abstract class  MutableObject extends HashedObject {
         let result = Promise.resolve(false);
 
         if (op instanceof CascadedInvalidateOp) {
-            
-            let targetOp: MutationOp|undefined;
-            let targetOpHash: Hash|undefined;
 
             const finalTargetOp     = op.getFinalTargetOp();
             const finalTargetOpHash = finalTargetOp.hash();
             
             const wasValid = this.isValidOp(finalTargetOpHash);
 
-            let currentOp: CascadedInvalidateOp|undefined = op;
-            let currentOpHash: Hash|undefined = currentOp.hash();
-            let flipped: boolean;
-
-            do {
-                targetOp = currentOp.getTargetOp();
-                targetOpHash = targetOp?.hash();
-
-                const wasValid = this.isValidOp(targetOpHash);
-                if (this.isValidOp(currentOpHash)) { // FIXME: this looks wrong
-                    console.log('xxx ADD xxx')
-                    this._activeCascInvsPerOp.add(targetOpHash, currentOpHash);
-                } else {
-                    console.log('xxx DELETE xxx')
-                    this._activeCascInvsPerOp.delete(targetOpHash, currentOpHash);
-                }
-                const isValid  = this.isValidOp(targetOpHash);
-                
-                flipped = wasValid !== isValid;
-                
-                if (flipped && targetOp instanceof CascadedInvalidateOp) {
-                    currentOp = targetOp;
-                    currentOpHash = targetOpHash;
-                } else {
-                    currentOp = undefined;
-                    currentOpHash = undefined;
-                }
-
-            } while (currentOp !== undefined && currentOpHash !== undefined);
-
-            if (wasValid !== this.isValidOp(finalTargetOpHash) ) {
-                if (op.undo) {
-                    result = this.mutate(op.getFinalTargetOp(), false, true);
-                } else {
-                    result = this.mutate(op.getFinalTargetOp(), true, true);
-                }
-            }
-            
-            /*
-            
-            const finalTargetOp     = op.getFinalTargetOp();
-            const finalTargetOpHash = finalTargetOp.hash();
-            
-            const wasUndone = this._activeCascInvsPerOp.get(finalTargetOpHash).size > 0;
-
             if (op.undo) {
                 this._activeCascInvsPerOp.add(finalTargetOpHash, opHash);
-            } else { // redo
+            } else {
                 this._activeCascInvsPerOp.delete(finalTargetOpHash, op.getTargetOp().hash());
             }
 
-            if (wasUndone !== op.undo) {
-                if (op.undo) {
-                    //result = this.undo(op.getFinalTargetOp());
-                    result = this.mutate(op.getFinalTargetOp(), false, true);
-                } else { // redo
-                    //result = this.redo(op.getFinalTargetOp());
-                    result = this.mutate(op.getFinalTargetOp(), true, true);
-                }
+            const isValidNow = this.isValidOp(finalTargetOpHash);
+            const isCascade  = op.targetOp instanceof CascadedInvalidateOp;
+
+            if (wasValid !==  isValidNow) {
+                result = this.mutate(finalTargetOp, isValidNow, isCascade);
             }
-            */
         } else {
             result = this.mutate(op, true, false);
         }
