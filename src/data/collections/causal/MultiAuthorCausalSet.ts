@@ -1,9 +1,14 @@
 import { Identity } from 'data/identity';
-import { Authorization, Hash, HashedObject } from 'data/model';
+import { HashedObject } from 'data/model';
 import { Authorizer } from 'data/model';
 import { CausalSet } from './CausalSet';
 
 /**
+ * 
+ * --------- DEPRECATED ---------- DEPRECATED ------- DEPRECATED ----------------
+ * 
+ * THIS WAS DEEMED COMMON ENOUGH TO WARRANT THE CausalSet CLASS TO SUPPORT IT
+ * DIRECTLY.
  * 
  * A CausalSet, equipped with a set of authorized identities that can modify it.
  * 
@@ -24,14 +29,8 @@ class MultiAuthorCausalSet<T> extends CausalSet<T> {
 
     static className = 'hss/v0/MultiAuthorCausalSet';
 
-    authorized?: CausalSet<Identity>;
-
     constructor(authorized?: CausalSet<Identity>, acceptedTypes?: Array<string>, acceptedElements?: Array<any>) {
-        super(acceptedTypes, acceptedElements);
-
-        if (authorized !== undefined) {
-            this.authorized = authorized;
-        }
+        super({mutableWriters: authorized, acceptedTypes: acceptedTypes, acceptedElements: acceptedElements});
     }
 
     getClassName(): string {
@@ -46,37 +45,9 @@ class MultiAuthorCausalSet<T> extends CausalSet<T> {
         return super.delete(elmt, author, extraAuth);
     }
 
-    async validate(references: Map<Hash, HashedObject>) {
-
-        references;
-
-        if (this.authorized === undefined || !(this.authorized instanceof CausalSet)) {
-            return false;
-        }
-
-        return true;
-
-    }
-
     getAuthorizedIdentitiesSet() {
-        return this.authorized as CausalSet<Identity>;
+        return this.mutableWriters as CausalSet<Identity>;
     }
-
-    protected createAddAuthorizer(elmt: T, author: Identity): Authorizer {
-
-        return Authorization.chain(super.createAddAuthorizer(elmt, author), this.createAuthorizerUsingMembership(author));
-    }
-
-    protected createDeleteAuthorizerByHash(elmtHash: Hash, author: Identity): Authorizer {
-
-        return Authorization.chain(super.createDeleteAuthorizerByHash(elmtHash, author), this.createAuthorizerUsingMembership(author));
-    }
-
-    protected createAuthorizerUsingMembership(author: Identity) {
-
-        return this.getAuthorizedIdentitiesSet().createMembershipAuthorizer(author);
-    }
-
 }
 
 HashedObject.registerClass(MultiAuthorCausalSet.className, MultiAuthorCausalSet);

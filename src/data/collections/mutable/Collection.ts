@@ -6,7 +6,12 @@ import { Hash} from '../../model/hashing'
 
 type CollectionConfig = {writer?: Identity, writers?: IterableIterator<Identity>};
 
-abstract class Collection extends MutableObject {
+interface Collection<T> {
+    has(element: T): boolean;
+    hasByHash(hash: Hash): boolean;
+}
+
+abstract class BaseCollection extends MutableObject {
     writers?: HashedSet<Identity>;  //if writers is missing, anybody can write
 
     constructor(acceptedOpClasses : Array<string>, config?: MutableObjectConfig & CollectionConfig) {
@@ -27,8 +32,6 @@ abstract class Collection extends MutableObject {
         if (this.writers.size() === 0) {
             this.writers = undefined;
         }
-
-        this.setRandomId();
     }
 
     async validate(references: Map<Hash, HashedObject>) {
@@ -62,7 +65,7 @@ abstract class Collection extends MutableObject {
        if (this.writers === undefined)  {
            return undefined;
        } else if (this.writers.size() > 1) {
-           throw new Error('Called getWriter() on a mutableSet, but it has more than one');
+           throw new Error('Called getWriter() on a collection, but it has more than one writer');
        } else {
            return this.writers.values().next().value;
        }
@@ -83,7 +86,7 @@ abstract class Collection extends MutableObject {
 
 abstract class CollectionOp extends MutationOp {
 
-    constructor(targetObject?: Collection) {
+    constructor(targetObject?: BaseCollection) {
         super(targetObject);
 
         if (targetObject !== undefined) {
@@ -103,7 +106,7 @@ abstract class CollectionOp extends MutationOp {
             return false;
         }
 
-        const targetObject = this.getTargetObject() as Collection;
+        const targetObject = this.getTargetObject() as BaseCollection;
         const auth = this.getAuthor();
 
         if (targetObject.writers !== undefined && (auth === undefined || !targetObject.writers.has(auth))) {
@@ -115,5 +118,5 @@ abstract class CollectionOp extends MutationOp {
     
 }
 
-export { Collection, CollectionOp };
+export { Collection, BaseCollection, CollectionOp };
 export type { CollectionConfig };

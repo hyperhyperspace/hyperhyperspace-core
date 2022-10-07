@@ -7,9 +7,9 @@ import { Hash } from '../../model/hashing';
 import { ClassRegistry } from '../../model';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
-import { Collection, CollectionConfig, CollectionOp } from './Collection';
+import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
 
-class MutableReference<T> extends Collection {
+class MutableReference<T> extends BaseCollection {
 
     static className = 'hhs/v0/MutableReference';
 
@@ -21,6 +21,8 @@ class MutableReference<T> extends Collection {
 
     constructor(config?: CollectionConfig) {
         super([RefUpdateOp.className], config);
+
+        this.setRandomId();
     }
 
     getValue() : T | undefined {

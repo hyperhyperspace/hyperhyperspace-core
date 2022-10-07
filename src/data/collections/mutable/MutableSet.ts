@@ -8,7 +8,7 @@ import { Types } from '../Types';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { ClassRegistry } from 'data/model';
-import { Collection, CollectionConfig, CollectionOp } from './Collection';
+import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
 
 type ElmtHash = Hash;
 
@@ -171,7 +171,7 @@ class DeleteOp<T> extends CollectionOp {
     
 }
 
-class MutableSet<T> extends Collection {
+class MutableSet<T> extends BaseCollection {
 
     static className = 'hss/v0/MutableSet';
     static opClasses = [AddOp.className, DeleteOp.className];
@@ -191,6 +191,8 @@ class MutableSet<T> extends Collection {
 
     constructor(config?: CollectionConfig) {
         super(MutableSet.opClasses, config);
+
+        this.setRandomId();
 
         this._logger = MutableSet.logger;
 

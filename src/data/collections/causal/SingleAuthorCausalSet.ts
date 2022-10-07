@@ -3,13 +3,22 @@ import { CausalSet } from './CausalSet';
 import { Hash, HashedObject } from '../../model';
 import { Authorization, Authorizer } from '../../model/causal/Authorization';
 
+/*
+ * --------- DEPRECATED ---------- DEPRECATED ------- DEPRECATED ----------------
+ * 
+ * THIS WAS DEEMED COMMON ENOUGH TO WARRANT THE CausalSet CLASS TO SUPPORT IT
+ * DIRECTLY.
+ *
+ */ 
 
 class SingleAuthorCausalSet<T> extends CausalSet<T> {
 
     static className = 'hss/v0/SingleAuthorCausalSet';
 
     constructor(author?: Identity, acceptedTypes?: Array<string>, acceptedElements?: Array<any>) {
-        super(acceptedTypes, acceptedElements);
+        super({writer: author, acceptedTypes: acceptedTypes, acceptedElements: acceptedElements});
+
+        
 
         if (author !== undefined) {
             this.setAuthor(author);
@@ -65,7 +74,6 @@ class SingleAuthorCausalSet<T> extends CausalSet<T> {
         } else {
             return Authorization.never;
         }
-
     }
 
     getClassName() {

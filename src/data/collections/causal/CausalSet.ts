@@ -1,6 +1,6 @@
 import { Identity } from '../../identity';
 import { Hash, HashedObject } from '../../model';
-import { MutableObject, MutationOp, InvalidateAfterOp } from '../../model';
+import { MutationOp, InvalidateAfterOp } from '../../model';
 import { Authorizer } from '../../model/causal/Authorization'
 
 import { MultiMap } from 'util/multimap';
@@ -8,14 +8,19 @@ import { Authorization, Verification } from '../../model/causal/Authorization';
 import { HashedSet } from '../../model/immutable/HashedSet';
 import { MutableSetEvents } from '../../collections/mutable/MutableSet';
 import { MutableContentEvents } from '../../model/mutable/MutableObject';
+import { BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
+import { ClassRegistry } from 'data/model/literals';
 
 /*
- * CausalSet: A set with an explicit membership op that can be used by other objects as
- *            a causal dependency to prove that when something happened, this set contained
+ * CausalSet: A set with an explicit membership attestation op that can be used by other objects
+ *            as a causal dependency to prove that when something happened, this set contained
  *            a given element. When an element is deleted, an 'InvalidateAfterOp' is
- *            generated, causing any membership ops that were generated concurrently to be
- *            undone automatically, as well as any ops that have them as causal dependencies,
+ *            generated, causing any membership attestation ops that were generated concurrently 
+ *            to be undone automatically, as well as any ops that have them as causal dependencies,
  *            by the cascading undo/redo mechanism.
+ * 
+ *            
+ * 
  */
 
 class AddOp<T> extends MutationOp {
@@ -167,9 +172,9 @@ class MembershipAttestationOp<T> extends MutationOp {
     }
 }
 
-abstract class CausalSet<T> extends MutableObject {
+class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T> {
 
-    
+    static className = 'hhs/v0/CausalSet';
     static opClasses = [AddOp.className, DeleteOp.className, MembershipAttestationOp.className];
 
     acceptedTypes?: HashedSet<string>;
@@ -188,21 +193,10 @@ abstract class CausalSet<T> extends MutableObject {
     _allElements: Map<Hash, T>;
 
 
-    constructor(acceptedTypes?: Array<string>, acceptedElements?: Array<any>) {
-        super(CausalSet.opClasses, {supportsUndo: true});
+    constructor(config: CausalCollectionConfig = {}) {
+        super(CausalSet.opClasses, {...config, supportsUndo: true});
 
         this.setRandomId();
-
-        if (acceptedTypes !== undefined) {
-            this.acceptedTypes = new HashedSet<string>(acceptedTypes.values());
-        }
-
-        if (acceptedElements !== undefined) {
-            this.acceptedElementHashes = new HashedSet<Hash>();
-            for (const acceptedElement of acceptedElements.values()) {
-                this.acceptedElementHashes.add(HashedObject.hashElement(acceptedElement));
-            }
-        }
         
         this._allElements = new Map();
 
@@ -216,19 +210,29 @@ abstract class CausalSet<T> extends MutableObject {
         
     }
 
-    protected async add(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+    getClassName() {
+        return CausalSet.className;
+    }
+
+    async add(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
 
         if (!(elmt instanceof HashedObject) && !HashedObject.isLiteral(elmt)) {
             throw new Error('CausalSets can contain either a class deriving from HashedObject or a pure literal (a constant, without any HashedObjects within).');
+        }
+
+        if (!this.shouldAcceptElement(elmt)) {
+            throw new Error('CausalSet has type/element contraints that reject the element that is being added:' + elmt)
         }
         
         const addOp = new AddOp(this, elmt);
 
         if (author !== undefined) {
             addOp.setAuthor(author);
+        } else {
+            CausalCollectionOp.setSingleAuthorIfNecessary(addOp);
         }
 
-        const auth = Authorization.chain(this.createAddAuthorizer(elmt, author), extraAuth);
+        const auth = Authorization.chain(this.createAddAuthorizer(elmt, addOp.getAuthor()), extraAuth);
 
         this.setCurrentPrevOps(addOp);
 
@@ -240,7 +244,7 @@ abstract class CausalSet<T> extends MutableObject {
 
     }
 
-    protected async delete(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+    async delete(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
 
         const hash = HashedObject.hashElement(elmt);
         
@@ -248,30 +252,25 @@ abstract class CausalSet<T> extends MutableObject {
 
     }
 
-    protected async deleteByHash(hash: Hash, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
-        
-        const auth = Authorization.chain(this.createDeleteAuthorizerByHash(hash, author), extraAuth);
-
-        return this.deleteByHashWithAuth(hash, auth, author, extraAuth);
-    }
-
-    private async deleteByHashWithAuth(hash: Hash, ourAuth: Authorizer, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+    async deleteByHash(hash: Hash, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
 
         const deleteOps: Array<DeleteOp<T>> = [];
         
-
         for (const addOpHash of this._currentAddOpsPerElmt.get(hash)) {
             const addOp = this._currentAddOps.get(addOpHash) as AddOp<T>;
             const deleteOp = new DeleteOp(addOp);
             if (author !== undefined) {
                 deleteOp.setAuthor(author);
+            } else {
+                CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
             }
 
-            const auth = Authorization.chain(ourAuth, extraAuth);
+            const auth = Authorization.chain(this.createDeleteAuthorizerByHash(hash, deleteOp.getAuthor()), extraAuth);
 
             this.setCurrentPrevOps(deleteOp);
 
             if (!(await auth.attempt(deleteOp))) {
+                console.log('CANNOT AUTH')
                 return false;
             }
             
@@ -287,11 +286,11 @@ abstract class CausalSet<T> extends MutableObject {
         return Promise.all(deletions).then(() => deletions.length > 0);
     }
 
-    protected has(elmt: T): boolean {
+    has(elmt: T): boolean {
         return this.hasByHash(HashedObject.hashElement(elmt));
     }
 
-    protected hasByHash(hash: Hash): boolean {
+    hasByHash(hash: Hash): boolean {
         return this._currentAddOpsPerElmt.get(hash).size > 0;
     }
 
@@ -303,14 +302,14 @@ abstract class CausalSet<T> extends MutableObject {
         return 'CausalSet/attest:' + hash + '-belongs-to-' + this.hash();
     }
 
-    protected async attestMembershipForOp(elmt: T, op: MutationOp): Promise<boolean> {
+    async attestMembershipForOp(elmt: T, op: MutationOp): Promise<boolean> {
 
         const hash = HashedObject.hashElement(elmt);
 
         return this.attestMembershipForOpByHash(hash, op);
     }
 
-    protected async attestMembershipForOpByHash(hash: Hash, op: MutationOp): Promise<boolean> {
+    async attestMembershipForOpByHash(hash: Hash, op: MutationOp): Promise<boolean> {
 
         const addOpHashes = this._currentAddOpsPerElmt.get(hash);
 
@@ -331,7 +330,7 @@ abstract class CausalSet<T> extends MutableObject {
 
     }
 
-    protected verifyMembershipAttestationForOp(elmt: T, op: MutationOp, usedKeys: Set<string>): boolean {
+    verifyMembershipAttestationForOp(elmt: T, op: MutationOp, usedKeys: Set<string>): boolean {
 
         return this.checkMembershipAttestationByHashForOp(HashedObject.hashElement(elmt), op, usedKeys);
     }
@@ -406,6 +405,15 @@ abstract class CausalSet<T> extends MutableObject {
 
     async mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean> {
 
+        if (valid && cascade) {
+            //console.log('***** REDO REDO REDO REDO REDO *****');
+            //console.log(op.getClassName() + ' for ' + op.getTargetObject().hash());
+
+            if (op instanceof AddOp) {
+                //console.log('reinstating ' + op.element);
+            }
+        }
+
         let mutated = false;
 
         if (op instanceof AddOp || op instanceof DeleteOp) {
@@ -439,7 +447,6 @@ abstract class CausalSet<T> extends MutableObject {
                 elementHash = HashedObject.hashElement(addOp.getElement());
 
                 if (valid) {
-                    
                     this._validDeleteOpsPerAddOp.add(addOpHash, deleteOpHash);
                 } else {
                     this._validDeleteOpsPerAddOp.delete(addOpHash, deleteOpHash); 
@@ -449,21 +456,21 @@ abstract class CausalSet<T> extends MutableObject {
                 throw new Error("This should be impossible")
             }
 
-            
-
-            const wasInBefore = this._currentAddOpsPerElmt.get(elementHash);
+            const wasInBefore = this._currentAddOpsPerElmt.get(elementHash).size > 0;
 
             if ( this._validAddOpsPerElmt.has(elementHash, addOpHash) && 
-                this._validDeleteOpsPerAddOp.get(addOpHash).size === 0 ) {
-        
+                 this._validDeleteOpsPerAddOp.get(addOpHash).size === 0 ) {
+                
+                //console.log('ADDED ' + addOp.getElement())
                 this._currentAddOps.set(addOpHash, addOp);
                 this._currentAddOpsPerElmt.add(elementHash, addOpHash);
             } else {
+                //console.log('DELETED ' + addOp.getElement())
                 this._currentAddOps.delete(addOpHash);
                 this._currentAddOpsPerElmt.delete(elementHash, addOpHash);
             }
 
-            const isInNow = this._currentAddOpsPerElmt.get(elementHash);
+            const isInNow = this._currentAddOpsPerElmt.get(elementHash).size > 0;
 
             mutated = wasInBefore !== isInNow;
 
@@ -483,6 +490,7 @@ abstract class CausalSet<T> extends MutableObject {
             }
 
         }
+
         return mutated;
     }
 
@@ -519,19 +527,21 @@ abstract class CausalSet<T> extends MutableObject {
         return found;
     }
 
-    protected createAddAuthorizer(_elmt: T, _author?: Identity): Authorizer {
-        return Authorization.always;
-    }
+    protected createAddAuthorizer(elmt: T, author?: Identity): Authorizer {
 
-    // It's important to keep the two delete authorizer functions independent (by hash / by element)
-    // so subclasses may redefine their behaviour separately.
+        if (!this.shouldAcceptElement(elmt)) {
+            return Authorization.never;
+        } else {
+            return this.createWriteAuthorizer(author);
+        }
+    }
 
     protected createDeleteAuthorizer(elmt: T, author?: Identity): Authorizer {
         return this.createDeleteAuthorizerByHash(HashedObject.hashElement(elmt), author);
     }
 
-    protected createDeleteAuthorizerByHash(_elmtHash: Hash, _author?: Identity): Authorizer {
-        return Authorization.always;
+    protected createDeleteAuthorizerByHash(_elmtHash: Hash, author?: Identity): Authorizer {
+        return this.createWriteAuthorizer(author);
     }
 
     createMembershipAuthorizer(elmt: T): Authorizer {
@@ -545,17 +555,7 @@ abstract class CausalSet<T> extends MutableObject {
 
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
 
-        references;
-
-        if (this.acceptedElementHashes !== undefined && this.acceptedElementHashes.size() === 0) {
-            return false;
-        }
-
-        if (this.acceptedTypes !== undefined && this.acceptedTypes.size() === 0) {
-            return false;
-        }
-
-        return true;
+        return super.validate(references);
     }
 
     checkAcceptedTypes(acceptedTypes: Array<string>): boolean {
@@ -579,9 +579,10 @@ abstract class CausalSet<T> extends MutableObject {
     }
 }
 
-HashedObject.registerClass(AddOp.className, AddOp);
-HashedObject.registerClass(DeleteOp.className, DeleteOp);
-HashedObject.registerClass(MembershipAttestationOp.className, MembershipAttestationOp);
+ClassRegistry.register(AddOp.className, AddOp);
+ClassRegistry.register(DeleteOp.className, DeleteOp);
+ClassRegistry.register(MembershipAttestationOp.className, MembershipAttestationOp);
+ClassRegistry.register(CausalSet.className, CausalSet);
 
 export { CausalSet, AddOp as CausalSetAddOp, DeleteOp as CausalSetDeleteOp, MembershipAttestationOp as CausalSetMembershipAttestationOp };
 

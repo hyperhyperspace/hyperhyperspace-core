@@ -359,26 +359,18 @@ class Store {
             
             if (object instanceof InvalidateAfterOp || object instanceof CascadedInvalidateOp) {
 
-                //console.log('looking for invalidations targets for ' + object.hash() + ' of type ' + object.getClassName());
-                //console.log('targeting:')
-                //console.log(object.getTargetOp());
-
                 const consequences = await this.loadAllConsequences(object.getTargetOp().hash());
-
-                //console.log('found consequences of target: ')
-                //console.log(consequences);
                 
                 if (object instanceof InvalidateAfterOp) {
 
                     const validConsequences = await this.loadPrevOpsClosure(object.getTerminalOps());
 
-                    //console.log('valid consequences are:')
-                    //console.log(validConsequences);
-
                     for (const conseqOp of consequences.values()) {
                         if (!validConsequences.has(conseqOp.getLastHash())) {
-                            //console.log('found invalid consequence:')
-                            //console.log(conseqOp);
+                            //console.log('invalidating a ' + conseqOp.getClassName() + ' because of a ' + object.getClassName());
+                            if (conseqOp instanceof CascadedInvalidateOp) {
+                                //console.log('final target is a ' + conseqOp.getFinalTargetOp().getClassName());
+                            }
                             const casc = CascadedInvalidateOp.create(conseqOp, object);
                             casc.toContext(context);
                             await this.saveWithContext(casc.getLastHash(), context, saved);
@@ -387,7 +379,10 @@ class Store {
                 
                 } else if (object instanceof CascadedInvalidateOp) {
     
+                    
                     for (const conseqOp of consequences.values()) {
+                        //console.log('cascading an invalidation of a ' + object.getFinalTargetOp().getClassName());
+                        //console.log('found a dep: ' + conseqOp.getClassName());    
                         const casc = CascadedInvalidateOp.create(conseqOp, object);
                         casc.toContext(context);
                         await this.saveWithContext(casc.getLastHash(), context, saved);
@@ -477,7 +472,7 @@ class Store {
         return this.load(hash, true, true);
     }
 
-    async load(hash: Hash, loadMutations=true, watchForChanges=false) : Promise<HashedObject | undefined> {
+    async load<T=HashedObject>(hash: Hash, loadMutations=true, watchForChanges=false) : Promise<T | undefined> {
 
         await this.initKeyPairs;
 
@@ -493,14 +488,16 @@ class Store {
 
         if (loadMutations && object !== undefined) {
 
-            if (watchForChanges) {
-                object.watchForChanges();
+            for (const subobj of context.objects.values()) {
+                if (watchForChanges) {
+                    subobj.watchForChanges();
+                }
+    
+                await subobj.loadAllChanges();
             }
-
-            await object.loadAllChanges();
         }
 
-        return object;
+        return object as (T|undefined);
     }
 
     private async loadWithContext(hash: Hash, context: Context) : Promise<HashedObject | undefined> {

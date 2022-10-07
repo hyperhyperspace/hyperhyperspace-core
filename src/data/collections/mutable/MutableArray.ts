@@ -12,7 +12,7 @@ import { location } from 'util/events';
 import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
-import { Collection, CollectionConfig, CollectionOp } from './Collection';
+import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Collection';
 
 // a simple mutable list with a single writer
 
@@ -174,7 +174,7 @@ class DeleteOp<T> extends CollectionOp {
 
 type MutableArrayConfig = { duplicates: boolean }
 
-class MutableArray<T> extends Collection {
+class MutableArray<T> extends BaseCollection implements Collection<T> {
 
     static className = 'hhs/v0/MutableArray';
     static opClasses = [InsertOp.className, DeleteOp.className];
@@ -199,6 +199,8 @@ class MutableArray<T> extends Collection {
 
     constructor(config: MutableArrayConfig & CollectionConfig = {duplicates: true}) {
         super(MutableArray.opClasses, config);
+
+        this.setRandomId();
 
         this.duplicates = config.duplicates;
 
@@ -345,12 +347,12 @@ class MutableArray<T> extends Collection {
         return Array.from(this._hashes);
     }
 
-    lookup(idx: number) {
+    lookup(idx: number): T {
         this.rebuild();
         return this._contents[idx];
     }
 
-    lookupHash(idx: number) {
+    lookupHash(idx: number): Hash {
         this.rebuild();
         return this._hashes[idx];
     }
@@ -393,6 +395,14 @@ class MutableArray<T> extends Collection {
         if (deleteOp !== undefined) {
             await this.applyNewOp(deleteOp);
         }
+    }
+
+    has(element: T): boolean {
+        return this.indexOf(element) >= 0;
+    }
+
+    hasByHash(hash: Hash): boolean {
+        return this.indexOfByHash(hash) >= 0;
     }
 
     async mutate(op: MutationOp): Promise<boolean> {
