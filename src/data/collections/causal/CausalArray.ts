@@ -435,7 +435,7 @@ class MutableArray<T> extends MutableObject {
         }
     }
 
-    async mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean> {
+    async mutate(op: MutationOp, valid: boolean, _cascade: boolean): Promise<boolean> {
 
         const opHash = op.getLastHash();
 
