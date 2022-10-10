@@ -256,6 +256,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         for (const addOpHash of this._currentAddOpsPerElmt.get(hash)) {
             const addOp = this._currentAddOps.get(addOpHash) as AddOp<T>;
             const deleteOp = new DeleteOp(addOp);
+            
             if (author !== undefined) {
                 deleteOp.setAuthor(author);
             } else {

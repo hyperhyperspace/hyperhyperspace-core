@@ -304,7 +304,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             if (this.duplicates) {
                 await this.delete(hash, this._ordinals[idx], author, extraAuth);
             } else {
-                await this.delete(hash, undefined, authr, extraAuth);
+                await this.delete(hash, undefined, author, extraAuth);
             }
 
             idx = idx + 1;
