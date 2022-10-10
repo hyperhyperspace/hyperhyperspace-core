@@ -568,6 +568,14 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
     checkAcceptedElementsIsMissing(): boolean {
         return this.acceptedElementHashes === undefined;
     }
+
+    values() {
+        return this.getMutableContents().values();
+    }
+    
+    size() {
+        return this.getMutableContents().size;
+    }
 }
 
 ClassRegistry.register(AddOp.className, AddOp);

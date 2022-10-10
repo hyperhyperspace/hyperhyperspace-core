@@ -697,6 +697,14 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
     protected createDeleteAuthorizerByHash(_elmtHash: Hash, author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
+
+    values() {
+        return this.getMutableContents().values();
+    }
+    
+    size() {
+        return this.getMutableContents().size;
+    }
 }
 
 ClassRegistry.register(InsertOp.className, InsertOp);
