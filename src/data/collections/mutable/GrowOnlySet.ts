@@ -1,16 +1,16 @@
 import { MultiMap } from 'util/multimap';
 
 import { Identity } from '../../identity';
-import { Hash, HashedObject, MutableObject, MutationOp, HashedSet, MutableContentEvents, ClassRegistry } from '../../model';
-import { Types } from '../../collections';
+import { Hash, HashedObject, MutationOp, MutableContentEvents, ClassRegistry } from '../../model';
+import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
 
 type ElmtHash = Hash;
 
 enum GrowOnlySetEvents {
-    Add    = 'add'
+    Add = 'add'
 }
 
-class AddOp<T> extends MutationOp {
+class AddOp<T> extends CollectionOp<T> {
 
     static className = 'hhs/v0/GrowOnlySet/AddOp';
 
@@ -48,12 +48,6 @@ class AddOp<T> extends MutationOp {
             return false;
         }
 
-        const constraints = (this.getTargetObject() as GrowOnlySet<T>).typeConstraints;
-
-        if (!Types.satisfies(this.element, constraints)) {
-            return false;
-        }
-
         if (!(this.element instanceof HashedObject || HashedObject.isLiteral(this.element))) {
             return false;
         }
@@ -63,19 +57,15 @@ class AddOp<T> extends MutationOp {
     
 }
 
-class GrowOnlySet<T> extends MutableObject {
+class GrowOnlySet<T> extends BaseCollection<T> {
 
     static className = 'hhs/v0/GrowOnlySet';
 
-    writers?: HashedSet<Identity>;
-    typeConstraints?: Array<string>;
-
     _elements: Map<ElmtHash, T>;
 
-    constructor(config={writers: undefined as (HashedSet<Identity> | undefined)}) {
-        super([AddOp.className]);
+    constructor(config?: CollectionConfig) {
+        super([AddOp.className], config);
 
-        this.writers = config?.writers;
         this.setRandomId();
 
         this._elements = new Map();
@@ -145,37 +135,7 @@ class GrowOnlySet<T> extends MutableObject {
     }
 
     async validate(references: Map<string, HashedObject>) {
-        references;
-
-        if (!Types.isTypeConstraint(this.typeConstraints)) {
-            return false;
-        }
-
-        if (this.writers !== undefined && !(this.writers instanceof HashedSet)) {
-            return false;
-        }
-
-        if (this.writers !== undefined) {
-            for (const id of this.writers.values()) {
-                if (!(id instanceof Identity)) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    setWriters(writers?: HashedSet<Identity>) {
-        this.writers = writers;
-    }
-
-    getWriters() {
-        return this.writers;
-    }
-
-    hasWriters() {
-        return this.writers !== undefined;
+        return super.validate(references);
     }
 
     getMutableContents(): MultiMap<string, HashedObject> {
@@ -200,6 +160,19 @@ class GrowOnlySet<T> extends MutableObject {
         }
 
         return found;
+    }
+
+    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
+
+        if (!super.shouldAcceptMutationOp(op, opReferences)) {
+            return false;
+        }
+
+        if (op instanceof AddOp && !this.shouldAcceptElement(op.element as T)) {
+            return false;
+        }
+
+        return true;
     }
 
     getClassName(): string {

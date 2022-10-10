@@ -2,18 +2,15 @@ import { MutableContentEvents, MutableObject } from '../../model/mutable/Mutable
 import { MutationOp } from '../../model/mutable/MutationOp';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
-import { Types } from '../Types';
 import { Hash } from '../../model/hashing';
 import { ClassRegistry } from '../../model';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
 import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
 
-class MutableReference<T> extends BaseCollection {
+class MutableReference<T> extends BaseCollection<T> {
 
     static className = 'hhs/v0/MutableReference';
-
-    typeConstraints?: Array<string>;
 
     _sequence?: number;
     _timestamp?: string;
@@ -111,7 +108,16 @@ class MutableReference<T> extends BaseCollection {
             return false;
         }
 
-        if (!(Types.isTypeConstraint(this.typeConstraints))) {
+        return true;
+    }
+
+    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
+
+        if (!super.shouldAcceptMutationOp(op, opReferences)) {
+            return false;
+        }
+
+        if (op instanceof RefUpdateOp && !this.shouldAcceptElement(op.value as T)) {
             return false;
         }
 
@@ -119,7 +125,7 @@ class MutableReference<T> extends BaseCollection {
     }
 }
 
-class RefUpdateOp<T> extends CollectionOp {
+class RefUpdateOp<T> extends CollectionOp<T> {
 
     static className = 'hhs/v0/RefUpdateOp';
 
@@ -185,13 +191,6 @@ class RefUpdateOp<T> extends CollectionOp {
 
         if (this.value === undefined) {
             MutableObject.validationLog.debug('The field value is mandatory in class REfUpdateop');
-            return false;
-        }
-
-        let constraints = (this.targetObject as MutableReference<T>).typeConstraints;
-
-        if (!Types.satisfies(this.value, constraints)) {
-            MutableObject.validationLog.debug('RefUpdateOp contains a value with an unexpected type.');
             return false;
         }
 

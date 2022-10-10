@@ -1,8 +1,8 @@
-import { HashedObject, HashedSet } from '../../model/immutable';
-import { MutableObject, MutableObjectConfig, MutationOp } from '../../model/mutable';
+import { MutableObjectConfig, MutationOp } from '../../model/mutable';
 import { Identity } from '../../identity';
 import { Hash} from '../../model/hashing'
 import { Authorization, Authorizer } from 'data/model';
+import { BaseCollection, CollectionConfig } from '../mutable/Collection';
 
 interface CausalCollection<T> {
     has(elmt: T): boolean;
@@ -16,75 +16,31 @@ interface CausalCollection<T> {
     createMembershipAuthorizer(elmt: T): Authorizer;
 }
 
-type CausalCollectionConfig = {
-    writer?: Identity, // just for convenience, "writer: A" is equiv. to "writers: [A]"
-    writers?: IterableIterator<Identity>,
-    mutableWriters?: CausalCollection<Identity>,
-    acceptedTypes?: Array<string>,
-    acceptedElements?: Array<any>
+type CausalCollectionConfig = CollectionConfig & {
+    mutableWriters?: CausalCollection<Identity>
 };
 
-abstract class BaseCausalCollection<T> extends MutableObject {
+// Note: the validation of writing rights in BaseCollection is delegated to the validate
+//       function of the class CollectionOp. In the causal case, we don't use a base class
+//       for ops (they may be derived either from MutationOp or InvalidateAfterOp, so a 
+//       single base class would be unfeasible anyway). Instead, the createWriteAuthorizer()
+//       method creates an Authorizer that takes the causal colleciton's write configuration
+//       and checks whether it is honored by an op.
+
+abstract class BaseCausalCollection<T> extends BaseCollection<T> {
     
-    // The collection has both an immutable set and a mutable causal collection of authorized writers:
-    writers?        : HashedSet<Identity>;
+    // Adds a mutable causal collection of authorized writers to what we had in BaseCollection:
     mutableWriters? : CausalCollection<Identity>;
 
-    // For someone to have write access they must either be in the immutable set, or attest that they 
-    // belong to the causal collection of writers. If both are missing, then the writing permissions
-    // have no effect, and anyone can write.
-
-    acceptedTypes?: HashedSet<string>;
-    acceptedElementHashes?: HashedSet<Hash>;
+    // For someone to have write access they must either be in BaseCollection's immutable writers 
+    // set, or attest that they belong to the causal collection of writers. If both are missing, 
+    // then the writing permissions have no effect, and anyone can write.
 
     constructor(acceptedOpClasses : Array<string>, config?: MutableObjectConfig & CausalCollectionConfig) {
         super(acceptedOpClasses, config);
 
-        if (config?.writers !== undefined) {
-            this.writers = new HashedSet<Identity>(config.writers);
-
-            for (const writer of this.writers.values()) {
-                if (!(writer instanceof Identity)) {
-                    throw new Error('Causal collection: the config param "writers" contains an element that is not an instanfce of the Identity class');
-                }
-            }
-        }
-
-        if (config?.writer !== undefined) {
-            if (config.writer instanceof Identity) {
-                if (this.writers === undefined) {
-                    this.writers = new HashedSet<Identity>([config.writer].values());
-                } else {
-                    this.writers.add(config?.writer);
-                }
-            } else {
-                throw new Error('Causal collection: the config param "writer" must be an instance of the Identity class');
-            }
-        }
-
-        if (this.writers !== undefined && this.writers.size() === 0) {
-            this.writers = undefined;
-        }
-
         if (config?.mutableWriters !== undefined) {
             this.mutableWriters = config?.mutableWriters;
-        }
-
-        if (config?.acceptedTypes !== undefined) {
-            this.acceptedTypes = new HashedSet<string>(config.acceptedTypes.values());
-
-            for (const acceptedType of this.acceptedTypes.values()) {
-                if (typeof(acceptedType) !== 'string') {
-                    throw new Error('Accepted types in a CausalCollection should be strings (either class names, or primitive type names)');
-                }
-            }
-        }
-
-        if (config?.acceptedElements !== undefined) {
-            this.acceptedElementHashes = new HashedSet<Hash>();
-            for (const acceptedElement of config.acceptedElements.values()) {
-                this.acceptedElementHashes.add(HashedObject.hashElement(acceptedElement));
-            }
         }
     }
 
@@ -92,62 +48,7 @@ abstract class BaseCausalCollection<T> extends MutableObject {
     //       we cannot check its integrity here. The app should check that it is
     //       the right collection if it is present anyway.
 
-    async validate(references: Map<Hash, HashedObject>) {
-        references;
-
-        if (this.writers !== undefined) {
-            if (!(this.writers instanceof HashedSet)) {
-                return false;
-            }
-
-            if (this.writers.size() === 0) {
-                return false;
-            }
-
-            for (const writer of this.writers.values()) {
-                if (!(writer instanceof Identity)) {
-                    return false;
-                }
-            }
-        }
-
-        if (this.acceptedElementHashes !== undefined && this.acceptedElementHashes.size() === 0) {
-            return false;
-        }
-
-        if (this.acceptedTypes !== undefined && this.acceptedTypes.size() === 0) {
-            return false;
-        }
-
-        return true;
-    }
-
-    hasSingleWriter() {
-        return this.writers !== undefined && this.writers.size() === 1 && this.mutableWriters === undefined;
-    }
-
-    // throws if there isn't exactly one writer
-    getSingleWriter() {
-       if (this.writers === undefined)  {
-           return undefined;
-       } else if (this.writers.size() > 1 || this.mutableWriters !== undefined) {
-           throw new Error('Called getWriter() on a collection, but it has more than one writer');
-       } else {
-           return this.writers.values().next().value;
-       }
-    }
-
-    getWriters() {
-        return this.writers;
-    }
-
-    hasWriters() {
-        return this.writers !== undefined;
-    }
-
-    hasWriterSet() {
-        return this.mutableWriters !== undefined;
-    }
+    // (Hence we just rely on Collection's validate function.)
 
     hasMutableWriters() {
         return this.mutableWriters !== undefined;
@@ -173,28 +74,6 @@ abstract class BaseCausalCollection<T> extends MutableObject {
         } else {
             return Authorization.never;
         }
-    }
-
-    protected shouldAcceptElement(element: T) {
-
-        if (this.acceptedElementHashes !== undefined && !this.acceptedElementHashes.has(HashedObject.hashElement(element))) {
-            return false;
-        }
-
-        if (this.acceptedTypes !== undefined && 
-              !(
-                (element instanceof HashedObject && this.acceptedTypes.has(element.getClassName())) 
-                        ||
-                (!(element instanceof HashedObject) && this.acceptedTypes.has(typeof(element)))
-               )
-                
-        ) {
-
-            return false;
-
-        }
-    
-        return true;
     }
 }
 

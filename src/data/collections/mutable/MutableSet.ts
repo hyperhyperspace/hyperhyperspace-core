@@ -4,7 +4,6 @@ import { Hash } from '../../model/hashing/Hashing';
 import { MutationOp } from 'data/model/mutable/MutationOp';
 import { HashedSet } from 'data/model/immutable/HashedSet';
 import { HashReference } from 'data/model/immutable/HashReference';
-import { Types } from '../Types';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { ClassRegistry } from 'data/model';
@@ -19,7 +18,7 @@ enum MutableSetEvents {
     Delete = 'delete'
 }
 
-class AddOp<T> extends CollectionOp {
+class AddOp<T> extends CollectionOp<T> {
 
     static className = 'hhs/v0/MutableSet/AddOp';
 
@@ -54,12 +53,6 @@ class AddOp<T> extends CollectionOp {
             return false;
         }
 
-        const constraints = (this.getTargetObject() as MutableSet<T>).typeConstraints;
-
-        if (!Types.satisfies(this.element, constraints)) {
-            return false;
-        }
-
         if (!(this.element instanceof HashedObject || HashedObject.isLiteral(this.element))) {
             return false;
         }
@@ -68,7 +61,7 @@ class AddOp<T> extends CollectionOp {
     }
 }
 
-class DeleteOp<T> extends CollectionOp {
+class DeleteOp<T> extends CollectionOp<T> {
 
     static className = 'hhs/v0/MutableSet/DeleteOp';
 
@@ -171,15 +164,13 @@ class DeleteOp<T> extends CollectionOp {
     
 }
 
-class MutableSet<T> extends BaseCollection {
+class MutableSet<T> extends BaseCollection<T> {
 
     static className = 'hss/v0/MutableSet';
     static opClasses = [AddOp.className, DeleteOp.className];
     static logger    = new Logger(MutableSet.className, LogLevel.INFO);
 
     _logger: Logger;
-
-    typeConstraints?: Array<string>;
 
     _elements: Map<ElmtHash, T>;
     _currentAddOpRefs: Map<ElmtHash, HashedSet<HashReference<AddOp<T>>>>;
@@ -213,7 +204,16 @@ class MutableSet<T> extends BaseCollection {
             return false;
         }
 
-        if (!(Types.isTypeConstraint(this.typeConstraints))) {
+        return true;
+    }
+
+    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
+
+        if (!super.shouldAcceptMutationOp(op, opReferences)) {
+            return false;
+        }
+
+        if (op instanceof AddOp && !this.shouldAcceptElement(op.element as T)) {
             return false;
         }
 

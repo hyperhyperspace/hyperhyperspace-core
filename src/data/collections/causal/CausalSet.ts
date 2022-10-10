@@ -18,9 +18,6 @@ import { ClassRegistry } from 'data/model/literals';
  *            generated, causing any membership attestation ops that were generated concurrently 
  *            to be undone automatically, as well as any ops that have them as causal dependencies,
  *            by the cascading undo/redo mechanism.
- * 
- *            
- * 
  */
 
 class AddOp<T> extends MutationOp {

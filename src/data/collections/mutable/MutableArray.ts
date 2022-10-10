@@ -1,4 +1,3 @@
-import { Types } from '../../collections';
 import { Hash } from '../../model/hashing';
 import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
@@ -18,7 +17,7 @@ import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Co
 
 // can work with or without duplicates (in the latter case, inserting an element already in the set has no effect)
 
-class InsertOp<T> extends CollectionOp {
+class InsertOp<T> extends CollectionOp<T> {
 
     static className = 'hhs/v0/MutableArray/InsertOp';
 
@@ -59,17 +58,11 @@ class InsertOp<T> extends CollectionOp {
             return false;
         }
 
-        const constraints = (this.getTargetObject() as MutableArray<T>).typeConstraints;
-
-        if (!Types.satisfies(this.element, constraints)) {
-            return false;            
-        }
-
         return true;
     }
 }
 
-class DeleteOp<T> extends CollectionOp {
+class DeleteOp<T> extends CollectionOp<T> {
 
     static className = 'hhs/v0/MutableArray/DeleteOp';
 
@@ -174,15 +167,13 @@ class DeleteOp<T> extends CollectionOp {
 
 type MutableArrayConfig = { duplicates: boolean }
 
-class MutableArray<T> extends BaseCollection implements Collection<T> {
+class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
 
     static className = 'hhs/v0/MutableArray';
     static opClasses = [InsertOp.className, DeleteOp.className];
     static logger    = new Logger(MutableArray.className, LogLevel.INFO);
     
     duplicates: boolean;
-
-    typeConstraints?: Array<string>;
 
     _elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
     _ordinalsPerElement: ArrayMap<Hash, Ordinal>;
@@ -566,15 +557,18 @@ class MutableArray<T> extends BaseCollection implements Collection<T> {
     init(): void {
     }
 
-    async validate(references: Map<string, HashedObject>): Promise<boolean> {
-        
-        if (!(await super.validate(references))) {
+    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
+
+        if (!super.shouldAcceptMutationOp(op, opReferences)) {
             return false;
         }
 
-        return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints); 
-    }
+        if (op instanceof InsertOp && !this.shouldAcceptElement(op.element as T)) {
+            return false;
+        }
 
+        return true;
+    }
 }
 
 ClassRegistry.register(InsertOp.className, InsertOp);

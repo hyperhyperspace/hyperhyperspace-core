@@ -15,7 +15,7 @@ import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
 
-// a simple mutable list with a single writer
+// A mutable list with a 
 
 // can work with or without duplicates (in the latter case, inserting an element already in the set has no effect)
 
