@@ -231,7 +231,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
 
         const auth = Authorization.chain(this.createAddAuthorizer(elmt, addOp.getAuthor()), extraAuth);
 
-        this.setCurrentPrevOps(addOp);
+        this.setCurrentPrevOpsTo(addOp);
 
         if (!(await auth.attempt(addOp))) {
                 return false;
@@ -264,7 +264,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
 
             const auth = Authorization.chain(this.createDeleteAuthorizerByHash(hash, deleteOp.getAuthor()), extraAuth);
 
-            this.setCurrentPrevOps(deleteOp);
+            this.setCurrentPrevOpsTo(deleteOp);
 
             if (!(await auth.attempt(deleteOp))) {
                 console.log('CANNOT AUTH')
@@ -367,18 +367,16 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
 
     shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
 
-        opReferences;
-
         if (!super.shouldAcceptMutationOp(op, opReferences)) {
+            return false;
+        }
+
+        if (op instanceof AddOp && !this.shouldAcceptElement(op.element as T)) {
             return false;
         }
 
         if (op instanceof AddOp || op instanceof DeleteOp) {
             const author = op.getAuthor();
-
-            if (author === undefined) {
-                return false;
-            }
 
             const auth = (op instanceof AddOp) ?
                                             this.createAddAuthorizer(op.getElement(), author)
@@ -524,13 +522,8 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         return found;
     }
 
-    protected createAddAuthorizer(elmt: T, author?: Identity): Authorizer {
-
-        if (!this.shouldAcceptElement(elmt)) {
-            return Authorization.never;
-        } else {
-            return this.createWriteAuthorizer(author);
-        }
+    protected createAddAuthorizer(_elmt: T, author?: Identity): Authorizer {
+        return this.createWriteAuthorizer(author);
     }
 
     protected createDeleteAuthorizer(elmt: T, author?: Identity): Authorizer {

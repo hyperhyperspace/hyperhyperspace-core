@@ -555,6 +555,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
     }
 
     init(): void {
+        
     }
 
     shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {

@@ -493,7 +493,7 @@ abstract class  MutableObject extends HashedObject {
         return this.getStore().load(opHash, false, false) as Promise<MutationOp|undefined>;
     }
 
-    protected setCurrentPrevOps(op: MutationOp): void {
+    protected setCurrentPrevOpsTo(op: MutationOp): void {
 
         op.setPrevOps(this._terminalOps.values());
     }

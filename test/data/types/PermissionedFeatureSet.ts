@@ -27,7 +27,7 @@ class PermissionedFeatureSet extends AbstractFeatureSet {
             enableOp.setAuthor(admin);
             // useCapabilityForOpIfAvailable() will take the nonCausalHash() of enableOp, hence we need it in its
             // final form (with prevOps already set) for generating the useOp:
-            this.setCurrentPrevOps(enableOp);
+            this.setCurrentPrevOpsTo(enableOp);
             const useOp = this.users?.useCapabilityForOpIfAvailable(admin, 'admin', enableOp);
             if (useOp !== undefined) {
                 const applyUseOp = this.getUsers().applyNewOp(useOp);
@@ -47,7 +47,7 @@ class PermissionedFeatureSet extends AbstractFeatureSet {
         for (const validEnableOpHash of this._validEnableOpsPerFeature.get(featureName).values()) {
             const validEnableOp = this._allValidEnableOps.get(validEnableOpHash);
             const disableOp = new DisableFeatureAfterOp(validEnableOp);
-            this.setCurrentPrevOps(disableOp);
+            this.setCurrentPrevOpsTo(disableOp);
             disableOp.setAuthor(admin);
             disableOp.setPrevOps(this._terminalOps.values());
             const useOp = this.getUsers().useCapabilityForOpIfAvailable(admin, 'admin', disableOp);

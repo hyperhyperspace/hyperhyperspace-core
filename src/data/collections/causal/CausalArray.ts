@@ -1,69 +1,35 @@
-import { Types } from '../../collections';
 import { Hash } from '../../model/hashing';
-import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
+import { HashedObject } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
-import { MutableObject } from '../../model';
 
 import { Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
 import { DedupMultiMap } from 'util/dedupmultimap';
 import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
 
+import { Authorizer } from '../../model/causal/Authorization'
+import { Authorization, Verification } from '../../model/causal/Authorization';
+
 import { location } from 'util/events';
 import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
+import { InvalidateAfterOp } from 'data/model/causal';
+import { BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
 import { Identity } from 'data/identity';
 
 // A mutable list with a 
 
 // can work with or without duplicates (in the latter case, inserting an element already in the set has no effect)
 
-abstract class MutableArrayOp<T> extends MutationOp {
+class InsertOp<T> extends MutationOp {
 
-    constructor(targetObject?: MutableArray<T>) {
-        super(targetObject);
-
-        if (targetObject !== undefined) {
-            if (targetObject.writer !== undefined) {
-                this.setAuthor(targetObject.writer);
-            }
-        }
-    }
-
-    init(): void {
-
-    }
-
-    async validate(references: Map<Hash, HashedObject>) {
-
-        if (!await super.validate(references)) {
-            return false;
-        }
-
-        const targetObject = this.getTargetObject();
-
-        if (! (targetObject instanceof MutableArray)) {
-            return false;
-        }
-
-        if (targetObject.writer !== undefined && !(targetObject.writer.equals(this.getAuthor()))) {
-            return false;
-        }
-
-        return true;
-    }
-    
-}
-
-class InsertOp<T> extends MutableArrayOp<T> {
-
-    static className = 'hhs/v0/MutableArray/InsertOp';
+    static className = 'hhs/v0/CausalArray/InsertOp';
 
     element?: T;
     ordinal?: Ordinal;
 
-    constructor(target?: MutableArray<T>, element?: T, ordinal?: Ordinal) {
+    constructor(target?: CausalArray<T>, element?: T, ordinal?: Ordinal) {
         super(target);
 
         this.element = element;
@@ -75,7 +41,7 @@ class InsertOp<T> extends MutableArrayOp<T> {
     }
 
     init(): void {
-        super.init();
+        
     }
     
     async validate(references: Map<Hash, HashedObject>) {
@@ -91,39 +57,16 @@ class InsertOp<T> extends MutableArrayOp<T> {
             return false;
         }
 
-        const constraints = (this.getTargetObject() as MutableArray<T>).typeConstraints;
-
-        if (!Types.satisfies(this.element, constraints)) {
-            return false;            
-        }
-
         return true;
     }
 }
 
-class DeleteOp<T> extends MutableArrayOp<T> {
+class DeleteOp<T> extends InvalidateAfterOp {
 
-    static className = 'hhs/v0/MutableArray/DeleteOp';
+    static className = 'hhs/v0/CausalArray/DeleteOp';
 
-    elementHash?: Hash;
-    deletedOps?: HashedSet<HashReference<InsertOp<T>>>;
-
-    constructor(target?: MutableArray<T>, elementHash?: Hash, insertOps?: IterableIterator<HashReference<InsertOp<T>>>) {
-        super(target);
-
-        this.elementHash = elementHash;
-
-        if (insertOps !== undefined) {
-            this.deletedOps = new HashedSet();
-            
-            for (const insertOp of insertOps) {
-                if (insertOp.className !== InsertOp.className) {
-                    throw new Error('Trying to create a delete op referencing an op that is not an insertion op.');
-                }
-
-                this.deletedOps.add(insertOp);
-            }
-        }
+    constructor(insertOp?: InsertOp<T>) {
+        super(insertOp);
     }
 
     init() {
@@ -131,89 +74,101 @@ class DeleteOp<T> extends MutableArrayOp<T> {
     }
 
     async validate(references: Map<Hash, HashedObject>) {
-
-        if (!await super.validate(references)) {
-            return false;
-        }
-
-        if (this.elementHash === undefined) {
-            
-            MutableArray.logger.warning('The field elementHash of type MutableArray/DeletOp is mandatory.')
-            return false;
-        }
-
-        if (typeof this.elementHash !== 'string') {
-            MutableArray.logger.warning('The field elementHash of type MutableArray/DeleteOp should be a string.')
-            return false;
-        }
-
-        if (this.deletedOps === undefined) {
-            MutableArray.logger.warning('The field deletedOps of type MutableArray/DeleteOp is mandatory');
-            return false;
-        }
-
-        if (!(this.deletedOps instanceof HashedSet)) {
-            MutableArray.logger.warning('The field deletedOps of type MutableArray/DeleteOp should be a HashedSet.');
-            return false;
-        }
-
-        if (this.deletedOps.size() === 0) {
-            MutableArray.logger.warning('The deletedOps set cannot be empty in a MutableArray/DeleteOp.');
-            return false;
-        }
-
-        for (const ref of (this.deletedOps as HashedSet<HashReference<InsertOp<T>>>).values()) {
-            const op = references.get(ref.hash);
-
-            if (op === undefined) {
-                MutableArray.logger.warning('Addition op referenced in MutableArray deletion op is missing from references provided for validation.');
-            }
-
-            if (!(op instanceof InsertOp)) {
-                MutableArray.logger.warning('Addition op referenced in MutableArray deletion op has the wrong type in the references provided for validation.');
-                return false;
-            }
-
-            if (!op.targetObject?.equals(this.targetObject)) {
-                MutableArray.logger.warning('Addition op referenced in MutableArray deletion op points to a different set.');
-                return false;
-            }
-
-            const insertOp = op as InsertOp<T>;
-
-            if (HashedObject.hashElement(insertOp.element) !== this.elementHash) {
-                MutableArray.logger.warning('Insertion op referenced in MutableArray deletion op contains an element whose hash does not match the one being deleted.');
-                return false;
-            }
-        }
-
-
-        return true;
-
+        return await super.validate(references) && this.targetOp !== undefined && this.targetOp instanceof InsertOp;
     }
 
     getClassName(): string {
         return DeleteOp.className;
     }
+
+    getInsertOp() {
+        return this.getTargetOp() as InsertOp<T>;
+    }
     
 }
 
-class MutableArray<T> extends MutableObject {
+class MembershipAttestationOp<T> extends MutationOp {
+    static className = 'hhs/v0/CausalArray/MembershipAttestationOp';
 
-    static className = 'hhs/v0/MutableArray';
+    targetOpNonCausalHash?: Hash;
+
+    constructor(insertOp?: InsertOp<T>, targetOp?: MutationOp) {
+        super(insertOp?.getTargetObject());
+
+        if (insertOp !== undefined) {
+            if (targetOp === undefined) {
+                throw new Error('Attempted to construct a CausalArray MembershipOp, but no targetOp was provided.');
+            }
+
+            this.addCausalOp('insert-op', insertOp);
+
+            this.targetOpNonCausalHash = targetOp.nonCausalHash();
+        }
+    }
+
+    getClassName(): string {
+        return MembershipAttestationOp.className;
+    }
+
+    init(): void {
+        
+    }
+
+    async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
+
+        if (!await super.validate(references)) {
+            return false;
+        }
+
+        if (this.causalOps === undefined) {
+            CausalArray.validationLog.debug('MembershipAttestationOps should have exactly one causalOp, and causalOps is undefined');
+        }
+
+        if (this.getCausalOps().size() !== 1) {
+            CausalArray.validationLog.debug('MembershipAttestationOps should have exactly one causalOp');
+            return false;
+        }
+
+        const insertOp = this.getInsertOp();
+
+        if (insertOp === undefined || !(insertOp instanceof InsertOp)) {
+            CausalArray.validationLog.debug('insertOp is missing from MembershipAttestationOp ' + this.hash())
+            return false;
+        }
+
+        if (!insertOp.getTargetObject().equals(this.getTargetObject())) {
+            CausalArray.validationLog.debug('insertOp for MembershipAttestationOp ' + this.hash() + ' has a different target')
+            return false;
+        }
+
+        if (this.targetOpNonCausalHash === undefined) {
+            CausalArray.validationLog.debug('insertOpNonCausalHash is missing for MembershipAttestationOp ' + this.hash());
+            return false;
+        }
+
+        return true;
+    }
+    
+    getInsertOp() {
+        return this.getCausalOps().get('insert-op') as InsertOp<T>;
+    }
+}
+
+type MutableArrayConfig = { duplicates: boolean }
+
+class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection<T> {
+
+    static className = 'hhs/v0/CausalArray';
     static opClasses = [InsertOp.className, DeleteOp.className];
-    static logger    = new Logger(MutableArray.className, LogLevel.INFO);
+    static logger    = new Logger(CausalArray.className, LogLevel.INFO);
     
     duplicates: boolean;
-
-    writer?: Identity;
-    typeConstraints?: Array<string>;
 
     _elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
     _ordinalsPerElement: ArrayMap<Hash, Ordinal>;
     _elements: Map<Hash, T>;
 
-    _currentInsertOpRefs : DedupMultiMap<Hash, HashReference<InsertOp<T>>>;
+    _currentInsertOps    : DedupMultiMap<Hash, InsertOp<T>>;
     _currentInsertOpOrds : Map<Hash, Ordinal>;
 
     _needToRebuild: boolean;
@@ -222,19 +177,18 @@ class MutableArray<T> extends MutableObject {
     _hashes   : Array<Hash>;
     _ordinals : Array<Ordinal>;
 
-    constructor(config={duplicates: true, writer: undefined as (undefined|Identity)}) {
-        super(MutableArray.opClasses, {supportsUndo: true});
+    constructor(config?: MutableArrayConfig & CausalCollectionConfig) {
+        super(CausalArray.opClasses, config);
 
-        this.duplicates = config.duplicates;
-        this.writer     = config.writer;
-        
         this.setRandomId();
+
+        this.duplicates = config?.duplicates === undefined? true: config?.duplicates;
 
         this._elementsPerOrdinal = new ArrayMap();
         this._ordinalsPerElement = new ArrayMap();
         this._elements = new Map();
 
-        this._currentInsertOpRefs = new DedupMultiMap();
+        this._currentInsertOps    = new DedupMultiMap();
         this._currentInsertOpOrds = new Map();
 
         this._needToRebuild = false;
@@ -243,23 +197,11 @@ class MutableArray<T> extends MutableObject {
         this._ordinals = [];
     }
 
-    setWriter(writer?: Identity) {
-        this.writer = writer;
+    async insertAt(element: T, idx: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return this.insertManyAt([element], idx, author, extraAuth);
     }
 
-    getWriter() {
-        return this.writer;
-    }
-
-    hasWriter() {
-        return this.writer !== undefined;
-    }
-
-    async insertAt(element: T, idx: number) {
-        await this.insertManyAt([element], idx);
-    }
-
-    async insertManyAt(elements: T[], idx: number) {
+    async insertManyAt(elements: T[], idx: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
         this.rebuild();
 
         // In the "no duplicates" case, any items we insert will disappear from their old positions. So
@@ -303,13 +245,28 @@ class MutableArray<T> extends MutableObject {
             //             come at and after idx, that is).
             const ordinal = DenseOrder.between(after, before);
 
-            let oldInsertionOps: Set<HashReference<InsertOp<T>>>|undefined = undefined;
+            let oldInsertionOps: Set<InsertOp<T>>|undefined = undefined;
 
             if (!this.duplicates) {
-                oldInsertionOps = this._currentInsertOpRefs.get(elementHash);
+                oldInsertionOps = this._currentInsertOps.get(elementHash);
             }
 
             const insertOp = new InsertOp(this, element, ordinal);
+
+            if (author !== undefined) {
+                insertOp.setAuthor(author);
+            } else {
+                CausalCollectionOp.setSingleAuthorIfNecessary(insertOp);
+            }
+
+            const auth = Authorization.chain(this.createInsertAuthorizer(element, insertOp.getAuthor()), extraAuth);
+
+            this.setCurrentPrevOpsTo(insertOp);
+
+            if (!(await auth.attempt(insertOp))) {
+                return false;
+            }
+
             await this.applyNewOp(insertOp);
 
             // Note: in the "no duplicates" case, the delete -if necessary- has to come after the 
@@ -318,29 +275,36 @@ class MutableArray<T> extends MutableObject {
             // will "move" over there after the delete. Hence the size of the list will never decrease,
             // and from the outside it will look like the element was just repositioned.
 
-            if (oldInsertionOps !== undefined && oldInsertionOps.size > 0) {
-                const deleteOp = new DeleteOp(this, elementHash, oldInsertionOps.values());
-                await this.applyNewOp(deleteOp);
+            if (oldInsertionOps !== undefined) {
+
+                for (const oldInsertionOp of oldInsertionOps) {
+                    const deleteOp = new DeleteOp(oldInsertionOp);
+                    await this.applyNewOp(deleteOp);
+                }
+
+                
             }
 
             after = ordinal;
         }
+
+        return true;
     }
 
-    async deleteAt(idx: number) {
-        await this.deleteManyAt(idx, 1);
+    async deleteAt(idx: number, author?: Identity, extraAuth?: Authorizer) {
+        await this.deleteManyAt(idx, 1, author, extraAuth);
     }
 
-    async deleteManyAt(idx: number, count: number) {
+    async deleteManyAt(idx: number, count: number, author?: Identity, extraAuth?: Authorizer) {
         this.rebuild();
 
         while (idx < this._contents.length && count > 0) {
             let hash = this._hashes[idx];
 
             if (this.duplicates) {
-                await this.delete(hash, this._ordinals[idx]);
+                await this.delete(hash, this._ordinals[idx], author, extraAuth);
             } else {
-                await this.delete(hash);
+                await this.delete(hash, undefined, authr, extraAuth);
             }
 
             idx = idx + 1;
@@ -348,13 +312,13 @@ class MutableArray<T> extends MutableObject {
         }
     }
 
-    async deleteElement(element: T) {
-        this.deleteElementByHash(HashedObject.hashElement(element));
+    async deleteElement(element: T, author?: Identity, extraAuth?: Authorizer) {
+        this.deleteElementByHash(HashedObject.hashElement(element), author, extraAuth);
     }
 
-    async deleteElementByHash(hash: Hash) {
+    async deleteElementByHash(hash: Hash, author?: Identity, extraAuth?: Authorizer) {
         this.rebuild();
-        this.delete(hash);
+        this.delete(hash, undefined, author, extraAuth);
     }
 
     async push(element: T) {
@@ -385,12 +349,12 @@ class MutableArray<T> extends MutableObject {
         return Array.from(this._hashes);
     }
 
-    lookup(idx: number) {
+    lookup(idx: number): T {
         this.rebuild();
         return this._contents[idx];
     }
 
-    lookupHash(idx: number) {
+    lookupHash(idx: number): Hash {
         this.rebuild();
         return this._hashes[idx];
     }
@@ -412,95 +376,95 @@ class MutableArray<T> extends MutableObject {
         return this._contents[idx];
     }
 
-    private async delete(hash: Hash, ordinal?: Ordinal) {
+    private async delete(hash: Hash, ordinal?: Ordinal, author?: Identity, extraAuth?: Authorizer) {
 
         let deleteOp: DeleteOp<T>|undefined = undefined;
-        const insertOpRefs = this._currentInsertOpRefs.get(hash);
+        const insertOps = this._currentInsertOps.get(hash);
 
-        if (ordinal !== undefined) {
-            for (const insertOpRef of insertOpRefs.values()) {
-                if (this._currentInsertOpOrds.get(insertOpRef.hash) === ordinal) {
-                    deleteOp = new DeleteOp(this, hash, [insertOpRef].values());
+        for (const insertOp of insertOps.values()) {
+            if (this._currentInsertOpOrds.get(insertOp.getLastHash()) === ordinal) {
+                deleteOp = new DeleteOp(insertOp);
+                await this.applyNewOp(deleteOp);
+                if (ordinal !== undefined) {
                     break;
                 }
             }
-        } else {
-            if (insertOpRefs.size > 0) {
-                deleteOp = new DeleteOp(this, hash, insertOpRefs.values());
-            }
-        }
-
-        if (deleteOp !== undefined) {
-            await this.applyNewOp(deleteOp);
         }
     }
 
-    async mutate(op: MutationOp, valid: boolean, _cascade: boolean): Promise<boolean> {
+    has(element: T): boolean {
+        return this.indexOf(element) >= 0;
+    }
+
+    hasByHash(hash: Hash): boolean {
+        return this.indexOfByHash(hash) >= 0;
+    }
+
+    async mutate(op: MutationOp): Promise<boolean> {
 
         const opHash = op.getLastHash();
 
         if (op instanceof InsertOp) {
 
-            if (valid) {
-                const element = op.element as T;
-                const ordinal = op.ordinal as Ordinal;
+            const element = op.element as T;
+            const ordinal = op.ordinal as Ordinal;
 
-                const elementHash = HashedObject.hashElement(element);
+            const elementHash = HashedObject.hashElement(element);
 
-                this._elementsPerOrdinal.add(ordinal, elementHash);
-                this._ordinalsPerElement.add(elementHash, ordinal);
+            this._elementsPerOrdinal.add(ordinal, elementHash);
+            this._ordinalsPerElement.add(elementHash, ordinal);
 
-                let wasNotBefore = false;
+            let wasNotBefore = false;
 
-                if (this._currentInsertOpRefs.get(elementHash).size === 0) {
-                    wasNotBefore = true;
-                    this._elements.set(elementHash, element);
-                }
+            if (this._currentInsertOps.get(elementHash).size === 0) {
+                wasNotBefore = true;
+                this._elements.set(elementHash, element);
+            }
 
-                this._currentInsertOpRefs.add(elementHash, new HashReference(op.getLastHash(), op.getClassName()));
-                this._currentInsertOpOrds.set(opHash, ordinal);
+            this._currentInsertOps.add(elementHash, op);
+            this._currentInsertOpOrds.set(opHash, ordinal);
 
-                this._needToRebuild = true;
+            this._needToRebuild = true;
 
-                if (wasNotBefore && element instanceof HashedObject) {
-                    this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: element});
-                }
+            if (wasNotBefore && element instanceof HashedObject) {
+                this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: element});
+            }
 
-                if (this.duplicates || wasNotBefore) {
-                    this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element} as InsertEvent<T>);
-                } else {
-                    this._mutationEventSource?.emit({emitter: this, action: 'move', data: element} as MoveEvent<T>);
-                }
+            if (this.duplicates || wasNotBefore) {
+                this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element} as InsertEvent<T>);
+            } else {
+                this._mutationEventSource?.emit({emitter: this, action: 'move', data: element} as MoveEvent<T>);
             }
 
         } else if (op instanceof DeleteOp) {
 
-            const elementHash = op.elementHash as Hash;
-            const deletedOps = op.deletedOps as HashedSet<HashReference<DeleteOp<T>>>;
+            const deletedOp     = op.getTargetOp() as InsertOp<T>;
+            const deletedOpHash = deletedOp.getLastHash();
+            const elementHash   = HashedObject.hashElement(deletedOp.element);
             
+
             let wasBefore = false;
             let element: T|undefined;
 
-            if (this._currentInsertOpRefs.get(elementHash).size > 0) {
+            if (this._currentInsertOps.get(elementHash).size > 0) {
                 wasBefore = true;
                 element = this._elements.get(elementHash);
             }
 
             let deletedOrdinal = false;
 
-            for (const opRef of deletedOps.values()) {
-                if (this._currentInsertOpRefs.delete(elementHash, opRef)) {
-                    const ordinal = this._currentInsertOpOrds.get(opRef.hash) as Ordinal;
-                    this._currentInsertOpOrds.delete(opRef.hash);
 
-                    this._elementsPerOrdinal.delete(ordinal, elementHash);
-                    this._ordinalsPerElement.delete(elementHash, ordinal);
+            if (this._currentInsertOps.delete(elementHash, deletedOp)) {
+                const ordinal = this._currentInsertOpOrds.get(deletedOpHash) as Ordinal;
+                this._currentInsertOpOrds.delete(deletedOpHash);
 
-                    deletedOrdinal = true;
-                }
+                this._elementsPerOrdinal.delete(ordinal, elementHash);
+                this._ordinalsPerElement.delete(elementHash, ordinal);
+
+                deletedOrdinal = true;
             }
 
-            let current = this._currentInsertOpRefs.get(elementHash);
+            let current = this._currentInsertOps.get(elementHash);
 
             const wasDeleted = current.size === 0;
 
@@ -592,30 +556,159 @@ class MutableArray<T> extends MutableObject {
 
 
     getClassName(): string {
-        return MutableArray.className;
+        return CausalArray.className;
     }
 
     init(): void {
+
     }
 
-    async validate(references: Map<string, HashedObject>): Promise<boolean> {
-        references;
-        return (typeof this.duplicates) === 'boolean' && Types.isTypeConstraint(this.typeConstraints) && (this.writer === undefined || this.writer instanceof Identity); 
+    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
+
+        if (!super.shouldAcceptMutationOp(op, opReferences)) {
+            return false;
+        }
+
+        if (op instanceof InsertOp && !this.shouldAcceptElement(op.element as T)) {
+            return false;
+        }
+
+        if (op instanceof InsertOp || op instanceof DeleteOp) {
+            const author = op.getAuthor();
+
+            const auth = (op instanceof InsertOp) ?
+                                            this.createInsertAuthorizer(op.element, author)
+                                                        :
+                                            this.createDeleteAuthorizerByHash(
+                                                    HashedObject.hashElement(op.getInsertOp().element), author);
+
+            const usedKeys     = new Set<string>();
+
+            if (!auth.verify(op, usedKeys)) {
+                return false;
+            }
+
+            if (!Verification.checkKeys(usedKeys, op)) {
+                return false;
+            }
+
+        }
+
+        return true;
     }
 
+
+    attestationKey(elmt: T) {
+        return this.attestationKeyByHash(HashedObject.hashElement(elmt));
+    }
+
+    attestationKeyByHash(hash: Hash) {
+        return 'CausalArray/attest-member:' + hash + '-belongs-to-' + this.hash();
+    }
+
+    async attestMembershipForOp(elmt: T, op: MutationOp): Promise<boolean> {
+
+        const hash = HashedObject.hashElement(elmt);
+
+        return this.attestMembershipForOpByHash(hash, op);
+    }
+
+    async attestMembershipForOpByHash(hash: Hash, op: MutationOp): Promise<boolean> {
+
+        const insertOps = this._currentInsertOps.get(hash);
+
+        if (insertOps.size > 0) {
+            const insertOp = insertOps.values().next().value as InsertOp<T>;
+
+            const attestOp = new MembershipAttestationOp(insertOp, op);
+
+            await this.applyNewOp(attestOp);
+            const key = this.attestationKeyByHash(hash);
+            op.addCausalOp(key, attestOp);
+
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
+    verifyMembershipAttestationForOp(elmt: T, op: MutationOp, usedKeys: Set<string>): boolean {
+
+        return this.checkMembershipAttestationByHashForOp(HashedObject.hashElement(elmt), op, usedKeys);
+    }
+
+    protected checkMembershipAttestationByHashForOp(elmtHash: Hash, op: MutationOp, usedKeys: Set<string>): boolean {
+
+        const key = this.attestationKeyByHash(elmtHash);
+
+        const attestOp = op.getCausalOps().get(key);
+
+        if (attestOp === undefined) {
+            return false;
+        }
+
+        if (!(attestOp instanceof MembershipAttestationOp)) {
+            return false;
+        }
+
+        if (!attestOp.getTargetObject().equals(this)) {
+            return false;
+        }
+
+        if (attestOp.targetOpNonCausalHash !== op.nonCausalHash()) {
+            return false;
+        }
+
+        const insertOp = attestOp.getInsertOp();
+
+        if (HashedObject.hashElement(insertOp.element) !== elmtHash) {
+            return false;
+        }
+
+        usedKeys.add(key);
+
+        return true;
+    }
+
+    createMembershipAuthorizer(elmt: T): Authorizer {
+
+        return {
+            attempt : (op:  MutationOp) => this.attestMembershipForOp(elmt, op),
+            verify  : (op: MutationOp, usedKeys: Set<string>) => this.verifyMembershipAttestationForOp(elmt, op, usedKeys)
+        };
+
+    }
+
+    protected createInsertAuthorizer(elmt: T, author?: Identity): Authorizer {
+
+        if (!this.shouldAcceptElement(elmt)) {
+            return Authorization.never;
+        } else {
+            return this.createWriteAuthorizer(author);
+        }
+    }
+
+    protected createDeleteAuthorizer(elmt: T, author?: Identity): Authorizer {
+        return this.createDeleteAuthorizerByHash(HashedObject.hashElement(elmt), author);
+    }
+
+    protected createDeleteAuthorizerByHash(_elmtHash: Hash, author?: Identity): Authorizer {
+        return this.createWriteAuthorizer(author);
+    }
 }
 
 ClassRegistry.register(InsertOp.className, InsertOp);
 ClassRegistry.register(DeleteOp.className, DeleteOp);
-ClassRegistry.register(MutableArray.className, MutableArray);
+ClassRegistry.register(CausalArray.className, CausalArray);
 
 
-type InsertEvent<T> = {emitter: MutableArray<T>, action: 'insert', path?: location<HashedObject>[], data: T};
-type MoveEvent<T>   = {emitter: MutableArray<T>, action: 'move', path?: location<HashedObject>[], data: T};
-type DeleteEvent<T> = {emitter: MutableArray<T>, action: 'delete', path?: location<HashedObject>[], data: Hash};
+type InsertEvent<T> = {emitter: CausalArray<T>, action: 'insert', path?: location<HashedObject>[], data: T};
+type MoveEvent<T>   = {emitter: CausalArray<T>, action: 'move', path?: location<HashedObject>[], data: T};
+type DeleteEvent<T> = {emitter: CausalArray<T>, action: 'delete', path?: location<HashedObject>[], data: Hash};
 
 type MutationEvent<T> = InsertEvent<T> | MoveEvent<T> | DeleteEvent<T>;
 
-export { MutableArray, InsertOp as MutableArrayInsertOp, DeleteOp as MutableArrayDeleteOp };
-export { InsertEvent as ArrayInsertEvent, MoveEvent as ArrayMoveEvent, DeleteEvent as ArrayDeleteEvent,
-         MutationEvent as ArrayMutationEvent };
+export { CausalArray, InsertOp as CausalArrayInsertOp, DeleteOp as CausalArrayDeleteOp };
+export { InsertEvent as CausalArrayInsertEvent, MoveEvent as CausalArrayMoveEvent, DeleteEvent as CausalArrayDeleteEvent,
+         MutationEvent as CausalArrayMutationEvent };
