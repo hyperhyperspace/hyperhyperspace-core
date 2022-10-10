@@ -376,7 +376,8 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         return this._contents[idx];
     }
 
-    private async delete(hash: Hash, ordinal?: Ordinal, author?: Identity, extraAuth?: Authorizer) {
+    // FIXME: incomplete
+    private async delete(hash: Hash, ordinal?: Ordinal, _author?: Identity, _extraAuth?: Authorizer) {
 
         let deleteOp: DeleteOp<T>|undefined = undefined;
         const insertOps = this._currentInsertOps.get(hash);
