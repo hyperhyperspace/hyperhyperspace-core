@@ -241,7 +241,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
             // MEGA FIXME: This is broken. It may be the case that after === before if there are several items
             //             with the same ordinal in the array. In that case, the items with ordinal before need
-            //             to be re-inserted using a higer ordinal to make the insertion possible (only those that
+            //             to be re-inserted using a higher ordinal to make the insertion possible (only those that
             //             come at and after idx, that is).
             const ordinal = DenseOrder.between(after, before);
 
@@ -376,8 +376,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         return this._contents[idx];
     }
 
-    // FIXME: incomplete
-    private async delete(hash: Hash, ordinal?: Ordinal, _author?: Identity, _extraAuth?: Authorizer) {
+    private async delete(hash: Hash, ordinal?: Ordinal, author?: Identity, extraAuth?: Authorizer) {
 
         let deleteOp: DeleteOp<T>|undefined = undefined;
         const insertOps = this._currentInsertOps.get(hash);
@@ -385,12 +384,29 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         for (const insertOp of insertOps.values()) {
             if (this._currentInsertOpOrds.get(insertOp.getLastHash()) === ordinal) {
                 deleteOp = new DeleteOp(insertOp);
+
+                if (author !== undefined) {
+                    deleteOp.setAuthor(author);
+                } else {
+                    CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
+                }
+    
+                const auth = Authorization.chain(this.createDeleteAuthorizer(insertOp.element as T, deleteOp.getAuthor()), extraAuth);
+    
+                this.setCurrentPrevOpsTo(deleteOp);
+    
+                if (!(await auth.attempt(deleteOp))) {
+                    return false;
+                }
+
                 await this.applyNewOp(deleteOp);
                 if (ordinal !== undefined) {
                     break;
                 }
             }
         }
+
+        return true;
     }
 
     has(element: T): boolean {
