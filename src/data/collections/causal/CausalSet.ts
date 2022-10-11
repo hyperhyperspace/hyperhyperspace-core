@@ -256,7 +256,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         for (const addOpHash of this._currentAddOpsPerElmt.get(hash)) {
             const addOp = this._currentAddOps.get(addOpHash) as AddOp<T>;
             const deleteOp = new DeleteOp(addOp);
-            
+
             if (author !== undefined) {
                 deleteOp.setAuthor(author);
             } else {
@@ -290,6 +290,14 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
 
     hasByHash(hash: Hash): boolean {
         return this._currentAddOpsPerElmt.get(hash).size > 0;
+    }
+
+    get(hash: Hash): T|undefined {
+        if (this.hasByHash(hash)) {
+            return this._allElements.get(hash);
+        } else {
+            return undefined;
+        }
     }
 
     attestationKey(elmt: T) {
@@ -570,11 +578,11 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
     }
 
     values() {
-        return this.getMutableContents().values();
+        return Array.from(this._currentAddOpsPerElmt.keys()).map((h: Hash) => this._allElements.get(h) as T).values();
     }
     
     size() {
-        return this.getMutableContents().size;
+        return Array.from(this._currentAddOpsPerElmt.keys()).map((h: Hash) => this._allElements.get(h) as T).length;
     }
 }
 

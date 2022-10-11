@@ -699,11 +699,13 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
     }
 
     values() {
-        return this.getMutableContents().values();
+        this.rebuild();
+        return this._contents.values();
     }
     
     size() {
-        return this.getMutableContents().size;
+        this.rebuild()
+        return this._contents.length;
     }
 }
 
