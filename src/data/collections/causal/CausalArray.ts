@@ -264,7 +264,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             this.setCurrentPrevOpsTo(insertOp);
 
             if (!(await auth.attempt(insertOp))) {
-                return false;
+                throw new Error('Cannot authorize insertion operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
             }
 
             await this.applyNewOp(insertOp);
@@ -381,6 +381,8 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         let deleteOp: DeleteOp<T>|undefined = undefined;
         const insertOps = this._currentInsertOps.get(hash);
 
+        const deleteOps: Array<DeleteOp<T>> = [];
+
         for (const insertOp of insertOps.values()) {
             if (this._currentInsertOpOrds.get(insertOp.getLastHash()) === ordinal) {
                 deleteOp = new DeleteOp(insertOp);
@@ -396,17 +398,26 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
                 this.setCurrentPrevOpsTo(deleteOp);
     
                 if (!(await auth.attempt(deleteOp))) {
-                    return false;
+                    throw new Error('Cannot authorize delete operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
                 }
 
-                await this.applyNewOp(deleteOp);
+                deleteOps.push(deleteOp);
+                
                 if (ordinal !== undefined) {
                     break;
                 }
             }
         }
 
-        return true;
+        const deletions: Array<Promise<void>> = [];
+
+        for (const deleteOp of deleteOps) {
+            deletions.push(this.applyNewOp(deleteOp));
+        }
+
+        await Promise.all(deletions);
+
+        return deleteOps.length > 0;
     }
 
     has(element: T): boolean {

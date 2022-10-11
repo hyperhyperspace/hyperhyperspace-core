@@ -234,7 +234,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         this.setCurrentPrevOpsTo(addOp);
 
         if (!(await auth.attempt(addOp))) {
-                return false;
+            throw new Error('Cannot authorize addition operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());
         }
         
         return this.applyNewOp(addOp).then(() => true);
@@ -268,8 +268,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             this.setCurrentPrevOpsTo(deleteOp);
 
             if (!(await auth.attempt(deleteOp))) {
-                console.log('CANNOT AUTH')
-                return false;
+                throw new Error('Cannot authorize delete operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());
             }
             
             deleteOps.push(deleteOp);
@@ -281,7 +280,9 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             deletions.push(this.applyNewOp(deleteOp));
         }
 
-        return Promise.all(deletions).then(() => deletions.length > 0);
+        await Promise.all(deletions);
+
+        return deleteOps.length > 0;
     }
 
     has(elmt: T): boolean {

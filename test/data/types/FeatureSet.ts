@@ -37,7 +37,11 @@ class FeatureSet extends CausalSet<Feature> {
 
         const auth = this.createAuthorizerFor(author);
 
-        return super.add(feature, author, auth);
+        try {            
+            return await super.add(feature, author, auth);
+        } catch (e) {
+            return false;
+        }
     }
 
     async disable(feature: Feature, author: Identity): Promise<boolean> {
@@ -48,14 +52,23 @@ class FeatureSet extends CausalSet<Feature> {
 
         const auth = this.createAuthorizerFor(author);
 
-        return super.delete(feature, author, auth);
+        try {
+            return await super.delete(feature, author, auth);
+        } catch (e) {
+            return false;
+        }
     }
 
     async disableByHash(hash: Hash, author: Identity): Promise<boolean> {
 
         const auth = this.createAuthorizerFor(author);
 
-        return super.deleteByHash(hash, author, auth);
+        try {
+            return super.deleteByHash(hash, author, auth);
+        } catch (e) {
+            return false;
+        }
+        
     }
 
     isEnabled(feature: Feature) {
