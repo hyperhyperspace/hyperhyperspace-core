@@ -4,6 +4,10 @@ import { Hash} from '../../model/hashing'
 import { Authorization, Authorizer } from 'data/model';
 import { BaseCollection, CollectionConfig } from '../mutable/Collection';
 
+class AuthError extends Error {
+
+};
+
 interface CausalCollection<T> {
     has(elmt: T): boolean;
     hasByHash(hash: Hash): boolean;
@@ -92,5 +96,5 @@ abstract class CausalCollectionOp extends MutationOp {
     }
 }
 
-export { CausalCollection, BaseCausalCollection, CausalCollectionOp };
+export { CausalCollection, BaseCausalCollection, CausalCollectionOp, AuthError };
 export type { CausalCollectionConfig };

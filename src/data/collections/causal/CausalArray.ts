@@ -15,7 +15,7 @@ import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
 import { InvalidateAfterOp } from 'data/model/causal';
-import { BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
+import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
 import { Identity } from 'data/identity';
 
 // A mutable list with a 
@@ -264,7 +264,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             this.setCurrentPrevOpsTo(insertOp);
 
             if (!(await auth.attempt(insertOp))) {
-                throw new Error('Cannot authorize insertion operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
+                throw new AuthError('Cannot authorize insertion operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
             }
 
             await this.applyNewOp(insertOp);
@@ -398,7 +398,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
                 this.setCurrentPrevOpsTo(deleteOp);
     
                 if (!(await auth.attempt(deleteOp))) {
-                    throw new Error('Cannot authorize delete operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
+                    throw new AuthError('Cannot authorize delete operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
                 }
 
                 deleteOps.push(deleteOp);

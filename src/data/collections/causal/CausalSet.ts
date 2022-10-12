@@ -8,7 +8,7 @@ import { Authorization, Verification } from '../../model/causal/Authorization';
 import { HashedSet } from '../../model/immutable/HashedSet';
 import { MutableSetEvents } from '../../collections/mutable/MutableSet';
 import { MutableContentEvents } from '../../model/mutable/MutableObject';
-import { BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
+import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
 import { ClassRegistry } from 'data/model/literals';
 
 /*
@@ -234,7 +234,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         this.setCurrentPrevOpsTo(addOp);
 
         if (!(await auth.attempt(addOp))) {
-            throw new Error('Cannot authorize addition operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());
+            throw new AuthError('Cannot authorize addition operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());;
         }
         
         return this.applyNewOp(addOp).then(() => true);
@@ -268,7 +268,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             this.setCurrentPrevOpsTo(deleteOp);
 
             if (!(await auth.attempt(deleteOp))) {
-                throw new Error('Cannot authorize delete operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());
+                throw new AuthError('Cannot authorize delete operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());
             }
             
             deleteOps.push(deleteOp);

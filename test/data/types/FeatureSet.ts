@@ -1,4 +1,5 @@
 import { CausalSet, SingleAuthorCausalSet, CausalSetAddOp, CausalSetDeleteOp } from 'data/collections';
+import { AuthError } from 'data/collections/causal/CausalCollection';
 import { Identity } from 'data/identity';
 import { Hash, HashedObject, MutationOp } from 'data/model';
 import { Authorizer, Authorization } from 'data/model';
@@ -40,7 +41,12 @@ class FeatureSet extends CausalSet<Feature> {
         try {            
             return await super.add(feature, author, auth);
         } catch (e) {
-            return false;
+            if (e instanceof AuthError) {
+                return false;
+            } else {
+                throw e;
+            }
+            
         }
     }
 
@@ -55,7 +61,12 @@ class FeatureSet extends CausalSet<Feature> {
         try {
             return await super.delete(feature, author, auth);
         } catch (e) {
-            return false;
+            if (e instanceof AuthError) {
+                return false;
+            } else {
+                throw e;
+            }
+            
         }
     }
 
@@ -64,9 +75,13 @@ class FeatureSet extends CausalSet<Feature> {
         const auth = this.createAuthorizerFor(author);
 
         try {
-            return super.deleteByHash(hash, author, auth);
+            return await super.deleteByHash(hash, author, auth);
         } catch (e) {
-            return false;
+            if (e instanceof AuthError) {
+                return false;
+            } else {
+                throw e;
+            }   
         }
         
     }
