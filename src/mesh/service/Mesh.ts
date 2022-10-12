@@ -16,6 +16,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { Identity } from 'data/identity';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn/ObjectSpawnAgent';
 import { ObjectInvokeAgent } from 'mesh/agents/spawn/ObjectInvokeAgent';
+import { PeerGroupState } from 'mesh/agents/peer/PeerGroupState';
 
 
 
@@ -205,6 +206,19 @@ class Mesh {
 
         }
 
+    }
+
+    async getPeerGroupState(peerGroupId: string): Promise<PeerGroupState|undefined> {
+
+        const agentId = PeerGroupAgent.agentIdForPeerGroup(peerGroupId);
+
+        const agent = this.pod.getAgent(agentId) as PeerGroupAgent;
+
+        if (agent === undefined) {
+            return undefined;
+        } else {
+            return agent.getState();
+        }
     }
 
     /*getConnectedPeers(peerGroupId: string): Array<PeerInfo> {

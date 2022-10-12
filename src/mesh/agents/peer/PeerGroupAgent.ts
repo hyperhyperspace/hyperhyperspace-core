@@ -17,6 +17,7 @@ import { Identity } from 'data/identity';
 import { Logger, LogLevel } from 'util/logging';
 import { Lock } from 'util/concurrency';
 import { LRUCache } from 'util/caching';
+import { PeerGroupState } from './PeerGroupState';
 
 type PeerInfo = { endpoint: Endpoint, identityHash: Hash, identity?: Identity };
 
@@ -547,6 +548,24 @@ class PeerGroupAgent implements Agent {
             
         }
 
+    }
+
+    getState(): PeerGroupState {
+
+        const remote = new Map<Endpoint, PeerInfo>();
+
+        for (const ep of this.connectionsPerEndpoint.keys()) {
+            const connId = this.findWorkingConnectionId(ep);
+            const conn   = connId === undefined? undefined : this.connections.get(connId);
+            if (conn !== undefined) {
+                remote.set(ep, conn.peer);
+            }
+        }
+
+        return {
+            local: this.localPeer,
+            remote: remote
+        };
     }
 
     shutdown() {

@@ -1,15 +1,20 @@
 import { PeerGroupAgentConfig, PeerInfo, PeerSource } from '../../agents/peer';
 import { Mesh, SyncMode, UsageToken } from '../../service/Mesh';
+import { SpawnCallback } from '../../agents/spawn';
+import { PeerGroupState } from '../../agents/peer/PeerGroupState';
+import { ObjectDiscoveryReply } from '../../agents/discovery';
+import { Endpoint } from '../../agents/network';
+
+import { Identity, RSAKeyPair } from 'data/identity';
 import { Context, HashedObject, LiteralContext } from 'data/model';
 import { Hash } from 'data/model';
-import { Endpoint } from 'mesh/agents/network';
+
 import { AsyncStream } from 'util/streams';
-import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
+
 import { RNGImpl } from 'crypto/random';
-import { Identity, RSAKeyPair } from 'data/identity';
+
 import { Store } from 'storage/store';
 import { LinkupAddress } from 'net/linkup';
-import { SpawnCallback } from 'mesh/agents/spawn';
 
 /* Run a mesh remotely, and access it through a MeshProxy */
 
@@ -25,7 +30,7 @@ import { SpawnCallback } from 'mesh/agents/spawn';
  * 
  * Ah, the things we do for you, Hyper Hyper Space. */
 
-type MeshCommand = JoinPeerGroup | LeavePeerGroup |
+type MeshCommand = JoinPeerGroup | LeavePeerGroup | ForwardPeerGroupState |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
                    StartObjectBroadcast | StopObjectBroadcast |
                    FindObjectByHash | FindObjectByHashSuffix |  Shutdown |
@@ -48,6 +53,12 @@ type JoinPeerGroup = {
 type LeavePeerGroup = {
     type: 'leave-peer-group',
     usageToken: UsageToken
+}
+
+type ForwardPeerGroupState = {
+    type: 'forward-peer-group-state',
+    requestId: string,
+    peerGroupId: string
 }
 
 type SyncObjectsWithPeerGroup = {
@@ -147,7 +158,7 @@ type ForwardGetPeerForEndpointReply = {
 
 type PeerInfoContext = { endpoint: Endpoint, identityHash: Hash, identity?: LiteralContext };
 
-type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply | ObjectSpawnCallback;
+type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply | ObjectSpawnCallback | PeerGroupStateReply;
 
 type LiteralObjectDiscoveryReply = {
     type: 'object-discovery-reply'
@@ -171,6 +182,15 @@ type ObjectSpawnCallback = {
     object: LiteralContext,
     sender: LiteralContext,
     senderEndpoint: string
+}
+
+type LiteralPeerInfo =  { endpoint: Endpoint, identityHash: Hash, identity?: LiteralContext };
+
+type PeerGroupStateReply = {
+    type: 'peer-group-state-reply',
+    requestId: string,
+    local?: LiteralPeerInfo,
+    remote?: Array<LiteralPeerInfo>
 }
 
 
@@ -199,6 +219,7 @@ class MeshHost {
         return (type === 'join-peer-group' ||
             type === 'check-peer-group-usage' ||
             type === 'leave-peer-group' ||
+            type === 'forward-peer-group-state' ||
             type === 'sync-objects-with-peer-group' ||
             type === 'stop-sync-objects-with-peer-group' ||
             type === 'start-object-broadcast' ||
@@ -220,7 +241,8 @@ class MeshHost {
 
         return (type === 'object-discovery-reply' ||
                 type === 'object-discovery-end'   || 
-                type === 'object-spawn-callback');
+                type === 'object-spawn-callback'  ||
+                type === 'peer-group-state-reply');
     }
 
     static isPeerSourceRequest(msg: any): boolean {
@@ -275,6 +297,42 @@ class MeshHost {
         } else if (command.type === 'leave-peer-group') {
             const leave = command as LeavePeerGroup;
             this.mesh.leavePeerGroup(leave.usageToken);
+
+        } else if (command.type === 'forward-peer-group-state') {
+
+            this.mesh.getPeerGroupState(command.peerGroupId).then((state: PeerGroupState|undefined) => {
+
+                const reply: PeerGroupStateReply = {
+                    type: 'peer-group-state-reply',
+                    requestId: command.requestId,
+                }
+
+                if (state !== undefined) {
+                    const local: LiteralPeerInfo = {endpoint: state.local.endpoint, identityHash: state.local.identityHash};
+
+                    if (state.local.identity !== undefined) {
+                        local.identity = state.local.identity.toLiteralContext();
+                    }
+
+                    reply.local = local;
+
+                    reply.remote = [];
+
+                    for (const peerInfo of state.remote.values()) {
+                        const lit: LiteralPeerInfo = {endpoint: peerInfo.endpoint, identityHash: peerInfo.identityHash};
+
+                        if (peerInfo.identity !== undefined) {
+                            lit.identity = peerInfo.identity.toLiteralContext();
+                        }
+
+                        reply.remote.push(lit);
+                    }
+                }
+
+                this.streamedReplyCb(reply);
+
+            })
+
         } else if (command.type === 'sync-objects-with-peer-group') {
             const syncObjs = command as SyncObjectsWithPeerGroup;
 
@@ -570,11 +628,11 @@ class PeerSourceProxy implements PeerSource {
 }
 
 export { MeshHost, MeshCommand,
-         JoinPeerGroup, LeavePeerGroup,
+         JoinPeerGroup, LeavePeerGroup, ForwardPeerGroupState, 
          SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
          StartObjectBroadcast, StopObjectBroadcast,
          FindObjectByHash, FindObjectByHashSuffix, AddObjectSpawnCallback, SendObjectSpawnRequest,
          Shutdown,
-         CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply, ObjectSpawnCallback,
+         CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply, ObjectSpawnCallback, PeerGroupStateReply, LiteralPeerInfo, 
          ForwardGetPeersReply, ForwardGetPeerForEndpointReply,
          PeerSourceRequest, GetPeersRequest, GetPeerForEndpointRequest, PeerInfoContext };

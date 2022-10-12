@@ -10,7 +10,8 @@ import { MeshCommand,
     Shutdown,
     PeerInfoContext,
     AddObjectSpawnCallback,
-    SendObjectSpawnRequest} from './MeshHost';
+    SendObjectSpawnRequest,
+    ForwardPeerGroupState} from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject } from 'data/model';
@@ -21,8 +22,11 @@ import { LinkupAddress, LinkupManager, LinkupManagerCommand, LinkupManagerProxy 
 import { WebRTCConnectionEvent, WebRTCConnectionsHost } from 'net/transport';
 import { Identity } from 'data/identity';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn';
+import { PeerGroupState } from 'mesh/agents/peer/PeerGroupState';
 
 /* Access a mesh remotely, see the MeshHost class. */
+
+type RequestId = string;
 
 class MeshProxy {
 
@@ -36,6 +40,8 @@ class MeshProxy {
 
     peerSources: Map<string, PeerSource>;
     peerSourceRequestIngestFn: (req: PeerSourceRequest) => void;
+
+    pendingPeerGroupStates: Map<RequestId, {resolve: (result: PeerGroupState|undefined) => void, reject: (reason: any) => void, timeout: any}>;
 
     
 
@@ -77,6 +83,47 @@ class MeshProxy {
                     const object = HashedObject.fromLiteralContext(reply.object);
                     const sender = HashedObject.fromLiteralContext(reply.sender) as Identity;
                     cb(object, sender, reply.senderEndpoint);
+                }
+            } else if (reply.type === 'peer-group-state-reply') {
+                const cb = this.pendingPeerGroupStates.get(reply.requestId)?.resolve;
+                const to = this.pendingPeerGroupStates.get(reply.requestId)?.timeout;
+
+                this.pendingPeerGroupStates.delete(reply.requestId);
+
+                if (to !== undefined) {
+                    window.clearTimeout(to);
+                }
+
+                if (cb !== undefined) {
+
+                    if (reply.local !== undefined && reply.remote !== undefined) {
+                        const remote = new Map<Endpoint, PeerInfo>();
+
+                        const state: PeerGroupState = {
+                            local: {endpoint: reply.local.endpoint, identityHash: reply.local.identityHash},
+                            remote: remote
+                        }
+    
+                        if (reply.local.identity !== undefined) {
+                            state.local.identity = HashedObject.fromLiteralContext(reply.local.identity) as Identity;
+                        }
+    
+                        for (const litPeerInfo of reply.remote) {
+
+                            const peerInfo: PeerInfo = {endpoint: litPeerInfo.endpoint, identityHash: litPeerInfo.identityHash};
+
+                            if (litPeerInfo.identity !== undefined) {
+                                peerInfo.identity = HashedObject.fromLiteralContext(litPeerInfo.identity) as Identity;
+                            }
+
+                            remote.set(peerInfo.endpoint, peerInfo);
+                        }
+
+                        cb(state);    
+                    } else {
+                        cb(undefined);
+                    }
+                    
                 }
             }
         }
@@ -143,6 +190,8 @@ class MeshProxy {
                 }
             }
         };
+
+        this.pendingPeerGroupStates = new Map();
     }
 
     getCommandStreamedReplyIngestFn() {
@@ -180,6 +229,35 @@ class MeshProxy {
         };
 
         this.commandForwardingFn(cmd);
+    }
+
+    async getPeerGroupState(peerGroupId: string, timeout=10000): Promise<PeerGroupState|undefined> {
+
+        const p = new Promise<PeerGroupState|undefined>((resolve: (result: PeerGroupState|undefined) => void, reject: (reason: any) => void) => {
+            const requestId = new RNGImpl().randomHexString(128);
+
+            const cmd: ForwardPeerGroupState = {
+                type: 'forward-peer-group-state',
+                requestId: requestId,
+                peerGroupId: peerGroupId
+            };
+    
+            
+
+            const to = window.setTimeout(() => {
+                if (this.pendingPeerGroupStates.has(requestId)) {
+                    this.pendingPeerGroupStates.delete(requestId)
+                    reject('timeout');
+                }
+            }, timeout);
+
+            this.pendingPeerGroupStates.set(requestId, {resolve: resolve, reject: reject, timeout: to});
+
+            this.commandForwardingFn(cmd);
+    
+        });
+
+        return p;
     }
 
     syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string, usageToken?: UsageToken): UsageToken {
