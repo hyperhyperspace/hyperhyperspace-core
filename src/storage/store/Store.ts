@@ -257,7 +257,7 @@ class Store {
 
             if (author !== undefined) {
 
-                if (object.shouldSignOnSave()) {
+                if (object.shouldSignOnSave() && !object.hasLastSignature()) {
 
                     if (!author.hasKeyPair()) {
                         const kp = await this.load(author.getKeyPairHash(), false);
