@@ -178,7 +178,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
     _ordinals : Array<Ordinal>;
 
     constructor(config?: MutableArrayConfig & CausalCollectionConfig) {
-        super(CausalArray.opClasses, config);
+        super(CausalArray.opClasses, {...config, supportsUndo: true});
 
         this.setRandomId();
 
@@ -593,6 +593,8 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
     shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
 
+        console.log('VALIDATING....')
+
         if (!super.shouldAcceptMutationOp(op, opReferences)) {
             return false;
         }
@@ -610,15 +612,23 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
                                             this.createDeleteAuthorizerByHash(
                                                     HashedObject.hashElement(op.getInsertOp().element), author);
 
+            console.log('verifying mutation op for ' + this.hash());
+            console.log('auth', auth);
+
             const usedKeys     = new Set<string>();
 
             if (!auth.verify(op, usedKeys)) {
+                console.log('verification failed')
                 return false;
             }
+
+            console.log('verification OK')
 
             if (!Verification.checkKeys(usedKeys, op)) {
                 return false;
             }
+
+            console.log('keys OK: ', usedKeys);
 
         }
 

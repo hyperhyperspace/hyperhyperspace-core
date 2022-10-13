@@ -1,3 +1,4 @@
+import { HashedMap } from 'data/model';
 import { HashedSet } from '../immutable/HashedSet';
 import { MutationOp } from '../mutable/MutationOp';
 
@@ -48,12 +49,12 @@ class Attestation {
                   = (a1: Attestator, a2?: Attestator) => 
                             ( async (op: MutationOp) => {
 
-                                    const savedCausalOps = op.getCausalOps().entries();
+                                    const savedCausalOps = new HashedMap(op.getCausalOps().entries());
 
                                     if (await a1(op) && (a2 === undefined || await a2(op)))  {
                                         return true;
                                     } else {
-                                        op.setCausalOps(savedCausalOps)
+                                        op.setCausalOps(savedCausalOps.entries())
                                         return false;
                                     }
                                 }
@@ -77,11 +78,11 @@ class Attestation {
                = (authorizers: Array<Attestator>) =>
                                         async (op: MutationOp) => {
 
-                                            const savedCausalOps = op.getCausalOps().entries();
+                                            const savedCausalOps = new HashedMap(op.getCausalOps().entries());
 
                                             for (const authorize of authorizers) {
                                                 if (!(await authorize(op))) {
-                                                    op.setCausalOps(savedCausalOps);
+                                                    op.setCausalOps(savedCausalOps.entries());
                                                     return false;
                                                 }
                                             }

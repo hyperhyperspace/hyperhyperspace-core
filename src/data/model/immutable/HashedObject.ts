@@ -101,8 +101,10 @@ abstract class HashedObject {
         //       would be).
 
         this.author = author;
-        this._signOnSave = true;
-        
+
+        if (author !== undefined) {
+            this._signOnSave = true;
+        }
     }
 
     getAuthor() {
