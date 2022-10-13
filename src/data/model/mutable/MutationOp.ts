@@ -59,7 +59,7 @@ abstract class MutationOp extends HashedObject {
         }
 
         if (!this.targetObject.supportsUndo() && this.causalOps !== undefined) {
-            MutationOp.validationLog.debug('The target object for ' + this.hash() + ' does not support undo, yet this op has causalOps !== undefined');
+            MutationOp.validationLog.debug('The target object for ' + this.hash() + ', a ' + this.getTargetObject().getClassName() + ', does not support undo, yet this op has causalOps !== undefined');
             return false;
         }
 
