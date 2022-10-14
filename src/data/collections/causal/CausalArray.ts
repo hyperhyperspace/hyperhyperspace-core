@@ -321,22 +321,22 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         this.delete(hash, undefined, author, extraAuth);
     }
 
-    async push(element: T) {
-        await this.insertAt(element, this._contents.length);
+    async push(element: T, author?: Identity, extraAuth?: Authorizer) {
+        await this.insertAt(element, this._contents.length, author, extraAuth);
     }
 
-    async pop(): Promise<T> {
+    async pop(author?: Identity, extraAuth?: Authorizer): Promise<T> {
         this.rebuild();
         const lastIdx = this._contents.length - 1;
         const last = this._contents[lastIdx];
-        await this.deleteAt(lastIdx);
+        await this.deleteAt(lastIdx, author, extraAuth);
 
         return last;
     }
 
-    async concat(elements: T[]) {
+    async concat(elements: T[], author?: Identity, extraAuth?: Authorizer) {
         this.rebuild();
-        await this.insertManyAt(elements, this._contents.length);
+        await this.insertManyAt(elements, this._contents.length, author, extraAuth);
     }
 
     contents() {
@@ -625,6 +625,8 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             console.log('verification OK')
 
             if (!Verification.checkKeys(usedKeys, op)) {
+                console.log('usedKeys', Array.from(usedKeys));
+                console.log('op', Array.from(op.getCausalOps().keys()))
                 return false;
             }
 

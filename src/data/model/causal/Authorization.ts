@@ -1,4 +1,4 @@
-import { HashedMap } from 'data/model';
+import { HashedMap } from '../immutable/HashedMap';
 import { HashedSet } from '../immutable/HashedSet';
 import { MutationOp } from '../mutable/MutationOp';
 
