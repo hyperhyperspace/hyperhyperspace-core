@@ -334,7 +334,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         } else {
             return false;
         }
-
+        
     }
 
     verifyMembershipAttestationForOp(elmt: T, op: MutationOp, usedKeys: Set<string>): boolean {

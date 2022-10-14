@@ -86,7 +86,7 @@ class Identity extends HashedObject {
     getKeyPair(): RSAKeyPair {
 
         if (!this.hasKeyPair()) {
-            throw new Error('Trying to get key pair, but it is missing from Identity.');
+            throw new Error('Trying to get key pair, but it is missing from Identity ' + this.hash() + ' (info=' + JSON.stringify(this.info) + ').');
         }
 
         return this._keyPair as RSAKeyPair;

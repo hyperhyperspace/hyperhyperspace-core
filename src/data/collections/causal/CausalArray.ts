@@ -255,7 +255,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
             if (author !== undefined) {
                 insertOp.setAuthor(author);
-            } else {
+            } else if (this.getClassName() === CausalArray.className) {
                 CausalCollectionOp.setSingleAuthorIfNecessary(insertOp);
             }
 
@@ -389,7 +389,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
                 if (author !== undefined) {
                     deleteOp.setAuthor(author);
-                } else {
+                } else if (this.getClassName() === CausalArray.className) {
                     CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
                 }
     
@@ -593,8 +593,6 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
     shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
 
-        console.log('VALIDATING....')
-
         if (!super.shouldAcceptMutationOp(op, opReferences)) {
             return false;
         }
@@ -612,26 +610,17 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
                                             this.createDeleteAuthorizerByHash(
                                                     HashedObject.hashElement(op.getInsertOp().element), author);
 
-            console.log('verifying mutation op for ' + this.hash());
-            console.log('auth', auth);
-
             const usedKeys     = new Set<string>();
 
             if (!auth.verify(op, usedKeys)) {
-                console.log('verification failed')
+                HashedObject.validationLog.warning('Could not verify authorization for op ' + op.hash() + ', a ' + op.getClassName() + ' being applied to ' + this.hash() + ', a ' + this.getClassName());
                 return false;
             }
-
-            console.log('verification OK')
 
             if (!Verification.checkKeys(usedKeys, op)) {
-                console.log('usedKeys', Array.from(usedKeys));
-                console.log('op', Array.from(op.getCausalOps().keys()))
+                HashedObject.validationLog.warning('Authorization key checking step failed for op ' + op.hash() + ', a ' + op.getClassName() + ' being applied to ' + this.hash() + ', a ' + this.getClassName());
                 return false;
             }
-
-            console.log('keys OK: ', usedKeys);
-
         }
 
         return true;
