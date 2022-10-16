@@ -7,5 +7,6 @@ export * from './peer/sources/SecretBasedPeerSource';
 export * from './peer/IdentityPeer';
 export * from './peer/Peer';
 export * from './peer/PeerGroupAgent';
+export * from './peer/PeerGroupState';
 export * from './peer/PeeringAgentBase';
 export * from './peer/PeerSource';

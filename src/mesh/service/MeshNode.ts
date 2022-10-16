@@ -2,7 +2,7 @@
 import { Identity } from 'data/identity';
 import { Hash, HashedObject } from 'data/model';
 import { Endpoint } from 'mesh/agents/network';
-import { ObjectDiscoveryPeerSource, PeerInfo } from 'mesh/agents/peer';
+import { ObjectDiscoveryPeerSource, PeerGroupState, PeerInfo } from 'mesh/agents/peer';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn';
 import { LinkupAddress, LinkupManager } from 'net/linkup';
 import { Resources } from 'spaces/spaces';
@@ -57,6 +57,16 @@ class MeshNode {
             this.broadcastTokens.delete(obj.getLastHash());
         }
         
+    }
+
+    async getPeerGroupState(peerGroupId: string): Promise<PeerGroupState|undefined> {
+        return this.resources.mesh.getPeerGroupState(peerGroupId);
+    }
+
+    async getPeerGroupStateForSyncObj(obj: HashedObject) {
+        const peerGroup = await this.discoveryPeerGroupInfo(obj);
+
+        return this.getPeerGroupState(peerGroup.id);
     }
 
     async sync(obj: HashedObject, mode :SyncMode = SyncMode.full, peerGroup?: PeerGroupInfo, gossipId?: string): Promise<void> {
