@@ -127,7 +127,9 @@ class WebRTCConnection implements Connection {
     }
 
     channelIsOperational() {
-        return this.connection !== undefined && this.channel !== undefined && this.channel.readyState === 'open';
+        return this.connection !== undefined && this.connection.connectionState !== 'disconnected' &&
+               this.connection.connectionState !== 'closed' && this.connection.connectionState !== 'failed' &&
+               this.channel !== undefined && this.channel.readyState === 'open';
     }
 
     setMessageCallback(messageCallback: (message: any, conn: Connection) => void) {
@@ -268,6 +270,14 @@ class WebRTCConnection implements Connection {
                 }
             };
 
+            this.connection.onconnectionstatechange = () => {
+                WebRTCConnection.logger.debug(this.callId + ' connectionState now is ' + this?.connection?.connectionState);
+
+                if (this.channelStatusChangeCallback !== undefined) {
+                    this.channelStatusChangeCallback(this.channel?.readyState || 'unknown', this);
+                }
+            };
+
         }
     }
 
@@ -364,6 +374,7 @@ class WebRTCConnection implements Connection {
 
         let stateChange = () => {
             WebRTCConnection.logger.debug(this.callId + ' readyState now is ' + this.channel?.readyState);
+
             if (this.channel?.readyState === 'open') {
                 this.onready();
             };
