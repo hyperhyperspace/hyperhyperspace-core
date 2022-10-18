@@ -278,7 +278,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             if (oldInsertionOps !== undefined) {
 
                 for (const oldInsertionOp of oldInsertionOps) {
-                    const deleteOp = new DeleteOp(oldInsertionOp);
+                    const deleteOp = await this.deleteOpForInsertOp(oldInsertionOp, author, extraAuth);
                     await this.applyNewOp(deleteOp);
                 }
 
@@ -384,22 +384,9 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         const deleteOps: Array<DeleteOp<T>> = [];
 
         for (const insertOp of insertOps.values()) {
-            if (this._currentInsertOpOrds.get(insertOp.getLastHash()) === ordinal) {
-                deleteOp = new DeleteOp(insertOp);
-
-                if (author !== undefined) {
-                    deleteOp.setAuthor(author);
-                } else if (this.getClassName() === CausalArray.className) {
-                    CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
-                }
-    
-                const auth = Authorization.chain(this.createDeleteAuthorizer(insertOp.element as T, deleteOp.getAuthor()), extraAuth);
-    
-                this.setCurrentPrevOpsTo(deleteOp);
-    
-                if (!(await auth.attempt(deleteOp))) {
-                    throw new AuthError('Cannot authorize delete operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
-                }
+            if (ordinal === undefined || this._currentInsertOpOrds.get(insertOp.getLastHash()) === ordinal) {
+                
+                deleteOp = await this.deleteOpForInsertOp(insertOp, author, extraAuth);
 
                 deleteOps.push(deleteOp);
                 
@@ -418,6 +405,26 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         await Promise.all(deletions);
 
         return deleteOps.length > 0;
+    }
+
+    private async deleteOpForInsertOp(insertOp: InsertOp<T>, author?: Identity, extraAuth?: Authorizer) {
+        const deleteOp = new DeleteOp(insertOp);
+
+        if (author !== undefined) {
+            deleteOp.setAuthor(author);
+        } else if (this.getClassName() === CausalArray.className) {
+            CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
+        }
+
+        const auth = Authorization.chain(this.createDeleteAuthorizer(insertOp.element as T, deleteOp.getAuthor()), extraAuth);
+
+        this.setCurrentPrevOpsTo(deleteOp);
+
+        if (!(await auth.attempt(deleteOp))) {
+            throw new AuthError('Cannot authorize delete operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
+        }
+
+        return deleteOp;
     }
 
     has(element: T): boolean {
@@ -614,6 +621,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
             if (!auth.verify(op, usedKeys)) {
                 HashedObject.validationLog.warning('Could not verify authorization for op ' + op.hash() + ', a ' + op.getClassName() + ' being applied to ' + this.hash() + ', a ' + this.getClassName());
+
                 return false;
             }
 
