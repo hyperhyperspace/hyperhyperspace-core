@@ -51,6 +51,12 @@ class SignallingServerConnection implements LinkupServer {
 
     challenge?: string;
 
+    closed: boolean;
+
+    checkReceptionInterval: any;
+
+    lastReceivedMessageTimestamp?: number;
+
     constructor(serverURL : string) {
 
         if (!SignallingServerConnection.isWebRTCBased(serverURL)) {
@@ -70,7 +76,38 @@ class SignallingServerConnection implements LinkupServer {
 
         this.messageQueue = [];
 
+        this.closed = false;
+
         this.checkWebsocket();
+
+        const FIVE_MINUTES = 5 * 60 * 1000;
+        const HALF_HOUR    = 30 * 60 * 1000;
+
+        // If we don't receive anything from the singalling server for
+        // 10 minutes straight, disconnect and re-connect just in case.
+        this.checkReceptionInterval = setInterval(() => {
+
+            if (!this.closed) {
+                if (this.lastReceivedMessageTimestamp === undefined ||
+                    Date.now() - this.lastReceivedMessageTimestamp >= HALF_HOUR) {
+
+                        SignallingServerConnection.logger.debug('closing websocket to server ' + this.serverURL + ' due to lack of received messages, will try to re-open');
+                        try {
+                            this.ws?.close();
+                        } finally {
+                            this.checkWebsocket();
+                        }
+
+                } else if (Date.now() - this.lastReceivedMessageTimestamp >= FIVE_MINUTES) {
+                    try {
+                        SignallingServerConnection.logger.trace('sending ping to server ' + this.serverURL);
+                        this.ws?.send(JSON.stringify({action: 'ping'}));
+                    } catch(e) {
+                        this.checkWebsocket();
+                    }
+                }
+            }
+        }, FIVE_MINUTES);
     }
     
     getInstanceId() {
@@ -261,6 +298,8 @@ class SignallingServerConnection implements LinkupServer {
       
                     this.ws.onmessage = (ev) => {
 
+                        this.lastReceivedMessageTimestamp = Date.now();
+
                         const message = JSON.parse(ev.data);
                         const ws = this.ws as WebSocket;
             
@@ -276,6 +315,8 @@ class SignallingServerConnection implements LinkupServer {
                                 SignallingServerConnection.logger.debug('not sending pong to ' + this.serverURL + ': connection is not open');
                             }
 
+                        } else if (message['action'] === 'pong') { 
+                            SignallingServerConnection.logger.trace('received pong from server ' + this.serverURL);
                         } else if (message['action'] === 'send') {
                             const linkupId = message['linkupId'];
                             const callId   = message['callId'];
@@ -448,8 +489,17 @@ class SignallingServerConnection implements LinkupServer {
     }
 
     close() {
-        if (this.ws?.readyState === WebSocket.CONNECTING && this.ws?.readyState === WebSocket.CONNECTING) {
-            this.ws?.close();
+
+        if (!this.closed) {
+            this.closed = true;
+
+            if (this.ws?.readyState !== WebSocket.CLOSED && this.ws?.readyState !== WebSocket.CLOSING) {
+                this.ws?.close();
+            }
+
+            if (this.checkReceptionInterval !== undefined) {
+                clearInterval(this.checkReceptionInterval);
+            }
         }
     }
 
