@@ -13,6 +13,7 @@
   },
   "scripts": {
     "build": "npx ttsc --project tsconfig.build.json",
+    "watch": "npx ttsc --project tsconfig.build.json --watch",
     "build-dev": "npx ttsc",
     "build-browser": "npx ttsc --project tsconfig.browser.json && npx rollup -c",
     "clean": "rm -rf ./dist/* && rm -rf ./dist-dev/* ",
