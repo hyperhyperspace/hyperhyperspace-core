@@ -472,6 +472,11 @@ class Store {
         return this.load(hash, true, true);
     }
 
+    // convenience
+    async loadInitialValue(hash: Hash): Promise<HashedObject | undefined> {
+        return this.load(hash, false, false);
+    }
+
     async load<T=HashedObject>(hash: Hash, loadMutations=true, watchForChanges=false) : Promise<T | undefined> {
 
         await this.initKeyPairs;
@@ -488,13 +493,19 @@ class Store {
 
         if (loadMutations && object !== undefined) {
 
-            for (const subobj of context.objects.values()) {
+            if (watchForChanges) {
+                object.watchForChanges();
+            }
+
+            await object.loadAllChanges();
+
+            /*for (const subobj of context.objects.values()) {
                 if (watchForChanges) {
                     subobj.watchForChanges();
                 }
     
                 await subobj.loadAllChanges();
-            }
+            }*/
         }
 
         return object as (T|undefined);

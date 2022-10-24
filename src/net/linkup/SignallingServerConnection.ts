@@ -87,10 +87,11 @@ class SignallingServerConnection implements LinkupServer {
         // 10 minutes straight, disconnect and re-connect just in case.
         this.checkReceptionInterval = setInterval(() => {
 
+            const now = Date.now();
+
             if (!this.closed) {
                 if (this.lastReceivedMessageTimestamp === undefined ||
-                    Date.now() - this.lastReceivedMessageTimestamp >= HALF_HOUR) {
-
+                    now - this.lastReceivedMessageTimestamp >= HALF_HOUR) {
                         SignallingServerConnection.logger.debug('closing websocket to server ' + this.serverURL + ' due to lack of received messages, will try to re-open');
                         try {
                             this.ws?.close();
@@ -98,13 +99,13 @@ class SignallingServerConnection implements LinkupServer {
                             this.checkWebsocket();
                         }
 
-                } else if (Date.now() - this.lastReceivedMessageTimestamp >= FIVE_MINUTES) {
-                    try {
-                        SignallingServerConnection.logger.trace('sending ping to server ' + this.serverURL);
-                        this.ws?.send(JSON.stringify({action: 'ping'}));
-                    } catch(e) {
-                        this.checkWebsocket();
-                    }
+                } else if (now - this.lastReceivedMessageTimestamp >= FIVE_MINUTES) {
+                        try {
+                            SignallingServerConnection.logger.trace('sending ping to server ' + this.serverURL);
+                            this.ws?.send(JSON.stringify({action: 'ping'}));
+                        } catch(e) {
+                            this.checkWebsocket();
+                        }    
                 }
             }
         }, FIVE_MINUTES);
@@ -272,144 +273,148 @@ class SignallingServerConnection implements LinkupServer {
 
     private checkWebsocket() : boolean {
 
-        if (this.ws !== null && this.ws.readyState === WebSocket.OPEN) {
-            return true;
-        } else {
-            if ( (this.ws === null ||
-                  (this.ws.readyState === WebSocket.CLOSING ||
-                   this.ws.readyState === WebSocket.CLOSED))
-                &&
-                  (this.lastConnectionAttempt === undefined ||
-                   (Date.now() > this.lastConnectionAttempt + CONN_BACKOFF_TIME))     
-                ) {
+        if (!this.closed) {
+            if (this.ws !== null && this.ws.readyState === WebSocket.OPEN) {
+                return true;
+            } else {
+                if ( (this.ws === null ||
+                    (this.ws.readyState === WebSocket.CLOSING ||
+                    this.ws.readyState === WebSocket.CLOSED))
+                    &&
+                    (this.lastConnectionAttempt === undefined ||
+                    (Date.now() > this.lastConnectionAttempt + CONN_BACKOFF_TIME))     
+                    ) {
+                    
+                    this.lastConnectionAttempt = Date.now();
+
+                    SignallingServerConnection.logger.debug('creating websocket to server ' + this.serverURL);
+                    try {
+                        this.ws = new WebSocket(SignallingServerConnection.getRealServerURL(this.serverURL));
+                    } catch (e: any) {
+                        this.ws = null;
+                        SignallingServerConnection.logger.warning('Unexpected error while creating websocket to signalling server ' + this.serverURL);
+                        SignallingServerConnection.logger.error(e);
+                    }
+                    
+                    if (this.ws !== null) {
+        
+                        this.ws.onmessage = (ev) => {
+
+                            this.lastReceivedMessageTimestamp = Date.now();
+
+                            const message = JSON.parse(ev.data);
+                            const ws = this.ws as WebSocket;
                 
-                this.lastConnectionAttempt = Date.now();
-
-                SignallingServerConnection.logger.debug('creating websocket to server ' + this.serverURL);
-                try {
-                    this.ws = new WebSocket(SignallingServerConnection.getRealServerURL(this.serverURL));
-                } catch (e: any) {
-                    this.ws = null;
-                    SignallingServerConnection.logger.warning('Unexpected error while creating websocket to signalling server ' + this.serverURL);
-                    SignallingServerConnection.logger.error(e);
-                }
-                
-                if (this.ws !== null) {
-      
-                    this.ws.onmessage = (ev) => {
-
-                        this.lastReceivedMessageTimestamp = Date.now();
-
-                        const message = JSON.parse(ev.data);
-                        const ws = this.ws as WebSocket;
-            
-                        if (message['action'] === 'ping') {
-                            SignallingServerConnection.logger.trace('sending pong to ' + this.serverURL);
-                            if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
-                                try {
-                                    ws.send(JSON.stringify({'action' : 'pong'}));
-                                } catch (e: any) {
-                                    SignallingServerConnection.logger.warning('Error while sending pong to ' + this.serverURL, e);
+                            if (message['action'] === 'ping') {
+                                SignallingServerConnection.logger.trace('sending pong to ' + this.serverURL);
+                                if (this.ws !== null && this.ws.readyState === this.ws.OPEN) {
+                                    try {
+                                        ws.send(JSON.stringify({'action' : 'pong'}));
+                                    } catch (e: any) {
+                                        SignallingServerConnection.logger.warning('Error while sending pong to ' + this.serverURL, e);
+                                    }
+                                } else {
+                                    SignallingServerConnection.logger.debug('not sending pong to ' + this.serverURL + ': connection is not open');
                                 }
-                            } else {
-                                SignallingServerConnection.logger.debug('not sending pong to ' + this.serverURL + ': connection is not open');
-                            }
 
-                        } else if (message['action'] === 'pong') { 
-                            SignallingServerConnection.logger.trace('received pong from server ' + this.serverURL);
-                        } else if (message['action'] === 'send') {
-                            const linkupId = message['linkupId'];
-                            const callId   = message['callId'];
-                            const raw      = message['raw'];
+                            } else if (message['action'] === 'pong') { 
+                                SignallingServerConnection.logger.trace('received pong from server ' + this.serverURL);
+                            } else if (message['action'] === 'send') {
+                                const linkupId = message['linkupId'];
+                                const callId   = message['callId'];
+                                const raw      = message['raw'];
 
-                            if (callId !== undefined) {
-                                const linkupIdCalls = this.messageCallbacks.get(linkupId);
-                                let found = false;
-                                if (linkupIdCalls !== undefined) {
-                                    let callMessageCallbacks = linkupIdCalls.get(callId);
-                                    if (callMessageCallbacks !== undefined) {
-                                        callMessageCallbacks.forEach((callback: MessageCallback) => {
-                                            SignallingServerConnection.logger.debug('Delivering linkup message to ' + linkupId + ' on call ' + message['callId']);
-                                            callback(message['instanceId'], message['data']);
-                                            found = true;
+                                if (callId !== undefined) {
+                                    const linkupIdCalls = this.messageCallbacks.get(linkupId);
+                                    let found = false;
+                                    if (linkupIdCalls !== undefined) {
+                                        let callMessageCallbacks = linkupIdCalls.get(callId);
+                                        if (callMessageCallbacks !== undefined) {
+                                            callMessageCallbacks.forEach((callback: MessageCallback) => {
+                                                SignallingServerConnection.logger.debug('Delivering linkup message to ' + linkupId + ' on call ' + message['callId']);
+                                                callback(message['instanceId'], message['data']);
+                                                found = true;
+                                            });
+                                        }
+                                    }
+
+                                    if (!found) {
+                                        found = false;
+                                        let linkupIdCallbacks = this.newCallMessageCallbacks.get(linkupId);
+                                        if (linkupIdCallbacks !== undefined) {
+                                            linkupIdCallbacks.forEach((callback: NewCallMessageCallback) => {
+                                                SignallingServerConnection.logger.debug('Calling default callback for linkupId ' + linkupId + ', unlistened callId is ' + callId);
+                                                callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), callId, message['instanceId'], message['data']);
+                                                found = true;
+                                            })
+                                        }
+            
+                                        if (!found) {
+                                            SignallingServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId, message);
+                                        }
+                                    }
+                                } else if (raw !== undefined && raw === 'true') {
+
+                                    let callbacks = this.rawMessageCallbacks.get(linkupId);
+
+                                    if (callbacks !== undefined) {
+                                        callbacks.forEach((callback: RawMessageCallback) => {
+                                            SignallingServerConnection.logger.debug('Calling raw message callback for linkupId ' + linkupId);
+                                            callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), message['data']);
                                         });
                                     }
                                 }
-
-                                if (!found) {
-                                    found = false;
-                                    let linkupIdCallbacks = this.newCallMessageCallbacks.get(linkupId);
-                                    if (linkupIdCallbacks !== undefined) {
-                                        linkupIdCallbacks.forEach((callback: NewCallMessageCallback) => {
-                                            SignallingServerConnection.logger.debug('Calling default callback for linkupId ' + linkupId + ', unlistened callId is ' + callId);
-                                            callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), callId, message['instanceId'], message['data']);
-                                            found = true;
-                                        })
-                                    }
-        
-                                    if (!found) {
-                                        SignallingServerConnection.logger.warning('Received message for unlistened linkupId: ' + linkupId, message);
-                                    }
-                                }
-                            } else if (raw !== undefined && raw === 'true') {
-
-                                let callbacks = this.rawMessageCallbacks.get(linkupId);
-
-                                if (callbacks !== undefined) {
-                                    callbacks.forEach((callback: RawMessageCallback) => {
-                                        SignallingServerConnection.logger.debug('Calling raw message callback for linkupId ' + linkupId);
-                                        callback(new LinkupAddress(message['replyServerUrl'], message['replyLinkupId']), new LinkupAddress(this.serverURL, linkupId), message['data']);
-                                    });
-                                }
-                            }
-                            
-
-                            
-                        } else if (message['action'] === 'query-reply') {
-
-                            const queryId = message['queryId'];
-                            const hits   = message['hits'];
-                            
-                            let callback = this.listeningAddressesQueryCallback;
-
-                            if (callback !== undefined) {
-                                let matchingLinkupAddresses = new Array<LinkupAddress>();
-                                for (const linkupId of hits) {
-                                    matchingLinkupAddresses.push(new LinkupAddress(this.serverURL, linkupId));
-                                }
-                                callback(queryId, matchingLinkupAddresses);
-                            }
-                        } else if (message['action'] === 'update-challenge') { 
-                            this.challenge = message['challenge'];
-
-                            for (const address of this.linkupIdsToListen.values()) {
                                 
-                                if (address.identity !== undefined && 
-                                    address.linkupId.slice(0, LinkupAddress.verifiedIdPrefix.length) === LinkupAddress.verifiedIdPrefix) {
-                                    
-                                    this.setUpListener(address);
+
+                                
+                            } else if (message['action'] === 'query-reply') {
+
+                                const queryId = message['queryId'];
+                                const hits   = message['hits'];
+                                
+                                let callback = this.listeningAddressesQueryCallback;
+
+                                if (callback !== undefined) {
+                                    let matchingLinkupAddresses = new Array<LinkupAddress>();
+                                    for (const linkupId of hits) {
+                                        matchingLinkupAddresses.push(new LinkupAddress(this.serverURL, linkupId));
+                                    }
+                                    callback(queryId, matchingLinkupAddresses);
                                 }
+                            } else if (message['action'] === 'update-challenge') { 
+                                this.challenge = message['challenge'];
+
+                                for (const address of this.linkupIdsToListen.values()) {
+                                    
+                                    if (address.identity !== undefined && 
+                                        address.linkupId.slice(0, LinkupAddress.verifiedIdPrefix.length) === LinkupAddress.verifiedIdPrefix) {
+                                        
+                                        this.setUpListener(address);
+                                    }
+                                }
+
+                            } else {
+                                SignallingServerConnection.logger.info('received unknown message on ' + this.serverURL + ': ' + ev.data);
                             }
+                        };
+            
+                        this.ws.onopen = () => {
+                            SignallingServerConnection.logger.debug('done creating websocket to URL ' + this.serverURL);
+                            this.setUpListeners();
+                            this.emptyMessageQueue();
+                        };
 
-                        } else {
-                            SignallingServerConnection.logger.info('received unknown message on ' + this.serverURL + ': ' + ev.data);
-                        }
-                    };
-        
-                    this.ws.onopen = () => {
-                        SignallingServerConnection.logger.debug('done creating websocket to URL ' + this.serverURL);
-                        this.setUpListeners();
-                        this.emptyMessageQueue();
-                    };
+                        this.ws.onerror = (ev: Event) => {
+                            ev;
+                            SignallingServerConnection.logger.debug('Error in websocket for server ' + this.serverURL + ':');
+                            //SignallingServerConnection.logger.error(ev);
+                        };
+                    }
 
-                    this.ws.onerror = (ev: Event) => {
-                        ev;
-                        SignallingServerConnection.logger.debug('Error in websocket for server ' + this.serverURL + ':');
-                        //SignallingServerConnection.logger.error(ev);
-                    };
                 }
-
+                return false;
             }
+        } else {
             return false;
         }
     }

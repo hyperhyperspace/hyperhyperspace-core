@@ -364,6 +364,41 @@ class IdbBackend implements Backend {
         await this.idbPromise;
     }
 
+    static async exists(name: string): Promise<boolean> {
+
+        if (window.indexedDB.databases === undefined) {
+
+            try {
+                const db = await openDB(name, 1);
+
+                const exists = db.objectStoreNames.contains(IdbBackend.OBJ_STORE);
+
+                await db.close();
+
+                if (!exists) {
+                    console.log('database doesnt exists (from attampting open): ' + name)
+                    window.indexedDB.deleteDatabase(name);
+                } else {
+                    console.log('database exists (from attempting open): ' + name);
+                }
+                
+                return exists;
+            } catch (e: any) {
+                console.log("error attempting to open idb to check its existence: " + name, e);
+                return false;
+            }
+        } else {
+            for (const dbInfo of (await window.indexedDB.databases())) {
+                if (dbInfo.name === name) {
+                    console.log('database exists (from databases call): ' + name)
+                    return true;
+                }
+            }
+
+            console.log('database doesnt exist (from databases call): ' + name);
+            return false;
+        }
+    }
 }
 
 Store.registerBackend(IdbBackend.backendName, (dbName: string) => new IdbBackend(dbName));
