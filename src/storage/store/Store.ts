@@ -481,6 +481,8 @@ class Store {
 
         await this.initKeyPairs;
 
+        console.log('+++ loading ' + hash)
+
         if (!loadMutations && watchForChanges) {
             throw Error('Trying to load ' + hash + ' from the store, but loadMotations=false and watchForChanges=true. This combination does not make sense.');
         }
@@ -497,15 +499,16 @@ class Store {
                 object.watchForChanges();
             }
 
+            console.log('+++ loading changes for ' + hash);
             await object.loadAllChanges();
 
-            /*for (const subobj of context.objects.values()) {
+            for (const subobj of context.objects.values()) {
                 if (watchForChanges) {
                     subobj.watchForChanges();
                 }
     
                 await subobj.loadAllChanges();
-            }*/
+            }
         }
 
         return object as (T|undefined);
