@@ -406,9 +406,9 @@ class SecureNetworkAgent implements Agent {
 
     secureForReceiving(connId: ConnectionId, localIdentity: Identity, timeout=DEFAULT_TIMEOUT) {
         
-        SecureNetworkAgent.logger.trace('Asked to verify ' + connId + ' for receiving with ' + localIdentity.hash());
+        SecureNetworkAgent.logger.trace('Asked to verify ' + connId + ' for receiving with ' + localIdentity.getLastHash());
 
-        const identityHash = localIdentity.hash();
+        const identityHash = localIdentity.getLastHash();
 
         let secured = this.getOrCreateConnectionSecuredForReceiving(connId, identityHash);
         secured.identity = localIdentity;
@@ -799,7 +799,7 @@ class SecureNetworkAgent implements Agent {
     private sendIdentity(connId: ConnectionId, identity: Identity, identityHash?: Hash) {
 
         if (identityHash === undefined) {
-            identityHash = identity.hash();
+            identityHash = identity.getLastHash();
         }
         
         let content: SendIdentityMessage = {

@@ -205,6 +205,9 @@ abstract class HashedObject {
   
     hash(seed?: string): Hash {
 
+        //console.log('about to hash a ' + this.getClassName())
+        //console.trace();
+
         let hash = this.customHash(seed);
 
         if (hash === undefined) {

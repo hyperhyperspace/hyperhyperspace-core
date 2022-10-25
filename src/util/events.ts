@@ -15,7 +15,7 @@ import { Logger, LogLevel } from 'util/logging';
 
 
 type hash = string;
-type hashable = { hash(): hash; };
+type hashable = { getLastHash(): hash; };
 
 type location<T> = {name: string, emitter: T};
 //type path<T> = Array<location<T>>;
@@ -46,7 +46,7 @@ class EventRelay<T extends hashable> {
     constructor(source: T, upstreamRelays: Map<string, EventRelay<T>>) {
 
         this.emitter     = source;
-        this.emitterHash = source.hash(); 
+        this.emitterHash = source.getLastHash(); 
 
         this.upstreamRelays = new Map();
 

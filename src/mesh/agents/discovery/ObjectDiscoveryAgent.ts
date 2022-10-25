@@ -7,6 +7,7 @@ import { Endpoint, LinkupMessage, NetworkAgent, NetworkEventType } from '../netw
 import { ObjectBroadcastAgent, ObjectBroadcastRequest, ObjectBroadcastReply } from './ObjectBroadcastAgent';
 
 import { AsyncStream, BufferedAsyncStream, BufferingAsyncStreamSource, AsyncStreamSource, FilteredAsyncStreamSource } from 'util/streams';
+import { LRUCache } from 'util/caching';
 
 type Params = {
     broadcastedSuffixBits : number,
@@ -28,6 +29,10 @@ class ObjectDiscoveryAgent implements Agent {
 
     static newestReplyFirst = (a: ObjectDiscoveryReply, b: ObjectDiscoveryReply) => (b.timestamp - a.timestamp);
 
+    private static makeEndpointObjectPair(hash: Hash, source: Endpoint, destination: Endpoint) {
+        return hash + '_' + source.replaceAll('_', '__') + '_' + destination.replaceAll('_', '__');
+    }
+
     pod?: AgentPod;
 
     
@@ -39,6 +44,7 @@ class ObjectDiscoveryAgent implements Agent {
 
     streamSource: BufferingAsyncStreamSource<ObjectDiscoveryReply>;
 
+    discoveredEndpointObjectPairs: LRUCache<string, HashedObject>;
 
     wasShutdown = false;
 
@@ -60,6 +66,8 @@ class ObjectDiscoveryAgent implements Agent {
         this.lastQueryingTimePerServer = new Map();
 
         this.streamSource = new BufferingAsyncStreamSource(this.params.maxStoredReplies);
+
+        this.discoveredEndpointObjectPairs = new LRUCache(256);
     }
 
     getAgentId(): string {
@@ -169,52 +177,81 @@ class ObjectDiscoveryAgent implements Agent {
 
             if (msg.agentId === this.getAgentId()) {
 
-                const reply = msg.content as ObjectBroadcastReply;
-
                 
 
-                let replyHash: Hash|undefined = undefined;
-                let object: HashedObject | undefined = undefined;
-                let error: string | undefined = undefined;
-                try {
-                    object = HashedObject.fromLiteralContext(reply.literalContext);
-                    replyHash = object.hash();
-                } catch (e: any) {
-
-                    // Since anybody may reply with _anything_, only replies that at least match the hash
-                    // suffix being queried will be reported back to the caller.
-
-                    ObjectDiscoveryAgent.log.warning('Error deliteralizing object discovery reply:' + e);
-                    object = undefined;
-                    replyHash = undefined;
-                    const literal = reply.literalContext.literals[reply.literalContext.rootHashes[0]];
-
-                    if (literal !== undefined && LiteralUtils.validateHash(literal)) {
-                        if (literal.hash === reply.literalContext.rootHashes[0]) {
-                            replyHash = literal.hash;
-                        }
-                    }
-
-                    error = String(e);
-                }
-
-                if (replyHash === reply.literalContext.rootHashes[0] && 
-                    this.hexHashSuffix === Hashing.toHex(replyHash).slice(-this.hexHashSuffix.length) &&
-                    this.localEndpoints.has(msg.destination)) {
-
-                    ObjectDiscoveryAgent.log.trace(() => 'Received object with hash ' + replyHash + ' from ' + msg.source + ' at ' + msg.destination);
-
-                    let item = {source: msg.source, destination: msg.destination, hash: replyHash, object: object, error: error, timestamp: Date.now()}; 
-                    
-
-                    this.streamSource.ingest(item);
-                    
-                } else {
-                    ObjectDiscoveryAgent.log.debug('Error validating object discovery reply');
-                }
+                this.processReply(msg);
 
             }
 
+        }
+    }
+
+    private processReply(msg: LinkupMessage) {
+
+        const reply = msg.content as ObjectBroadcastReply;
+
+        let replyHash: Hash|undefined = undefined;
+        let object: HashedObject | undefined = undefined;
+        let error: string | undefined = undefined;
+
+        
+
+        try {
+            const declaredHash = reply.literalContext.rootHashes.length === 1? 
+                                        reply.literalContext.rootHashes[0]
+                                    :
+                                        '';
+
+            if (this.hexHashSuffix === Hashing.toHex(declaredHash).slice(-this.hexHashSuffix.length)) {
+               
+                const cacheKey = ObjectDiscoveryAgent.makeEndpointObjectPair(declaredHash, msg.source, msg.destination);
+                object = this.discoveredEndpointObjectPairs.get(cacheKey);
+
+                if (object === undefined) {
+                    object = HashedObject.fromLiteralContext(reply.literalContext);
+                    replyHash = object.hash();
+
+                    if (replyHash === declaredHash) {
+                        this.discoveredEndpointObjectPairs.set(cacheKey, object);
+                    }
+                } else {
+                    replyHash = declaredHash;
+                }
+            }
+
+            
+        } catch (e: any) {
+
+            // Since anybody may reply with _anything_, only replies that at least match the hash
+            // suffix being queried will be reported back to the caller.
+
+            ObjectDiscoveryAgent.log.warning('Error deliteralizing object discovery reply:' + e);
+            object = undefined;
+            replyHash = undefined;
+            const literal = reply.literalContext.literals[reply.literalContext.rootHashes[0]];
+
+            if (literal !== undefined && LiteralUtils.validateHash(literal)) {
+                if (literal.hash === reply.literalContext.rootHashes[0]) {
+                    replyHash = literal.hash;
+                }
+            }
+
+            error = String(e);
+        }
+
+        if (replyHash === reply.literalContext.rootHashes[0] && 
+            this.hexHashSuffix === Hashing.toHex(replyHash).slice(-this.hexHashSuffix.length) &&
+            this.localEndpoints.has(msg.destination)) {
+
+            ObjectDiscoveryAgent.log.trace(() => 'Received object with hash ' + replyHash + ' from ' + msg.source + ' at ' + msg.destination);
+
+            let item = {source: msg.source, destination: msg.destination, hash: replyHash, object: object, error: error, timestamp: Date.now()}; 
+            
+
+            this.streamSource.ingest(item);
+            
+        } else {
+            ObjectDiscoveryAgent.log.debug('Error validating object discovery reply');
         }
     }
 

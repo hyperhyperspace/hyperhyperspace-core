@@ -515,7 +515,7 @@ class Store {
             }*/
         }
 
-        //console.log('+++ loaded ' + hash, object?.getClassName(), new Error().stack);
+        //console.log('+++ loaded ' + hash, object?.getClassName());
 
         if (object instanceof MutationOp) {
             //console.log('+++ target: ' + object.getTargetObject().getLastHash() + ' (' + object.getTargetObject().getClassName() + ')');

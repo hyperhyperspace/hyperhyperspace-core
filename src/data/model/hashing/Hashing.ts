@@ -15,14 +15,21 @@ class Hashing {
             seed = '';
         }
 
-        let firstPass  = Hashing.sha.sha256base64('0a' + text + seed);
-        let secondPass = Hashing.rmd.rmd160base64(text + firstPass); 
+        //const t = Date.now();
+
+        const firstPass  = Hashing.sha.sha256base64('0a' + text + seed);
+        const secondPass = Hashing.rmd.rmd160base64(text + firstPass); 
+
+        //console.trace();
+        //console.log(' *** hashing took ', Date.now() - t, ' for result ', secondPass);
 
         return secondPass;
     }
 
     static forValue(value: any, seed?: string) : Hash{
-        let text = Serialization.default(value);
+        //const t = Date.now()
+        const text = Serialization.default(value);
+        //console.log(' *** serialization took ', Date.now() - t);
         
         return Hashing.forString(text, seed);
     }
