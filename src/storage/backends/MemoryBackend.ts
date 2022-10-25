@@ -1,4 +1,4 @@
-import { Backend, BackendSearchParams, BackendSearchResults } from './Backend';
+import { Backend, BackendSearchParams, BackendSearchResults, Storable } from './Backend';
 import { Literal, Hash, HashReference, HashedSet } from 'data/model';
 import { MultiMap } from 'util/multimap';
 import { Store, StoredOpHeader } from 'storage/store/Store';
@@ -172,10 +172,15 @@ class MemoryBackend implements Backend {
         }
     }
 
-    async load(hash: string): Promise<Literal | undefined> {
+    async load(hash: string): Promise<Storable | undefined> {
         const loaded = this.repr.objects.get(hash);
 
-        return loaded?.literal;
+        if (loaded === undefined) {
+            return undefined;
+        } else {
+            return {literal: loaded.literal, sequence: loaded.sequence};
+        }
+        
     }
 
     async loadTerminalOpsForMutable(hash: string): Promise<{ lastOp: string; terminalOps: string[]; } | undefined> {

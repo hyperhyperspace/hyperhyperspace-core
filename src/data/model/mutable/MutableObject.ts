@@ -222,6 +222,8 @@ abstract class  MutableObject extends HashedObject {
 
     async loadAllChanges(batchSize=128) {
 
+        await super.loadAllChanges(batchSize);
+
         let results = await this.getStore()
                                 .loadByReference(
                                     'targetObject', 
@@ -379,7 +381,11 @@ abstract class  MutableObject extends HashedObject {
 
     protected apply(op: MutationOp, isNew: boolean) : Promise<void> {
 
-        const opHash = op.hash();
+        if (isNew) {
+            op.hash();
+        }
+
+        const opHash = op.getLastHash();
 
         if (this._allAppliedOps.has(opHash)) {
             return Promise.resolve();

@@ -5,6 +5,11 @@ import { StoredOpHeader } from '../store/Store';
 type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, limit?: number};
 type BackendSearchResults = {items : Array<Literal>, start?: string, end?: string };
 
+// The sequence number in a storable indicates the order in which objects have been persisted.
+// It's useful, for example, as a rough approximation of the partial order defined by prevOps,
+// since a < b in the prevOps partial order, then seq(a) < seq(b).
+type Storable = { literal: Literal, sequence: number };
+
 //type MutableObjectInfo = { hash: Hash, nextOpSeqNumber: number, terminalOps: Array<Hash> };
 
 //type StoredLiteral = { literal: Literal, extra: {opHeight?: number, prevOpCount?: number, causalHistoryHash?: Hash}};
@@ -16,7 +21,7 @@ interface Backend {
     getName() : string;
 
     store(literal : Literal, history?: StoredOpHeader) : Promise<void>;
-    load(hash: Hash) : Promise<Literal | undefined>;
+    load(hash: Hash) : Promise<Storable | undefined>;
 
     loadOpHeader(opHash: Hash) : Promise<StoredOpHeader | undefined>;
     loadOpHeaderByHeaderHash(causalHistoryHash: Hash) : Promise<StoredOpHeader | undefined>;
@@ -37,3 +42,4 @@ interface Backend {
 }
 
 export { Backend, BackendSearchParams, BackendSearchResults };
+export type { Storable };

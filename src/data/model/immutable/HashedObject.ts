@@ -900,7 +900,7 @@ abstract class HashedObject {
                 if (value['_type'] === 'hashed_set') {
                     something = HashedSet.deliteralize(value, context, validate);
                 } else if (value['_type'] === 'hashed_map') { 
-                    something = HashedMap.deliteralize(value, context);
+                    something = HashedMap.deliteralize(value, context, validate);
                 } else if (value['_type'] === 'hashed_object_reference') {
                     something = HashReference.deliteralize(value);
                 } else if (value['_type'] === 'hashed_object_dependency') {
@@ -1058,8 +1058,11 @@ abstract class HashedObject {
     }
 
     async loadAllChanges(loadBatchSize=128) {
-        for (const obj of this.getDirectSubObjects().values()) {
-            await obj.loadAllChanges(loadBatchSize);
+
+        const subobjs = new Set(this.getDirectSubObjects().values());
+
+        for (const subobj of subobjs.values()) {
+            await subobj.loadAllChanges(loadBatchSize);
         }
     }
 }

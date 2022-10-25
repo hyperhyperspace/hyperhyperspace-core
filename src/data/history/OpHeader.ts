@@ -28,7 +28,7 @@ class OpHeader {
         if (opOrLiteral instanceof MutationOp) {
             const op = opOrLiteral as MutationOp;
 
-            this.opHash = op.hash();
+            this.opHash = op.getLastHash();
 
             if (prevOpHeaders === undefined) {
                 throw new Error('Parameter prevOpCausalHistories is mandatory to create an OpCausalHistory from a MutationOp');
@@ -88,7 +88,7 @@ class OpHeader {
 
     verifyOpMatch(op: MutationOp, prevOpCausalHistories: Map<Hash, OpHeader>): boolean {
 
-        if (op.hash() !== this.opHash) {
+        if (op.getLastHash() !== this.opHash) {
             return false;
         }
 

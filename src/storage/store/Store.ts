@@ -1,4 +1,4 @@
-import { Backend, BackendSearchParams, BackendSearchResults } from '../backends/Backend'; 
+import { Backend, BackendSearchParams, BackendSearchResults, Storable } from '../backends/Backend'; 
 import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp, HashedSet, LiteralUtils } from 'data/model';
 import { Hash } from 'data/model/hashing/Hashing';
 
@@ -245,7 +245,7 @@ class Store {
         object.setLastHash(hash);
 
         const author = object.getAuthor();
-        const loadedLit = await this.backend.load(hash);
+        const loadedLit = (await this.backend.load(hash))?.literal;
 
         if (loadedLit !== undefined) { 
 
@@ -361,31 +361,35 @@ class Store {
 
                 const consequences = await this.loadAllConsequences(object.getTargetOp().hash());
                 
-                if (object instanceof InvalidateAfterOp) {
+                if (consequences.length > 0) { // if there are no consequences, optimize away the following
 
-                    const validConsequences = await this.loadPrevOpsClosure(object.getTerminalOps());
+                    if (object instanceof InvalidateAfterOp) {
 
-                    for (const conseqOp of consequences.values()) {
-                        if (!validConsequences.has(conseqOp.getLastHash())) {
-                            //console.log('invalidating a ' + conseqOp.getClassName() + ' because of a ' + object.getClassName());
-                            if (conseqOp instanceof CascadedInvalidateOp) {
-                                //console.log('final target is a ' + conseqOp.getFinalTargetOp().getClassName());
+                        const validConsequences = await this.loadPrevOpsClosureFast(object.getTerminalOps(), object.getTargetObject().getLastHash());
+
+                        for (const conseqOp of consequences.values()) {
+                            if (!validConsequences.has(conseqOp.getLastHash())) {
+                                //console.log('invalidating a ' + conseqOp.getClassName() + ' because of a ' + object.getClassName());
+                                if (conseqOp instanceof CascadedInvalidateOp) {
+                                    //console.log('final target is a ' + conseqOp.getFinalTargetOp().getClassName());
+                                }
+                                const casc = CascadedInvalidateOp.create(conseqOp, object);
+                                casc.toContext(context);
+                                await this.saveWithContext(casc.getLastHash(), context, saved);
                             }
+                        }
+                    
+                    } else if (object instanceof CascadedInvalidateOp) {
+        
+                        
+                        for (const conseqOp of consequences.values()) {
+                            //console.log('cascading an invalidation of a ' + object.getFinalTargetOp().getClassName());
+                            //console.log('found a dep: ' + conseqOp.getClassName());    
                             const casc = CascadedInvalidateOp.create(conseqOp, object);
                             casc.toContext(context);
                             await this.saveWithContext(casc.getLastHash(), context, saved);
                         }
-                    }
-                
-                } else if (object instanceof CascadedInvalidateOp) {
-    
-                    
-                    for (const conseqOp of consequences.values()) {
-                        //console.log('cascading an invalidation of a ' + object.getFinalTargetOp().getClassName());
-                        //console.log('found a dep: ' + conseqOp.getClassName());    
-                        const casc = CascadedInvalidateOp.create(conseqOp, object);
-                        casc.toContext(context);
-                        await this.saveWithContext(casc.getLastHash(), context, saved);
+
                     }
 
                 }
@@ -443,7 +447,7 @@ class Store {
         let literal = this.cache.get(hash);
 
         if (literal === undefined) {
-            literal = await this.backend.load(hash);
+            literal = (await this.backend.load(hash))?.literal;
             if (literal !== undefined) {
                 this.cache.set(literal?.hash, literal);
             }
@@ -481,10 +485,10 @@ class Store {
 
         await this.initKeyPairs;
 
-        console.log('+++ loading ' + hash)
+        //console.log('+++ loading ' + hash, new Error().stack)
 
         if (!loadMutations && watchForChanges) {
-            throw Error('Trying to load ' + hash + ' from the store, but loadMotations=false and watchForChanges=true. This combination does not make sense.');
+            throw Error('Trying to load ' + hash + ' from the store, but loadMutations=false and watchForChanges=true. This combination does not make sense.');
         }
 
         let context = new Context();
@@ -499,17 +503,23 @@ class Store {
                 object.watchForChanges();
             }
 
-            console.log('+++ loading changes for ' + hash);
+            //console.log('+++ loading changes for ' + hash + ' ', new Error().stack);
             await object.loadAllChanges();
 
-            for (const subobj of context.objects.values()) {
+            /*for (const subobj of context.objects.values()) {
                 if (watchForChanges) {
                     subobj.watchForChanges();
                 }
     
                 await subobj.loadAllChanges();
-            }
+            }*/
         }
+
+        //console.log('+++ loaded ' + hash, object?.getClassName(), new Error().stack);
+
+        if (object instanceof MutationOp) {
+            //console.log('+++ target: ' + object.getTargetObject().getLastHash() + ' (' + object.getTargetObject().getClassName() + ')');
+        } 
 
         return object as (T|undefined);
     }
@@ -672,6 +682,41 @@ class Store {
         let info = await this.backend.loadTerminalOpsForMutable(hash);
 
         return info;
+    }
+
+    async loadPrevOpsClosureFast(init: HashedSet<HashReference<MutationOp>>, lowerBoundHash?: Hash): Promise<Set<Hash>> {
+
+        const closure = new Set<Hash>();
+        const pending = new Set<Hash>(Array.from(init.values()).map((ref: HashReference<MutationOp>) => ref.hash));
+        const discarded = new Set<Hash>();
+
+        const lowerBoundSeq = lowerBoundHash === undefined? undefined :
+                                                            (await this.backend.load(lowerBoundHash))?.sequence;
+
+        while (pending.size > 0) {
+            let {value} = pending.values().next();
+            pending.delete(value);
+
+            if (!closure.has(value)) {
+                let storable = await this.backend.load(value) as Storable;
+
+                if (lowerBoundSeq === undefined || storable.sequence >= lowerBoundSeq) {
+                    closure.add(value);
+
+                    const prevOps = HashedSet.deliteralize(LiteralUtils.getFields(storable.literal)['prevOps'], new Context()) as HashedSet<HashReference<MutationOp>>;
+
+                    for (const prevOpRef of prevOps.values()) {
+                        if (!closure.has(prevOpRef.hash) && !discarded.has(value)) {
+                            pending.add(prevOpRef.hash);
+                        }
+                    }
+                } else {
+                    discarded.add(value);
+                }
+            }
+        }
+
+        return closure;
     }
 
     async loadPrevOpsClosure(init: HashedSet<HashReference<MutationOp>>) {

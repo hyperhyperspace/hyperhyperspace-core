@@ -17,8 +17,9 @@ class HashedSet<T> {
         }
     }
 
-    add(element: T) {
-        this.hashedElements.set(HashedObject.hashElement(element), element);
+    add(element: T, elementHash?: Hash) {
+        const hash = elementHash || HashedObject.hashElement(element);
+        this.hashedElements.set(hash, element);
     }
 
     remove(element: T) : boolean {
@@ -62,9 +63,9 @@ class HashedSet<T> {
         return {hashes: hashes, elements: elements as T[]};
     }
 
-    fromArrays(_hashes: string[], elements: any[]) {
+    fromArrays(hashes: string[], elements: any[]) {
         for (let i=0; i<elements.length; i++) {
-            this.add(elements[i]);
+            this.add(elements[i], hashes[i]);
         }
     }
 

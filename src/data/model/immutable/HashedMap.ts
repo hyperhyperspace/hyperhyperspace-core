@@ -21,8 +21,8 @@ class HashedMap<K, V> {
         }
     }
 
-    set(key: K, value: V): void {
-        let hash = HashedObject.hashElement(value);
+    set(key: K, value: V, valueHash?: Hash): void {
+        const hash = valueHash || HashedObject.hashElement(value);
         this.content.set(key, value);
         this.contentHashes.set(key, hash);
     }
@@ -76,10 +76,10 @@ class HashedMap<K, V> {
         return {entries: entries, hashes: hashes};
     }
 
-    fromArrays(_hashes: Hash[], entries: [K,V][]) {
+    fromArrays(hashes: Hash[], entries: [K,V][]) {
         for (let i=0; i<entries.length; i++) {
             let [key, value] = entries[i];
-            this.set(key, value);
+            this.set(key, value, hashes[i]);
         }
     }
 
@@ -140,6 +140,18 @@ class HashedMap<K, V> {
 
         let hmap = new HashedMap();
         hmap.fromArrays(hashes, entries);
+
+        if (validate) {
+            let another = new HashedMap();
+            for (const [key, value] of hmap.entries()) {
+                another.set(key, value);
+            }
+
+            if (!hmap.equals(another)) {
+                throw new Error('HashedMap failed validation: reconstruction resulted in a different set.');
+            }
+
+        }
 
         return hmap;
     }

@@ -5,7 +5,7 @@ import { Logger, LogLevel } from 'util/logging';
 
 import { Literal, Hash, HashedSet, HashReference } from 'data/model';
 
-import { Backend, BackendSearchParams, BackendSearchResults } from './Backend'; 
+import { Backend, BackendSearchParams, BackendSearchResults, Storable } from './Backend'; 
 import { Store, StoredOpHeader } from 'storage/store/Store';
 import { MultiMap } from 'util/multimap';
 import { LiteralUtils } from 'data/model/literals/LiteralUtils';
@@ -214,7 +214,7 @@ class IdbBackend implements Backend {
         await IdbBackend.fireCallbacks(this.name, literal);
     }
     
-    async load(hash: Hash): Promise<Literal | undefined> {
+    async load(hash: Hash): Promise<Storable | undefined> {
 
         if (this.closed) {
             throw new Error('Attempted to load a literal from a closed IndexedDB backend.')
@@ -224,7 +224,11 @@ class IdbBackend implements Backend {
 
         const loaded = await (idb.get(IdbBackend.OBJ_STORE, hash) as Promise<IdbStorageFormat|undefined>);
 
-        return loaded?.literal;
+        if (loaded === undefined) {
+            return undefined;
+        } else {
+            return { literal: loaded.literal, sequence: loaded.sequence };
+        }
     }
 
     async loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined> {
