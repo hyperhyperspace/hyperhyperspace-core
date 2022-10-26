@@ -30,7 +30,7 @@ class ObjectDiscoveryAgent implements Agent {
     static newestReplyFirst = (a: ObjectDiscoveryReply, b: ObjectDiscoveryReply) => (b.timestamp - a.timestamp);
 
     private static makeEndpointObjectPair(hash: Hash, source: Endpoint, destination: Endpoint) {
-        return hash + '_' + source.replaceAll('_', '__') + '_' + destination.replaceAll('_', '__');
+        return hash + '_' + source.replace(/_/g, '__') + '_' + destination.replace(/_/g, '__');
     }
 
     pod?: AgentPod;
