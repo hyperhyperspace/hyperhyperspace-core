@@ -14,6 +14,7 @@ type CollectionConfig = {
 interface Collection<T> {
     has(element: T): boolean;
     hasByHash(hash: Hash): boolean;
+    values(): IterableIterator<T>;
 }
 
 // WARNING: CausalCollection extends this class and uses some of its fields directly,

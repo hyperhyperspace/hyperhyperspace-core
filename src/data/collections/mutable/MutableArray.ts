@@ -338,6 +338,10 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         return Array.from(this._hashes);
     }
 
+    values(): IterableIterator<T> {
+        return this.contents().values();
+    }
+
     lookup(idx: number): T {
         this.rebuild();
         return this._contents[idx];

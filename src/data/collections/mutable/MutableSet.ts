@@ -7,7 +7,7 @@ import { HashReference } from 'data/model/immutable/HashReference';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { ClassRegistry } from 'data/model';
-import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
+import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Collection';
 
 type ElmtHash = Hash;
 
@@ -164,7 +164,7 @@ class DeleteOp<T> extends CollectionOp<T> {
     
 }
 
-class MutableSet<T> extends BaseCollection<T> {
+class MutableSet<T> extends BaseCollection<T> implements Collection<T> {
 
     static className = 'hss/v0/MutableSet';
     static opClasses = [AddOp.className, DeleteOp.className];
