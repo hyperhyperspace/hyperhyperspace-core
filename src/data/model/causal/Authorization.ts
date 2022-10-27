@@ -39,22 +39,22 @@ import { MutationOp } from '../mutable/MutationOp';
  *                                       _exactly_ the provided keys.
  */
 
-type Attestator = (op: MutationOp) => Promise<boolean>;
+type Attestator = (op?: MutationOp) => Promise<boolean>;
 
 class Attestation {
-    static always : Attestator = (_op: MutationOp) => Promise.resolve(true);
-    static never  : Attestator = (_op: MutationOp) => Promise.resolve(false);
+    static always : Attestator = (_op?: MutationOp) => Promise.resolve(true);
+    static never  : Attestator = (_op?: MutationOp) => Promise.resolve(false);
     static chain  : (a1: Attestator, a2?: Attestator) => Attestator 
 
                   = (a1: Attestator, a2?: Attestator) => 
-                            ( async (op: MutationOp) => {
+                            ( async (op?: MutationOp) => {
 
-                                    const savedCausalOps = new HashedMap(op.getCausalOps().entries());
+                                    const savedCausalOps = new HashedMap(op?.getCausalOps().entries());
 
                                     if (await a1(op) && (a2 === undefined || await a2(op)))  {
                                         return true;
                                     } else {
-                                        op.setCausalOps(savedCausalOps.entries())
+                                        op?.setCausalOps(savedCausalOps.entries())
                                         return false;
                                     }
                                 }
@@ -64,7 +64,7 @@ class Attestation {
     static oneOf : (candidates: Array<Attestator>) => Attestator
 
                     = (candidates: Array<Attestator|undefined>) => (
-                                        async (op: MutationOp) => {
+                                        async (op?: MutationOp) => {
                                             for (const candidate of candidates) {
                                                 if (candidate !== undefined && await candidate(op)) {
                                                     return true;
@@ -76,13 +76,13 @@ class Attestation {
     static all : (authorizers: Array<Attestator>) => Attestator
 
                = (authorizers: Array<Attestator>) =>
-                                        async (op: MutationOp) => {
+                                        async (op?: MutationOp) => {
 
-                                            const savedCausalOps = new HashedMap(op.getCausalOps().entries());
+                                            const savedCausalOps = new HashedMap(op?.getCausalOps().entries());
 
                                             for (const authorize of authorizers) {
                                                 if (!(await authorize(op))) {
-                                                    op.setCausalOps(savedCausalOps.entries());
+                                                    op?.setCausalOps(savedCausalOps.entries());
                                                     return false;
                                                 }
                                             }

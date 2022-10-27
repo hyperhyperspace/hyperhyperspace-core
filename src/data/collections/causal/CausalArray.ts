@@ -197,6 +197,14 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         this._ordinals = [];
     }
 
+    canInsert(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return Authorization.chain(this.createInsertAuthorizer(author), extraAuth).attempt();
+    }
+
+    canDelete(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return Authorization.chain(this.createDeleteAuthorizer(author), extraAuth).attempt();
+    }
+
     async insertAt(element: T, idx: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
         return this.insertManyAt([element], idx, author, extraAuth);
     }
@@ -259,7 +267,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
                 CausalCollectionOp.setSingleAuthorIfNecessary(insertOp);
             }
 
-            const auth = Authorization.chain(this.createInsertAuthorizer(element, insertOp.getAuthor()), extraAuth);
+            const auth = Authorization.chain(this.createInsertAuthorizer(insertOp.getAuthor()), extraAuth);
 
             this.setCurrentPrevOpsTo(insertOp);
 
@@ -416,7 +424,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
         }
 
-        const auth = Authorization.chain(this.createDeleteAuthorizer(insertOp.element as T, deleteOp.getAuthor()), extraAuth);
+        const auth = Authorization.chain(this.createDeleteAuthorizer(deleteOp.getAuthor()), extraAuth);
 
         this.setCurrentPrevOpsTo(deleteOp);
 
@@ -612,10 +620,9 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             const author = op.getAuthor();
 
             const auth = (op instanceof InsertOp) ?
-                                            this.createInsertAuthorizer(op.element, author)
+                                            this.createInsertAuthorizer(author)
                                                         :
-                                            this.createDeleteAuthorizerByHash(
-                                                    HashedObject.hashElement(op.getInsertOp().element), author);
+                                            this.createDeleteAuthorizer(author);
 
             const usedKeys     = new Set<string>();
 
@@ -643,25 +650,28 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         return 'CausalArray/attest-member:' + hash + '-belongs-to-' + this.hash();
     }
 
-    async attestMembershipForOp(elmt: T, op: MutationOp): Promise<boolean> {
+    async attestMembershipForOp(elmt: T, op?: MutationOp): Promise<boolean> {
 
         const hash = HashedObject.hashElement(elmt);
 
         return this.attestMembershipForOpByHash(hash, op);
     }
 
-    async attestMembershipForOpByHash(hash: Hash, op: MutationOp): Promise<boolean> {
+    async attestMembershipForOpByHash(hash: Hash, op?: MutationOp): Promise<boolean> {
 
         const insertOps = this._currentInsertOps.get(hash);
 
         if (insertOps.size > 0) {
-            const insertOp = insertOps.values().next().value as InsertOp<T>;
 
-            const attestOp = new MembershipAttestationOp(insertOp, op);
+            if (op !== undefined) {
+                const insertOp = insertOps.values().next().value as InsertOp<T>;
 
-            await this.applyNewOp(attestOp);
-            const key = this.attestationKeyByHash(hash);
-            op.addCausalOp(key, attestOp);
+                const attestOp = new MembershipAttestationOp(insertOp, op);
+    
+                await this.applyNewOp(attestOp);
+                const key = this.attestationKeyByHash(hash);
+                op.addCausalOp(key, attestOp);
+            }
 
             return true;
         } else {
@@ -711,26 +721,17 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
     createMembershipAuthorizer(elmt: T): Authorizer {
 
         return {
-            attempt : (op:  MutationOp) => this.attestMembershipForOp(elmt, op),
+            attempt : (op?:  MutationOp) => this.attestMembershipForOp(elmt, op),
             verify  : (op: MutationOp, usedKeys: Set<string>) => this.verifyMembershipAttestationForOp(elmt, op, usedKeys)
         };
 
     }
 
-    protected createInsertAuthorizer(elmt: T, author?: Identity): Authorizer {
-
-        if (!this.shouldAcceptElement(elmt)) {
-            return Authorization.never;
-        } else {
-            return this.createWriteAuthorizer(author);
-        }
+    protected createInsertAuthorizer(author?: Identity): Authorizer {
+        return this.createWriteAuthorizer(author);
     }
 
-    protected createDeleteAuthorizer(elmt: T, author?: Identity): Authorizer {
-        return this.createDeleteAuthorizerByHash(HashedObject.hashElement(elmt), author);
-    }
-
-    protected createDeleteAuthorizerByHash(_elmtHash: Hash, author?: Identity): Authorizer {
+    protected createDeleteAuthorizer(author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
 

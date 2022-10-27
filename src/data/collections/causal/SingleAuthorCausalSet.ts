@@ -58,7 +58,7 @@ class SingleAuthorCausalSet<T> extends CausalSet<T> {
         return this.getAuthor() !== undefined;
     }
 
-    protected createAddAuthorizer(_elmt: T, author: Identity): Authorizer {
+    protected createAddAuthorizer(author: Identity): Authorizer {
 
         if (author.equals(this.getAuthor())) {
             return Authorization.always;

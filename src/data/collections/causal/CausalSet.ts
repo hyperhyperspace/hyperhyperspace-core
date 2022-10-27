@@ -211,6 +211,15 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         return CausalSet.className;
     }
 
+    canAdd(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return Authorization.chain(this.createAddAuthorizer(author), extraAuth).attempt();
+    }
+
+    canDelete(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return Authorization.chain(this.createDeleteAuthorizer(author), extraAuth).attempt();
+    }
+
+
     async add(elmt: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
 
         if (!(elmt instanceof HashedObject) && !HashedObject.isLiteral(elmt)) {
@@ -229,7 +238,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             CausalCollectionOp.setSingleAuthorIfNecessary(addOp);
         }
 
-        const auth = Authorization.chain(this.createAddAuthorizer(elmt, addOp.getAuthor()), extraAuth);
+        const auth = Authorization.chain(this.createAddAuthorizer(addOp.getAuthor()), extraAuth);
 
         this.setCurrentPrevOpsTo(addOp);
 
@@ -246,7 +255,6 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         const hash = HashedObject.hashElement(elmt);
         
         return this.deleteByHash(hash, author, extraAuth);
-
     }
 
     async deleteByHash(hash: Hash, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
@@ -263,7 +271,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
                 CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
             }
 
-            const auth = Authorization.chain(this.createDeleteAuthorizerByHash(hash, deleteOp.getAuthor()), extraAuth);
+            const auth = Authorization.chain(this.createDeleteAuthorizer(deleteOp.getAuthor()), extraAuth);
 
             this.setCurrentPrevOpsTo(deleteOp);
 
@@ -309,27 +317,30 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         return 'CausalSet/attest:' + hash + '-belongs-to-' + this.hash();
     }
 
-    async attestMembershipForOp(elmt: T, op: MutationOp): Promise<boolean> {
+    async attestMembershipForOp(elmt: T, op?: MutationOp): Promise<boolean> {
 
         const hash = HashedObject.hashElement(elmt);
 
         return this.attestMembershipForOpByHash(hash, op);
     }
 
-    async attestMembershipForOpByHash(hash: Hash, op: MutationOp): Promise<boolean> {
+    async attestMembershipForOpByHash(hash: Hash, op?: MutationOp): Promise<boolean> {
 
         const addOpHashes = this._currentAddOpsPerElmt.get(hash);
 
         if (addOpHashes.size > 0) {
-            const addOpHash = addOpHashes.values().next().value as Hash;
-            const addOp     = this._currentAddOps.get(addOpHash) as AddOp<T>;
 
-            const attestOp = new MembershipAttestationOp(addOp, op);
+            if (op !== undefined) {
+                const addOpHash = addOpHashes.values().next().value as Hash;
+                const addOp     = this._currentAddOps.get(addOpHash) as AddOp<T>;
 
-            await this.applyNewOp(attestOp);
-            const key = this.attestationKeyByHash(hash);
-            op.addCausalOp(key, attestOp);
+                const attestOp = new MembershipAttestationOp(addOp, op);
 
+                await this.applyNewOp(attestOp);
+                const key = this.attestationKeyByHash(hash);
+                op.addCausalOp(key, attestOp);
+            }
+            
             return true;
         } else {
             return false;
@@ -389,10 +400,9 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             const author = op.getAuthor();
 
             const auth = (op instanceof AddOp) ?
-                                            this.createAddAuthorizer(op.getElement(), author)
+                                            this.createAddAuthorizer(author)
                                                         :
-                                            this.createDeleteAuthorizerByHash(
-                                                    HashedObject.hashElement(op.getAddOp().getElement()), author);;
+                                            this.createDeleteAuthorizer(author);;
                                                                                 
             const usedKeys     = new Set<string>();
 
@@ -532,22 +542,18 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         return found;
     }
 
-    protected createAddAuthorizer(_elmt: T, author?: Identity): Authorizer {
+    protected createAddAuthorizer(author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
 
-    protected createDeleteAuthorizer(elmt: T, author?: Identity): Authorizer {
-        return this.createDeleteAuthorizerByHash(HashedObject.hashElement(elmt), author);
-    }
-
-    protected createDeleteAuthorizerByHash(_elmtHash: Hash, author?: Identity): Authorizer {
+    protected createDeleteAuthorizer(author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
 
     createMembershipAuthorizer(elmt: T): Authorizer {
 
         return {
-            attempt : (op:  MutationOp) => this.attestMembershipForOp(elmt, op),
+            attempt : (op?:  MutationOp) => this.attestMembershipForOp(elmt, op),
             verify  : (op: MutationOp, usedKeys: Set<string>) => this.verifyMembershipAttestationForOp(elmt, op, usedKeys)
         };
 
