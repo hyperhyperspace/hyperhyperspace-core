@@ -58,18 +58,18 @@ class SingleAuthorCausalSet<T> extends CausalSet<T> {
         return this.getAuthor() !== undefined;
     }
 
-    protected createAddAuthorizer(author: Identity): Authorizer {
+    protected createAddAuthorizer(_element?: T, author?: Identity): Authorizer {
 
-        if (author.equals(this.getAuthor())) {
+        if (author !== undefined && author.equals(this.getAuthor())) {
             return Authorization.always;
         } else {
             return Authorization.never;
         }
     }
 
-    protected createDeleteAuthorizerByHash(_elmtHash: Hash, author: Identity): Authorizer {
+    protected createDeleteAuthorizerByHash(_elmtHash?: Hash, author?: Identity): Authorizer {
 
-        if (author.equals(this.getAuthor())) {
+        if (author !== undefined && author.equals(this.getAuthor())) {
             return Authorization.always;
         } else {
             return Authorization.never;

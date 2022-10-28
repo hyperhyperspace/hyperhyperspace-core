@@ -218,12 +218,23 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         return CausalSet.className;
     }
 
-    canAdd(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
-        return Authorization.chain(this.createAddAuthorizer(author), extraAuth).attempt();
+    // canAdd: if a parameter is absent, interpret it as if addition is allowed for any possible value
+
+    //         e.g.: element === undefined, can add independently of what is being added,
+    //               author  === undefined, can add independently of who is doing it, etc.
+
+    // same goes for canDelete, canDeleteByHash.
+
+    canAdd(element?: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return Authorization.chain(this.createAddAuthorizer(element, author), extraAuth).attempt();
     }
 
-    canDelete(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
-        return Authorization.chain(this.createDeleteAuthorizer(author), extraAuth).attempt();
+    canDelete(element?: T, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return Authorization.chain(this.createDeleteAuthorizer(element, author), extraAuth).attempt();
+    }
+
+    canDeleteByHash(elementHash?: Hash, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+        return Authorization.chain(this.createDeleteAuthorizerByHash(elementHash, author), extraAuth).attempt();
     }
 
 
@@ -239,7 +250,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         
         const addOp = new AddOp(this, elmt, author);
 
-        const auth = Authorization.chain(this.createAddAuthorizer(addOp.getAuthor()), extraAuth);
+        const auth = Authorization.chain(this.createAddAuthorizer(elmt, addOp.getAuthor()), extraAuth);
 
         this.setCurrentPrevOpsTo(addOp);
 
@@ -266,7 +277,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             const addOp = this._currentAddOps.get(addOpHash) as AddOp<T>;
             const deleteOp = new DeleteOp(addOp, author);
 
-            const auth = Authorization.chain(this.createDeleteAuthorizer(deleteOp.getAuthor()), extraAuth);
+            const auth = Authorization.chain(this.createDeleteAuthorizerByHash(hash, deleteOp.getAuthor()), extraAuth);
 
             this.setCurrentPrevOpsTo(deleteOp);
 
@@ -395,9 +406,9 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             const author = op.getAuthor();
 
             const auth = (op instanceof AddOp) ?
-                                            this.createAddAuthorizer(author)
+                                            this.createAddAuthorizer(op.element, author)
                                                         :
-                                            this.createDeleteAuthorizer(author);;
+                                            this.createDeleteAuthorizer(op.getAddOp().element, author);;
                                                                                 
             const usedKeys     = new Set<string>();
 
@@ -537,11 +548,15 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         return found;
     }
 
-    protected createAddAuthorizer(author?: Identity): Authorizer {
+    protected createAddAuthorizer(_element?: T, author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
 
-    protected createDeleteAuthorizer(author?: Identity): Authorizer {
+    protected createDeleteAuthorizer(_element?: T, author?: Identity): Authorizer {
+        return this.createWriteAuthorizer(author);
+    }
+
+    protected createDeleteAuthorizerByHash(_elementHash?: Hash, author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
 

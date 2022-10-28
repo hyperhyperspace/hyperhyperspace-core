@@ -204,12 +204,25 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         this._ordinals = [];
     }
 
-    canInsert(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
-        return Authorization.chain(this.createInsertAuthorizer(author), extraAuth).attempt();
+    // canInsert: if a parameter is absent, interpret it as if insertion is allowed for any possible value
+
+    //         e.g.: element === undefined, can add independently of what is being added,
+    //               author  === undefined, can add independently of who is doing it, etc.
+
+    // same goes for canDelete, canDeleteByHash.
+
+    canInsert(element?: T, _idx?: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+
+        // TODO: translate the idx into an actual ordinal and actually pass it on!
+
+        return Authorization.chain(this.createInsertAtAuthorizer(element, undefined, author), extraAuth).attempt();
     }
 
-    canDelete(author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
-        return Authorization.chain(this.createDeleteAuthorizer(author), extraAuth).attempt();
+    canDelete(author?: Identity, _idx?: number, extraAuth?: Authorizer): Promise<boolean> {
+
+        // TODO: find the actual ops that should be deleted and actually pass them on!
+
+        return Authorization.chain(this.createDeleteAuthorizer(undefined, author), extraAuth).attempt();
     }
 
     async insertAt(element: T, idx: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
@@ -268,7 +281,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
             const insertOp = new InsertOp(this, element, ordinal, author);
 
-            const auth = Authorization.chain(this.createInsertAuthorizer(insertOp.getAuthor()), extraAuth);
+            const auth = Authorization.chain(this.createInsertAtAuthorizer(element, ordinal, author), extraAuth);
 
             this.setCurrentPrevOpsTo(insertOp);
 
@@ -420,7 +433,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         
         const deleteOp = new DeleteOp(insertOp, author);
 
-        const auth = Authorization.chain(this.createDeleteAuthorizer(deleteOp.getAuthor()), extraAuth);
+        const auth = Authorization.chain(this.createDeleteAuthorizer(insertOp, author), extraAuth);
 
         this.setCurrentPrevOpsTo(deleteOp);
 
@@ -616,9 +629,9 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
             const author = op.getAuthor();
 
             const auth = (op instanceof InsertOp) ?
-                                            this.createInsertAuthorizer(author)
+                                            this.createInsertAtAuthorizer(op.element, op.ordinal, author)
                                                         :
-                                            this.createDeleteAuthorizer(author);
+                                            this.createDeleteAuthorizer(op.getInsertOp(), author);
 
             const usedKeys     = new Set<string>();
 
@@ -723,11 +736,11 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
 
     }
 
-    protected createInsertAuthorizer(author?: Identity): Authorizer {
+    protected createInsertAtAuthorizer(_element?: T, _ordinal?: Ordinal, author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
 
-    protected createDeleteAuthorizer(author?: Identity): Authorizer {
+    protected createDeleteAuthorizer(_insertOp?: InsertOp<T>, author?: Identity): Authorizer {
         return this.createWriteAuthorizer(author);
     }
 
