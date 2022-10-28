@@ -12,6 +12,7 @@ import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
 import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Collection';
+import { Identity } from 'data/identity';
 
 // a simple mutable list with a single writer
 
@@ -24,11 +25,14 @@ class InsertOp<T> extends CollectionOp<T> {
     element?: T;
     ordinal?: Ordinal;
 
-    constructor(target?: MutableArray<T>, element?: T, ordinal?: Ordinal) {
+    constructor(target?: MutableArray<T>, element?: T, ordinal?: Ordinal, author?: Identity) {
         super(target);
 
         this.element = element;
         this.ordinal = ordinal;
+        if (author !== undefined) {
+            this.setAuthor(author);
+        }
     }
 
     getClassName(): string {
@@ -69,7 +73,7 @@ class DeleteOp<T> extends CollectionOp<T> {
     elementHash?: Hash;
     deletedOps?: HashedSet<HashReference<InsertOp<T>>>;
 
-    constructor(target?: MutableArray<T>, elementHash?: Hash, insertOps?: IterableIterator<HashReference<InsertOp<T>>>) {
+    constructor(target?: MutableArray<T>, elementHash?: Hash, insertOps?: IterableIterator<HashReference<InsertOp<T>>>, author?: Identity) {
         super(target);
 
         this.elementHash = elementHash;
@@ -84,6 +88,10 @@ class DeleteOp<T> extends CollectionOp<T> {
 
                 this.deletedOps.add(insertOp);
             }
+        }
+
+        if (author !== undefined) {
+            this.setAuthor(author);
         }
     }
 
@@ -208,11 +216,11 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         this._ordinals = [];
     }
 
-    async insertAt(element: T, idx: number) {
-        await this.insertManyAt([element], idx);
+    async insertAt(element: T, idx: number, author?: Identity) {
+        await this.insertManyAt([element], idx, author);
     }
 
-    async insertManyAt(elements: T[], idx: number) {
+    async insertManyAt(elements: T[], idx: number, author?: Identity) {
         this.rebuild();
 
         // In the "no duplicates" case, any items we insert will disappear from their old positions. So
@@ -262,7 +270,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
                 oldInsertionOps = this._currentInsertOpRefs.get(elementHash);
             }
 
-            const insertOp = new InsertOp(this, element, ordinal);
+            const insertOp = new InsertOp(this, element, ordinal, author);
             await this.applyNewOp(insertOp);
 
             // Note: in the "no duplicates" case, the delete -if necessary- has to come after the 
@@ -280,20 +288,20 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         }
     }
 
-    async deleteAt(idx: number) {
-        await this.deleteManyAt(idx, 1);
+    async deleteAt(idx: number, author?: Identity) {
+        await this.deleteManyAt(idx, 1, author);
     }
 
-    async deleteManyAt(idx: number, count: number) {
+    async deleteManyAt(idx: number, count: number, author?: Identity) {
         this.rebuild();
 
         while (idx < this._contents.length && count > 0) {
             let hash = this._hashes[idx];
 
             if (this.duplicates) {
-                await this.delete(hash, this._ordinals[idx]);
+                await this.delete(hash, this._ordinals[idx], author);
             } else {
-                await this.delete(hash);
+                await this.delete(hash, undefined, author);
             }
 
             idx = idx + 1;
@@ -301,31 +309,31 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         }
     }
 
-    async deleteElement(element: T) {
-        this.deleteElementByHash(HashedObject.hashElement(element));
+    async deleteElement(element: T, author?: Identity) {
+        this.deleteElementByHash(HashedObject.hashElement(element), author);
     }
 
-    async deleteElementByHash(hash: Hash) {
+    async deleteElementByHash(hash: Hash, author?: Identity) {
         this.rebuild();
-        this.delete(hash);
+        this.delete(hash, undefined, author);
     }
 
-    async push(element: T) {
-        await this.insertAt(element, this._contents.length);
+    async push(element: T, author?: Identity) {
+        await this.insertAt(element, this._contents.length, author);
     }
 
-    async pop(): Promise<T> {
+    async pop(author?: Identity): Promise<T> {
         this.rebuild();
         const lastIdx = this._contents.length - 1;
         const last = this._contents[lastIdx];
-        await this.deleteAt(lastIdx);
+        await this.deleteAt(lastIdx, author);
 
         return last;
     }
 
-    async concat(elements: T[]) {
+    async concat(elements: T[], author?: Identity) {
         this.rebuild();
-        await this.insertManyAt(elements, this._contents.length);
+        await this.insertManyAt(elements, this._contents.length, author);
     }
 
     contents() {
@@ -369,7 +377,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         return this._contents[idx];
     }
 
-    private async delete(hash: Hash, ordinal?: Ordinal) {
+    private async delete(hash: Hash, ordinal?: Ordinal, author?: Identity) {
 
         let deleteOp: DeleteOp<T>|undefined = undefined;
         const insertOpRefs = this._currentInsertOpRefs.get(hash);
@@ -377,7 +385,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         if (ordinal !== undefined) {
             for (const insertOpRef of insertOpRefs.values()) {
                 if (this._currentInsertOpOrds.get(insertOpRef.hash) === ordinal) {
-                    deleteOp = new DeleteOp(this, hash, [insertOpRef].values());
+                    deleteOp = new DeleteOp(this, hash, [insertOpRef].values(), author);
                     break;
                 }
             }

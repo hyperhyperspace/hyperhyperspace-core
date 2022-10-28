@@ -15,7 +15,7 @@ import { ClassRegistry } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
 import { InvalidateAfterOp } from 'data/model/causal';
-import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
+import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig } from './CausalCollection';
 import { Identity } from 'data/identity';
 
 // A mutable list with a 
@@ -29,11 +29,14 @@ class InsertOp<T> extends MutationOp {
     element?: T;
     ordinal?: Ordinal;
 
-    constructor(target?: CausalArray<T>, element?: T, ordinal?: Ordinal) {
+    constructor(target?: CausalArray<T>, element?: T, ordinal?: Ordinal, author?: Identity) {
         super(target);
 
         this.element = element;
         this.ordinal = ordinal;
+        if (author !== undefined) { 
+            this.setAuthor(author);
+        }
     }
 
     getClassName(): string {
@@ -65,8 +68,12 @@ class DeleteOp<T> extends InvalidateAfterOp {
 
     static className = 'hhs/v0/CausalArray/DeleteOp';
 
-    constructor(insertOp?: InsertOp<T>) {
+    constructor(insertOp?: InsertOp<T>, author?: Identity) {
         super(insertOp);
+
+        if (author !== undefined) {
+            this.setAuthor(author);
+        }
     }
 
     init() {
@@ -259,13 +266,7 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
                 oldInsertionOps = this._currentInsertOps.get(elementHash);
             }
 
-            const insertOp = new InsertOp(this, element, ordinal);
-
-            if (author !== undefined) {
-                insertOp.setAuthor(author);
-            } else if (this.getClassName() === CausalArray.className) {
-                CausalCollectionOp.setSingleAuthorIfNecessary(insertOp);
-            }
+            const insertOp = new InsertOp(this, element, ordinal, author);
 
             const auth = Authorization.chain(this.createInsertAuthorizer(insertOp.getAuthor()), extraAuth);
 
@@ -416,13 +417,8 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
     }
 
     private async deleteOpForInsertOp(insertOp: InsertOp<T>, author?: Identity, extraAuth?: Authorizer) {
-        const deleteOp = new DeleteOp(insertOp);
-
-        if (author !== undefined) {
-            deleteOp.setAuthor(author);
-        } else if (this.getClassName() === CausalArray.className) {
-            CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
-        }
+        
+        const deleteOp = new DeleteOp(insertOp, author);
 
         const auth = Authorization.chain(this.createDeleteAuthorizer(deleteOp.getAuthor()), extraAuth);
 

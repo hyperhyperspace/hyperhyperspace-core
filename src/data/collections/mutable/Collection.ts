@@ -5,6 +5,7 @@ import { Hash} from '../../model/hashing'
 
 
 type CollectionConfig = {
+    author?: Identity,
     writer?: Identity,
     writers?: IterableIterator<Identity>,
     acceptedTypes?: Array<string>,
@@ -28,6 +29,10 @@ abstract class BaseCollection<T> extends MutableObject {
 
     constructor(acceptedOpClasses : Array<string>, config?: MutableObjectConfig & CollectionConfig) {
         super(acceptedOpClasses, config);
+
+        if (config?.author !== undefined) {
+            this.setAuthor(config.author);
+        }
 
         if (config?.writers !== undefined) {
             this.writers = new HashedSet<Identity>(config.writers);
@@ -101,10 +106,6 @@ abstract class BaseCollection<T> extends MutableObject {
         }
 
         return true;
-    }
-
-    validateWriteAccess() {
-
     }
 
     hasSingleWriter() {

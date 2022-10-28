@@ -8,7 +8,7 @@ import { Authorization, Verification } from '../../model/causal/Authorization';
 import { HashedSet } from '../../model/immutable/HashedSet';
 import { MutableSetEvents } from '../../collections/mutable/MutableSet';
 import { MutableContentEvents } from '../../model/mutable/MutableObject';
-import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig, CausalCollectionOp } from './CausalCollection';
+import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig } from './CausalCollection';
 import { ClassRegistry } from 'data/model/literals';
 
 /*
@@ -25,10 +25,13 @@ class AddOp<T> extends MutationOp {
 
     element?: T;
 
-    constructor(targetObject?: CausalSet<T>, element?: T) {
+    constructor(targetObject?: CausalSet<T>, element?: T, author?: Identity) {
         super(targetObject);
 
         this.element = element;
+        if (author !== undefined) {
+            this.setAuthor(author);
+        }
     }
 
     getClassName(): string {
@@ -84,8 +87,12 @@ class AddOp<T> extends MutationOp {
 class DeleteOp<T> extends InvalidateAfterOp {
     static className = 'hss/v0/CausalSet/DeleteOp';
 
-    constructor(targetOp?: AddOp<T>) {
+    constructor(targetOp?: AddOp<T>, author?: Identity) {
         super(targetOp);
+
+        if (author !== undefined) {
+            this.setAuthor(author);
+        }
     }
 
     async validate(references: Map<Hash, HashedObject>): Promise<boolean> {
@@ -230,13 +237,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
             throw new Error('CausalSet has type/element contraints that reject the element that is being added:' + elmt)
         }
         
-        const addOp = new AddOp(this, elmt);
-
-        if (author !== undefined) {
-            addOp.setAuthor(author);
-        } else {
-            CausalCollectionOp.setSingleAuthorIfNecessary(addOp);
-        }
+        const addOp = new AddOp(this, elmt, author);
 
         const auth = Authorization.chain(this.createAddAuthorizer(addOp.getAuthor()), extraAuth);
 
@@ -263,13 +264,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         
         for (const addOpHash of this._currentAddOpsPerElmt.get(hash)) {
             const addOp = this._currentAddOps.get(addOpHash) as AddOp<T>;
-            const deleteOp = new DeleteOp(addOp);
-
-            if (author !== undefined) {
-                deleteOp.setAuthor(author);
-            } else {
-                CausalCollectionOp.setSingleAuthorIfNecessary(deleteOp);
-            }
+            const deleteOp = new DeleteOp(addOp, author);
 
             const auth = Authorization.chain(this.createDeleteAuthorizer(deleteOp.getAuthor()), extraAuth);
 

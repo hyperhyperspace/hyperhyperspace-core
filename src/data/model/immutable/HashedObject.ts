@@ -81,7 +81,7 @@ abstract class HashedObject {
         }
     }
 
-    setRandomId() {
+    protected setRandomId() {
         //TODO: use b64 here
         this.setId(new RNGImpl().randomHexString(BITS_FOR_ID));
     }
@@ -131,7 +131,7 @@ abstract class HashedObject {
         return this._lastSignature;
     }
 
-    overrideChildrenId() : void {
+    protected overrideChildrenId() : void {
         for (const fieldName of Object.keys(this)) {
             if (fieldName.length > 0 && fieldName[0] !== '_') {
                 let value = (this as any)[fieldName];
@@ -142,7 +142,7 @@ abstract class HashedObject {
         }
     }
 
-    overrideIdForPath(path: string, target: HashedObject) : void {
+    protected overrideIdForPath(path: string, target: HashedObject) : void {
         let parentId = this.getId();
 
         if (parentId === undefined) {
@@ -257,7 +257,7 @@ abstract class HashedObject {
         return clone;
     }
 
-    addDerivedField(fieldName: string, object?: HashedObject) {
+    protected addDerivedField(fieldName: string, object?: HashedObject) {
         this._derivedFields.add(fieldName);
 
         // to keep backwards compat for now:
@@ -266,7 +266,7 @@ abstract class HashedObject {
         }
     }
 
-    setDerivedField(fieldName: string, object: HashedObject) {
+    protected setDerivedField(fieldName: string, object: HashedObject) {
 
         if (!this._derivedFields.has(fieldName)) {
             throw new Error('Trying to set the value of a derived field that was not added. Add derived fields (independently of they being set) to ensure the correct behaviour of setId on loaded objects.');

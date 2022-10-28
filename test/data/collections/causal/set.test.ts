@@ -54,7 +54,7 @@ describeProxy('[CST] Causal sets', () => {
         let s1 = new CausalSet<Identity>({mutableWriters: s0, acceptedTypes: [Identity.className]});
         let s2 = new CausalSet<string>({mutableWriters: s1, acceptedTypes: ['string']});
 
-        await s0.add(i1)
+        await s0.add(i1, i0)
 
         await store.save(s0);
         await store.save(s1);
@@ -91,7 +91,7 @@ describeProxy('[CST] Causal sets', () => {
         // s0=     {i1, att(i1)}, s1= {i2, att(i2)}, s2= {'hi'}
         // s0_too= {i1}
 
-        let deleted = await s0_too.delete(i1);
+        let deleted = await s0_too.delete(i1, i0);
         await s0_too.save();
 
         //                X----UNDO----v       X----UNDO---v
@@ -158,8 +158,8 @@ describeProxy('[CST] Causal sets', () => {
         let s1 = new CausalSet<Identity>({mutableWriters: s0, acceptedTypes: [Identity.className]});
         let s2 = new CausalSet<string>({mutableWriters: s1, acceptedTypes: ['string']});
 
-        await s0.add(i1);
-        await s0.add(i2);
+        await s0.add(i1, i0);
+        await s0.add(i2, i0);
 
         await store.save(s0);
         await store.save(s1);
@@ -214,7 +214,7 @@ describeProxy('[CST] Causal sets', () => {
         // it is undone by cascade.
 
         
-        deleted = await s0_too.delete(i2);
+        deleted = await s0_too.delete(i2, i0);
         await s0_too.save();
 
         expect(deleted).toBeTruthy();

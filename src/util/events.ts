@@ -36,7 +36,6 @@ class EventRelay<T extends hashable> {
     static logger = new Logger('event-relay', LogLevel.INFO);
 
     emitter: T;
-    emitterHash: hash;
     upstreamRelays: Map<string, [EventRelay<T>, Observer<T>]>;
 
     observers: Set<Observer<T>>;
@@ -46,7 +45,6 @@ class EventRelay<T extends hashable> {
     constructor(source: T, upstreamRelays: Map<string, EventRelay<T>>) {
 
         this.emitter     = source;
-        this.emitterHash = source.getLastHash(); 
 
         this.upstreamRelays = new Map();
 
@@ -77,10 +75,10 @@ class EventRelay<T extends hashable> {
 
     addUpstreamRelay(name: string, upstream: EventRelay<T>) {
 
-        EventRelay.logger.debug('adding upstream ' + name + ' (' + upstream.emitterHash + ') to ' + this.emitterHash);
+        EventRelay.logger.debug('adding upstream ' + name + ' (' + upstream.emitter.getLastHash() + ') to ' + this.emitter.getLastHash());
 
         //if (!this.wouldCreateACycle(upstream.emitterHash)) {
-        if (!upstream.wouldCreateACycle(this.emitterHash)) {
+        if (!upstream.wouldCreateACycle(this.emitter.getLastHash())) {
 
             const observer = (upstreamEv: Event<T>) => {
 
@@ -95,7 +93,7 @@ class EventRelay<T extends hashable> {
                     data: upstreamEv.data                
                 };
 
-                EventRelay.logger.debug('upstream from ' + this.emitterHash + ' name: ' + name);
+                EventRelay.logger.debug('upstream from ' + this.emitter.getLastHash() + ' name: ' + name);
 
                 this.emit(ev);
 
@@ -133,7 +131,7 @@ class EventRelay<T extends hashable> {
 
     private wouldCreateACycle(emitterHash: hash) {
 
-        if (this.emitterHash === emitterHash) {
+        if (this.emitter.getLastHash() === emitterHash) {
             return true;
         }
 
@@ -149,7 +147,7 @@ class EventRelay<T extends hashable> {
 
     emit(ev: Event<T>) {
  
-        EventRelay.logger.debug('emitting from ' + this.emitterHash);
+        EventRelay.logger.debug('emitting from ' + this.emitter.getLastHash());
         EventRelay.logger.trace('event is:', ev);
         EventRelay.logger.trace('got ' + this.observers.size + ' observers');
 

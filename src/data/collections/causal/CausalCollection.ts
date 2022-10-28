@@ -81,20 +81,6 @@ abstract class BaseCausalCollection<T> extends BaseCollection<T> {
     }
 }
 
-abstract class CausalCollectionOp extends MutationOp {
 
-    static setSingleAuthorIfNecessary(op: MutationOp) {
-
-        const targetObject = op.getTargetObject();
-
-        if (targetObject instanceof BaseCausalCollection) {
-            if (targetObject.hasSingleWriter()) {
-                op.setAuthor(targetObject.getSingleWriter());
-            }
-        }
-
-    }
-}
-
-export { CausalCollection, BaseCausalCollection, CausalCollectionOp, AuthError };
+export { CausalCollection, BaseCausalCollection, AuthError };
 export type { CausalCollectionConfig };

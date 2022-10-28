@@ -8,6 +8,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
 import { ClassRegistry } from 'data/model';
 import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Collection';
+import { Identity } from 'data/identity';
 
 type ElmtHash = Hash;
 
@@ -24,12 +25,16 @@ class AddOp<T> extends CollectionOp<T> {
 
     element?: T;
 
-    constructor(targetObject?: MutableSet<T>, element?: T) {
+    constructor(targetObject?: MutableSet<T>, element?: T, author?: Identity) {
         super(targetObject);
 
         if (element !== undefined) {
             this.element = element;
             this.setRandomId();
+
+            if (author !== undefined) {
+                this.setAuthor(author);
+            }
         }   
     }
 
@@ -68,7 +73,7 @@ class DeleteOp<T> extends CollectionOp<T> {
     elementHash? : Hash;
     deletedOps?  : HashedSet<HashReference<AddOp<T>>>;
 
-    constructor(target?: MutableSet<T>, elementHash?: Hash, addOps?: IterableIterator<HashReference<AddOp<T>>>) {
+    constructor(target?: MutableSet<T>, elementHash?: Hash, addOps?: IterableIterator<HashReference<AddOp<T>>>, author?: Identity) {
         super(target);
 
         this.elementHash = elementHash;
@@ -83,6 +88,10 @@ class DeleteOp<T> extends CollectionOp<T> {
 
                 this.deletedOps.add(addOp);
             }
+        }
+
+        if (author !== undefined) {
+            this.setAuthor(author);
         }
     }
 

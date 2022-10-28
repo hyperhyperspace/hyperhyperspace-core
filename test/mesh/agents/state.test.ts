@@ -208,9 +208,7 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
     let id = await TestIdentity.getFirstTestIdentity();
     let kp = await TestIdentity.getFistTestKeyPair();
     
-    let s = new MutableSet<HashedObject>();
-    
-    s.setAuthor(id);
+    let s = new MutableSet<HashedObject>({author: id});
     
     await stores[0].save(kp);
     await stores[0].save(s);
@@ -340,9 +338,7 @@ async function stagedSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'
     let id = await TestIdentity.getFirstTestIdentity();
     let kp = await TestIdentity.getFistTestKeyPair();
     
-    let s = new MutableSet<Identity>();
-    
-    s.setAuthor(id);
+    let s = new MutableSet<Identity>({author: id});
     
     await stores[0].save(kp);
     await stores[0].save(s);
@@ -499,11 +495,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
     let id = await TestIdentity.getFirstTestIdentity();
     let kp = await TestIdentity.getFistTestKeyPair();
     
-    let s = new MutableSet();
-    
-    s.setAuthor(id);
-    
-   
+    let s = new MutableSet({author: id});
 
     for (let k=0; k<size; k++) {
         await stores[k].save(kp);

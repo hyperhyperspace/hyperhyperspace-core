@@ -16,10 +16,14 @@ class AddOp<T> extends CollectionOp<T> {
 
     element?: T;
 
-    constructor(targetObject?: GrowOnlySet<T>, element?: T) {
+    constructor(targetObject?: GrowOnlySet<T>, element?: T, author?: Identity) {
         super(targetObject);
 
         this.element = element;
+        
+        if (author !== undefined) {
+            this.setAuthor(author);
+        }
     }
 
     getClassName(): string {
@@ -84,14 +88,12 @@ class GrowOnlySet<T> extends BaseCollection<T> {
         }
 
         if (!this.has(element)) {
-            let op = new AddOp<T>(this, element);
+            let op = new AddOp<T>(this, element, author);
             if (author !== undefined) {
 
                 if (this.writers !== undefined && !this.writers.has(author)) {
                     throw new Error('Identity ' + author.hash() + ' tried to add an element to GrowOnlySet ' + this.hash() + ', but it is not in the writers set.');
                 }
-
-                op.setAuthor(author);
             } else {
                 if (this.writers !== undefined) {
                     throw new Error('Tried to add an element to GrowOnlySet ' + this.hash + ', but did not probide an author that can write to it.');
