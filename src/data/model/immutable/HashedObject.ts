@@ -341,11 +341,11 @@ abstract class HashedObject {
         return new EventRelay(this, subObservers);
     }
 
-    addMutationObserver(obs: MutationObserver) {
+    addObserver(obs: MutationObserver) {
         this.getMutationEventSource().addObserver(obs);
     }
 
-    removeMutationObserver(obs: MutationObserver) {
+    removeObserver(obs: MutationObserver) {
         this._mutationEventSource?.removeObserver(obs);
     }
 

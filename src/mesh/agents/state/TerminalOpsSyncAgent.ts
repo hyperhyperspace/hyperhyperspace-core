@@ -1,4 +1,4 @@
-import { HashedObject, HashedSet, Hash } from 'data/model';
+import { HashedObject, HashedSet, Hash, MutableObject } from 'data/model';
 import { MutationOp } from 'data/model';
 import { Context, Literal, LiteralContext, Dependency } from 'data/model';
 
@@ -16,6 +16,8 @@ import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { RNGImpl } from 'crypto/random';
 import { MultiMap } from 'util/multimap';
 import { LiteralUtils } from 'data/model/literals/LiteralUtils';
+import { SyncState } from './SyncObserverAgent';
+import { EventRelay } from 'util/events';
 
 /*
 
@@ -294,6 +296,7 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         }, 5000);
 
     }
+   
     expectingMoreOps(receivedOpHashes?: Set<string>): boolean {
         receivedOpHashes;
         throw new Error('Method not implemented.');
@@ -860,6 +863,19 @@ class TerminalOpsSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             return true;
         }
 
+    }
+
+    getMutableObject(): MutableObject {
+        throw new Error('Unimplemented!');
+    }
+    getPeerGroupId(): string {
+        throw new Error('Unimplemented!');
+    }
+    getSyncState(): SyncState {
+        throw new Error('Unimplemented!');
+    }
+    getSyncEventSource(): EventRelay<HashedObject> {
+        throw new Error('Unimplemented!');
     }
     
 }

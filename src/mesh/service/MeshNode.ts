@@ -69,7 +69,7 @@ class MeshNode {
         return this.getPeerGroupState(peerGroup.id);
     }
 
-    async sync(obj: HashedObject, mode :SyncMode = SyncMode.full, peerGroup?: PeerGroupInfo, gossipId?: string): Promise<void> {
+    async sync(obj: HashedObject, mode :SyncMode = SyncMode.full, peerGroup?: PeerGroupInfo): Promise<void> {
 
         if (peerGroup === undefined) {
             peerGroup = await this.discoveryPeerGroupInfo(obj);
@@ -84,12 +84,12 @@ class MeshNode {
             this.peerGroupTokens.set(peerGroupKey, peerGroupToken);
         }
 
-        const syncKey = MeshNode.generateKey([obj.hash(), peerGroup.id, gossipId]);
+        const syncKey = MeshNode.generateKey([obj.hash(), peerGroup.id]);
 
         let syncToken = this.syncTokens.get(syncKey);
 
         if (syncToken === undefined) {
-            syncToken = this.resources.mesh.syncObjectWithPeerGroup(peerGroup.id, obj, mode, gossipId);
+            syncToken = this.resources.mesh.syncObjectWithPeerGroup(peerGroup.id, obj, mode);
             this.syncTokens.set(syncKey, syncToken);
             this.syncPerPeerGroup.add(peerGroupToken, syncToken);
         }

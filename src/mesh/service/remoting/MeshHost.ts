@@ -67,7 +67,6 @@ type SyncObjectsWithPeerGroup = {
     objContext: LiteralContext,
     stores: any,
     mode: SyncMode,
-    gossipId?: string,
     usageTokens?: any
 }
 
@@ -381,7 +380,7 @@ class MeshHost {
             }
             
             this.mesh.syncManyObjectsWithPeerGroup(
-                syncObjs.peerGroupId, objs.values(), syncObjs.mode, syncObjs.gossipId, tokens
+                syncObjs.peerGroupId, objs.values(), syncObjs.mode, tokens
             );
         } else if (command.type === 'stop-sync-objects-with-peer-group') {
             const stopSyncObjs = command as StopSyncObjectsWithPeerGroup;

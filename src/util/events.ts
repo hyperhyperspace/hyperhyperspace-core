@@ -20,11 +20,11 @@ type hashable = { getLastHash(): hash; };
 type location<T> = {name: string, emitter: T};
 //type path<T> = Array<location<T>>;
 
-type Event<T extends hashable> = {
-    emitter: T;
-    path?: location<T>[];
+type Event<E extends hashable, D=any> = {
+    emitter: E;
+    path?: location<E>[];
     action: string;
-    data: any;
+    data: D;
 }
 
 type EventCallback<T extends hashable> = (ev: Event<T>) => boolean|void;
@@ -120,9 +120,13 @@ class EventRelay<T extends hashable> {
             upstream.removeDownstreamObserver(observer);
 
             this.upstreamRelays.delete(name);
-        }
+        }   
+    }
 
-        
+    removeAllUpstreamRelays() {
+        for (const name of Array.from(this.upstreamRelays.keys())) {
+            this.removeUpstreamRelay(name);
+        }
     }
 
     hasUpstreamRelay(name: string) {

@@ -260,7 +260,7 @@ class MeshProxy {
         return p;
     }
 
-    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string, usageToken?: UsageToken): UsageToken {
+    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, usageToken?: UsageToken): UsageToken {
         
         const ctx = obj.toContext();
 
@@ -285,7 +285,6 @@ class MeshProxy {
             objContext: obj.toLiteralContext(),
             stores: stores,
             mode: mode,
-            gossipId: gossipId,
             usageTokens: tokens
         };
         
@@ -294,7 +293,7 @@ class MeshProxy {
         return token;
     }
 
-    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, gossipId?: string, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken> {
+    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken> {
 
         const objContext = new Context();
         let tokens: any = {}
@@ -322,7 +321,6 @@ class MeshProxy {
             objContext: objContext.toLiteralContext(),
             stores: stores,
             mode: mode,
-            gossipId: gossipId,
             usageTokens: tokens
         };
 

@@ -139,7 +139,7 @@ class LinearStateAgent extends PeeringAgentBase implements StateSyncAgent {
 
     ready(pod: AgentPod): void {
         this.pod = pod;
-        this.gossipAgent = pod.getAgent(StateGossipAgent.agentIdForGossip(this.topic)) as StateGossipAgent;
+        this.gossipAgent = pod.getAgent(StateGossipAgent.agentIdForGossipId(this.topic)) as StateGossipAgent;
     }
 
     receiveLocalEvent(ev: AgentEvent): void {

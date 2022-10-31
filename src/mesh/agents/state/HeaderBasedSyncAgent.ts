@@ -6,13 +6,15 @@ import { Endpoint } from '../network/NetworkAgent';
 import { PeerGroupAgent } from '../peer/PeerGroupAgent';
 import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { HeaderBasedState } from './history/HeaderBasedState';
-import { AgentStateUpdateEvent, GossipEventTypes } from './StateGossipAgent';
+import { AgentStateUpdateEvent, GossipEventTypes, StateGossipAgent } from './StateGossipAgent';
 import { StateSyncAgent } from './StateSyncAgent';
 
 import { HistorySynchronizer } from './history/HistorySynchronizer';
 import { HistoryProvider, MessageType, SyncMsg } from './history/HistoryProvider';
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
 import { Resources } from 'spaces/Resources';
+import { EventRelay } from 'util/events';
+import { SyncObserverEventTypes, SyncState, SyncStateUpdateEvent } from './SyncObserverAgent';
 
 /*
  *  Important notice: The constructor of the HeaderBasedSyncAgent can receive either an instance or just the
@@ -36,7 +38,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     static MaxRequestsPerRemote = 2;
 
-    mutableObj?: MutableObject;
+    mutableObj: MutableObject;
     mutableObjHash: Hash;
     acceptedMutationOpClasses: string[];
     stateOpFilter?: StateFilter;
@@ -55,20 +57,19 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     synchronizer : HistorySynchronizer;
     provider     : HistoryProvider;
 
+    syncEventSource?: EventRelay<HashedObject>;
+
     terminated = false;
 
     controlLog: Logger;
     messageLog: Logger;
 
-    constructor(peerGroupAgent: PeerGroupAgent, mutableObjOrHash: MutableObject|Hash, resources: Resources, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
+    constructor(peerGroupAgent: PeerGroupAgent, mutableObj: MutableObject, resources: Resources, acceptedMutationOpClasses : string[], stateOpFilter?: StateFilter) {
         super(peerGroupAgent);
 
-        if (mutableObjOrHash instanceof MutableObject) {
-            this.mutableObj  = mutableObjOrHash;
-            this.mutableObjHash = mutableObjOrHash.hash();    
-        } else {
-            this.mutableObjHash =  mutableObjOrHash;
-        }
+        this.mutableObj = mutableObj;
+        this.mutableObjHash = mutableObj.hash();
+
         this.acceptedMutationOpClasses = acceptedMutationOpClasses;
         this.stateOpFilter = stateOpFilter;
 
@@ -86,9 +87,6 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         this.messageLog = HeaderBasedSyncAgent.messageLog;
     }
 
-
-
-    
     getAgentId(): string {
         return HeaderBasedSyncAgent.syncAgentIdFor(this.mutableObjHash, this.peerGroupAgent.peerGroupId);
     }
@@ -96,6 +94,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     ready(pod: AgentPod): void {
         
         this.pod = pod;
+
         this.updateStateFromStore().then(async () => {
                 if (this.stateOpHeadersByOpHash !== undefined) {
                     for (const opHistory of this.stateOpHeadersByOpHash.values()) {
@@ -111,6 +110,14 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     }
 
     shutdown(): void {
+
+        const ev: SyncStateUpdateEvent = {
+            emitter: this.mutableObj,
+            action: SyncObserverEventTypes.SyncStateUpdate,
+            data: {inSync: false, synchronizing: false, opsToFetch: 0, remoteStateHashes: {}}
+        };
+
+        this.syncEventSource?.emit(ev);
 
         this.terminated = true;
         this.synchronizer.shutdown();
@@ -205,6 +212,16 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         if (this.shouldAcceptMutationOp(op)) {
             await this.synchronizer.onNewLocalOp(op);
             await this.updateStateFromStore();  
+        }
+
+        if (this.syncEventSource !== undefined) {
+            const ev: SyncStateUpdateEvent = {
+                emitter: this.mutableObj,
+                action: SyncObserverEventTypes.SyncStateUpdate,
+                data: this.getSyncState()
+            };
+
+            this.syncEventSource.emit(ev);
         }
     };
 
@@ -324,6 +341,46 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         return this.synchronizer.expectingMoreOps(receivedOpHashes);
     }
 
+    getSyncEventSource(): EventRelay<HashedObject> {
+
+        if (this.syncEventSource === undefined) {
+            this.syncEventSource = this.createSyncEventSource();
+        }
+
+        return this.syncEventSource;
+    }
+
+    createSyncEventSource(): EventRelay<HashedObject> {
+        return new EventRelay(this.mutableObj as HashedObject, new Map());
+    }
+
+    getSyncState(): SyncState {
+
+        const gossipAgent = this.pod?.getAgent(StateGossipAgent.agentIdForGossipId(this.getAgentId())) as StateGossipAgent;
+
+        const remoteStateHashes = gossipAgent.getAllRemoteStateForAgent(this.getAgentId());
+        const localStateHash    = gossipAgent.getLocalStateForAgent(this.getAgentId());
+
+        let inSync = true;
+        for (const remoteHash of Object.values(remoteStateHashes)) {
+            if (remoteHash !== localStateHash) {
+                inSync = false;
+                break;
+            }
+        }
+
+        const opsToFetch = this.synchronizer.discoveredHistory.contents.size;
+
+        return {remoteStateHashes: remoteStateHashes, localStateHash: localStateHash, inSync: inSync, opsToFetch: opsToFetch, synchronizing: true}
+    }
+
+    getMutableObject(): MutableObject {
+        return this.mutableObj;
+    }
+
+    getPeerGroupId(): string {
+        return this.peerGroupAgent.peerGroupId;
+    }
 }
 
 export { SyncMsg as HistoryMsg, HeaderBasedSyncAgent, StateFilter }

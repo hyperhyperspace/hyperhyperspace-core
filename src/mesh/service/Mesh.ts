@@ -5,7 +5,7 @@ import { MultiMap } from 'util/multimap';
 
 import { Endpoint, NetworkAgent, NetworkAgentProxyConfig, SecureNetworkAgent } from '../agents/network';
 import { PeerInfo, PeerSource, PeerGroupAgent, PeerGroupAgentConfig } from '../agents/peer';
-import { StateGossipAgent, StateSyncAgent } from 'mesh/agents/state';
+import { StateGossipAgent, StateSyncAgent, SyncObserver, SyncObserverAgent, SyncState } from 'mesh/agents/state';
 import { ObjectBroadcastAgent, ObjectDiscoveryAgent, ObjectDiscoveryReply, ObjectDiscoveryReplyParams } from '../agents/discovery';
 
 import { AgentPod } from './AgentPod';
@@ -17,8 +17,6 @@ import { Identity } from 'data/identity';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn/ObjectSpawnAgent';
 import { ObjectInvokeAgent } from 'mesh/agents/spawn/ObjectInvokeAgent';
 import { PeerGroupState } from 'mesh/agents/peer/PeerGroupState';
-
-
 
 
 /* Connect to the Hyper Hyper Space service mesh.
@@ -83,15 +81,13 @@ import { PeerGroupState } from 'mesh/agents/peer/PeerGroupState';
  */ 
 
 
-
-type GossipId  = string;
 type PeerGroupId = string;
 type PeerGroupInfo = { id: string, localPeer: PeerInfo, peerSource: PeerSource };
 
 type UsageToken = string;
 
 type PeerGroupUsageInfo       = { type: 'peer-group', peerGroupId: PeerGroupId };
-type ObjectSyncUsageInfo      = { type: 'object-sync', peerGroupId: PeerGroupId, objHash: Hash, gossipId: GossipId };
+type ObjectSyncUsageInfo      = { type: 'object-sync', peerGroupId: PeerGroupId, objHash: Hash };
 type ObjectBroadcastUsageInfo = { type: 'object-broadcast', objHash: Hash, broadcastedSuffixBits: number }
 type UsageInfo = PeerGroupUsageInfo | ObjectSyncUsageInfo | ObjectBroadcastUsageInfo;
 
@@ -103,6 +99,12 @@ enum SyncMode {
     recursive = 'recursive'   // sync the object, and any mutable object referenced by it or its mutation ops.
 }
 
+class CannotInferPeerGroup extends Error {
+    constructor(mutHash: Hash) {
+        super('The sync state for ' + mutHash + ' was requested, but no peerGroupId was specified, and there are more than one peer groups synchronizing this object!');
+    }
+}
+
 class Mesh {
 
     static syncCommandsLog = new Logger('mesh-sync-commands', LogLevel.INFO);
@@ -111,31 +113,28 @@ class Mesh {
 
     network: NetworkAgent;
     secured: SecureNetworkAgent;
+    syncObserver: SyncObserverAgent;
 
     usage: MultiMap<UsageKey, UsageToken>;
     usageTokens: Map<UsageToken, UsageInfo>;
 
-
-    // for each peer group, all the gossip ids we have created.
-    gossipIdsPerPeerGroup: MultiMap<string, GossipId>;
-
     syncAgents: Map<PeerGroupId, Map<Hash, StateSyncAgent>>;
 
-    // for each gossip id, all the objects we've been explicitly asked to sync, and with which mode.
-    rootObjects: Map<GossipId, Map<Hash, SyncMode>>;
-    rootObjectStores: Map<GossipId, Map<Hash, Store>>;
+    // for each peer group, all the objects we've been explicitly asked to sync, and with which mode.
+    rootObjects: Map<PeerGroupId, Map<Hash, SyncMode>>;
+    rootObjectStores: Map<PeerGroupId, Map<Hash, Store>>;
 
-    // given an object, all the gossip ids that are following it.
-    gossipIdsPerObject: MultiMap<Hash, GossipId>;
+    // given an object, all the peer groups that are following it.
+    gossipIdsPerObject: MultiMap<Hash, PeerGroupId>;
 
     // keep track of callbacks for ALL objects we're monitoring (for recursive sync)
-    allNewOpCallbacks: Map<GossipId, Map<Hash, (opHash: Hash)  => Promise<void>>>;
+    allNewOpCallbacks: Map<PeerGroupId, Map<Hash, (opHash: Hash)  => Promise<void>>>;
 
     // given an object, all the root objects it is being sync'd after.
-    allRootAncestors: Map<GossipId, MultiMap<Hash, Hash>>;
+    allRootAncestors: Map<PeerGroupId, MultiMap<Hash, Hash>>;
 
     // given a root object, ALL the mut. objects that are being sync'd because of it.
-    allDependencyClosures: Map<GossipId, MultiMap<Hash, Hash>>;
+    allDependencyClosures: Map<PeerGroupId, MultiMap<Hash, Hash>>;
 
     // configuration
 
@@ -149,11 +148,11 @@ class Mesh {
         this.pod.registerAgent(this.network);
         this.secured = new SecureNetworkAgent();
         this.pod.registerAgent(this.secured);
+        this.syncObserver = new SyncObserverAgent();
+        this.pod.registerAgent(this.syncObserver);
 
         this.usage = new MultiMap();
         this.usageTokens = new Map();
-
-        this.gossipIdsPerPeerGroup = new MultiMap();
 
         this.syncAgents         = new Map();
 
@@ -233,7 +232,7 @@ class Mesh {
         
     // Object synchronization
 
-    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, gossipId?: string, usageToken?: UsageToken): UsageToken {
+    syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, usageToken?: UsageToken): UsageToken {
         
         Mesh.syncCommandsLog.debug('requested sync of ' + obj.getLastHash() + ' with ' + peerGroupId + ' in mode ' + mode);
 
@@ -242,11 +241,9 @@ class Mesh {
             throw new Error("Cannot sync object with mesh " + peerGroupId + ", need to join it first.");
         }
 
-        if (gossipId === undefined) {
-            gossipId = peerGroupId;
-        }
+        const gossipId = peerGroupId;
 
-        let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
+        let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossipId(gossipId)) as StateGossipAgent | undefined;
         if (gossip === undefined) {
             gossip = new StateGossipAgent(gossipId, peerGroup);
             this.pod.registerAgent(gossip);
@@ -256,17 +253,15 @@ class Mesh {
         
         this.addRootSync(gossip, obj, mode);
 
-        this.gossipIdsPerPeerGroup.add(peerGroupId, gossipId);
-
-        return this.registerUsage({type: 'object-sync', objHash: obj.getLastHash(), peerGroupId: peerGroupId, gossipId: gossipId}, usageToken);
+        return this.registerUsage({type: 'object-sync', objHash: obj.getLastHash(), peerGroupId: peerGroupId}, usageToken);
     }
-        
-    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, gossipId?: string, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken>{
+    
+    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken>{
         
         const tokens = new Map<Hash, UsageToken>();
 
         for (const obj of objs) {
-            const usageToken = this.syncObjectWithPeerGroup(peerGroupId, obj, mode, gossipId, usageTokens?.get(obj.getLastHash()));
+            const usageToken = this.syncObjectWithPeerGroup(peerGroupId, obj, mode, usageTokens?.get(obj.getLastHash()));
             tokens.set(obj.getLastHash(), usageToken);
         }
 
@@ -285,20 +280,18 @@ class Mesh {
                 
                 const peerGroupId = usageInfo.peerGroupId;
                 const hash        = usageInfo.objHash;
-                const gossipId    = usageInfo.gossipId;
 
                 Mesh.syncCommandsLog.debug('requested STOP sync of ' + hash + ' with ' + peerGroupId);
         
-                let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossip(gossipId)) as StateGossipAgent | undefined;
+                let gossip = this.pod.getAgent(StateGossipAgent.agentIdForGossipId(peerGroupId)) as StateGossipAgent | undefined;
         
                 if (gossip !== undefined) {
                     this.removeRootSync(gossip, hash);
         
-                    let roots = this.rootObjects.get(gossipId);
+                    let roots = this.rootObjects.get(peerGroupId);
         
                     if (roots === undefined || roots.size === 0) {
                         this.pod.deregisterAgent(gossip);
-                        this.gossipIdsPerPeerGroup.delete(peerGroupId, gossipId);
                     }
                 }
             }
@@ -316,6 +309,39 @@ class Mesh {
             this.stopSyncObjectWithPeerGroup(token);
         }
 
+    }
+
+    async getSyncState(mut: MutableObject, peerGroupId?: PeerGroupId): Promise<SyncState|undefined> {
+
+        if (peerGroupId === undefined) {
+            peerGroupId = this.inferPeerGroupId(mut);
+        }
+
+        const syncAgent = this.pod.getAgent(mut.getSyncAgentId(peerGroupId)) as StateSyncAgent|undefined;
+
+        if (syncAgent !== undefined) {
+            return syncAgent.getSyncState();
+        } else {
+            return undefined;
+        }
+    }
+
+    addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId) {
+
+        if (peerGroupId === undefined) {
+            peerGroupId = this.inferPeerGroupId(mut);
+        }
+
+        this.syncObserver.addSyncObserver(obs, mut, peerGroupId);
+    }
+
+    removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId) {
+
+        if (peerGroupId === undefined) {
+            peerGroupId = this.inferPeerGroupId(mut);
+        }
+
+        this.syncObserver.removeSyncObserver(obs, mut, peerGroupId);
     }
 
     // Object discovery
@@ -544,28 +570,22 @@ class Mesh {
         if (gossip !== undefined) {
             let peerGroupId = gossip.peerGroupAgent.peerGroupId;
 
-            let matchGossipIds = this.gossipIdsPerPeerGroup.get(peerGroupId);
-
-            if (matchGossipIds !== undefined) {
-                for (const matchGossipId of matchGossipIds) {
-                    let roots = this.rootObjects.get(matchGossipId);
-                    let mode = roots?.get(objHash);
-                    if (mode !== undefined) {
-                        modes.add(mode);
-                    }
-
-                    let rootAncestors = this.allRootAncestors.get(matchGossipId)?.get(objHash);
-
-                    if (rootAncestors !== undefined) {
-                        for (const rootHash of rootAncestors) {
-                            let rootMode = roots?.get(rootHash);
-                            if (rootMode !== undefined) {
-                                modes.add(rootMode);
-                            }
-                        }
-                    } 
-                }
+            let roots = this.rootObjects.get(peerGroupId);
+            let mode = roots?.get(objHash);
+            if (mode !== undefined) {
+                modes.add(mode);
             }
+
+            let rootAncestors = this.allRootAncestors.get(peerGroupId)?.get(objHash);
+
+            if (rootAncestors !== undefined) {
+                for (const rootHash of rootAncestors) {
+                    let rootMode = roots?.get(rootHash);
+                    if (rootMode !== undefined) {
+                        modes.add(rootMode);
+                    }
+                }
+            } 
 
             return modes;
         }
@@ -816,11 +836,23 @@ class Mesh {
         if (usageInfo.type === 'peer-group') {
             return usageInfo.type + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--');
         } else if (usageInfo.type === 'object-sync') {
-            return usageInfo.type + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--') + '-' + usageInfo.gossipId.replace(/[-]/g, '--');
+            return usageInfo.type + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--');
         } else {
             return usageInfo.type + '-' + usageInfo.objHash + '-' + usageInfo.broadcastedSuffixBits;
         }
 
+    }
+
+    private inferPeerGroupId(mut: MutableObject) {
+        const mutHash = mut.getLastHash();
+
+        const agents = this.gossipIdsPerObject.get(mutHash);
+
+        if (agents.size > 0) {
+            throw new CannotInferPeerGroup(mutHash);
+        } else {
+            return agents.values().next().value as string;
+        }
     }
 
 }

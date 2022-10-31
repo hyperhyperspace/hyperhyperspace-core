@@ -9,7 +9,7 @@ type QueryCallback = (queryId: string, listening: Array<LinkupAddress>) => void;
 
 class LinkupManager {
 
-    static logger = new Logger(LinkupManager.name, LogLevel.INFO);
+    static logger = new Logger(LinkupManager.name, LogLevel.DEBUG);
 
     static defaultLinkupServer =  'wrtc+wss://mypeer.net:443';
     //static defaultLinkupServer =  'wrtc+ws://localhost:3002';

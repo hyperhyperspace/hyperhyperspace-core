@@ -70,7 +70,7 @@ enum GossipType {
 
 interface SendFullState { 
     type: GossipType.SendFullState,
-    state: {entries: [AgentId, Hash][], hashes: Hash[]} //HashedMap<AgentId, Hash>.toArrays
+    state: {entries: [AgentId, Hash][], hashes: Hash[]}
 };
 
 interface SendStateObject {
@@ -121,7 +121,7 @@ enum SendingReason {
 
 class StateGossipAgent extends PeeringAgentBase {
 
-    static agentIdForGossip(gossipId: string) {
+    static agentIdForGossipId(gossipId: string) {
         return 'state-gossip-agent-for-' + gossipId;
     }
 
@@ -164,9 +164,9 @@ class StateGossipAgent extends PeeringAgentBase {
 
     
 
-    constructor(topic: string, peerNetwork: PeerGroupAgent) {
+    constructor(gossipId: string, peerNetwork: PeerGroupAgent) {
         super(peerNetwork);
-        this.gossipId = topic;
+        this.gossipId = gossipId;
 
         this.trackedAgentIds = new Set();
         this.localState  = new Map();
@@ -211,7 +211,7 @@ class StateGossipAgent extends PeeringAgentBase {
     }
 
     getAgentId(): string {
-        return StateGossipAgent.agentIdForGossip(this.gossipId);
+        return StateGossipAgent.agentIdForGossipId(this.gossipId);
     }
 
     getNetwork() : AgentPod {
@@ -471,7 +471,12 @@ class StateGossipAgent extends PeeringAgentBase {
 
         if (gossip.type === GossipType.RequestStateObject) {
             this.controlLog.trace('Recevied state request for ' + gossip.agentId);
-            this.sendStateObject(source, gossip.agentId, SendingReason.Request);    
+            if (this.localStateObjects.get(gossip.agentId)) {
+                this.sendStateObject(source, gossip.agentId, SendingReason.Request);    
+            } else {
+                this.controlLog.debug('Recevied state request for ' + gossip.agentId + ', but no state was found: not sending')
+            }
+            
         }
     }
 
@@ -557,7 +562,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
             }
 
-            if (receivedOldState && this.localState.get(agentId) !== state) {
+            if (receivedOldState && this.localState.get(agentId) !== state && this.localStateObjects.get(agentId) !== undefined) {
                 this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
                 this.sendStateObject(sender, agentId);
             }
@@ -680,6 +685,26 @@ class StateGossipAgent extends PeeringAgentBase {
 
     }
 
+    // for other agents
+
+    getAllRemoteStateForAgent(agentId: AgentId): {[key: Endpoint]: Hash} {
+
+        let state: {[key: Endpoint]: Hash} = {};
+
+        for (const [endpoint, peerState] of this.remoteState.entries()) {
+            const stateHash = peerState.get(agentId);
+            
+            if (stateHash !== undefined) {
+                state[endpoint] = stateHash;
+            }
+        }
+
+        return state;
+    }
+
+    getLocalStateForAgent(agentId: AgentId): Hash|undefined {
+        return this.localState.get(agentId);
+    }
 
 }
 

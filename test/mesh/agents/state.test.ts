@@ -218,8 +218,8 @@ async function syncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'mix'
         const peerGroupAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         
         //let agent = new TerminalOpsSyncAgent(peerGroupAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(peerGroupAgent, s.hash(),  await Resources.create({store: stores[i]}), MutableSet.opClasses);
-        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
+        let agent = new HeaderBasedSyncAgent(peerGroupAgent, s,  await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossipId(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
         pods[i].registerAgent(agent);
@@ -350,8 +350,8 @@ async function stagedSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(meshAgent, s.hash(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
-        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
+        let agent = new HeaderBasedSyncAgent(meshAgent, s, await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossipId(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
         pods[i].registerAgent(agent);
@@ -513,7 +513,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(meshAgent, s.hash(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let agent = new HeaderBasedSyncAgent(meshAgent, s, await Resources.create({store: stores[i]}), MutableSet.opClasses);
         if (i===0) {
 
             //syncAgent = agent;
@@ -531,7 +531,7 @@ async function deepSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws'|'
         
         }
         
-        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
+        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossipId(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
         pods[i].registerAgent(agent);
@@ -727,7 +727,7 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
     for (let i=0; i<size; i++) {
         const meshAgent = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
         //let agent = new TerminalOpsSyncAgent(meshAgent, s.hash(), stores[i], MutableSet.opClasses);
-        let agent = new HeaderBasedSyncAgent(meshAgent, s.hash(), await Resources.create({store: stores[i]}), MutableSet.opClasses);
+        let agent = new HeaderBasedSyncAgent(meshAgent, s, await Resources.create({store: stores[i]}), MutableSet.opClasses);
         
         agent.synchronizer.controlLog = new Logger('synchronizer', LogLevel.INFO);
         agent.synchronizer.stateLog   = new Logger('synchronizer', LogLevel.INFO);
@@ -738,7 +738,7 @@ async function diamondSyncInSmallPeerGroup(done: () => void, network: 'wrtc'|'ws
         agent.provider.opXferLog      = new Logger('provider', LogLevel.INFO);
         agent.provider.storeLog       = new Logger('provider', LogLevel.INFO);
         
-        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossip(peerNetworkId)) as StateGossipAgent;
+        let gossip = pods[i].getAgent(StateGossipAgent.agentIdForGossipId(peerNetworkId)) as StateGossipAgent;
         gossip.trackAgentState(agent.getAgentId());
         //agent;
         pods[i].registerAgent(agent);

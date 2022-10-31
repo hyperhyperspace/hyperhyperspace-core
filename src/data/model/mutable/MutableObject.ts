@@ -4,7 +4,7 @@ import { HashedObject } from '../immutable/HashedObject';
 import { Context } from '../literals/Context';
 import { Hash } from '../hashing/Hashing';
 import { Logger, LogLevel } from 'util/logging';
-import { HeaderBasedSyncAgent, StateSyncAgent, StateFilter } from 'mesh/agents/state';
+import { HeaderBasedSyncAgent, StateSyncAgent, StateFilter, SyncState, SyncObserver } from 'mesh/agents/state';
 import { PeerGroupAgent } from 'mesh/agents/peer';
 import { HashedSet } from '../immutable/HashedSet';
 import { HashReference } from '../immutable/HashReference';
@@ -603,7 +603,7 @@ abstract class  MutableObject extends HashedObject {
                 for (const elmt of aliases) {
                     if (!seen.has(elmt)) {
                         seen.add(elmt);
-                        MutableObject.addEventRelayForElmt(own, hash, elmt);
+                        MutableObject.removeEventRelayForElmt(own, hash, elmt);
                     }
                 }
             }    
@@ -615,8 +615,38 @@ abstract class  MutableObject extends HashedObject {
         //return new TerminalOpsSyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
     }
 
+    getSyncAgentId(peerGroupId: string) {
+        return HeaderBasedSyncAgent.syncAgentIdFor(this.getLastHash(), peerGroupId);
+    }
+
     getSyncAgentStateFilter() : StateFilter | undefined {
         return undefined;
+    }
+
+    async getSyncState(peerGroupId?: string): Promise<SyncState|undefined> {
+        return this.getResources()?.mesh.getSyncState(this, peerGroupId);
+    }
+
+    addSyncObserver(obs: SyncObserver, peerGroupId?: string) {
+
+        const mesh = this.getResources()?.mesh;
+
+        if (mesh === undefined) {
+            throw new Error('Trying to add a sync observer, but object ' + this.hash() + ' does not have a mesh resource.');
+        }
+
+        mesh.addSyncObserver(obs, this, peerGroupId);
+    }
+
+    removeSyncObserver(obs: SyncObserver, peerGroupId?: string) {
+
+        const mesh = this.getResources()?.mesh;
+
+        if (mesh === undefined) {
+            throw new Error('Trying to add a sync observer, but object ' + this.hash() + ' does not have a mesh resource.');
+        }
+
+        mesh.removeSyncObserver(obs, this, peerGroupId);
     }
 
     getAcceptedMutationOpClasses() : Array<string> {
