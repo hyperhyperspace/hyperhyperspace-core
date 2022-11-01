@@ -24,10 +24,12 @@ import { StateSyncAgent } from './StateSyncAgent';
  * - addSyncObserver() is called -> ... to be continued
  */
 
-type SyncObserver = Observer<HashedObject>;
+type SyncState = { remoteStateHashes: {[key: Endpoint]: Hash}, localStateHash?: Hash, allPeersInSync: boolean, opsToFetch: number, synchronizing: boolean };
+
+type SyncObserver = Observer<HashedObject, SyncState>;
 type SyncEvent    = Event<HashedObject, SyncState>;
 
-type SyncState = { remoteStateHashes: {[key: Endpoint]: Hash}, localStateHash?: Hash, inSync: boolean, opsToFetch: number, synchronizing: boolean }
+
 
 enum SyncObserverEventTypes {
     SyncStateUpdate = 'sync-state-update'
@@ -43,7 +45,7 @@ class SyncObserverAgent implements Agent {
 
     pod?: AgentPod;
 
-    relays: Map<AgentId, EventRelay<HashedObject>>;
+    relays: Map<AgentId, [EventRelay<HashedObject>, SyncObserver]>;
 
     constructor() {
         this.relays = new Map();
@@ -59,27 +61,44 @@ class SyncObserverAgent implements Agent {
 
     addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId: PeerGroupId) {
 
+        console.log('adding sync observer ', obs, ' for ', mut.getLastHash(), ' in peer group ', peerGroupId)
+
         if (this.pod === undefined) {
             throw new Error('Trying to add a sync observer, but the SyncObserverAgent is not ready.');
         }
 
         const syncAgentId = mut.getSyncAgentId(peerGroupId);
+        const syncAgent   = this.pod.getAgent(syncAgentId) as StateSyncAgent|undefined;
 
-        let relay = this.relays.get(syncAgentId);
+        let pair = this.relays.get(syncAgentId);
+        
 
-        if (relay === undefined) {
-            const upstream = new Map<string, EventRelay<HashedObject>>();
+        if (pair === undefined) {
 
-            const syncAgent = this.pod.getAgent(syncAgentId) as StateSyncAgent;
-            if (syncAgent !== undefined) {
-                upstream.set('agent', syncAgent.getSyncEventSource());
+            const relay = new EventRelay<HashedObject>(mut);
+            const syncAgentObs = (ev: SyncEvent) => {
+                relay.emit(ev);
             }
 
-            relay = new EventRelay<HashedObject>(mut, upstream);
-            this.relays.set(syncAgentId, relay);
+            pair = [relay, syncAgentObs];
+    
+            this.relays.set(syncAgentId, [relay, syncAgentObs]);
+    
+            
+            if (syncAgent !== undefined) {
+                syncAgent.getSyncEventSource().addObserver(syncAgentObs);
+            }
         }
 
-        relay.addObserver(obs);
+        pair[0].addObserver(obs);
+
+        if (syncAgent !== undefined) {
+            obs({
+                emitter: mut,
+                action: SyncObserverEventTypes.SyncStateUpdate,
+                data: syncAgent.getSyncState()
+            });
+        }
     }
 
     removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId: PeerGroupId) {
@@ -88,13 +107,20 @@ class SyncObserverAgent implements Agent {
         }
 
         const syncAgentId = mut.getSyncAgentId(peerGroupId);
-        let   relay = this.relays.get(syncAgentId);
+        const pair        = this.relays.get(syncAgentId);
 
-        if (relay !== undefined) {
+        if (pair !== undefined) {
+            const [relay, syncAgentObs] = pair;
             relay.removeObserver(obs);
 
             if (relay.observers.size === 0) {
-                relay.removeAllUpstreamRelays();
+
+                const syncAgent = this.pod.getAgent(syncAgentId) as StateSyncAgent|undefined;
+
+                if (syncAgent !== undefined) {
+                    syncAgent.getSyncEventSource().removeObserver(syncAgentObs);
+                }
+                
                 this.relays.delete(syncAgentId);
             }
         }
@@ -106,14 +132,19 @@ class SyncObserverAgent implements Agent {
             const agentEv = ev as AgentSetChangeEvent;
 
             const syncAgentId = agentEv.content.agentId;
-            const relay = this.relays.get(syncAgentId);
+            const pair = this.relays.get(syncAgentId);
 
-            if (relay !== undefined) {
+            if (pair !== undefined) {
                 if (agentEv.content.change === AgentSetChange.Addition) {
                     const syncAgent = this.pod?.getAgent(syncAgentId) as StateSyncAgent;
-                    relay.addUpstreamRelay('agent', syncAgent.getSyncEventSource());
+                    const [_relay, syncAgentObserver] = pair;
+                    syncAgent.getSyncEventSource().addObserver(syncAgentObserver);
+                    console.log('+++ adding agent relay ', syncAgent.getSyncEventSource(), ' to ', _relay)
                 } else if (agentEv.content.change === AgentSetChange.Removal) {
-                    relay.removeUpstreamRelay('agent');
+                    const syncAgent = this.pod?.getAgent(syncAgentId) as StateSyncAgent|undefined;
+                    const [_relay, syncAgentObserver] = pair;
+                    syncAgent?.getSyncEventSource().addObserver(syncAgentObserver);
+                    console.log('+++ removing agent relay from ', _relay)
                 }
     
             }

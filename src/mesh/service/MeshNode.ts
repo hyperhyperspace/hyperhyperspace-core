@@ -2,12 +2,12 @@
 import { Identity } from 'data/identity';
 import { Hash, HashedObject } from 'data/model';
 import { Endpoint } from 'mesh/agents/network';
-import { ObjectDiscoveryPeerSource, PeerGroupState, PeerInfo } from 'mesh/agents/peer';
+import { PeerGroupState, PeerInfo } from 'mesh/agents/peer';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn';
 import { LinkupAddress, LinkupManager } from 'net/linkup';
 import { Resources } from 'spaces/spaces';
 import { MultiMap } from 'util/multimap';
-import { PeerGroupInfo, SyncMode, UsageToken } from './Mesh';
+import { Mesh, PeerGroupInfo, SyncMode, UsageToken } from './Mesh';
 
 type Key = string;
 
@@ -64,7 +64,7 @@ class MeshNode {
     }
 
     async getPeerGroupStateForSyncObj(obj: HashedObject) {
-        const peerGroup = await this.discoveryPeerGroupInfo(obj);
+        const peerGroup = await this.getDiscoveryPeerGroup(obj);
 
         return this.getPeerGroupState(peerGroup.id);
     }
@@ -72,7 +72,7 @@ class MeshNode {
     async sync(obj: HashedObject, mode :SyncMode = SyncMode.full, peerGroup?: PeerGroupInfo): Promise<void> {
 
         if (peerGroup === undefined) {
-            peerGroup = await this.discoveryPeerGroupInfo(obj);
+            peerGroup = await this.getDiscoveryPeerGroup(obj);
         }
 
         const peerGroupKey = MeshNode.generateKey([peerGroup.id]);
@@ -97,7 +97,7 @@ class MeshNode {
 
     async stopSync(obj: HashedObject, peerGroupId?: string, gossipId?: string) : Promise<void> {
         if (peerGroupId === undefined) {
-            peerGroupId = MeshNode.discoveryPeerGroupInfoId(obj);
+            peerGroupId = Mesh.discoveryPeerGroupId(obj);
         }
 
         const syncKey   = MeshNode.generateKey([obj.hash(), peerGroupId, gossipId]);
@@ -129,20 +129,8 @@ class MeshNode {
         this.resources.mesh.sendObjectSpawnRequest(object, sender, receiver, senderEndpoint, receiverLinkupServers, spawnId)
     }
 
-    private async discoveryPeerGroupInfo(obj: HashedObject) : Promise<PeerGroupInfo> {
-        let localPeer = this.resources.getPeersForDiscovery()[0];
-        let peerSource = new ObjectDiscoveryPeerSource(this.resources.mesh, obj, this.resources.config.linkupServers, LinkupAddress.fromURL(localPeer.endpoint, localPeer.identity), this.resources.getEndointParserForDiscovery());
-
-        return {
-            id: MeshNode.discoveryPeerGroupInfoId(obj),
-            localPeer: localPeer,
-            peerSource: peerSource
-        };
-
-    }
-
-    private static discoveryPeerGroupInfoId(obj: HashedObject) {
-        return  'sync-for-' + obj.hash();
+    async getDiscoveryPeerGroup(obj: HashedObject) : Promise<PeerGroupInfo> {
+        return this.resources.mesh.getDiscoveryPeerGroup(obj, this.resources);
     }
 
     private static generateKey(parts: (string|undefined)[]): string {
@@ -164,7 +152,7 @@ class MeshNode {
     async expectingMoreOps(obj: HashedObject, receivedOps?: Set<Hash>, peerGroupId?: string, rootObject?: HashedObject): Promise<boolean> {
 
         if (peerGroupId === undefined) {
-            const peerGroup = await this.discoveryPeerGroupInfo(rootObject !== undefined? rootObject : obj);
+            const peerGroup = await this.getDiscoveryPeerGroup(rootObject !== undefined? rootObject : obj);
             peerGroupId = peerGroup.id;
         }
 

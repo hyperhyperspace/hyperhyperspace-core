@@ -4,7 +4,7 @@ import { Store } from 'storage/store';
 import { MultiMap } from 'util/multimap';
 
 import { Endpoint, NetworkAgent, NetworkAgentProxyConfig, SecureNetworkAgent } from '../agents/network';
-import { PeerInfo, PeerSource, PeerGroupAgent, PeerGroupAgentConfig } from '../agents/peer';
+import { PeerInfo, PeerSource, PeerGroupAgent, PeerGroupAgentConfig, ObjectDiscoveryPeerSource } from '../agents/peer';
 import { StateGossipAgent, StateSyncAgent, SyncObserver, SyncObserverAgent, SyncState } from 'mesh/agents/state';
 import { ObjectBroadcastAgent, ObjectDiscoveryAgent, ObjectDiscoveryReply, ObjectDiscoveryReplyParams } from '../agents/discovery';
 
@@ -17,6 +17,7 @@ import { Identity } from 'data/identity';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn/ObjectSpawnAgent';
 import { ObjectInvokeAgent } from 'mesh/agents/spawn/ObjectInvokeAgent';
 import { PeerGroupState } from 'mesh/agents/peer/PeerGroupState';
+import { Resources } from 'spaces/Resources';
 
 
 /* Connect to the Hyper Hyper Space service mesh.
@@ -101,7 +102,7 @@ enum SyncMode {
 
 class CannotInferPeerGroup extends Error {
     constructor(mutHash: Hash) {
-        super('The sync state for ' + mutHash + ' was requested, but no peerGroupId was specified, and there are more than one peer groups synchronizing this object!');
+        super('The sync state for ' + mutHash + ' was requested, but no peerGroupId was specified, and there is not exactly one peer group synchronizing this object, so we cannot infer which one was intended!');
     }
 }
 
@@ -331,6 +332,8 @@ class Mesh {
         if (peerGroupId === undefined) {
             peerGroupId = this.inferPeerGroupId(mut);
         }
+
+        console.log('mesh: observer to ', mut.getLastHash(), ' peerGroupId=', peerGroupId);
 
         this.syncObserver.addSyncObserver(obs, mut, peerGroupId);
     }
@@ -843,14 +846,38 @@ class Mesh {
 
     }
 
+    async getDiscoveryPeerGroup(obj: HashedObject, resources?: Resources) : Promise<PeerGroupInfo> {
+
+        resources = resources || obj.getResources();
+
+        if (resources === undefined) {
+            throw new Error('Could not find a valid resources object to use for the discovery peer group.');
+        }
+
+        let localPeer = resources.getPeersForDiscovery()[0];
+        let peerSource = new ObjectDiscoveryPeerSource(this, obj, resources.config.linkupServers, LinkupAddress.fromURL(localPeer.endpoint, localPeer.identity), resources.getEndointParserForDiscovery());
+
+        return {
+            id: Mesh.discoveryPeerGroupId(obj),
+            localPeer: localPeer,
+            peerSource: peerSource
+        };
+
+    }
+
+    static discoveryPeerGroupId(obj: HashedObject) {
+        return  'sync-for-' + obj.getLastHash();
+    }
+
     private inferPeerGroupId(mut: MutableObject) {
         const mutHash = mut.getLastHash();
 
         const agents = this.gossipIdsPerObject.get(mutHash);
 
-        if (agents.size > 0) {
+        if (agents.size !== 1) {
             throw new CannotInferPeerGroup(mutHash);
         } else {
+            console.log('agents ', agents)
             return agents.values().next().value as string;
         }
     }

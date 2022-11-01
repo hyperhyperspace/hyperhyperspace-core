@@ -57,7 +57,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     synchronizer : HistorySynchronizer;
     provider     : HistoryProvider;
 
-    syncEventSource?: EventRelay<HashedObject>;
+    syncEventSource?: EventRelay<HashedObject, SyncState>;
 
     terminated = false;
 
@@ -104,7 +104,10 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 }
             }
         );
+
         this.watchStoreForOps();
+
+        this.emitSyncState();
 
         this.controlLog.debug('Started agent for ' + this.mutableObjHash);
     }
@@ -114,7 +117,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         const ev: SyncStateUpdateEvent = {
             emitter: this.mutableObj,
             action: SyncObserverEventTypes.SyncStateUpdate,
-            data: {inSync: false, synchronizing: false, opsToFetch: 0, remoteStateHashes: {}}
+            data: {allPeersInSync: false, synchronizing: false, opsToFetch: 0, remoteStateHashes: {}}
         };
 
         this.syncEventSource?.emit(ev);
@@ -156,6 +159,9 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 if (isNew) {
                     this.synchronizer.onNewHistory(sender, unknown);
                 }
+
+                this.emitSyncState();
+
 
             }
 
@@ -214,15 +220,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             await this.updateStateFromStore();  
         }
 
-        if (this.syncEventSource !== undefined) {
-            const ev: SyncStateUpdateEvent = {
-                emitter: this.mutableObj,
-                action: SyncObserverEventTypes.SyncStateUpdate,
-                data: this.getSyncState()
-            };
-
-            this.syncEventSource.emit(ev);
-        }
+        this.emitSyncState();
     };
 
     literalIsValidOp(literal?: Literal, log=false): boolean { 
@@ -354,9 +352,27 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
         return new EventRelay(this.mutableObj as HashedObject, new Map());
     }
 
+    // by default use our own syncEventSource, but allow the caller to specify another event relay
+    // (used by the SyncObserverAgent to send the initial state)
+    emitSyncState() {
+
+        if (this.syncEventSource !== undefined) {
+            const ev: SyncStateUpdateEvent = {
+                emitter: this.mutableObj,
+                action: SyncObserverEventTypes.SyncStateUpdate,
+                data: this.getSyncState()
+            };
+
+            console.log('new sync state event:', ev);
+            this.syncEventSource.emit(ev);
+        } else {
+            console.log('not emitting new sync state event: no relay')
+        }
+    }
+
     getSyncState(): SyncState {
 
-        const gossipAgent = this.pod?.getAgent(StateGossipAgent.agentIdForGossipId(this.getAgentId())) as StateGossipAgent;
+        const gossipAgent = this.pod?.getAgent(StateGossipAgent.agentIdForGossipId(this.peerGroupAgent.peerGroupId)) as StateGossipAgent;
 
         const remoteStateHashes = gossipAgent.getAllRemoteStateForAgent(this.getAgentId());
         const localStateHash    = gossipAgent.getLocalStateForAgent(this.getAgentId());
@@ -371,7 +387,7 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         const opsToFetch = this.synchronizer.discoveredHistory.contents.size;
 
-        return {remoteStateHashes: remoteStateHashes, localStateHash: localStateHash, inSync: inSync, opsToFetch: opsToFetch, synchronizing: true}
+        return {remoteStateHashes: remoteStateHashes, localStateHash: localStateHash, allPeersInSync: inSync, opsToFetch: opsToFetch, synchronizing: true}
     }
 
     getMutableObject(): MutableObject {

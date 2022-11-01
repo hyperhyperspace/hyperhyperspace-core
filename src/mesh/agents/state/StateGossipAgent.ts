@@ -696,9 +696,11 @@ class StateGossipAgent extends PeeringAgentBase {
             
             if (stateHash !== undefined) {
                 state[endpoint] = stateHash;
+                console.log('ep=', endpoint, ', hash=', stateHash);
             }
         }
 
+        console.log(state);
         return state;
     }
 
