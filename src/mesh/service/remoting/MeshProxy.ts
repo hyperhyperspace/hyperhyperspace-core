@@ -1,4 +1,4 @@
-import { PeerGroupAgentConfig, PeerInfo, PeerSource } from 'mesh/agents/peer';
+import { ObjectDiscoveryPeerSource, PeerGroupAgentConfig, PeerInfo, PeerSource } from 'mesh/agents/peer';
 import { Mesh, PeerGroupInfo, SyncMode, UsageToken } from 'mesh/service/Mesh';
 import { MeshCommand,
     JoinPeerGroup, LeavePeerGroup,
@@ -14,7 +14,7 @@ import { MeshCommand,
     ForwardPeerGroupState} from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
-import { Context, Hash, HashedObject } from 'data/model';
+import { Context, Hash, HashedObject, MutableObject } from 'data/model';
 import { AsyncStream, BufferedAsyncStream, BufferingAsyncStreamSource } from 'util/streams';
 import { ObjectDiscoveryReply } from 'mesh/agents/discovery';
 import { Endpoint } from 'mesh/agents/network';
@@ -23,12 +23,15 @@ import { WebRTCConnectionEvent, WebRTCConnectionsHost } from 'net/transport';
 import { Identity } from 'data/identity';
 import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn';
 import { PeerGroupState } from 'mesh/agents/peer/PeerGroupState';
+import { Resources } from 'spaces/Resources';
+import { MeshInterface } from './MeshInterface';
+import { SyncState, SyncObserver } from 'mesh/agents/state';
 
 /* Access a mesh remotely, see the MeshHost class. */
 
 type RequestId = string;
 
-class MeshProxy {
+class MeshProxy implements MeshInterface {
 
     commandForwardingFn: (cmd: MeshCommand) => void;
     discoveryStreamSources: Map<string, BufferingAsyncStreamSource<ObjectDiscoveryReply>>;
@@ -497,6 +500,38 @@ class MeshProxy {
 
     }
 
+    // We do not need to bridge this request to the MeshHost: the ObjectDiscoveryPeerSource receives a reference
+    // to this mesh, that's already bridged.
+    async getDiscoveryPeerGroup(obj: HashedObject, resources?: Resources) : Promise<PeerGroupInfo> {
+
+        resources = resources || obj.getResources();
+
+        if (resources === undefined) {
+            throw new Error('Could not find a valid resources object to use for the discovery peer group.');
+        }
+
+        let localPeer = resources.getPeersForDiscovery()[0];
+        let peerSource = new ObjectDiscoveryPeerSource(this as any as Mesh, obj, resources.config.linkupServers, LinkupAddress.fromURL(localPeer.endpoint, localPeer.identity), resources.getEndointParserForDiscovery());
+
+        return {
+            id: Mesh.discoveryPeerGroupId(obj),
+            localPeer: localPeer,
+            peerSource: peerSource
+        };
+
+    }
+
+    getSyncState(_mut: MutableObject, _peerGroupId?: string | undefined): Promise<SyncState | undefined> {
+        throw new Error('Method not implemented.');
+    }
+
+    addSyncObserver(_obs: SyncObserver, _mut: MutableObject, _peerGroupId?: string | undefined): void {
+        throw new Error('Method not implemented.');
+    }
+
+    removeSyncObserver(_obs: SyncObserver, _mut: MutableObject, _peerGroupId?: string | undefined): void {
+        throw new Error('Method not implemented.');
+    }
 
 }
 

@@ -18,6 +18,7 @@ import { ObjectSpawnAgent, SpawnCallback } from 'mesh/agents/spawn/ObjectSpawnAg
 import { ObjectInvokeAgent } from 'mesh/agents/spawn/ObjectInvokeAgent';
 import { PeerGroupState } from 'mesh/agents/peer/PeerGroupState';
 import { Resources } from 'spaces/Resources';
+import { MeshInterface } from './remoting/MeshInterface';
 
 
 /* Connect to the Hyper Hyper Space service mesh.
@@ -106,7 +107,7 @@ class CannotInferPeerGroup extends Error {
     }
 }
 
-class Mesh {
+class Mesh implements MeshInterface {
 
     static syncCommandsLog = new Logger('mesh-sync-commands', LogLevel.INFO);
 
@@ -257,7 +258,7 @@ class Mesh {
         return this.registerUsage({type: 'object-sync', objHash: obj.getLastHash(), peerGroupId: peerGroupId}, usageToken);
     }
     
-    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken>{
+    syncManyObjectsWithPeerGroup(peerGroupId: string, objs: IterableIterator<HashedObject>, mode:SyncMode=SyncMode.full, usageTokens?: Map<Hash, UsageToken>): Map<Hash, UsageToken> {
         
         const tokens = new Map<Hash, UsageToken>();
 
@@ -456,9 +457,6 @@ class Mesh {
 
         objectInvokeAgent.sendRequest(object, receiver, receiverLinkupServers, senderEndpoint);
     }
-
-
-
 
     getSyncAgentFor(peerGroupId: PeerGroupId, mutHash: Hash): StateSyncAgent|undefined {
         return this.syncAgents.get(peerGroupId)?.get(mutHash);

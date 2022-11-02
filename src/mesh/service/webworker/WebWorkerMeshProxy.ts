@@ -137,7 +137,7 @@ class WebWorkerMeshProxy {
     }
 
     getMesh(): Mesh {
-        return this.proxy as any as Mesh;
+        return this.proxy as unknown as Mesh;
     }
 
 }
