@@ -882,4 +882,4 @@ class Mesh implements MeshInterface {
 
 }
 
-export { Mesh, PeerGroupInfo, SyncMode, UsageToken }
+export { Mesh, PeerGroupInfo, SyncMode, UsageToken, CannotInferPeerGroup }

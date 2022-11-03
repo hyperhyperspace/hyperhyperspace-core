@@ -1,5 +1,5 @@
 import { ObjectDiscoveryPeerSource, PeerGroupAgentConfig, PeerInfo, PeerSource } from 'mesh/agents/peer';
-import { Mesh, PeerGroupInfo, SyncMode, UsageToken } from 'mesh/service/Mesh';
+import { CannotInferPeerGroup, Mesh, PeerGroupInfo, SyncMode, UsageToken } from 'mesh/service/Mesh';
 import { MeshCommand,
     JoinPeerGroup, LeavePeerGroup,
     SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
@@ -11,7 +11,8 @@ import { MeshCommand,
     PeerInfoContext,
     AddObjectSpawnCallback,
     SendObjectSpawnRequest,
-    ForwardPeerGroupState} from './MeshHost';
+    ForwardPeerGroupState,
+    ForwardSyncState} from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject, MutableObject } from 'data/model';
@@ -45,7 +46,7 @@ class MeshProxy implements MeshInterface {
     peerSourceRequestIngestFn: (req: PeerSourceRequest) => void;
 
     pendingPeerGroupStates: Map<RequestId, {resolve: (result: PeerGroupState|undefined) => void, reject: (reason: any) => void, timeout: any}>;
-
+    pendingSyncStates: Map<RequestId, {resolve: (result: SyncState|undefined) => void, reject: (reason: any) => void, mut: MutableObject, timeout: any}>;
     
 
     constructor(meshCommandFwdFn: (cmd: MeshCommand) => void, linkupCommandFwdFn?: (cmd: LinkupManagerCommand) => void, webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void) {
@@ -128,6 +129,33 @@ class MeshProxy implements MeshInterface {
                     }
                     
                 }
+            } else if (reply.type === 'sync-state-reply') {
+                const pending = this.pendingSyncStates.get(reply.requestId);
+                const cb = pending?.resolve;
+                const err = pending?.reject;
+                const to =  pending?.timeout;
+                const mut = pending?.mut;
+
+                this.pendingSyncStates.delete(reply.requestId);
+
+                if (to !== undefined) {
+                    window.clearTimeout(to);
+                }
+
+                if (reply.state !== undefined) {
+                
+                    if (cb !== undefined) {        
+                        cb(reply.state);    
+                    }
+                } else {
+                    if (err !== undefined) {
+                        if (reply.errorType === 'infer-peer-group' && mut !== undefined) {
+                            err(new CannotInferPeerGroup(mut.getLastHash()));
+                        } else {
+                            err(reply.error);
+                        }
+                    }
+                }
             }
         }
 
@@ -195,6 +223,7 @@ class MeshProxy implements MeshInterface {
         };
 
         this.pendingPeerGroupStates = new Map();
+        this.pendingSyncStates      = new Map();
     }
 
     getCommandStreamedReplyIngestFn() {
@@ -521,8 +550,32 @@ class MeshProxy implements MeshInterface {
 
     }
 
-    getSyncState(_mut: MutableObject, _peerGroupId?: string | undefined): Promise<SyncState | undefined> {
-        throw new Error('Method not implemented.');
+    getSyncState(mut: MutableObject, peerGroupId?: string | undefined, timeout=10000): Promise<SyncState | undefined> {
+        const p = new Promise<SyncState|undefined>((resolve: (result: SyncState|undefined) => void, reject: (reason: any) => void) => {
+            const requestId = new RNGImpl().randomHexString(128);
+
+            const cmd: ForwardSyncState = {
+                type: 'forward-sync-state',
+                requestId: requestId,
+                peerGroupId: peerGroupId,
+                mutLiteralContext: mut.toLiteralContext()
+            };
+    
+            
+
+            const to = window.setTimeout(() => {
+                if (this.pendingSyncStates.has(requestId)) {
+                    this.pendingSyncStates.delete(requestId)
+                    reject('timeout');
+                }
+            }, timeout);
+
+            this.pendingSyncStates.set(requestId, {resolve: resolve, reject: reject, timeout: to, mut: mut});
+
+            this.commandForwardingFn(cmd);
+        });
+
+        return p;
     }
 
     addSyncObserver(_obs: SyncObserver, _mut: MutableObject, _peerGroupId?: string | undefined): void {
