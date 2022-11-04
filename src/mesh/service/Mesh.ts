@@ -328,18 +328,16 @@ class Mesh implements MeshInterface {
         }
     }
 
-    addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId) {
+    async addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId) {
 
         if (peerGroupId === undefined) {
             peerGroupId = this.inferPeerGroupId(mut);
         }
 
-        console.log('mesh: observer to ', mut.getLastHash(), ' peerGroupId=', peerGroupId);
-
         this.syncObserver.addSyncObserver(obs, mut, peerGroupId);
     }
 
-    removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId) {
+    async removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId) {
 
         if (peerGroupId === undefined) {
             peerGroupId = this.inferPeerGroupId(mut);
@@ -875,7 +873,6 @@ class Mesh implements MeshInterface {
         if (agents.size !== 1) {
             throw new CannotInferPeerGroup(mutHash);
         } else {
-            console.log('agents ', agents)
             return agents.values().next().value as string;
         }
     }

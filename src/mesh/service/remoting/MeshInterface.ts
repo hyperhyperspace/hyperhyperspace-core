@@ -25,8 +25,8 @@ interface MeshInterface {
     stopSyncManyObjectsWithPeerGroup(tokens: IterableIterator<UsageToken>): void;
 
     getSyncState(mut: MutableObject, peerGroupId?: string): Promise<SyncState|undefined>;
-    addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId): void;
-    removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId): void;
+    addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId): Promise<void>;
+    removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: PeerGroupId): Promise<void>;
 
     startObjectBroadcast(object: HashedObject, linkupServers: string[], replyEndpoints: Endpoint[], broadcastedSuffixBits?: number, usageToken?: UsageToken): UsageToken;
     stopObjectBroadcast(token: UsageToken): void;

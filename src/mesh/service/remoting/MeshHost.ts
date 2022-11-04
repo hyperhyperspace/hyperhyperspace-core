@@ -1,10 +1,3 @@
-import { PeerGroupAgentConfig, PeerInfo, PeerSource } from '../../agents/peer';
-import { CannotInferPeerGroup, Mesh, SyncMode, UsageToken } from '../../service/Mesh';
-import { SpawnCallback } from '../../agents/spawn';
-import { PeerGroupState } from '../../agents/peer/PeerGroupState';
-import { ObjectDiscoveryReply } from '../../agents/discovery';
-import { Endpoint } from '../../agents/network';
-
 import { Identity, RSAKeyPair } from 'data/identity';
 import { Context, HashedObject, LiteralContext, MutableObject } from 'data/model';
 import { Hash } from 'data/model';
@@ -15,7 +8,14 @@ import { RNGImpl } from 'crypto/random';
 
 import { Store } from 'storage/store';
 import { LinkupAddress } from 'net/linkup';
-import { SyncState } from 'mesh/agents/state';
+
+import { PeerGroupAgentConfig, PeerInfo, PeerSource } from '../../agents/peer';
+import { CannotInferPeerGroup, Mesh, SyncMode, UsageToken } from '../../service/Mesh';
+import { SpawnCallback } from '../../agents/spawn';
+import { PeerGroupState } from '../../agents/peer/PeerGroupState';
+import { ObjectDiscoveryReply } from '../../agents/discovery';
+import { Endpoint } from '../../agents/network';
+import { SyncEvent, SyncObserver, SyncState } from '../../agents/state';
 
 /* Run a mesh remotely, and access it through a MeshProxy */
 
@@ -31,13 +31,15 @@ import { SyncState } from 'mesh/agents/state';
  * 
  * Ah, the things we do for you, Hyper Hyper Space. */
 
+type ObserverId = string;
+
 type MeshCommand = JoinPeerGroup | LeavePeerGroup | ForwardPeerGroupState |
                    SyncObjectsWithPeerGroup | StopSyncObjectsWithPeerGroup |
                    StartObjectBroadcast | StopObjectBroadcast |
                    FindObjectByHash | FindObjectByHashSuffix |
                    ForwardGetPeersReply | ForwardGetPeerForEndpointReply |
                    AddObjectSpawnCallback | SendObjectSpawnRequest |
-                   ForwardSyncState |
+                   ForwardSyncState | AddSyncObserver | RemoveSyncObserver |
                    Shutdown;
 
 type JoinPeerGroup = {
@@ -147,6 +149,20 @@ type ForwardSyncState = {
     peerGroupId?: string
 }
 
+type AddSyncObserver = {
+    type: 'add-sync-observer',
+    observerId: ObserverId,
+    mutLiteralContext: LiteralContext,
+    peerGroupId?: string
+}
+
+type RemoveSyncObserver = {
+    type: 'remove-sync-observer',
+    observerId: ObserverId,
+    mutLiteralContext: LiteralContext,
+    peerGroupId?: string
+}
+
 type Shutdown = {
     type: 'shutdown'
 }
@@ -167,7 +183,8 @@ type ForwardGetPeerForEndpointReply = {
 
 type PeerInfoContext = { endpoint: Endpoint, identityHash: Hash, identity?: LiteralContext };
 
-type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply | ObjectSpawnCallback | PeerGroupStateReply | SyncStateReply;
+type CommandStreamedReply = LiteralObjectDiscoveryReply | DiscoveryEndReply | ObjectSpawnCallback | PeerGroupStateReply | 
+                            SyncStateReply | AddSyncObserverReply | RemoveSyncObserverReply | SyncObserverEventReply;
 
 type LiteralObjectDiscoveryReply = {
     type: 'object-discovery-reply'
@@ -210,6 +227,27 @@ type SyncStateReply = {
     errorType?: 'infer-peer-group'
 }
 
+type AddSyncObserverReply = {
+    type: 'add-sync-observer-reply',
+    observerId: ObserverId,
+    errorType?: 'infer-peer-group',
+    error?: string
+}
+
+type RemoveSyncObserverReply = {
+    type: 'remove-sync-observer-reply',
+    observerId: ObserverId,
+    errorType?: 'infer-peer-group',
+    error?: string
+}
+
+type SyncObserverEventReply = {
+    type: 'sync-observer-event-reply',
+    observerId: ObserverId,
+    action: string,
+    data: SyncState
+}
+
 type PeerSourceRequest = GetPeersRequest | GetPeerForEndpointRequest;
 
 type GetPeersRequest = { 
@@ -249,7 +287,9 @@ class MeshHost {
             type === 'forward-get-peer-for-endpoint-reply' || 
             type === 'add-object-spawn-callback' ||
             type === 'send-object-spawn-callback' ||
-            type === 'forward-sync-state'
+            type === 'forward-sync-state' ||
+            type === 'add-sync-observer' ||
+            type === 'remove-sync-observer'
             );
     }
 
@@ -257,9 +297,13 @@ class MeshHost {
         const type = msg?.type;
 
         return (type === 'object-discovery-reply' ||
-                type === 'object-discovery-end'   || 
-                type === 'object-spawn-callback'  ||
-                type === 'peer-group-state-reply');
+                type === 'object-discovery-end' || 
+                type === 'object-spawn-callback' ||
+                type === 'peer-group-state-reply' ||
+                type === 'sync-state-reply' ||
+                type === 'add-sync-observer-reply' ||
+                type === 'remove-sync-observer-reply' ||
+                type === 'sync-observer-event-reply');
     }
 
     static isPeerSourceRequest(msg: any): boolean {
@@ -280,6 +324,8 @@ class MeshHost {
 
     stores: Map<string, Map<string, Store>>;
 
+    syncObservers: Map<ObserverId, SyncObserver>;
+
     constructor(mesh: Mesh, streamedReplyCb: (resp: CommandStreamedReply) => void, peerSourceReqCb: (req: PeerSourceRequest) => void) {
         this.mesh = mesh;
         this.streamedReplyCb = streamedReplyCb;
@@ -288,6 +334,7 @@ class MeshHost {
         this.pendingPeerForEndpointRequests = new Map();
         this.spawnCallbacks = new Map();
         this.stores = new Map();
+        this.syncObservers = new Map();
     }
 
     execute(command: MeshCommand) : void {
@@ -371,11 +418,72 @@ class MeshHost {
                             reply.errorType = 'infer-peer-group';
                         }
 
-                        reply.error = reason;
+                        reply.error = reason.toString();
 
                         this.streamedReplyCb(reply);
                     });
-                    
+
+        } else if (command.type === 'add-sync-observer') {
+            let obs: SyncObserver = (ev: SyncEvent) => {
+
+                const reply: SyncObserverEventReply = {
+                    type: 'sync-observer-event-reply',
+                    observerId: command.observerId,
+                    action: ev.action,
+                    data: ev.data
+                }
+
+                this.streamedReplyCb(reply);
+            }
+
+            const reply: AddSyncObserverReply = {
+                type: 'add-sync-observer-reply',
+                observerId: command.observerId
+            }
+
+            try {
+                let mut = HashedObject.fromLiteralContext(command.mutLiteralContext) as MutableObject;
+                this.mesh.addSyncObserver(obs, mut, command.peerGroupId);
+            } catch (e: any) {
+                if (e instanceof CannotInferPeerGroup) {
+                    reply.errorType = 'infer-peer-group'
+                }
+                reply.error = e.toString();
+            }
+
+            if (reply.error === undefined && reply.errorType === undefined) {
+                this.syncObservers.set(command.observerId, obs);
+            }
+            
+            this.streamedReplyCb(reply);
+
+        } else if (command.type === 'remove-sync-observer') {
+
+            const reply: RemoveSyncObserverReply = {
+                type: 'remove-sync-observer-reply',
+                observerId: command.observerId
+            }
+
+            try {
+                const obs = this.syncObservers.get(command.observerId);
+
+                if (obs !== undefined) {
+                    let mut = HashedObject.fromLiteralContext(command.mutLiteralContext) as MutableObject;
+                    this.mesh.removeSyncObserver(obs, mut, command.peerGroupId);
+                }
+            } catch (e: any) {
+                if (e instanceof CannotInferPeerGroup) {
+                    reply.errorType = 'infer-peer-group'
+                }
+                reply.error = e.toString();
+            }
+
+            if (reply.error === undefined && reply.errorType === undefined) {
+                this.syncObservers.delete(command.observerId);
+            }
+
+            this.streamedReplyCb(reply);
+
         } else if (command.type === 'sync-objects-with-peer-group') {
             const syncObjs = command as SyncObjectsWithPeerGroup;
 
@@ -675,7 +783,7 @@ export { MeshHost, MeshCommand,
          SyncObjectsWithPeerGroup, StopSyncObjectsWithPeerGroup,
          StartObjectBroadcast, StopObjectBroadcast,
          FindObjectByHash, FindObjectByHashSuffix, AddObjectSpawnCallback, SendObjectSpawnRequest,
-         ForwardSyncState,
+         ForwardSyncState, AddSyncObserver, RemoveSyncObserver,
          Shutdown,
          CommandStreamedReply, LiteralObjectDiscoveryReply, DiscoveryEndReply, ObjectSpawnCallback, PeerGroupStateReply, LiteralPeerInfo, 
          ForwardGetPeersReply, ForwardGetPeerForEndpointReply,

@@ -12,7 +12,9 @@ import { MeshCommand,
     AddObjectSpawnCallback,
     SendObjectSpawnRequest,
     ForwardPeerGroupState,
-    ForwardSyncState} from './MeshHost';
+    ForwardSyncState,
+    AddSyncObserver,
+    RemoveSyncObserver} from './MeshHost';
 
 import { RNGImpl } from 'crypto/random';
 import { Context, Hash, HashedObject, MutableObject } from 'data/model';
@@ -31,6 +33,7 @@ import { SyncState, SyncObserver } from 'mesh/agents/state';
 /* Access a mesh remotely, see the MeshHost class. */
 
 type RequestId = string;
+type ObserverId = string;
 
 class MeshProxy implements MeshInterface {
 
@@ -48,6 +51,12 @@ class MeshProxy implements MeshInterface {
     pendingPeerGroupStates: Map<RequestId, {resolve: (result: PeerGroupState|undefined) => void, reject: (reason: any) => void, timeout: any}>;
     pendingSyncStates: Map<RequestId, {resolve: (result: SyncState|undefined) => void, reject: (reason: any) => void, mut: MutableObject, timeout: any}>;
     
+
+    syncObservers: Map<ObserverId, [SyncObserver, MutableObject]>;
+    syncObserverIds: Map<SyncObserver, ObserverId>;
+
+    pendingAddSyncObserver: Map<ObserverId, {resolve: () => void, reject: (reason: any) => void, timeout: any}>;
+    pendingRemoveSyncObserver: Map<ObserverId, {resolve: () => void, reject: (reason: any) => void, timeout: any}>;
 
     constructor(meshCommandFwdFn: (cmd: MeshCommand) => void, linkupCommandFwdFn?: (cmd: LinkupManagerCommand) => void, webRTCConnEventIngestFn?: (ev: WebRTCConnectionEvent) => void) {
         this.commandForwardingFn = meshCommandFwdFn;
@@ -156,6 +165,70 @@ class MeshProxy implements MeshInterface {
                         }
                     }
                 }
+
+            } else if (reply.type === 'add-sync-observer-reply') {
+                const pending = this.pendingAddSyncObserver.get(reply.observerId);
+
+                if (pending !== undefined) {
+                    this.pendingAddSyncObserver.delete(reply.observerId);
+
+                    if (pending.timeout !== undefined) {
+                        window.clearTimeout(pending.timeout);
+                    }
+
+                    if (reply.error === undefined && reply.errorType === undefined) {
+                        pending.resolve();
+                    } else {
+                        const pair = this.syncObservers.get(reply.observerId);
+                        if (reply.errorType === 'infer-peer-group' && pair !== undefined) {
+                            pending.reject(new CannotInferPeerGroup(pair[1].getLastHash()));        
+                        } else {
+                            pending.reject(reply.error);
+                        }
+                        this.syncObservers.delete(reply.observerId);
+                        if (pair !== undefined) {
+                            this.syncObserverIds.delete(pair[0]);
+                        }
+                    }
+                }
+            } else if (reply.type === 'remove-sync-observer-reply') {
+                const pending = this.pendingRemoveSyncObserver.get(reply.observerId);
+
+                if (pending !== undefined) {
+                    this.pendingRemoveSyncObserver.delete(reply.observerId);
+
+                    if (pending.timeout !== undefined) {
+                        window.clearTimeout(pending.timeout);
+                    }
+
+                    const pair = this.syncObservers.get(reply.observerId);
+                    if (reply.error === undefined && reply.errorType === undefined) {
+                        this.syncObservers.delete(reply.observerId);
+                        
+                        if (pair !== undefined) {
+                            this.syncObserverIds.delete(pair[0]);
+                        }
+                        pending.resolve();
+
+                    } else {
+
+                        if (reply.errorType === 'infer-peer-group' && pair !== undefined) {
+                            pending.reject(new CannotInferPeerGroup(pair[1].getLastHash()));        
+                        } else {
+                            pending.reject(reply.error);
+                        }
+                    }
+                }
+            } else if (reply.type === 'sync-observer-event-reply') {
+
+                const pair = this.syncObservers.get(reply.observerId);
+
+                if (pair !== undefined) {
+                    const [obs, mut] = pair;
+
+                    obs({emitter: mut, action: reply.action, data: reply.data});
+                }
+
             }
         }
 
@@ -224,6 +297,12 @@ class MeshProxy implements MeshInterface {
 
         this.pendingPeerGroupStates = new Map();
         this.pendingSyncStates      = new Map();
+
+        this.syncObservers   = new Map();
+        this.syncObserverIds = new Map();
+
+        this.pendingAddSyncObserver = new Map();
+        this.pendingRemoveSyncObserver = new Map();
     }
 
     getCommandStreamedReplyIngestFn() {
@@ -578,12 +657,66 @@ class MeshProxy implements MeshInterface {
         return p;
     }
 
-    addSyncObserver(_obs: SyncObserver, _mut: MutableObject, _peerGroupId?: string | undefined): void {
-        throw new Error('Method not implemented.');
+    addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: string | undefined, timeout=10000): Promise<void> {
+        const p = new Promise<void>((resolve: () => void, reject: (reason: any) => void) => {
+            const observerId = new RNGImpl().randomHexString(128);
+
+            const cmd: AddSyncObserver = {
+                type: 'add-sync-observer',
+                observerId: observerId,
+                peerGroupId: peerGroupId,
+                mutLiteralContext: mut.toLiteralContext()
+            };
+    
+            
+
+            const to = window.setTimeout(() => {
+                if (this.pendingAddSyncObserver.has(observerId)) {
+                    this.pendingAddSyncObserver.delete(observerId);
+                    reject('timeout');
+                }
+            }, timeout);
+
+            this.pendingAddSyncObserver.set(observerId, {resolve: resolve, reject: reject, timeout: to});
+
+            this.syncObservers.set(observerId, [obs, mut]);
+            this.syncObserverIds.set(obs, observerId);
+
+            this.commandForwardingFn(cmd);
+        });
+
+        return p;
     }
 
-    removeSyncObserver(_obs: SyncObserver, _mut: MutableObject, _peerGroupId?: string | undefined): void {
-        throw new Error('Method not implemented.');
+    removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: string | undefined, timeout=10000): Promise<void> {
+        const p = new Promise<void>((resolve: () => void, reject: (reason: any) => void) => {
+            const observerId = this.syncObserverIds.get(obs);
+
+            if (observerId !== undefined) {
+                const cmd: RemoveSyncObserver = {
+                    type: 'remove-sync-observer',
+                    observerId: observerId,
+                    peerGroupId: peerGroupId,
+                    mutLiteralContext: mut.toLiteralContext()
+                };
+                
+                const to = window.setTimeout(() => {
+                    if (this.pendingRemoveSyncObserver.has(observerId)) {
+                        this.pendingRemoveSyncObserver.delete(observerId);
+                        reject('timeout');
+                    }
+                }, timeout);
+    
+                this.pendingRemoveSyncObserver.set(observerId, {resolve: resolve, reject: reject, timeout: to});
+
+                this.commandForwardingFn(cmd);
+            } else {
+                resolve();
+            }
+
+        });
+    
+        return p;
     }
 
 }

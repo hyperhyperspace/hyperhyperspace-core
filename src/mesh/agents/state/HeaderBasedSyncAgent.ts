@@ -362,11 +362,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 action: SyncObserverEventTypes.SyncStateUpdate,
                 data: this.getSyncState()
             };
-
-            console.log('new sync state event:', ev);
+            
             this.syncEventSource.emit(ev);
-        } else {
-            console.log('not emitting new sync state event: no relay')
         }
     }
 

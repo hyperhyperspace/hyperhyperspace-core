@@ -1,10 +1,11 @@
 import { StateSyncAgent } from 'mesh/agents/state/StateSyncAgent';
 import { Endpoint } from 'mesh/agents/network';
 import { AgentPod, AgentEvent } from 'mesh/common';
-import { HashedObject, Hash } from 'data/model';
+import { HashedObject, Hash, MutableObject } from 'data/model';
 import { GossipEventTypes, StateGossipAgent } from 'mesh/agents/state/StateGossipAgent';
 import { Logger, LogLevel } from 'util/logging';
 import { PeerGroupAgent, PeeringAgentBase } from 'mesh/agents/peer';
+import { SyncState, EventRelay } from 'index';
 
 
 class LinearState extends HashedObject {
@@ -84,6 +85,18 @@ class LinearStateAgent extends PeeringAgentBase implements StateSyncAgent {
         this.topic = peerNetwork.peerGroupId;
         this.id = id;
         this.prevStates = new Set();
+    }
+    getMutableObject(): MutableObject {
+        throw new Error('Method not implemented.');
+    }
+    getPeerGroupId(): string {
+        throw new Error('Method not implemented.');
+    }
+    getSyncState(): SyncState {
+        throw new Error('Method not implemented.');
+    }
+    getSyncEventSource(): EventRelay<HashedObject, any> {
+        throw new Error('Method not implemented.');
     }
     expectingMoreOps(receivedOpHashes?: Set<string>): boolean {
         receivedOpHashes;

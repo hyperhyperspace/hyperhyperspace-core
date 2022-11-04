@@ -61,8 +61,6 @@ class SyncObserverAgent implements Agent {
 
     addSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId: PeerGroupId) {
 
-        console.log('adding sync observer ', obs, ' for ', mut.getLastHash(), ' in peer group ', peerGroupId)
-
         if (this.pod === undefined) {
             throw new Error('Trying to add a sync observer, but the SyncObserverAgent is not ready.');
         }
@@ -139,12 +137,10 @@ class SyncObserverAgent implements Agent {
                     const syncAgent = this.pod?.getAgent(syncAgentId) as StateSyncAgent;
                     const [_relay, syncAgentObserver] = pair;
                     syncAgent.getSyncEventSource().addObserver(syncAgentObserver);
-                    console.log('+++ adding agent relay ', syncAgent.getSyncEventSource(), ' to ', _relay)
                 } else if (agentEv.content.change === AgentSetChange.Removal) {
                     const syncAgent = this.pod?.getAgent(syncAgentId) as StateSyncAgent|undefined;
                     const [_relay, syncAgentObserver] = pair;
                     syncAgent?.getSyncEventSource().addObserver(syncAgentObserver);
-                    console.log('+++ removing agent relay from ', _relay)
                 }
     
             }
