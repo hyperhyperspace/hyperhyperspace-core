@@ -79,28 +79,31 @@ class EventRelay<E extends hashable, D=any> {
 
         EventRelay.logger.debug('adding upstream ' + name + ' (' + upstream.emitter.getLastHash() + ') to ' + this.emitter.getLastHash());
 
-        //if (!this.wouldCreateACycle(upstream.emitterHash)) {
         if (!upstream.wouldCreateACycle(this.emitter.getLastHash())) {
 
             const observer = (upstreamEv: Event<E, D>) => {
 
-                const upstreamEmitters = upstreamEv.path === undefined? [] : Array.from(upstreamEv.path)
+                // if the original emitter and the current emitter are the same,it means that the event has
+                // somehow propagated back to its origin, we do not need to forward the event any more
+                if (upstreamEv.emitter.getLastHash() !== this.emitter.getLastHash()) {
 
-                upstreamEmitters.push({name: name, emitter: this.emitter});
+                    const upstreamEmitters = upstreamEv.path === undefined? [] : Array.from(upstreamEv.path)
 
-                const ev: Event<E, D> = {
-                    emitter: upstreamEv.emitter,
-                    path: upstreamEmitters,
-                    action: upstreamEv.action,
-                    data: upstreamEv.data                
-                };
-
-                EventRelay.logger.debug('upstream from ' + this.emitter.getLastHash() + ' name: ' + name);
-
-                this.emit(ev);
+                    upstreamEmitters.push({name: name, emitter: this.emitter});
+    
+                    const ev: Event<E, D> = {
+                        emitter: upstreamEv.emitter,
+                        path: upstreamEmitters,
+                        action: upstreamEv.action,
+                        data: upstreamEv.data                
+                    };
+    
+                    EventRelay.logger.debug('upstream from ' + this.emitter.getLastHash() + ' name: ' + name);
+    
+                    this.emit(ev);
+                }
 
                 return false;
-
             };
             
             this.upstreamRelays.set(name, [upstream, observer]);

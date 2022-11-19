@@ -542,28 +542,28 @@ abstract class  MutableObject extends HashedObject {
         return before;
     }
 
-    protected createMutationEventSource(seen=new Set<HashedObject>()): EventRelay<HashedObject> {
+    protected createMutationEventSource(): EventRelay<HashedObject> {
 
-        const ownMutationEventSource = super.createMutationEventSource(seen);
+        const ownMutationEventSource = super.createMutationEventSource();
 
-        this.updateCascadeMutableContentRelays(ownMutationEventSource, seen);
+        this.updateCascadeMutableContentRelays(ownMutationEventSource);
 
         return ownMutationEventSource;
 
     }
 
-    private updateCascadeMutableContentRelays(ownMutationEventSource?: EventRelay<HashedObject>, seen=new Set<HashedObject>()) {
+    private updateCascadeMutableContentRelays(ownMutationEventSource?: EventRelay<HashedObject>) {
 
         if (ownMutationEventSource !== undefined) {
 
             if (this.isCascadingMutableContentEvents()) {
                 ownMutationEventSource.addObserver(this._cascadeMutableContentObserver);
 
-                this.addEventRelaysForContents(ownMutationEventSource, seen);
+                this.addEventRelaysForContents(ownMutationEventSource);
             } else {
                 ownMutationEventSource.removeObserver(this._cascadeMutableContentObserver);
 
-                this.removeEventRelaysForContents(ownMutationEventSource, seen);
+                this.removeEventRelaysForContents(ownMutationEventSource);
             }
         }
     }
