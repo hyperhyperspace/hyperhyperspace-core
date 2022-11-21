@@ -3,6 +3,7 @@ export * from './collections/mutable/MutableSet';
 export * from './collections/mutable/MutableReference';
 export * from './collections/mutable/MutableArray';
 export * from './collections/causal/CausalSet';
+export * from './collections/causal/CausalReference';
 export { SingleAuthorCausalSet } from './collections/causal/SingleAuthorCausalSet';
 export { MultiAuthorCausalSet } from './collections/causal/MultiAuthorCausalSet';
 export * from './collections/causal/CausalArray';
