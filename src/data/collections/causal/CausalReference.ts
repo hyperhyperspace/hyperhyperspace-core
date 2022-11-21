@@ -3,7 +3,6 @@ import { Timestamps } from 'util/timestamps';
 
 import { Identity } from '../../identity';
 import { Hash, HashedObject, MutableObject, MutationOp, MutableContentEvents, ClassRegistry } from '../../model';
-import { RefUpdateOp } from '../mutable/MutableReference';
 
 import { Authorizer } from '../../model/causal/Authorization';
 import { Verification } from '../../model/causal/Authorization';
@@ -26,9 +25,10 @@ function sig(op: CausalRefUpdateOp<any>) {
 // the following should return -1 if u2 comes after u1;
 
 function compareUpdateSigs(u1: UpdateSig, u2: UpdateSig) {
+
     if (u2.sequence > u1.sequence) {
         return -1;
-    } else if (u1.sequence < u2.sequence) {
+    } else if (u1.sequence > u2.sequence) {
         return 1;
     } else { // u2.sequence === u1.sequence
         if (Timestamps.after(u2.timestamp, u1.timestamp)) {
@@ -54,7 +54,7 @@ class CausalReference<T> extends BaseCausalCollection<T>  {
     _largestSequence?: number;
 
     constructor(config?: CausalCollectionConfig) {
-        super([CausalRefUpdateOp.className], config);
+        super([CausalRefUpdateOp.className], {...config, supportsUndo: true});
 
         this.setRandomId();
 
@@ -104,34 +104,33 @@ class CausalReference<T> extends BaseCausalCollection<T>  {
 
         let mutated = false;
 
-        if (op instanceof RefUpdateOp) {
+        if (op instanceof CausalRefUpdateOp) {
+
+            //console.log('processing sequence ' + op.sequence + ', valid=' + valid)
 
             const up = sig(op);
 
             let idx: number; // the position of op in the array
 
-            if (!this._allAppliedOps.has(up.opHash)) {
+            // find the right place for the op in the array:
+            const length = this._causallyOrderedUpdates.length
+            idx = length;
 
-                // if the op has not been applied, we find the right place for it:
-                const length = this._causallyOrderedUpdates.length
-                idx = length;
-
-                while (idx>0 && compareUpdateSigs(this._causallyOrderedUpdates[idx-1], up) > 0) {
-                    idx=idx-1;
-                }
-
-                // and then insert it there:
-                this._causallyOrderedUpdates.splice(idx, 0, up);
-            } else {
-
-                // else, we just go through the array until we find it
-                idx = length-1;
-
-                while (idx>0 && this._causallyOrderedUpdates[idx-1].opHash !== up.opHash) {
-                    idx=idx-1;
-                }
+            while (idx>0 && compareUpdateSigs(this._causallyOrderedUpdates[idx-1], up) > 0) {
+                idx=idx-1;
             }
 
+            // and then insert it there, if it was not there already:
+
+            // NOTE: since the compare above failed, upds[idx-1] <= up
+            if (idx===0 || this._causallyOrderedUpdates[idx-1].opHash !== up.opHash) {
+                // upds[idx-1] < up => insert in position idx
+                this._causallyOrderedUpdates.splice(idx, 0, up);
+            } else {
+                // upds[idx-1] === up => use old position idx-1
+                idx = idx-1;
+            }
+            
             let newValueIdx: number|undefined;
             let newValueOp: CausalRefUpdateOp<T>|undefined;
 
@@ -148,13 +147,14 @@ class CausalReference<T> extends BaseCausalCollection<T>  {
                 if (this._latestValidIdx === idx) {
                     // the current value has been invalidated, look for the next-best
 
-                    let nextValueIdx = length;
+                    let nextValueIdx = length-1;
 
                     while (nextValueIdx>=0 && !this.isValidOp(this._causallyOrderedUpdates[nextValueIdx].opHash)) {
                         nextValueIdx=nextValueIdx-1;
                     }
 
                     if (nextValueIdx >= 0) {
+
                         newValueIdx = nextValueIdx;
                         newValueOp  = await this.loadOp(this._causallyOrderedUpdates[nextValueIdx].opHash) as CausalRefUpdateOp<T>;
                     } else {
