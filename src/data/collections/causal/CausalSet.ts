@@ -255,7 +255,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         this.setCurrentPrevOpsTo(addOp);
 
         if (!(await auth.attempt(addOp))) {
-            throw new AuthError('Cannot authorize addition operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());;
+            throw new AuthError('Cannot authorize addition operation on CausalSet ' + this.hash() + ', author is: ' + author?.hash());
         }
         
         return this.applyNewOp(addOp).then(() => true);
