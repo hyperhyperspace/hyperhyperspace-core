@@ -381,6 +381,14 @@ class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection
         return this._hashes[idx];
     }
 
+    get(hash: Hash): T|undefined {
+        if (this.hasByHash(hash)) {
+            return this._elements.get(hash);
+        } else {
+            return undefined;
+        }
+    }
+
     indexOf(element?: T) {
         return this.indexOfByHash(HashedObject.hashElement(element));
     }
