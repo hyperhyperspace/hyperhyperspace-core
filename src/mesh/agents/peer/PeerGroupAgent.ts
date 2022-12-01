@@ -196,13 +196,16 @@ class PeerGroupAgent implements Agent {
             peerConnectionTimeout: params.peerConnectionTimeout || 20,
             peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 10,
             peerDiscoveryAttemptInterval: params.peerDiscoveryAttemptInterval || 15,
-            tickInterval: params.tickInterval || 1
+            tickInterval: params.tickInterval || 10
         };
 
         this.tick = async () => {
 
             if (this.tickLock.acquire()) {
                 try {
+
+                    console.log(this.peerGroupId + ' has ' + this.getPeers().length + ' peers')
+
                     this.cleanUp();
                     this.queryForOnlinePeers();
                     this.deduplicateConnections();
@@ -278,6 +281,10 @@ class PeerGroupAgent implements Agent {
         }
 
         return unique;
+    }
+
+    isPeer(ep: Endpoint){
+        return this.findWorkingConnectionId(ep, false) !== undefined;
     }
 
     validateConnectedPeer(ep: Endpoint) : boolean {
@@ -627,7 +634,7 @@ class PeerGroupAgent implements Agent {
     // Connection handling: find a working connecton to an ep, decide whether to connect to or accept a
     //                      connection from a potential peer.
 
-    private findWorkingConnectionId(ep: Endpoint) : ConnectionId | undefined {
+    private findWorkingConnectionId(ep: Endpoint, validate=true) : ConnectionId | undefined {
         let connIds = this.connectionsPerEndpoint.get(ep);
 
         if (connIds !== undefined) {
@@ -638,7 +645,7 @@ class PeerGroupAgent implements Agent {
 
                 if (pc !== undefined && 
                     pc.status === PeerConnectionStatus.Ready && 
-                    this.getNetworkAgent().checkConnection(connId)) {
+                    (!validate || this.getNetworkAgent().checkConnection(connId))) {
                         return connId;
                 }
 

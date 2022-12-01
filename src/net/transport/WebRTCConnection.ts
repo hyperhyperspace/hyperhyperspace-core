@@ -39,7 +39,7 @@ class WebRTCConnection implements Connection {
 
     onmessage : (ev: MessageEvent) => void;
     onready : () => void;
-    channelStatusChangeCallback : ((status: string, conn: Connection) => void) | undefined;
+    channelStatusChangeCallback : ((channelStatus: string, connectionStatus: string, conn: Connection) => void) | undefined;
 
     remoteInstanceId?: string;
 
@@ -47,7 +47,7 @@ class WebRTCConnection implements Connection {
 
     startup = Date.now();
 
-    constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void, channelStatusChangeCallback?: (status: string, conn: Connection) => void) {
+    constructor(linkupManager: LinkupManager, local: LinkupAddress, remote: LinkupAddress, callId: string, readyCallback : (conn: Connection) => void, channelStatusChangeCallback?: (channelStatus: string, connectionStatus: string, conn: Connection) => void) {
 
         this.linkupManager = linkupManager;
         this.localAddress  = local;
@@ -274,7 +274,7 @@ class WebRTCConnection implements Connection {
                 WebRTCConnection.logger.debug(this.callId + ' connectionState now is ' + this?.connection?.connectionState);
 
                 if (this.channelStatusChangeCallback !== undefined) {
-                    this.channelStatusChangeCallback(this.channel?.readyState || 'unknown', this);
+                    this.channelStatusChangeCallback(this.channel?.readyState || 'unknown', this.connection?.connectionState || 'unknown', this);
                 }
             };
 
@@ -380,7 +380,7 @@ class WebRTCConnection implements Connection {
             };
 
             if (this.channelStatusChangeCallback !== undefined) {
-                this.channelStatusChangeCallback(this.channel?.readyState || 'unknown', this);
+                this.channelStatusChangeCallback(this.channel?.readyState || 'unknown', this.connection?.connectionState || 'unknown', this);
             }
         };
 

@@ -317,7 +317,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
         if (this.trackedAgentIds.has(agentId)) {
             const hash = state.hash();
-    
+
             const currentState = this.localState.get(agentId);
     
             if (currentState !== undefined && hash !== currentState) {
@@ -692,10 +692,13 @@ class StateGossipAgent extends PeeringAgentBase {
         let state: {[key: Endpoint]: Hash} = {};
 
         for (const [endpoint, peerState] of this.remoteState.entries()) {
-            const stateHash = peerState.get(agentId);
+
+            if (this.peerGroupAgent.isPeer(endpoint)) {   // <--   this needs to work even if we still haven't received the
+                const stateHash = peerState.get(agentId); //       event telling us that endpoint is offline, so call directly
             
-            if (stateHash !== undefined) {
-                state[endpoint] = stateHash;
+                if (stateHash !== undefined) {
+                    state[endpoint] = stateHash;
+                }    
             }
         }
 

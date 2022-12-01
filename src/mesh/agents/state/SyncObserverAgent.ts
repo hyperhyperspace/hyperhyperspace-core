@@ -3,6 +3,7 @@ import { Agent } from 'mesh/service';
 import { AgentId } from 'mesh/service/Agent';
 import { AgentPod, AgentEvent, AgentPodEventType, AgentSetChangeEvent, AgentSetChange } from 'mesh/service/AgentPod';
 import { Event, EventRelay, Observer } from 'util/events';
+import { MultiMap } from 'util/multimap';
 import { Endpoint } from '../network';
 import { StateSyncAgent } from './StateSyncAgent';
 
@@ -45,9 +46,11 @@ class SyncObserverAgent implements Agent {
 
     pod?: AgentPod;
 
-    relays: Map<AgentId, [EventRelay<HashedObject>, SyncObserver]>;
+    observers : MultiMap<AgentId, SyncObserver>;
+    relays    : Map<AgentId, [EventRelay<HashedObject>, SyncObserver, MutableObject]>;
 
     constructor() {
+        this.observers = new MultiMap();
         this.relays = new Map();
     }
 
@@ -68,19 +71,18 @@ class SyncObserverAgent implements Agent {
         const syncAgentId = mut.getSyncAgentId(peerGroupId);
         const syncAgent   = this.pod.getAgent(syncAgentId) as StateSyncAgent|undefined;
 
-        let pair = this.relays.get(syncAgentId);
+        let tuple = this.relays.get(syncAgentId);
         
-
-        if (pair === undefined) {
+        if (tuple === undefined) {
 
             const relay = new EventRelay<HashedObject>(mut);
             const syncAgentObs = (ev: SyncEvent) => {
                 relay.emit(ev);
             }
 
-            pair = [relay, syncAgentObs];
+            tuple = [relay, syncAgentObs, mut];
     
-            this.relays.set(syncAgentId, [relay, syncAgentObs]);
+            this.relays.set(syncAgentId, tuple);
     
             
             if (syncAgent !== undefined) {
@@ -88,7 +90,7 @@ class SyncObserverAgent implements Agent {
             }
         }
 
-        pair[0].addObserver(obs);
+        tuple[0].addObserver(obs);
 
         if (syncAgent !== undefined) {
             obs({
@@ -96,19 +98,26 @@ class SyncObserverAgent implements Agent {
                 action: SyncObserverEventTypes.SyncStateUpdate,
                 data: syncAgent.getSyncState()
             });
+        } else {
+            obs({
+                emitter: mut,
+                action: SyncObserverEventTypes.SyncStateUpdate,
+                data: {allPeersInSync: false, opsToFetch: 0, remoteStateHashes: {}, synchronizing: false}
+            });
         }
     }
 
     removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId: PeerGroupId) {
+
         if (this.pod === undefined) {
             throw new Error('Trying to remove a sync observer, but the SyncObserverAgent is not ready.');
         }
 
         const syncAgentId = mut.getSyncAgentId(peerGroupId);
-        const pair        = this.relays.get(syncAgentId);
+        const tuple        = this.relays.get(syncAgentId);
 
-        if (pair !== undefined) {
-            const [relay, syncAgentObs] = pair;
+        if (tuple !== undefined) {
+            const [relay, syncAgentObs, _mut] = tuple;
             relay.removeObserver(obs);
 
             if (relay.observers.size === 0) {
@@ -130,19 +139,34 @@ class SyncObserverAgent implements Agent {
             const agentEv = ev as AgentSetChangeEvent;
 
             const syncAgentId = agentEv.content.agentId;
-            const pair = this.relays.get(syncAgentId);
+            const tuple = this.relays.get(syncAgentId);
 
-            if (pair !== undefined) {
+            if (tuple !== undefined) {
+                const [relay, syncAgentObserver, mut] = tuple;
                 if (agentEv.content.change === AgentSetChange.Addition) {
+
                     const syncAgent = this.pod?.getAgent(syncAgentId) as StateSyncAgent;
-                    const [_relay, syncAgentObserver] = pair;
                     syncAgent.getSyncEventSource().addObserver(syncAgentObserver);
+
+                    relay.emit({
+                        emitter: mut,
+                        action: SyncObserverEventTypes.SyncStateUpdate,
+                        data: syncAgent.getSyncState()
+                    });
+
                 } else if (agentEv.content.change === AgentSetChange.Removal) {
+
+                    console.log('SENDING LAST EV FOR ' + mut.getLastHash());
+
                     const syncAgent = this.pod?.getAgent(syncAgentId) as StateSyncAgent|undefined;
-                    const [_relay, syncAgentObserver] = pair;
-                    syncAgent?.getSyncEventSource().addObserver(syncAgentObserver);
+                    syncAgent?.getSyncEventSource().removeObserver(syncAgentObserver); // I think this will have no effect
+                    relay.emit({
+                        emitter: mut,
+                        action: SyncObserverEventTypes.SyncStateUpdate,
+                        data: {allPeersInSync: false, opsToFetch: 0, remoteStateHashes: {}, synchronizing: false}
+                    });
+
                 }
-    
             }
         }
     }

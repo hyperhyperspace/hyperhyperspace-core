@@ -1,9 +1,9 @@
 import { Hash, HashedObject, HashedSet, Literal, LiteralUtils, MutableObject, MutationOp } from 'data/model';
-import { AgentPod } from 'mesh/service/AgentPod';
+import { AgentEvent, AgentPod } from 'mesh/service/AgentPod';
 import { Store } from 'storage/store';
 import { Logger, LogLevel } from 'util/logging';
 import { Endpoint } from '../network/NetworkAgent';
-import { PeerGroupAgent } from '../peer/PeerGroupAgent';
+import { LostPeerEvent, NewPeerEvent, PeerGroupAgent, PeerMeshEventType } from '../peer/PeerGroupAgent';
 import { PeeringAgentBase } from '../peer/PeeringAgentBase';
 import { HeaderBasedState } from './history/HeaderBasedState';
 import { AgentStateUpdateEvent, GossipEventTypes, StateGossipAgent } from './StateGossipAgent';
@@ -159,11 +159,9 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 if (isNew) {
                     this.synchronizer.onNewHistory(sender, unknown);
                 }
-
-                this.emitSyncState();
-
-
             }
+
+            this.emitSyncState();
 
         }
 
@@ -219,8 +217,6 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
             await this.synchronizer.onNewLocalOp(op);
             await this.updateStateFromStore();  
         }
-
-        this.emitSyncState();
     };
 
     literalIsValidOp(literal?: Literal, log=false): boolean { 
@@ -306,7 +302,9 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
                 type: GossipEventTypes.AgentStateUpdate,
                 content: { agentId: this.getAgentId(), state }
             }
+
             this.pod?.broadcastEvent(stateUpdate);
+            this.emitSyncState();
         }
 
     }
@@ -357,12 +355,13 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
     emitSyncState() {
 
         if (this.syncEventSource !== undefined) {
+
             const ev: SyncStateUpdateEvent = {
                 emitter: this.mutableObj,
                 action: SyncObserverEventTypes.SyncStateUpdate,
                 data: this.getSyncState()
             };
-            
+
             this.syncEventSource.emit(ev);
         }
     }
@@ -373,6 +372,14 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         const remoteStateHashes = gossipAgent.getAllRemoteStateForAgent(this.getAgentId());
         const localStateHash    = gossipAgent.getLocalStateForAgent(this.getAgentId());
+
+        /*console.log('PEER GROUP AGENT', this.peerGroupAgent);
+        console.log('GOSSIP AGENT', gossipAgent);
+        console.log('GOSSIP AGENT, agent id', this.getAgentId());
+        console.log('GOSSIP AGENT, local state', localStateHash);
+        console.log('GOSSIP AGENT, remote states', remoteStateHashes);
+        console.log('GOSSIP AGENT, available local states', Array.from(gossipAgent.localState.keys()))
+        console.log('GOSSIP AGENT', new Error());*/
 
         let inSync = true;
         for (const remoteHash of Object.values(remoteStateHashes)) {
@@ -393,6 +400,22 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     getPeerGroupId(): string {
         return this.peerGroupAgent.peerGroupId;
+    }
+    
+    receiveLocalEvent(ev: AgentEvent): void {
+        if (ev.type === PeerMeshEventType.LostPeer) {
+            let lostPeerEv = ev as LostPeerEvent;
+
+            if (lostPeerEv.content.peerGroupId === this.peerGroupAgent.peerGroupId) {
+                this.emitSyncState();
+            }
+        } else if (ev.type === PeerMeshEventType.NewPeer) {
+            let lostPeerEv = ev as NewPeerEvent;
+
+            if (lostPeerEv.content.peerGroupId === this.peerGroupAgent.peerGroupId) {
+                this.emitSyncState();
+            }
+        }
     }
 }
 

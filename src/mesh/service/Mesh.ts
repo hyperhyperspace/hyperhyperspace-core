@@ -297,8 +297,6 @@ class Mesh implements MeshInterface {
                     }
                 }
             }
-
- 
         }
         
 
@@ -835,7 +833,7 @@ class Mesh implements MeshInterface {
         if (usageInfo.type === 'peer-group') {
             return usageInfo.type + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--');
         } else if (usageInfo.type === 'object-sync') {
-            return usageInfo.type + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--');
+            return usageInfo.type + '-' + usageInfo.objHash + '-' + usageInfo.peerGroupId.replace(/[-]/g, '--');
         } else {
             return usageInfo.type + '-' + usageInfo.objHash + '-' + usageInfo.broadcastedSuffixBits;
         }

@@ -151,7 +151,7 @@ class MeshProxy implements MeshInterface {
                     window.clearTimeout(to);
                 }
 
-                if (reply.state !== undefined) {
+                if (reply.errorType === undefined && reply.error === undefined) {
                 
                     if (cb !== undefined) {        
                         cb(reply.state);    
@@ -689,6 +689,7 @@ class MeshProxy implements MeshInterface {
     }
 
     removeSyncObserver(obs: SyncObserver, mut: MutableObject, peerGroupId?: string | undefined, timeout=10000): Promise<void> {
+
         const p = new Promise<void>((resolve: () => void, reject: (reason: any) => void) => {
             const observerId = this.syncObserverIds.get(obs);
 

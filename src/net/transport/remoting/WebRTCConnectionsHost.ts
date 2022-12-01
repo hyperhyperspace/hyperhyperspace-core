@@ -66,7 +66,8 @@ type ConnectionReady = {
 type ConnectionStatusChange = {
     type: 'connection-status-change',
     connId: string,
-    status: string,
+    channelStatus: string,
+    connectionStatus: string,
     remoteInstanceId?: string
 }
 
@@ -106,7 +107,7 @@ class WebRTCConnectionsHost {
     eventCallback: (ev: WebRTCConnectionEvent) => void;
     messageCallback: ((data: any, conn: Connection) => void);
     connectionReadyCallback: (conn: Connection) => void;
-    connectionStatusChangeCallback: (status: string, conn: Connection) => void;
+    connectionStatusChangeCallback: (channelStatus: string, connectionStatus: string, conn: Connection) => void;
     emptyBufferCallback: (conn: Connection) => void;
 
 
@@ -137,13 +138,16 @@ class WebRTCConnectionsHost {
             this.eventCallback(ev);
         };
 
-        this.connectionStatusChangeCallback = (status: string, conn: Connection) => {
+        this.connectionStatusChangeCallback = (channelStatus: string, connectionStatus: string, conn: Connection) => {
             let ev: ConnectionStatusChange = {
                 type: 'connection-status-change',
                 connId: conn.getConnectionId(),
-                status: status,
+                channelStatus: channelStatus,
+                connectionStatus: connectionStatus,
                 remoteInstanceId: conn.remoteInstanceId 
             };
+
+            console.log('SENDING CONN STATUS CHANGE:', ev);
 
             this.eventCallback(ev);
         };

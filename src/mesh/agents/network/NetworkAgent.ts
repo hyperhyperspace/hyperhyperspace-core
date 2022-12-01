@@ -373,7 +373,7 @@ class NetworkAgent implements Agent {
 
                 proxy?.connectionEventIngestFn(ev);
 
-                if (ev.type === 'connection-status-change' && ev.status === 'closed') {
+                if (ev.type === 'connection-status-change' && ev.channelStatus === 'closed') {
                     this.connProxies?.delete(ev.connId);
                 }
             };

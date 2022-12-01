@@ -26,6 +26,7 @@ class WebRTCConnectionProxy implements Connection {
     readyCallback : (conn: Connection) => void;
     messageCallback: ((data: any, conn: Connection) => void) | undefined;
     cachedChannelStatus : string;
+    cachedConnectionStatus: string;
     closed: boolean;
     lastKnownBufferedAmount: number;
 
@@ -43,6 +44,7 @@ class WebRTCConnectionProxy implements Connection {
         this.callId = callId;
         this.readyCallback = readyCallback;
         this.cachedChannelStatus = 'unknown';
+        this.cachedConnectionStatus = 'unknown';
         this.closed = false;
         this.lastKnownBufferedAmount = 0;
 
@@ -58,8 +60,11 @@ class WebRTCConnectionProxy implements Connection {
                 } else if (ev.type === 'connection-status-change') {
                     
                     const change = ev as ConnectionStatusChange;
-                    this.cachedChannelStatus = change.status;
+                    this.cachedChannelStatus = change.channelStatus;
+                    this.cachedConnectionStatus = change.connectionStatus;
                     this.remoteInstanceId = ev.remoteInstanceId;
+
+                    
 
                 } else if (ev.type === 'message-received') {
                     
@@ -124,7 +129,10 @@ class WebRTCConnectionProxy implements Connection {
 
 
     channelIsOperational(): boolean {
-        return this.cachedChannelStatus === 'open';
+        return this.cachedConnectionStatus !== 'disconnected' &&
+               this.cachedConnectionStatus !== 'closed' && 
+               this.cachedConnectionStatus !== 'failed' &&
+               this.cachedChannelStatus === 'open';
     }
 
     open(channelName='mesh-network-channel') {

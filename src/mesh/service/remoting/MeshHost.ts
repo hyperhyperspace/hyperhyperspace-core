@@ -411,6 +411,8 @@ class MeshHost {
 
                         reply.state = state;
 
+                        console.log('SENDING SYNC STATE reply=', reply)
+
                         this.streamedReplyCb(reply);
 
                     }).catch((reason: any) => {
