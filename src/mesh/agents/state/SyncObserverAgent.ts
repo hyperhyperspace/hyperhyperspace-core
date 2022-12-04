@@ -93,6 +93,7 @@ class SyncObserverAgent implements Agent {
         tuple[0].addObserver(obs);
 
         if (syncAgent !== undefined) {
+
             obs({
                 emitter: mut,
                 action: SyncObserverEventTypes.SyncStateUpdate,
@@ -155,8 +156,6 @@ class SyncObserverAgent implements Agent {
                     });
 
                 } else if (agentEv.content.change === AgentSetChange.Removal) {
-
-                    console.log('SENDING LAST EV FOR ' + mut.getLastHash());
 
                     const syncAgent = this.pod?.getAgent(syncAgentId) as StateSyncAgent|undefined;
                     syncAgent?.getSyncEventSource().removeObserver(syncAgentObserver); // I think this will have no effect

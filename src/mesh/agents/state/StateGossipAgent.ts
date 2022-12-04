@@ -153,7 +153,7 @@ class StateGossipAgent extends PeeringAgentBase {
     localStateObjects: Map<AgentId, HashedObject>;
     remoteStateObjects: Map<Endpoint, Map<AgentId, HashedObject>>;
 
-    previousStatesCache: Map<AgentId, Array<Hash>>;
+    previousStatesCaches: Map<AgentId, LRUCache<Hash, HashedObject>>;
 
     sentStateCache: LRUCache<string, {timestamp: number, stateHash: Hash, repeats: number}>;
 
@@ -175,7 +175,7 @@ class StateGossipAgent extends PeeringAgentBase {
         this.localStateObjects = new Map();
         this.remoteStateObjects = new Map();
 
-        this.previousStatesCache = new Map();
+        this.previousStatesCaches = new Map();
 
         this.sentStateCache = new LRUCache(512);
 
@@ -233,7 +233,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
     untrackAgentState(agentId: AgentId) {
         this.trackedAgentIds.delete(agentId);
-        this.previousStatesCache.delete(agentId);
+        this.previousStatesCaches.delete(agentId);
         this.localState.delete(agentId);
         this.localStateObjects.delete(agentId);
     }
@@ -300,7 +300,7 @@ class StateGossipAgent extends PeeringAgentBase {
     private clearAgentState(agentId: AgentId) {
         this.localState.delete(agentId);
         this.localStateObjects.delete(agentId);
-        this.previousStatesCache.delete(agentId);
+        this.previousStatesCaches.delete(agentId);
     }
 
     private clearPeerState(endpoint: Endpoint) {
@@ -321,7 +321,7 @@ class StateGossipAgent extends PeeringAgentBase {
             const currentState = this.localState.get(agentId);
     
             if (currentState !== undefined && hash !== currentState) {
-                this.cachePreviousStateHash(agentId, currentState);
+                this.cachePreviousState(agentId, currentState, this.localStateObjects.get(agentId) as HashedObject);
             }
     
             this.localState.set(agentId, hash);
@@ -383,36 +383,20 @@ class StateGossipAgent extends PeeringAgentBase {
         }
     }
 
-    private cachePreviousStateHash(agentId: AgentId, state: Hash) {
+    private cachePreviousState(agentId: AgentId, stateHash: Hash, stateObj: HashedObject) {
 
-        let prevStates = this.previousStatesCache.get(agentId);
+        let prevStates = this.previousStatesCaches.get(agentId);
 
         if (prevStates === undefined) {
-            prevStates = [];
-            this.previousStatesCache.set(agentId, prevStates);
+            prevStates = new LRUCache(this.params.maxCachedPrevStates);
+            this.previousStatesCaches.set(agentId, prevStates);
         }
 
-        // remove if already cached
-        let idx = prevStates.indexOf(state);
-        if (idx >= 0) {
-            prevStates.splice(idx, 1);
-        }
-
-        // truncate array to make room for new state
-        const maxLength = this.params.maxCachedPrevStates - 1;
-        if (prevStates.length > maxLength) {
-            const toDelete = prevStates.length - maxLength;
-            prevStates.splice(maxLength, toDelete);
-        }
-
-        // put state at the start of the cached states array
-        prevStates.unshift(state);
-
+        prevStates.set(stateHash, stateObj);
     }
 
-    private stateHashIsInPreviousCache(agentId: AgentId, state: Hash): boolean {
-        const cache = this.previousStatesCache.get(agentId);
-        return cache !== undefined && cache.indexOf(state) >= 0;
+    private getStateFromPreviousCache(agentId: AgentId, stateHash: Hash): HashedObject|undefined {
+        return this.previousStatesCaches.get(agentId)?.get(stateHash);
     }
 
     // handling and caching of remote states
@@ -493,7 +477,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
     // message handling
 
-    private receiveFullState(sender: Endpoint, state: PeerState) {
+    private async receiveFullState(sender: Endpoint, state: PeerState) {
 
         for(const [agentId, hash] of state.entries()) {
 
@@ -502,33 +486,34 @@ class StateGossipAgent extends PeeringAgentBase {
 
                 if (agent !== undefined) {
     
-                    const currentState = this.localState.get(agentId);
+                    //const currentState = this.localState.get(agentId);
     
-                    if (currentState !== hash) {
-                        const cacheHit = this.stateHashIsInPreviousCache(agentId, hash);
-                        if (! cacheHit) {
-                            
-                            try {
-                                
-                                const stateObj = this.lookupStateObject(agentId, hash);
+                    //if (currentState !== hash) {
+                        
+                        let stateObj = this.getStateFromPreviousCache(agentId, hash);
 
-                                if (stateObj === undefined) {
-                                    this.requestStateObject(sender, agentId);
-                                } else {
-                                    this.receiveStateObject(sender, agentId, stateObj, Date.now());
-                                }
-
-                                
-                            } catch (e) {
-                                StateGossipAgent.controlLog.warning('Error while processing received state for ' + agentId, e);
-                            }
+                        if (stateObj === undefined) {
                             
+                            stateObj = this.lookupStateObject(agentId, hash);                            
     
                             // I _think_ it's better to not gossip in this case.
                         } else {
                             StateGossipAgent.controlLog.trace('Not gossiping to ' + agentId + ' because ' + hash + ' is in the prev state cache');
                         }
-                    }
+
+                        try {
+                                
+                            if (stateObj === undefined) {
+                                this.requestStateObject(sender, agentId);
+                            } else {
+                                this.receiveStateObject(sender, agentId, stateObj, Date.now());
+                            }
+                            
+                        } catch (e) {
+                            StateGossipAgent.controlLog.warning('Error while processing received state for ' + agentId, e);
+                        }
+
+                    //}
                 }
             } else {
                 StateGossipAgent.controlLog.debug('Received state for agentId ' + agentId + ', but it is not being tracked')
@@ -540,35 +525,36 @@ class StateGossipAgent extends PeeringAgentBase {
 
     private async receiveStateObject(sender: Endpoint, agentId: AgentId, stateObj: HashedObject, _timestamp: number) {
 
-        if (await stateObj.validate(new Map())) {
-            const state = stateObj.hash();
+        const stateHash = stateObj.hash();
 
-            this.setRemoteState(sender, agentId, state, stateObj)
+        if (stateHash !== this.getRemoteState(sender, agentId)) {
+            if (await stateObj.validate(new Map())) {
             
-            const cacheHit = this.stateHashIsInPreviousCache(agentId, state);
 
-            let receivedOldState = cacheHit;
-
-            if (!receivedOldState) {
+                this.setRemoteState(sender, agentId, stateHash, stateObj);
+                this.cachePreviousState(agentId, stateHash, stateObj);
                 
-                try {
-                    receivedOldState = ! (await this.notifyAgentOfStateArrival(sender, agentId, state, stateObj));
+                let receivedOldState = false;
 
-                    StateGossipAgent.controlLog.trace('Received state for ' + agentId + ': (' + state + (receivedOldState? 'old' : 'new') + ')');
+                try {
+                    receivedOldState = ! (await this.notifyAgentOfStateArrival(sender, agentId, stateHash, stateObj));
                 } catch (e) {
                     // maybe cache erroneous states so we don't process them over and over?
                     StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender + ' for ' + agentId, e);
                 }
-
+    
+                StateGossipAgent.controlLog.trace('Received state for ' + agentId + ': (' + stateHash + '-' + (receivedOldState? 'old' : 'new') + ')');
+    
+                if (receivedOldState && this.localState.get(agentId) !== stateHash && this.localStateObjects.get(agentId) !== undefined) {
+                    this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
+                    this.sendStateObject(sender, agentId);
+                }
+            } else {
+                this.peerMessageLog.trace('Received invalid state for ' + agentId + ' from ' + sender + ', ignoring.');
             }
-
-            if (receivedOldState && this.localState.get(agentId) !== state && this.localStateObjects.get(agentId) !== undefined) {
-                this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
-                this.sendStateObject(sender, agentId);
-            }
-        } else {
-            this.peerMessageLog.trace('Received invalid state for ' + agentId + ' from ' + sender + ', ignoring.');
         }
+
+        
 
     }
 
@@ -691,6 +677,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
         let state: {[key: Endpoint]: Hash} = {};
 
+
         for (const [endpoint, peerState] of this.remoteState.entries()) {
 
             if (this.peerGroupAgent.isPeer(endpoint)) {   // <--   this needs to work even if we still haven't received the
@@ -698,7 +685,7 @@ class StateGossipAgent extends PeeringAgentBase {
             
                 if (stateHash !== undefined) {
                     state[endpoint] = stateHash;
-                }    
+                }
             }
         }
 
