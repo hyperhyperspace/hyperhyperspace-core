@@ -147,8 +147,6 @@ class WebRTCConnectionsHost {
                 remoteInstanceId: conn.remoteInstanceId 
             };
 
-            console.log('SENDING CONN STATUS CHANGE:', ev);
-
             this.eventCallback(ev);
         };
 

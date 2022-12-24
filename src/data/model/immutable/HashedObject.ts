@@ -74,7 +74,8 @@ abstract class HashedObject {
 
     setId(id: string) {
         this.id = id;
-
+        this._lastHash = undefined;
+        
         for (const fieldName of this._derivedFields) {
             const obj = (this as any)[fieldName];
             obj?.setId(this.getDerivedFieldId(fieldName));

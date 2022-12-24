@@ -196,7 +196,7 @@ class PeerGroupAgent implements Agent {
             peerConnectionTimeout: params.peerConnectionTimeout || 20,
             peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 10,
             peerDiscoveryAttemptInterval: params.peerDiscoveryAttemptInterval || 15,
-            tickInterval: params.tickInterval || 10
+            tickInterval: params.tickInterval || 30
         };
 
         this.tick = async () => {
@@ -204,7 +204,7 @@ class PeerGroupAgent implements Agent {
             if (this.tickLock.acquire()) {
                 try {
 
-                    console.log(this.peerGroupId + ' has ' + this.getPeers().length + ' peers')
+                    //console.log(this.peerGroupId + ' has ' + this.getPeers().length + ' peers')
 
                     this.cleanUp();
                     this.queryForOnlinePeers();
@@ -333,15 +333,15 @@ class PeerGroupAgent implements Agent {
                     peerMsg
                 );
     
-                this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': sending peer message to ' + ep);
+                this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': sending peer message to ' + ep + ' for agent ' + agentId + ' over connection ' + connId);
                 return true;    
             } catch (e) {
 
-                this.controlLog.warning(this.peerGroupId + '/' + this.localPeer.endpoint + ': Could not send message', e);
+                this.controlLog.warning(this.peerGroupId + '/' + this.localPeer.endpoint + ' (for agent ' + agentId + '): Could not send message to ' + ep + ': error', e);
                 return false;
             }
         } else {
-            this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint + ': could not send peer message to ' + ep);
+            this.controlLog.trace(this.peerGroupId + '/' + this.localPeer.endpoint  + ' (for agent ' + agentId + '): could not send peer message to ' + ep);
             return false;
         }
     }

@@ -109,7 +109,8 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
         this.emitSyncState();
 
-        this.controlLog.debug('Started agent for ' + this.mutableObjHash);
+        this.controlLog.debug('Started sync agent for ' + this.mutableObjHash);
+
     }
 
     shutdown(): void {
@@ -134,7 +135,9 @@ class HeaderBasedSyncAgent extends PeeringAgentBase implements StateSyncAgent {
 
     async receiveRemoteState(sender: string, stateHash: string, state: HashedObject): Promise<boolean> {
 
-        if (this.terminated) return false;
+        if (this.terminated) {
+            return false;
+        }
 
         let isNew = false;
 

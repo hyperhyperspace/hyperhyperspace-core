@@ -529,21 +529,18 @@ class StateGossipAgent extends PeeringAgentBase {
 
         if (stateHash !== this.getRemoteState(sender, agentId)) {
             if (await stateObj.validate(new Map())) {
-            
-
-                this.setRemoteState(sender, agentId, stateHash, stateObj);
-                this.cachePreviousState(agentId, stateHash, stateObj);
                 
                 let receivedOldState = false;
 
                 try {
                     receivedOldState = ! (await this.notifyAgentOfStateArrival(sender, agentId, stateHash, stateObj));
+                    this.setRemoteState(sender, agentId, stateHash, stateObj);
+                    this.cachePreviousState(agentId, stateHash, stateObj);
+                    StateGossipAgent.controlLog.trace('Received state for ' + agentId + ': (' + stateHash + '-' + (receivedOldState? 'old' : 'new') + ')');
                 } catch (e) {
                     // maybe cache erroneous states so we don't process them over and over?
                     StateGossipAgent.controlLog.warning('Received erroneous state from ' + sender + ' for ' + agentId, e);
                 }
-    
-                StateGossipAgent.controlLog.trace('Received state for ' + agentId + ': (' + stateHash + '-' + (receivedOldState? 'old' : 'new') + ')');
     
                 if (receivedOldState && this.localState.get(agentId) !== stateHash && this.localStateObjects.get(agentId) !== undefined) {
                     this.peerMessageLog.trace('Received old state for ' + agentId + ' from ' + sender + ', sending our own state over there.');
@@ -643,7 +640,7 @@ class StateGossipAgent extends PeeringAgentBase {
 
                     this.sentStateCache.set(lastSentKey, {timestamp: newTimestamp, stateHash: stateLiteral.hash, repeats: newRepeats});
                 } else {
-                    this.controlLog.debug('Sending state failed!');
+                    this.controlLog.debug('Sending state failed for ' + agentId + '!');
                 }
             } else {
                 this.controlLog.warning('not gossiping: repeats = ' + lastSent?.repeats + ' for agent ' + agentId);

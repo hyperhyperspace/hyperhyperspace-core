@@ -129,7 +129,7 @@ class HistorySynchronizer {
 
         this.lastCancelledRequests = [];
 
-        this.logPrefix = 'On peer ' + this.syncAgent.peerGroupAgent.localPeer.identity?.hash() as Hash + ':';
+        this.logPrefix = 'On peer ' + this.syncAgent.peerGroupAgent.localPeer.identity?.hash() as Hash + ' for mut ' + this.syncAgent.mutableObj.getLastHash() + ':';
 
         this.controlLog  = HistorySynchronizer.controlLog;
         this.sourcesLog  = HistorySynchronizer.sourcesLog;
