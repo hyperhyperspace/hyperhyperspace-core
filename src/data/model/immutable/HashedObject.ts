@@ -246,17 +246,20 @@ abstract class HashedObject {
     }
 
     clone() : this {
-        let c = this.toContext();
+        const c = this.toContext();
         
+        const current = c.objects;
+
         c.objects = new Map<Hash, HashedObject>();
 
         let clone = HashedObject.fromContext(c) as this;
 
-        clone.init();
+        for (const [hash, obj] of current.entries()) {
+            const clonedObj = c.objects.get(hash) as HashedObject;
+            clonedObj._signOnSave    = obj._signOnSave;
+            clonedObj._lastSignature = obj._lastSignature;
+        }
 
-        clone._signOnSave    = this._signOnSave;
-        clone._lastSignature = this._lastSignature;
-        
         return clone;
     }
 
