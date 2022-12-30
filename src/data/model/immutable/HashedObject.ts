@@ -48,6 +48,7 @@ abstract class HashedObject {
     private _signOnSave      : boolean;
     private _lastHash?       : Hash;
     private _lastSignature?  : string;
+    public _objectID : Number;
 
     private _resources? : Resources;
 
@@ -57,6 +58,7 @@ abstract class HashedObject {
     protected _cascadeMutableContentEvents: boolean;
 
     constructor() {
+        this._objectID = Math.random()
         this._derivedFields = new Set();
         this._signOnSave = false;
         this._boundToStore = false;
@@ -289,6 +291,7 @@ abstract class HashedObject {
     }
 
     setResources(resources: Resources, seen: Set<HashedObject> = new Set()): void {
+        if (this._resources === resources) return;
         if (seen?.has(this)) return;
 
         this._resources = resources;
@@ -441,7 +444,7 @@ abstract class HashedObject {
         //console.log(new Error().stack);
 
         let typ = typeof(value);
-
+        
         // We're only concerned with 'object' typed stuff, since scalars, strings, etc. cannot yield
         // any HashedObject-derived subobjects.
 
@@ -481,9 +484,11 @@ abstract class HashedObject {
         //return this.getSubObjects(context, true);
 
         const subobjects = new Map<string, HashedObject>();
-
-        for (const fieldName of Object.keys(this)) {
+        const objectKeys = Object.keys(this)
+        // console.log('getDirectSubObjects: iterating over', objectKeys.length, 'keys')
+        for (const fieldName of objectKeys) {
             if (fieldName.length > 0 && fieldName[0] !== '_') {
+                // console.log('getDirectSubObjects', fieldName, this)
                 let value = (this as any)[fieldName];
 
                 HashedObject.collectDirectSubobjects(fieldName, value, subobjects);
