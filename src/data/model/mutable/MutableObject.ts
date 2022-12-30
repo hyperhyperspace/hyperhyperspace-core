@@ -220,9 +220,9 @@ abstract class  MutableObject extends HashedObject {
 
     }
 
-    async loadAllChanges(batchSize=128) {
+    async loadAllChanges(batchSize=128, context = new Context()) {
 
-        await super.loadAllChanges(batchSize);
+        await super.loadAllChanges(batchSize, context);
 
         let results = await this.getStore()
                                 .loadByReference(
@@ -231,7 +231,8 @@ abstract class  MutableObject extends HashedObject {
                                     {
                                         order: 'asc',
                                         limit: batchSize
-                                    });
+                                    },
+                                    context);
 
         while (results.objects.length > 0) {
 
@@ -249,7 +250,8 @@ abstract class  MutableObject extends HashedObject {
                                         order: 'asc',
                                         limit: batchSize,
                                         start: results.end
-                                    });
+                                    },
+                                    context);
         }
     }
 

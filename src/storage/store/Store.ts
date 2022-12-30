@@ -504,7 +504,7 @@ class Store {
             }
 
             //console.log('+++ loading changes for ' + hash + ' ', new Error().stack);
-            await object.loadAllChanges();
+            await object.loadAllChanges(undefined, context);
 
             /*for (const subobj of context.objects.values()) {
                 if (watchForChanges) {
@@ -588,26 +588,26 @@ class Store {
         return obj;
     }
 
-    async loadByClass(className: string, params?: LoadParams) : Promise<LoadResults> {
+    async loadByClass(className: string, params?: LoadParams, context = new Context()) : Promise<LoadResults> {
 
         let searchResults = await this.backend.searchByClass(className, params);
 
-        return this.loadSearchResults(searchResults);
+        return this.loadSearchResults(searchResults, context);
 
     }
 
-    async loadByReference(referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<LoadResults> {
+    async loadByReference(referringPath: string, referencedHash: Hash, params?: LoadParams, context = new Context()) : Promise<LoadResults> {
 
         let searchResults = await this.backend.searchByReference(referringPath, referencedHash, params);
 
-        return this.loadSearchResults(searchResults);
+        return this.loadSearchResults(searchResults, context);
     }
 
-    async loadByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<LoadResults> {
+    async loadByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams, context = new Context()) : Promise<LoadResults> {
 
         let searchResults = await this.backend.searchByReferencingClass(referringClassName, referringPath, referencedHash, params);
 
-        return this.loadSearchResults(searchResults);
+        return this.loadSearchResults(searchResults, context);
     }
 
     async loadOpHeader(opHash: Hash): Promise<OpHeader | undefined> {
@@ -659,9 +659,7 @@ class Store {
         return literal;
     }*/
 
-    private async loadSearchResults(searchResults: BackendSearchResults) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
-
-        let context = new Context();
+    private async loadSearchResults(searchResults: BackendSearchResults, context = new Context()) : Promise<{objects: Array<HashedObject>, start?: string, end?: string}> {
 
         let objects = [] as Array<HashedObject>;
         

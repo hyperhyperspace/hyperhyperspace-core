@@ -118,7 +118,7 @@ describeProxy('[CST] Causal sets', () => {
 
         done();
 
-    });
+    }, 10000);
 
     test('[CST03] Causal set redo', async (done) => {
         let store = new Store(new IdbBackend('CST02 - ' + new RNGImpl().randomHexString(128)));

@@ -85,8 +85,6 @@ describeProxy('[CRF] Causal references', () => {
 
         await mutWritersClone.save();
 
-        console.log('FINAL LOADING!')
-
         let refClone = await store.load(ref.hash()) as CausalReference<string>;
 
         expect (refClone.getValue()).toEqual('2');

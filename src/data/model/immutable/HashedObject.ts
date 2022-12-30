@@ -437,6 +437,9 @@ abstract class HashedObject {
 
     static collectDirectSubobjects(path: string, value: any, subobjects: Map<string, HashedObject>) {
 
+        //console.log('called collectDirectSubobjects() w/path', path, 'subobjects: ', subobjects.size);
+        //console.log(new Error().stack);
+
         let typ = typeof(value);
 
         // We're only concerned with 'object' typed stuff, since scalars, strings, etc. cannot yield
@@ -1062,12 +1065,12 @@ abstract class HashedObject {
         return this._boundToStore;
     }
 
-    async loadAllChanges(loadBatchSize=128) {
+    async loadAllChanges(loadBatchSize=128, context = new Context()) {
 
         const subobjs = new Set(this.getDirectSubObjects().values());
 
         for (const subobj of subobjs.values()) {
-            await subobj.loadAllChanges(loadBatchSize);
+            await subobj.loadAllChanges(loadBatchSize, context);
         }
     }
 }
