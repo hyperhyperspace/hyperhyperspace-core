@@ -290,15 +290,13 @@ abstract class HashedObject {
         return Hashing.forValue('#' + this.getId() + '.' + fieldName);
     }
 
-    setResources(resources: Resources, seen: Set<HashedObject> = new Set()): void {
+    setResources(resources: Resources): void {
         if (this._resources === resources) return;
-        if (seen?.has(this)) return;
 
         this._resources = resources;
-        seen.add(this)
 
         for (const subobj of this.getDirectSubObjects().values()) {
-            subobj.setResources(resources, seen);
+            subobj.setResources(resources);
         }
     }
 
