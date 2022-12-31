@@ -48,7 +48,6 @@ abstract class HashedObject {
     private _signOnSave      : boolean;
     private _lastHash?       : Hash;
     private _lastSignature?  : string;
-    public _objectID : Number;
 
     private _resources? : Resources;
 
@@ -58,7 +57,6 @@ abstract class HashedObject {
     protected _cascadeMutableContentEvents: boolean;
 
     constructor() {
-        this._objectID = Math.random()
         this._derivedFields = new Set();
         this._signOnSave = false;
         this._boundToStore = false;
