@@ -1,6 +1,6 @@
 {
   "name": "@hyper-hyper-space/core",
-  "version": "0.12",
+  "version": "0.12.0",
   "author": "Santiago Bazerque",
   "license": "MIT",
   "source": "src/index.ts",
