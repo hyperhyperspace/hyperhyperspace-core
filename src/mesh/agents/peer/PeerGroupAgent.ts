@@ -207,8 +207,9 @@ class PeerGroupAgent implements Agent {
                     //console.log(this.peerGroupId + ' has ' + this.getPeers().length + ' peers')
 
                     this.cleanUp();
-                    this.queryForOnlinePeers();
+                    await this.queryForOnlinePeers();
                     this.deduplicateConnections();
+                    await this.checkPeers();
                 } finally {
                     this.tickLock.release();
                 }
@@ -497,6 +498,21 @@ class PeerGroupAgent implements Agent {
         }
 
         
+    }
+
+    private async checkPeers() {
+        for (const [endpoint, connIds] of this.connectionsPerEndpoint.entries()) {
+            if (await this.peerSource.getPeerForEndpoint(endpoint) === undefined) {
+                for (const connId of connIds) {
+                    try {
+                        this.getNetworkAgent().releaseConnectionIfExists(connId, this.getAgentId());
+                    } catch (e) {
+                        PeerGroupAgent.controlLog.warning('Error attempting to release connection ' + connId, e);
+                    }
+                }
+            }
+        }
+
     }
 
     // Connection deduplication logic.
