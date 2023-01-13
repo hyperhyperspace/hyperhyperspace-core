@@ -30,7 +30,7 @@ const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject
 
 type MutableObjectConfig = {supportsUndo?: boolean};
 
-abstract class  MutableObject extends HashedObject {
+abstract class MutableObject extends HashedObject {
 
     static controlLog = new Logger(MutableObject.name, LogLevel.INFO)
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
