@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults, Storable } from '../backends/Backend'; 
-import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp, HashedSet, LiteralUtils } from 'data/model';
+import { HashedObject, MutableObject, Literal, Context, HashReference, MutationOp, HashedSet, LiteralUtils, StateCheckpoint } from 'data/model';
 import { Hash } from 'data/model/hashing/Hashing';
 
 import { MultiMap } from 'util/multimap';
@@ -921,6 +921,13 @@ class Store {
         this.backend.close();
     }
     
+    async saveCheckpoint(checkpoint: StateCheckpoint) {
+        await this.backend.storeCheckpoint(checkpoint);
+    }
+
+    async loadLastCheckpoint(mutableObject: Hash) {
+        return this.backend.loadLastCheckpoint(mutableObject);
+    }
 }
 
 export { Store, StoredOpHeader, LoadResults };

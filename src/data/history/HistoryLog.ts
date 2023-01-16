@@ -17,8 +17,8 @@ class StateTransition<T extends MutableObject> extends MutationOp {
         super(log);
 
         this.mutableHash = mutableHash;
-        this.start   = start;
-        this.end     = end;
+        this.start       = start;
+        this.end         = end;
 
         this.info     = info;
     }

@@ -3,7 +3,7 @@ import { openDB, IDBPDatabase } from 'idb';
 
 import { Logger, LogLevel } from 'util/logging';
 
-import { Literal, Hash, HashedSet, HashReference } from 'data/model';
+import { Literal, Hash, HashedSet, HashReference, StateCheckpoint } from 'data/model';
 
 import { Backend, BackendSearchParams, BackendSearchResults, Storable } from './Backend'; 
 import { Store, StoredOpHeader } from 'storage/store/Store';
@@ -402,6 +402,17 @@ class IdbBackend implements Backend {
             console.log('database doesnt exist (from databases call): ' + name);
             return false;
         }
+    }
+
+    // TODO: add a STORE for the checkpoints, for now limited to max idb value size
+
+    async storeCheckpoint(checkpoint: StateCheckpoint): Promise<void> {
+        checkpoint;
+        throw new Error('Method not implemented.');
+    }
+
+    async loadLastCheckpoint(): Promise<StateCheckpoint|undefined> {
+        throw new Error('Method not implemented.');
     }
 }
 

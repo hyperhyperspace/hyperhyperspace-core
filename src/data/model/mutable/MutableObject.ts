@@ -28,7 +28,15 @@ enum MutableContentEvents {
 
 const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject];
 
-type MutableObjectConfig = {supportsUndo?: boolean};
+type MutableObjectConfig = {supportsUndo?: boolean, supportsCheckpoints?: boolean, checkpointFreq?: number};
+
+type StateCheckpoint = {
+    mutableObject: Hash,
+    terminalOpHashes: Array<Hash>, 
+    allAppliedOps: Array<Hash>, 
+    activeCascInvsPerOp: Array<[Hash, Array<Hash>]>, 
+    exportedState: any
+};
 
 abstract class MutableObject extends HashedObject {
 
@@ -36,7 +44,8 @@ abstract class MutableObject extends HashedObject {
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     readonly _acceptedMutationOpClasses : Array<string>;
-    
+    readonly _supportsCheckpoints: boolean;
+
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
 
@@ -68,6 +77,8 @@ abstract class MutableObject extends HashedObject {
                 acceptedOpClasses.push(CascadedInvalidateOp.className);
             }
         }
+
+        this._supportsCheckpoints = config?.supportsCheckpoints || false;
         
         this._acceptedMutationOpClasses = acceptedOpClasses;
         this._boundToStore = false;
@@ -111,6 +122,17 @@ abstract class MutableObject extends HashedObject {
     abstract mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean>;
     abstract getMutableContents(): MultiMap<Hash, HashedObject>;
     abstract getMutableContentByHash(hash: Hash): Set<HashedObject>;
+
+    // override the following two to support checkpointing (and pass apropriate params in config to constructor)
+
+    exportMutableState(): any {
+        throw new Error(this.getClassName() + ': this class does not support state packing')
+    }
+
+    importMutableState(state: any) {
+        state;
+        throw new Error(this.getClassName() + ': this class does not support applying packed state')
+    }
 
     /*
     // override if appropiate
@@ -223,6 +245,17 @@ abstract class MutableObject extends HashedObject {
     async loadAllChanges(batchSize=128, context = new Context()) {
 
         await super.loadAllChanges(batchSize, context);
+
+        if (this._supportsCheckpoints) {
+            const checkpoint = await this.getStore().loadLastCheckpoint(this.getLastHash());
+
+            if (checkpoint !== undefined) {
+                this.restoreCheckpoint(checkpoint);
+
+                // TODO: find a way to get the correct "start" parameter for loadByReference below
+                //       to make it ignore all the ops in the checkpoint
+            }
+        }
 
         let results = await this.getStore()
                                 .loadByReference(
@@ -510,6 +543,55 @@ abstract class MutableObject extends HashedObject {
         this._unsavedOps.push(op);
     }
 
+    // checkpointing
+
+    async saveCheckpoint() {
+
+        await this.saveQueuedOps();
+
+        const check: StateCheckpoint = {
+            mutableObject: this.getLastHash(),
+            terminalOpHashes: Array.from(this._terminalOps.keys()), 
+            allAppliedOps: Array.from(this._allAppliedOps), 
+            activeCascInvsPerOp: Array.from(this._activeCascInvsPerOp.entries()).map((v: [Hash, Set<Hash>]) => [v[0], Array.from(v[1].values())]),
+            exportedState: this.exportMutableState()
+        };
+
+        await this.getStore().saveCheckpoint(check);
+
+    }
+
+    async restoreCheckpoint(checkpoint: StateCheckpoint) {
+        if (this.getLastHash() !== checkpoint.mutableObject) {
+            throw new Error('Trying to apply a state checkpoint to ' + this.getLastHash() + ', but the checkpoint is for ' + checkpoint.mutableObject);
+        }
+
+        const terminalOps = new Map<Hash, MutationOp>();
+
+        for (const opHash of checkpoint.terminalOpHashes.values()) {
+            const op = await this.loadOp(opHash);
+
+            if (op === undefined) {
+                throw new Error('Cannot apply checkpoint to ' + this.getLastHash() + ', missing op: ' + opHash);
+            }
+
+            terminalOps.set(opHash, op);
+        }
+
+        this._terminalOps = terminalOps;
+        this._allAppliedOps = new Set(checkpoint.allAppliedOps.values());
+        this._activeCascInvsPerOp = new MultiMap();
+
+        for (const [k, vs] of checkpoint.activeCascInvsPerOp) {
+            for (const v of vs) {
+                this._activeCascInvsPerOp.add(k, v);
+            }
+        }
+
+        this.importMutableState(checkpoint.exportedState);
+    }
+
+
     literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
 
         if (flags === undefined) {
@@ -711,3 +793,4 @@ abstract class MutableObject extends HashedObject {
 
 export { MutableObject, MutableContentEvents };
 export type { MutableObjectConfig };
+export type { StateCheckpoint };

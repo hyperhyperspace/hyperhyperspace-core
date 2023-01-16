@@ -1,5 +1,5 @@
 import { Backend, BackendSearchParams, BackendSearchResults, Storable } from './Backend';
-import { Literal, Hash, HashReference, HashedSet } from 'data/model';
+import { Literal, Hash, HashReference, HashedSet, StateCheckpoint } from 'data/model';
 import { MultiMap } from 'util/multimap';
 import { Store, StoredOpHeader } from 'storage/store/Store';
 import { LiteralUtils } from 'data/model/literals/LiteralUtils';
@@ -24,7 +24,8 @@ type MemoryRepr = {
     terminalOps: MultiMap<Hash, Hash>,
     lastOps: Map<Hash, Hash>,
     opCausalHistories: Map<Hash, MemOpCausalHistoryFormat>,
-    opCausalHistoriesByHash: Map<Hash, MemOpCausalHistoryFormat>
+    opCausalHistoriesByHash: Map<Hash, MemOpCausalHistoryFormat>,
+    checkpoints: Map<Hash, StateCheckpoint>
 }
 
 class MemoryBackend implements Backend {
@@ -75,7 +76,8 @@ class MemoryBackend implements Backend {
                 terminalOps: new MultiMap(),
                 lastOps: new Map(),
                 opCausalHistories: new Map(),
-                opCausalHistoriesByHash: new Map()
+                opCausalHistoriesByHash: new Map(),
+                checkpoints: new Map()
             }
         }
 
@@ -258,6 +260,14 @@ class MemoryBackend implements Backend {
 
         }
 
+    }
+
+    async storeCheckpoint(checkpoint: StateCheckpoint): Promise<void> {
+        this.repr.checkpoints.set(checkpoint.mutableObject, checkpoint);
+    }
+    
+    async loadLastCheckpoint(mutableObject: Hash): Promise<StateCheckpoint|undefined> {
+        return this.repr.checkpoints.get(mutableObject);
     }
 
     async ready(): Promise<void> {
