@@ -190,8 +190,15 @@ class RefUpdateOp<T> extends CollectionOp<T> {
         }
 
         if (this.value === undefined) {
-            MutableObject.validationLog.debug('The field value is mandatory in class REfUpdateop');
+            MutableObject.validationLog.debug('The field value is mandatory in class RefUpdateop');
             return false;
+        }
+
+        if (!(this.value instanceof HashedObject)) {
+            if (!HashedObject.isLiteral(this.value)) {
+                MutableObject.validationLog.debug('The field value in class RefUpdateop must either be a HashedObject instance or a pure literal (a constant, without any HashedObjects within).');
+                return false;
+            }
         }
 
         return true;
