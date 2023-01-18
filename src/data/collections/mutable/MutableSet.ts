@@ -206,6 +206,18 @@ class MutableSet<T> extends BaseCollection<T> implements Collection<T> {
     init(): void {
 
     }
+    
+    exportMutableState() {
+        return {
+            _elements: this._elements,
+            _currentAddOpRefs: this._currentAddOpRefs
+        };
+    }
+
+    importMutableState(state: any): void {
+        this._elements = new Map(Object.entries(state._elements));
+        this._currentAddOpRefs = new Map(Object.entries(state._currentAddOpRefs));
+    }
 
     async validate(references: Map<Hash, HashedObject>) {
 

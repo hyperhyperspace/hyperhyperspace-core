@@ -17,8 +17,8 @@ class MutableReference<T> extends BaseCollection<T> {
     _value?: T;
 
     constructor(config?: CollectionConfig) {
-        super([RefUpdateOp.className], config);
-
+        super([RefUpdateOp.className], {supportsCheckpoints: true, ...config});
+        
         this.setRandomId();
     }
 
@@ -100,6 +100,20 @@ class MutableReference<T> extends BaseCollection<T> {
     
     init(): void {
         
+    }
+    
+    exportMutableState() {
+        return {
+            _sequence: this._sequence,
+            _timestamp: this._timestamp,
+            _value: this._value
+        };
+    }
+    
+    importMutableState(state: any) {
+        this._sequence = state._sequence;
+        this._timestamp = state._timestamp;
+        this._value = state._value;
     }
 
     async validate(references: Map<Hash, HashedObject>) {

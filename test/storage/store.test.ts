@@ -7,6 +7,7 @@ import { SomethingMutable, SomeMutation } from '../data//types/SomethingMutable'
 import { describeProxy } from 'config';
 import { HistoryFragment } from 'data/history/HistoryFragment';
 import { OpHeader } from 'data/history/OpHeader';
+import { MutableReference } from 'index';
 
 //import { SQLiteBackend } from '@hyper-hyper-space/sqlite';
 
@@ -138,6 +139,12 @@ describeProxy('[STR] Storage', () => {
         store.close();
     });*/
 
+    test('[STR19] Validate save/load checkpoint cycle for MutableReference with memory store', async () => {
+        let store = new Store(new MemoryBackend('test-storage-backend'));
+        await testCheckpointSaveLoadCycle(store);
+        store.close();
+    })
+
 });
 
 async function testLoadStoreCycle(store: Store) {
@@ -221,6 +228,27 @@ async function testMutationOps(store: Store) {
     for (let i=0; i<h.length; i++) {
         expect(h[i]).toEqual(h2[i]);
     }
+}
+
+async function testCheckpointSaveLoadCycle(store: Store) {
+    let sm = new MutableReference();
+    await sm.setValue('hello');
+    await store.save(sm);
+    await sm.saveCheckpoint();
+    const lastCheckpoint = await store.loadLastCheckpoint(sm.hash());
+    expect(sm.getValue()).toEqual('hello');
+
+    await sm.setValue('world');
+    await sm.setValue('!');
+    await store.save(sm);
+    expect(sm.getValue()).toEqual('!');
+    
+    await sm.restoreCheckpoint(lastCheckpoint!);
+    expect(sm.getValue()).toEqual('hello');
+    await store.save(sm);
+
+    await sm.loadAllChanges();
+    expect(sm.getValue()).toEqual('!');
 }
 
 async function testMutationOpAutoLoad(store: Store) {
