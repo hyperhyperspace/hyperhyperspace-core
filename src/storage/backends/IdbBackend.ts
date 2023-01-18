@@ -414,6 +414,21 @@ class IdbBackend implements Backend {
     async loadLastCheckpoint(): Promise<StateCheckpoint|undefined> {
         throw new Error('Method not implemented.');
     }
+
+    skipToObjectByClass(className: string, startObject: Hash): Promise<string | undefined> {
+        className; startObject
+        throw new Error('Method not implemented.');
+    }
+
+    skipToObjectByReference(referringPath: string, referencedHash: string, startObject: Hash): Promise<string | undefined> {
+        referringPath; referencedHash; startObject;
+        throw new Error('Method not implemented.');
+    }
+
+    skipToObjectByReferencingClass(referringClassName: string, referringPath: string, referencedHash: string, startObject: Hash): Promise<string | undefined> {
+        referringClassName; referringPath; referencedHash; startObject;
+        throw new Error('Method not implemented.');
+    }
 }
 
 Store.registerBackend(IdbBackend.backendName, (dbName: string) => new IdbBackend(dbName));

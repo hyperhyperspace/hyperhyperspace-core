@@ -610,6 +610,18 @@ class Store {
         return this.loadSearchResults(searchResults, context);
     }
 
+    async skipToObjectByClass(className: string, object: Hash): Promise<string|undefined> {
+        return this.backend.skipToObjectByClass(className, object);
+    }
+
+    async skipToObjectByReference(referringPath: string, referencedHash: Hash, object: Hash): Promise <string|undefined> {
+        return this.backend.skipToObjectByReference(referringPath, referencedHash, object);
+    }
+
+    async skipToObjectByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, object: Hash): Promise<string|undefined> {
+        return this.backend.skipToObjectByReferencingClass(referringClassName, referringPath, referencedHash, object);
+    }
+
     async loadOpHeader(opHash: Hash): Promise<OpHeader | undefined> {
         const stored = await this.backend.loadOpHeader(opHash);
 

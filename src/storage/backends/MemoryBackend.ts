@@ -212,6 +212,21 @@ class MemoryBackend implements Backend {
         return this.searchByIndex(key, this.repr.sortedReferencingClassIndex, params);
     }
 
+    skipToObjectByClass(className: string, startObject: Hash): Promise<string|undefined> {
+        return this.skipToObjectByIndex(className, this.repr.sortedClassIndex, startObject);
+    }
+    
+    skipToObjectByReference(referringPath: string, referencedHash: string, startObject: Hash): Promise<string|undefined> {
+        let key =  referringPath + '#' + referencedHash;
+        return this.skipToObjectByIndex(key, this.repr.sortedReferenceIndex, startObject);
+    }
+    
+    skipToObjectByReferencingClass(referringClassName: string, referringPath: string, referencedHash: string, startObject: Hash): Promise<string|undefined> {
+        let key = referringClassName + '.' + referringPath + '#' + referencedHash;
+        return this.skipToObjectByIndex(key, this.repr.sortedReferencingClassIndex, startObject);
+
+    }
+
     async loadOpHeader(opHash: string): Promise<StoredOpHeader | undefined> {
         return this.repr.opCausalHistories.get(opHash);
     }
@@ -220,10 +235,25 @@ class MemoryBackend implements Backend {
         return this.repr.opCausalHistoriesByHash.get(causalHistoryHash);
     }
 
+    private async skipToObjectByIndex(key: string, sortedIndex: Map<string, Hash[]>, objectHash: Hash): Promise<string|undefined> {
+
+        let classHashes = sortedIndex.get(key);
+
+        if (classHashes !== undefined) {
+            let idx = classHashes.indexOf(objectHash);
+
+            if (idx >= 0) {
+                return MemoryBackend.toStringIndex(idx);
+            }
+        }
+
+        return undefined;
+
+    }
+
     private async searchByIndex(key: string, sortedIndex: Map<string, Hash[]>, params?: BackendSearchParams | undefined): Promise<BackendSearchResults> {
         
         let classHashes = sortedIndex.get(key);
-
 
         if (classHashes === undefined) {
             return { items: [], start: '', end: ''}
@@ -232,8 +262,6 @@ class MemoryBackend implements Backend {
 
             let segment;
 
-
-
             if (order === 'desc') {
                 classHashes.reverse();
             }
@@ -241,11 +269,11 @@ class MemoryBackend implements Backend {
             let start = 0;
 
             if (params !== undefined && params.start !== undefined) {
-                start = Number.parseInt(params.start);
+                start = MemoryBackend.fromStringIndex(params.start);
             }
 
             if (start >= classHashes.length) {
-                return { items: [], start: classHashes.length.toString(), end: classHashes.length.toString()}
+                return { items: [], start: MemoryBackend.toStringIndex(classHashes.length), end: MemoryBackend.toStringIndex(classHashes.length)}
             }
 
             let end = classHashes.length
@@ -256,10 +284,18 @@ class MemoryBackend implements Backend {
 
             let result:Literal[] =  segment.map((hash: Hash) => this.repr.objects.get(hash)?.literal as Literal);
             
-            return { start: start.toString(), end: end.toString(), items: result };
+            return { start: MemoryBackend.toStringIndex(start), end: MemoryBackend.toStringIndex(end), items: result };
 
         }
 
+    }
+
+    private static toStringIndex(idx: number): string {
+        return idx.toString(16).padStart(16, '0');
+    }
+
+    private static fromStringIndex(idxString: string): number {
+        return Number.parseInt(idxString, 16);
     }
 
     async storeCheckpoint(checkpoint: StateCheckpoint): Promise<void> {
