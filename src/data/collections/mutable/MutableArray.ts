@@ -215,6 +215,27 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         this._hashes   = [];
         this._ordinals = [];
     }
+    
+    exportMutableState() {
+        return {
+            _elementsPerOrdinal: this._elementsPerOrdinal.toLiteral(),
+            _ordinalsPerElement: this._ordinalsPerElement.toLiteral(),
+            _elements: Object.fromEntries(this._elements.entries()),
+            _currentInsertOpRefs: this._currentInsertOpRefs.toLiteral(),
+            _currentInsertOpOrds: Object.fromEntries(this._currentInsertOpOrds),
+        }
+    }
+    
+    importMutableState(state: any) {
+        this._elementsPerOrdinal = ArrayMap.fromLiteral<Ordinal, Hash>(state._elementsPerOrdinal);
+        this._ordinalsPerElement = ArrayMap.fromLiteral<Hash, Ordinal>(state._ordinalsPerElement);
+        this._elements = new Map(Object.entries(state._elements));
+        this._currentInsertOpRefs = DedupMultiMap.fromLiteral<Hash, HashReference<InsertOp<T>>>(state._currentInsertOpRefs);
+        this._currentInsertOpOrds = new Map(Object.entries(state._currentInsertOpOrds));
+        
+        this._needToRebuild = true;
+        this.rebuild();
+    }
 
     async insertAt(element: T, idx: number, author?: Identity) {
         await this.insertManyAt([element], idx, author);

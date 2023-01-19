@@ -2,11 +2,11 @@ import { MutableContentEvents } from '../../model/mutable/MutableObject';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Hash } from '../../model/hashing/Hashing';
 import { MutationOp } from 'data/model/mutable/MutationOp';
-import { HashedSet } from 'data/model/immutable/HashedSet';
+import { HashedSet, HashedSetLiteralized } from 'data/model/immutable/HashedSet';
 import { HashReference } from 'data/model/immutable/HashReference';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
-import { ClassRegistry } from 'data/model';
+import { ClassRegistry, Context } from 'data/model';
 import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Collection';
 import { Identity } from 'data/identity';
 
@@ -209,14 +209,17 @@ class MutableSet<T> extends BaseCollection<T> implements Collection<T> {
     
     exportMutableState() {
         return {
-            _elements: this._elements,
-            _currentAddOpRefs: this._currentAddOpRefs
+            _elements: Object.fromEntries(this._elements.entries()),
+            _currentAddOpRefs: Object.fromEntries([...this._currentAddOpRefs.entries()].map(([key, value]) => [key, value.literalize()]))
         };
     }
 
-    importMutableState(state: any): void {
+    importMutableState(state: {
+        _elements: {[key: string]: T},
+        _currentAddOpRefs: {[key: string]: {value: HashedSetLiteralized }}
+    }): void {
         this._elements = new Map(Object.entries(state._elements));
-        this._currentAddOpRefs = new Map(Object.entries(state._currentAddOpRefs));
+        this._currentAddOpRefs = new Map(Object.entries(state._currentAddOpRefs).map(([key, value]) => [key, HashedSet.deliteralize(value, new Context())]));
     }
 
     async validate(references: Map<Hash, HashedObject>) {
