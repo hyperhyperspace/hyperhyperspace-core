@@ -83,6 +83,38 @@ class ArrayMap<K, V> {
     entries() {
         return this.inner.entries();
     }
+    
+    toLiteral() {
+        const result : {
+            sorted: boolean,
+            inner: {[key: keyof any]: V[]},
+            size: number
+        } = {
+            sorted: this.sorted,
+            inner: {},
+            size: this.size
+        };
+        for (const [key, value] of this.inner) {
+            if (typeof key !== "string" && typeof key !== "number" && typeof key !== "symbol") {
+                throw new Error("This ArrayMap's key type isn't supported for literalization");
+            }
+            result.inner[key as keyof any] = value;
+        }
+        return result;
+    }
+    
+    static fromLiteral<K extends keyof any | string | number | symbol, V>(literal: {
+        sorted: boolean,
+        inner: {[key: keyof any]: V[]},
+        size: number
+    }) {
+        const result = new ArrayMap<K, V>(literal.sorted);
+        result.size = literal.size;
+        for (const key in literal.inner) {
+            result.inner.set(key as K, literal.inner[key]);
+        }
+        return result; 
+    }
 }
 
 export { ArrayMap };
