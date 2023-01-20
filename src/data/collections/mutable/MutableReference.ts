@@ -3,7 +3,7 @@ import { MutationOp } from '../../model/mutable/MutationOp';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Timestamps } from 'util/timestamps';
 import { Hash } from '../../model/hashing';
-import { ClassRegistry } from '../../model';
+import { ClassRegistry, Context, LiteralContext } from '../../model';
 import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
 import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
@@ -103,17 +103,35 @@ class MutableReference<T> extends BaseCollection<T> {
     }
     
     exportMutableState() {
+
+        let objectValue  : (LiteralContext|undefined);
+        let literalValue : any;
+
+        if (this._value instanceof HashedObject) {
+            const context = new Context();
+            this._value.toContext(context);
+            objectValue = context.toLiteralContext();
+        } else {
+            literalValue = this._value;
+        }
+
         return {
             _sequence: this._sequence,
             _timestamp: this._timestamp,
-            _value: this._value
+            _objectValue: objectValue,
+            _literalValue: literalValue
         };
     }
     
     importMutableState(state: any) {
         this._sequence = state._sequence;
         this._timestamp = state._timestamp;
-        this._value = state._value;
+
+        if (state._objectValue !== undefined) {
+            this._value = HashedObject.fromLiteralContext(state._objectValue) as any as T;
+        } else {
+            this._value = state._literalValue;
+        }
     }
 
     async validate(references: Map<Hash, HashedObject>) {
@@ -146,7 +164,6 @@ class RefUpdateOp<T> extends CollectionOp<T> {
     sequence?: number;
     timestamp?: string;
     value?: T;
-
 
     constructor(targetObject?: MutableReference<T>, value?: T, sequence?: number, author?: Identity) {
         super(targetObject);

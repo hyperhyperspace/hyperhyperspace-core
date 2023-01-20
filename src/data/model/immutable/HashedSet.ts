@@ -4,7 +4,7 @@ import { Context } from '../literals/Context';
 
 import { Dependency } from '../literals/LiteralUtils';
 
-export type HashedSetLiteralized = {
+type HashedSetLiteral = {
     value: { _type: string, _hashes: string[], _elements: any[] },
     dependencies: Map<Hash, Dependency>,
 }
@@ -89,7 +89,7 @@ class HashedSet<T> {
         return result;
     }
 
-    literalize(path='', context?: Context) : HashedSetLiteralized  {
+    literalize(path='', context?: Context) : HashedSetLiteral  {
            
         let dependencies = new Map<Hash, Dependency>();
 
@@ -168,3 +168,4 @@ class HashedSet<T> {
 }
 
 export { HashedSet };
+export type { HashedSetLiteral };

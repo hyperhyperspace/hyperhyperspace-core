@@ -2,11 +2,11 @@ import { MutableContentEvents } from '../../model/mutable/MutableObject';
 import { HashedObject } from '../../model/immutable/HashedObject';
 import { Hash } from '../../model/hashing/Hashing';
 import { MutationOp } from 'data/model/mutable/MutationOp';
-import { HashedSet, HashedSetLiteralized } from 'data/model/immutable/HashedSet';
+import { HashedSet } from 'data/model/immutable/HashedSet';
 import { HashReference } from 'data/model/immutable/HashReference';
 import { Logger, LogLevel } from 'util/logging';
 import { MultiMap } from 'util/multimap';
-import { ClassRegistry, Context } from 'data/model';
+import { ClassRegistry, Context, LiteralContext } from 'data/model';
 import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Collection';
 import { Identity } from 'data/identity';
 
@@ -208,18 +208,46 @@ class MutableSet<T> extends BaseCollection<T> implements Collection<T> {
     }
     
     exportMutableState() {
+
+        const literalElements = {} as any;
+        const context = new Context();
+
+        for (const [hash, elmt] of this._elements.entries()) {
+            if (elmt instanceof HashedObject) {
+                elmt.toContext(context);
+            } else {
+                literalElements[hash] = elmt;
+            }
+        }
+
         return {
-            _elements: Object.fromEntries(this._elements.entries()),
-            _currentAddOpRefs: Object.fromEntries([...this._currentAddOpRefs.entries()].map(([key, value]) => [key, value.literalize()]))
+            _objectElements: context.toLiteralContext(),
+            _literalElements: literalElements,
+            _currentAddOpRefs: Object.fromEntries([...this._currentAddOpRefs.entries()].map(([key, value]) => [key, value.literalize().value]))
         };
     }
 
     importMutableState(state: {
-        _elements: {[key: string]: T},
-        _currentAddOpRefs: {[key: string]: {value: HashedSetLiteralized }}
+        _objectElements: LiteralContext,
+        _literalElements: {[key: string]: any},
+        _currentAddOpRefs: {[key: string]: any}
     }): void {
-        this._elements = new Map(Object.entries(state._elements));
-        this._currentAddOpRefs = new Map(Object.entries(state._currentAddOpRefs).map(([key, value]) => [key, HashedSet.deliteralize(value, new Context())]));
+
+        this._elements = new Map();
+
+        const context = new Context();
+        context.fromLiteralContext(state._objectElements);
+
+        for (const hash of context.rootHashes) {
+            this._elements.set(hash, HashedObject.fromContext(context, hash) as any as T);
+        }
+
+        for (const [hash, literal] of Object.entries(state._literalElements)) {
+            this._elements.set(hash, literal);
+        }
+
+        const emptyContext = new Context();
+        this._currentAddOpRefs = new Map(Object.entries(state._currentAddOpRefs).map(([key, value]) => [key, HashedSet.deliteralize(value, emptyContext)]));
     }
 
     async validate(references: Map<Hash, HashedObject>) {
