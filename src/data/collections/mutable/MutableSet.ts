@@ -221,28 +221,28 @@ class MutableSet<T> extends BaseCollection<T> implements Collection<T> {
         }
 
         return {
-            _objectElements: context.toLiteralContext(),
-            _literalElements: literalElements,
+            objectElements: context.toLiteralContext(),
+            literalElements,
             _currentAddOpRefs: Object.fromEntries([...this._currentAddOpRefs.entries()].map(([key, value]) => [key, value.literalize().value]))
         };
     }
 
     importMutableState(state: {
-        _objectElements: LiteralContext,
-        _literalElements: {[key: string]: any},
+        objectElements: LiteralContext,
+        literalElements: {[key: string]: any},
         _currentAddOpRefs: {[key: string]: any}
     }): void {
 
         this._elements = new Map();
 
         const context = new Context();
-        context.fromLiteralContext(state._objectElements);
+        context.fromLiteralContext(state.objectElements);
 
         for (const hash of context.rootHashes) {
             this._elements.set(hash, HashedObject.fromContext(context, hash) as any as T);
         }
 
-        for (const [hash, literal] of Object.entries(state._literalElements)) {
+        for (const [hash, literal] of Object.entries(state.literalElements)) {
             this._elements.set(hash, literal);
         }
 
