@@ -247,13 +247,17 @@ abstract class MutableObject extends HashedObject {
         await super.loadAllChanges(batchSize, context);
 
         if (this._supportsCheckpoints) {
-            const checkpoint = await this.getStore().loadLastCheckpoint(this.getLastHash());
+            try {
+                const checkpoint = await this.getStore().loadLastCheckpoint(this.getLastHash());
 
-            if (checkpoint !== undefined) {
-                this.restoreCheckpoint(checkpoint);
-
-                // TODO: find a way to get the correct "start" parameter for loadByReference below
-                //       to make it ignore all the ops in the checkpoint
+                if (checkpoint !== undefined) {
+                    this.restoreCheckpoint(checkpoint);
+    
+                    // TODO: find a way to get the correct "start" parameter for loadByReference below
+                    //       to make it ignore all the ops in the checkpoint
+                }    
+            } catch (e) {
+                // Ignore for now
             }
         }
 
