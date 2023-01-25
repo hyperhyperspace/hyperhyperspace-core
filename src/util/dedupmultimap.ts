@@ -65,30 +65,20 @@ class DedupMultiMap<K, V> {
         return this.inner.keys();
     }
 
-    toLiteral() {
-        const result : {
-            inner: {[key: keyof any]: V[]},
-        } = {
-            inner: {},
-        };
-        for (const [key, value] of this.inner.entries()) {
-            if (typeof key !== "string" && typeof key !== "number" && typeof key !== "symbol") {
-                throw new Error("ArrayMap key type isn't supported for literalization");
-            }
-            result.inner[key as keyof any | number | string | symbol] = Array.from(value.values());
-        }
-        return result;
+    entries() {
+        return this.inner.entries();
     }
     
-    static fromLiteral<K extends keyof any | string | number | symbol, V>(literal: {
-        inner: {[key: keyof any]: V[]},
-    }) {
+    static fromEntries<K, V>(entries: IterableIterator<[K, HashedSet<V>]>): DedupMultiMap<K, V> {
         const result = new DedupMultiMap<K, V>();
-        for (const key in literal.inner) {
-            const iter = literal.inner[key][Symbol.iterator]();
-            result.inner.set(key as K, new HashedSet(iter));
-        }
-        return result; 
+        result.inner = new Map(entries);
+        return result
+    }
+    
+    static fromIterableEntries<K, V>(entries: IterableIterator<[K, IterableIterator<V>]>): DedupMultiMap<K, V> {
+        const result = new DedupMultiMap<K, V>();
+        result.inner = new Map([...entries].map(([k, v]) => [k, new HashedSet(v)]));
+        return result;
     }
 }
 

@@ -548,21 +548,23 @@ abstract class MutableObject extends HashedObject {
     }
 
     // checkpointing
-
-    async saveCheckpoint() {
-
-        await this.saveQueuedOps();
-
-        const check: StateCheckpoint = {
+    
+    createCheckpoint(): StateCheckpoint {
+        return {
             mutableObject: this.getLastHash(),
             terminalOpHashes: Array.from(this._terminalOps.keys()), 
             allAppliedOps: Array.from(this._allAppliedOps), 
             activeCascInvsPerOp: Array.from(this._activeCascInvsPerOp.entries()).map((v: [Hash, Set<Hash>]) => [v[0], Array.from(v[1].values())]),
             exportedState: this.exportMutableState()
         };
+    }
 
+    async saveCheckpoint() : Promise<StateCheckpoint> {
+
+        await this.saveQueuedOps();
+        const check = this.createCheckpoint();
         await this.getStore().saveCheckpoint(check);
-
+        return check;
     }
 
     async restoreCheckpoint(checkpoint: StateCheckpoint) {

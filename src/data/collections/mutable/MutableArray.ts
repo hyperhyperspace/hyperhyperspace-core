@@ -1,5 +1,5 @@
 import { Hash } from '../../model/hashing';
-import { HashedObject, HashedSet, HashReference } from '../../model/immutable';
+import { HashedMap, HashedObject, HashedSet, HashReference } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
 
 import { Ordinal, Ordinals, DenseOrder } from 'util/ordinals';
@@ -8,7 +8,7 @@ import { Logger, LogLevel } from 'util/logging';
 import { ArrayMap } from 'util/arraymap';
 
 import { location } from 'util/events';
-import { ClassRegistry } from 'data/model/literals';
+import { ClassRegistry, Context, LiteralContext } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
 import { BaseCollection, Collection, CollectionConfig, CollectionOp } from './Collection';
@@ -175,6 +175,16 @@ class DeleteOp<T> extends CollectionOp<T> {
 
 type MutableArrayConfig = { duplicates: boolean }
 
+type MutableArrayLiteralState = {
+    _elementsPerOrdinal: any[],
+    _ordinalsPerElement: any[],
+    literalElements: any,
+    literalElementsContext: LiteralContext,
+    literalCurrentInsertOpRefs: any,
+    literalCurrentInsertOpRefsContext: LiteralContext,
+    _currentInsertOpOrds: any,
+}
+    
 class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
 
     static className = 'hhs/v0/MutableArray';
@@ -187,7 +197,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
     _ordinalsPerElement: ArrayMap<Hash, Ordinal>;
     _elements: Map<Hash, T>;
 
-    _currentInsertOpRefs : DedupMultiMap<Hash, HashReference<InsertOp<T>>>;
+    _currentInsertOpRefs : DedupMultiMap<Hash, HashReference<InsertOp<T>>> = new DedupMultiMap();
     _currentInsertOpOrds : Map<Hash, Ordinal>;
 
     _needToRebuild: boolean;
@@ -207,7 +217,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         this._ordinalsPerElement = new ArrayMap();
         this._elements = new Map();
 
-        this._currentInsertOpRefs = new DedupMultiMap();
+        this._currentInsertOpRefs = new DedupMultiMap<Hash, HashReference<InsertOp<T>>>();
         this._currentInsertOpOrds = new Map();
 
         this._needToRebuild = false;
@@ -216,27 +226,65 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         this._ordinals = [];
     }
     
-    exportMutableState() {
+    exportMutableState() : MutableArrayLiteralState {
+        const literalElements = {} as any;
+        const context = new Context();
+        for (const [hash, elmt] of this._elements.entries()) {
+            if (elmt instanceof HashedObject) {
+                elmt.toContext(context);
+            } else {
+                literalElements[hash] = elmt;
+            }
+        }
+        
+        const literalCurrentInsertOpsContext = new Context();
+        const hashedCurrentInsertOpRefs = new HashedMap(this._currentInsertOpRefs.entries())
+        const literalCurrentInsertOpRefs = hashedCurrentInsertOpRefs.literalize(
+            '', literalCurrentInsertOpsContext
+        )
+
         return {
-            _elementsPerOrdinal: this._elementsPerOrdinal.toLiteral(),
-            _ordinalsPerElement: this._ordinalsPerElement.toLiteral(),
-            _elements: Object.fromEntries(this._elements.entries()),
-            _currentInsertOpRefs: this._currentInsertOpRefs.toLiteral(),
+            _elementsPerOrdinal: [...this._elementsPerOrdinal.entries()],
+            _ordinalsPerElement: [...this._ordinalsPerElement.entries()],
+            literalElements: literalElements,
+            literalElementsContext: context.toLiteralContext(),
+            literalCurrentInsertOpRefs,
+            literalCurrentInsertOpRefsContext: literalCurrentInsertOpsContext.toLiteralContext(),
             _currentInsertOpOrds: Object.fromEntries(this._currentInsertOpOrds),
         }
     }
     
-    importMutableState(state: any) {
-        this._elementsPerOrdinal = ArrayMap.fromLiteral<Ordinal, Hash>(state._elementsPerOrdinal);
-        this._ordinalsPerElement = ArrayMap.fromLiteral<Hash, Ordinal>(state._ordinalsPerElement);
-        this._elements = new Map(Object.entries(state._elements));
-        this._currentInsertOpRefs = DedupMultiMap.fromLiteral<Hash, HashReference<InsertOp<T>>>(state._currentInsertOpRefs);
+    importMutableState(state: MutableArrayLiteralState) {
+        const _elements = {} as any;
+        
+        const context = new Context();
+        context.fromLiteralContext(state.literalElementsContext);
+        // check if we can deliteralize each element from the context
+        for (const [hash, elmt] of Object.entries(state.literalElements)) {
+            if ( context.has(hash) ) {
+                _elements[hash] = HashedObject.deliteralizeInContext(hash, context);
+            } else {
+                _elements[hash] = elmt;
+            }
+        }
+        
+        const contextCurrentInsertOps = new Context();
+        contextCurrentInsertOps.fromLiteralContext(state.literalCurrentInsertOpRefsContext);
+        
+        this._elementsPerOrdinal = ArrayMap.fromEntries<Ordinal, Hash>(state._elementsPerOrdinal.values());
+        this._ordinalsPerElement = ArrayMap.fromEntries<Hash, Ordinal>(state._ordinalsPerElement.values());
+        this._elements = new Map(Object.entries(_elements));
+        const currentInsertOpRefsDeliteralized = HashedMap.deliteralize(state.literalCurrentInsertOpRefs.value, contextCurrentInsertOps)
+        console.log('insertCurrentOpsDeliteralized: \n', JSON.stringify(currentInsertOpRefsDeliteralized, null, 2))
+        this._currentInsertOpRefs = DedupMultiMap.fromEntries(
+            currentInsertOpRefsDeliteralized.entries(),
+        );
+        
         this._currentInsertOpOrds = new Map(Object.entries(state._currentInsertOpOrds));
         
         this._needToRebuild = true;
         this.rebuild();
     }
-
     async insertAt(element: T, idx: number, author?: Identity) {
         await this.insertManyAt([element], idx, author);
     }
