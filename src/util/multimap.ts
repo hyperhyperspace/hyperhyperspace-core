@@ -89,6 +89,13 @@ class MultiMap<K, V> {
     entries() {
         return this.inner.entries();
     }
+    
+    static fromEntries<K, V>(entries: IterableIterator<readonly [K, Set<V>]>): MultiMap<K, V> {
+        const result = new MultiMap<K, V>();
+        result.inner = new Map([...entries].map(([k, v]) => [k, new Set(v)]));
+
+        return result;
+    }
 
     clone() {
         const clone = new MultiMap<K, V>();
