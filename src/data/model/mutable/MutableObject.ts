@@ -32,8 +32,8 @@ type MutableObjectConfig = {supportsUndo?: boolean, supportsCheckpoints?: boolea
 
 type StateCheckpoint = {
     mutableObject: Hash,
-    terminalOpHashes: Array<Hash>, 
-    allAppliedOps: Array<Hash>, 
+    terminalOpHashes: Array<Hash>,
+    allAppliedOps: Array<Hash>,
     activeCascInvsPerOp: Array<[Hash, Array<Hash>]>, 
     exportedState: any
 };

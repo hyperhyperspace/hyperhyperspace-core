@@ -4,6 +4,11 @@ import { Context } from '../literals/Context';
 
 import { Dependency } from '../literals/LiteralUtils';
 
+type HashedSetLiteral = {
+    value: { _type: string, _hashes: string[], _elements: any[] },
+    dependencies: Map<Hash, Dependency>,
+}
+
 class HashedSet<T> {
 
     hashedElements : Map<Hash, T>;
@@ -84,7 +89,7 @@ class HashedSet<T> {
         return result;
     }
 
-    literalize(path='', context?: Context) : { value: any, dependencies : Map<Hash, Dependency> }  {
+    literalize(path='', context?: Context) : HashedSetLiteral  {
            
         let dependencies = new Map<Hash, Dependency>();
 
@@ -98,7 +103,7 @@ class HashedSet<T> {
         let elements = child.value;
         HashedObject.collectChildDeps(dependencies, path, child.dependencies, true);
 
-        let value = {_type: 'hashed_set', _hashes: hashes, _elements: elements};
+        let value = {_type: 'hashed_set', _hashes: hashes, _elements: elements as any[]};
 
         return { value: value, dependencies: dependencies};
     }
@@ -163,3 +168,4 @@ class HashedSet<T> {
 }
 
 export { HashedSet };
+export type { HashedSetLiteral };
