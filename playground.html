@@ -76,7 +76,7 @@
             }
 
             addSyncCallback(cb) {
-                this.contents.addMutationCallback(async (mut) => {
+                this.contents.addMutationOpCallback(async (mut) => {
                     if (!(await this._node.expectingMoreOps(this.contents, new Set([mut.hash()]), undefined, this))) {
                         await this.contents.applyOpFromStore(mut.hash());
                         cb(this.getValue());
