@@ -15,7 +15,7 @@ type MutableStateExport = {
     _literalValue: any;
 };
 
-class MutableReference<T> extends BaseCollection<T, MutableStateExport> {
+class MutableReference<T> extends BaseCollection<T> {
 
     static className = 'hhs/v0/MutableReference';
 
