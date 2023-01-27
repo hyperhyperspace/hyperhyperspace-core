@@ -134,6 +134,7 @@ describe('[CHK] Checkpoints', () => {
 
         // load each element in the array
         for (const ref of arr.values()) {
+            ref.setStore(store);
             await ref.loadAllChanges();
         }
         // check equality of inner values
@@ -175,6 +176,7 @@ describe('[CHK] Checkpoints', () => {
         
         // load each element in the set
         for (const ref of set.values()) {
+            ref.setStore(store);
             await ref.loadAllChanges();
         }
         // check equality of inner values
