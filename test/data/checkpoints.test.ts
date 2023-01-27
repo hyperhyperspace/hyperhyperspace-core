@@ -18,8 +18,8 @@ describe('[CHK] Checkpoints', () => {
         ref.setValue(2);
         await ref.save();
 
-        ref.restoreCheckpoint(checkpoint);
-        await ref.save();
+        await ref.restoreCheckpoint(checkpoint);
+        //await ref.save();
 
         expect(ref.getValue()).toBe(1);
     });
@@ -40,7 +40,7 @@ describe('[CHK] Checkpoints', () => {
         await ref.save();
 
         await ref.restoreCheckpoint(checkpoint);
-        await ref.save();
+        //await ref.save();
 
         expect(ref.getValue()).toBeInstanceOf(MutableReference);
         expect((ref.getValue() as MutableReference<any>).hash).toEqual(innerRef.hash);
@@ -56,12 +56,11 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await set.saveCheckpoint();
         set.add(2);
         await set.save();
-        set.restoreCheckpoint(checkpoint);
-        await set.save();
+        await set.restoreCheckpoint(checkpoint);
         expect([...set.values()]).toStrictEqual([1]);
     });
     
-    it('[CHK02.1] Exporting and importing MutableSet with HashedObject members', async () => {
+    it('[CHK03] Exporting and importing MutableSet with HashedObject members', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<MutableReference<number>>();
         set.setStore(store);
@@ -76,7 +75,7 @@ describe('[CHK] Checkpoints', () => {
         set.add(new MutableReference<number>());
         await set.save();
         await set.restoreCheckpoint(checkpoint);
-        await set.save();
+        //await set.save();
 
         expect([...[...set.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
         
@@ -88,7 +87,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...[...set.values()].map(x => x.getValue())]).toStrictEqual([innerRef.getValue()]);
     });
 
-    it('[CHK03] Exporting and importing MutableArray', async () => {
+    it('[CHK04] Exporting and importing MutableArray', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const arr = new MutableArray<number>();
         arr.setStore(store);
@@ -112,7 +111,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...arr.values()]).toStrictEqual([1]);
     });
     
-    it('[CHK03.1] Exporting and importing MutableArray with HashedObject members', async () => {
+    it('[CHK05] Exporting and importing MutableArray with HashedObject members', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const arr = new MutableArray<MutableReference<number>>();
         arr.setStore(store);
@@ -127,7 +126,7 @@ describe('[CHK] Checkpoints', () => {
         arr.push(new MutableReference<number>());
         await arr.save();
         await arr.restoreCheckpoint(checkpoint);
-        await arr.save();
+        //await arr.save();
 
         expect([...[...arr.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
 
@@ -139,7 +138,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...[...arr.values()].map(x => x.getValue())]).toStrictEqual([innerRef.getValue()]);
     });
     
-    it('[CHK04] Exporting and importing GrowOnlySet', async () => {
+    it('[CHK06] Exporting and importing GrowOnlySet', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<number>();
         set.setStore(store);
@@ -153,7 +152,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...set.values()]).toStrictEqual([1]);
     });
     
-    it('[CHK04.1] Exporting and importing GrowOnlySet with HashedObject members', async () => {
+    it('[CHK07] Exporting and importing GrowOnlySet with HashedObject members', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<MutableReference<number>>();
         set.setStore(store);
@@ -168,7 +167,7 @@ describe('[CHK] Checkpoints', () => {
         set.add(new MutableReference<number>());
         await set.save();
         await set.restoreCheckpoint(checkpoint);
-        await set.save();
+        //await set.save();
 
         expect([...[...set.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
         

@@ -239,7 +239,8 @@ class MutableSet<T> extends BaseCollection<T> implements Collection<T> {
         context.fromLiteralContext(state.objectElements);
 
         for (const hash of context.rootHashes) {
-            this._elements.set(hash, HashedObject.fromContext(context, hash) as any as T);
+            const obj = HashedObject.fromContext(context, hash) as any as T;
+            this._elements.set(hash, obj);
         }
 
         for (const [hash, literal] of Object.entries(state.literalElements)) {
