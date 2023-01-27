@@ -21,7 +21,7 @@ interface Collection<T> {
 // WARNING: CausalCollection extends this class and uses some of its fields directly,
 //          so if this class changes, please check CausalCollection as well.
 
-abstract class BaseCollection<T> extends MutableObject {
+abstract class BaseCollection<T, MutableStateExport=any> extends MutableObject<MutableStateExport> {
     writers?: HashedSet<Identity>;  //if writers is missing, anybody can write
 
     acceptedTypes?: HashedSet<string>;

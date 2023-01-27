@@ -38,7 +38,7 @@ type StateCheckpoint = {
     exportedState: any
 };
 
-abstract class MutableObject extends HashedObject {
+abstract class MutableObject<MutableStateExport=any> extends HashedObject {
 
     static controlLog = new Logger(MutableObject.name, LogLevel.INFO)
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
@@ -125,13 +125,13 @@ abstract class MutableObject extends HashedObject {
 
     // override the following two to support checkpointing (and pass apropriate params in config to constructor)
 
-    exportMutableState(): any {
-        throw new Error(this.getClassName() + ': this class does not support state packing')
+    exportMutableState(): MutableStateExport {
+        throw new Error(this.getClassName() + ': this class does not support exporting its state')
     }
 
-    importMutableState(state: any) {
+    importMutableState(state: MutableStateExport) {
         state;
-        throw new Error(this.getClassName() + ': this class does not support applying packed state')
+        throw new Error(this.getClassName() + ': this class does not support importing its state')
     }
 
     /*

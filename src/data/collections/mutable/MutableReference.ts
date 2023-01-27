@@ -8,7 +8,14 @@ import { MultiMap } from 'util/multimap';
 import { Identity } from 'data/identity';
 import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
 
-class MutableReference<T> extends BaseCollection<T> {
+type MutableStateExport = {
+    _sequence: number | undefined;
+    _timestamp: string | undefined;
+    _objectValue: LiteralContext | undefined;
+    _literalValue: any;
+};
+
+class MutableReference<T> extends BaseCollection<T, MutableStateExport> {
 
     static className = 'hhs/v0/MutableReference';
 
@@ -123,7 +130,7 @@ class MutableReference<T> extends BaseCollection<T> {
         };
     }
     
-    importMutableState(state: any) {
+    importMutableState(state: MutableStateExport) {
         this._sequence = state._sequence;
         this._timestamp = state._timestamp;
 
