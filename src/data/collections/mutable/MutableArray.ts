@@ -179,7 +179,7 @@ type MutableArrayLiteralState = {
     _elementsPerOrdinal: any[],
     _ordinalsPerElement: any[],
     literalElements: any,
-    literalElementsContext: LiteralContext,
+    hashedObjectElementsLiteralContext: LiteralContext,
     literalCurrentInsertOpRefs: any,
     literalCurrentInsertOpRefsContext: LiteralContext,
     _currentInsertOpOrds: any,
@@ -247,7 +247,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
             _elementsPerOrdinal: [...this._elementsPerOrdinal.entries()],
             _ordinalsPerElement: [...this._ordinalsPerElement.entries()],
             literalElements: literalElements,
-            literalElementsContext: context.toLiteralContext(),
+            hashedObjectElementsLiteralContext: context.toLiteralContext(),
             literalCurrentInsertOpRefs,
             literalCurrentInsertOpRefsContext: literalCurrentInsertOpsContext.toLiteralContext(),
             _currentInsertOpOrds: Object.fromEntries(this._currentInsertOpOrds),
@@ -257,15 +257,13 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
     importMutableState(state: MutableArrayLiteralState) {
         const _elements = {} as any;
         
-        const context = new Context();
-        context.fromLiteralContext(state.literalElementsContext);
         // check if we can deliteralize each element from the context
+        for (const hash of state.hashedObjectElementsLiteralContext.rootHashes) {
+            _elements[hash] = HashedObject.fromLiteralContext(state.hashedObjectElementsLiteralContext, hash);
+        }
+        
         for (const [hash, elmt] of Object.entries(state.literalElements)) {
-            if ( context.has(hash) ) {
-                _elements[hash] = HashedObject.deliteralizeInContext(hash, context);
-            } else {
-                _elements[hash] = elmt;
-            }
+            _elements[hash] = elmt;
         }
         
         const contextCurrentInsertOps = new Context();
@@ -275,7 +273,6 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
         this._ordinalsPerElement = ArrayMap.fromEntries<Hash, Ordinal>(state._ordinalsPerElement.values());
         this._elements = new Map(Object.entries(_elements));
         const currentInsertOpRefsDeliteralized = HashedMap.deliteralize(state.literalCurrentInsertOpRefs.value, contextCurrentInsertOps)
-        console.log('insertCurrentOpsDeliteralized: \n', JSON.stringify(currentInsertOpRefsDeliteralized, null, 2))
         this._currentInsertOpRefs = DedupMultiMap.fromEntries(
             currentInsertOpRefsDeliteralized.entries(),
         );
