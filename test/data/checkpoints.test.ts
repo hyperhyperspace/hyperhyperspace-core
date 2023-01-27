@@ -24,7 +24,7 @@ describe('[CHK] Checkpoints', () => {
         expect(ref.getValue()).toBe(1);
     });
     
-    it('[CHK01.1] Exporting and importing MutableReference to a HashedObject', async () => {
+    it('[CHK02] Exporting and importing MutableReference to a HashedObject', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const ref = new MutableReference();
         const innerRef = new MutableReference();
@@ -46,7 +46,7 @@ describe('[CHK] Checkpoints', () => {
         expect((ref.getValue() as MutableReference<any>).hash).toEqual(innerRef.hash);
     });
 
-    it('[CHK02] Exporting and importing MutableSet', async () => {
+    it('[CHK03] Exporting and importing MutableSet', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<number>();
         set.setStore(store);
@@ -60,7 +60,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...set.values()]).toStrictEqual([1]);
     });
     
-    it('[CHK03] Exporting and importing MutableSet with HashedObject members', async () => {
+    it('[CHK04] Exporting and importing MutableSet with HashedObject members', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<MutableReference<number>>();
         set.setStore(store);
@@ -75,19 +75,21 @@ describe('[CHK] Checkpoints', () => {
         set.add(new MutableReference<number>());
         await set.save();
         await set.restoreCheckpoint(checkpoint);
-        //await set.save();
 
         expect([...[...set.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
         
+        
+
         // load each element in the set
         for (const ref of set.values()) {
+            ref.setStore(store);
             await ref.loadAllChanges();
         }
         // check equality of inner values
         expect([...[...set.values()].map(x => x.getValue())]).toStrictEqual([innerRef.getValue()]);
     });
 
-    it('[CHK04] Exporting and importing MutableArray', async () => {
+    it('[CHK05] Exporting and importing MutableArray', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const arr = new MutableArray<number>();
         arr.setStore(store);
@@ -111,7 +113,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...arr.values()]).toStrictEqual([1]);
     });
     
-    it('[CHK05] Exporting and importing MutableArray with HashedObject members', async () => {
+    it('[CHK06] Exporting and importing MutableArray with HashedObject members', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const arr = new MutableArray<MutableReference<number>>();
         arr.setStore(store);
@@ -138,7 +140,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...[...arr.values()].map(x => x.getValue())]).toStrictEqual([innerRef.getValue()]);
     });
     
-    it('[CHK06] Exporting and importing GrowOnlySet', async () => {
+    it('[CHK07] Exporting and importing GrowOnlySet', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<number>();
         set.setStore(store);
@@ -152,7 +154,7 @@ describe('[CHK] Checkpoints', () => {
         expect([...set.values()]).toStrictEqual([1]);
     });
     
-    it('[CHK07] Exporting and importing GrowOnlySet with HashedObject members', async () => {
+    it('[CHK08] Exporting and importing GrowOnlySet with HashedObject members', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<MutableReference<number>>();
         set.setStore(store);
