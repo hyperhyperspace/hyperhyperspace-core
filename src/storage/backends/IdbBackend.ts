@@ -413,7 +413,7 @@ class IdbBackend implements Backend {
         const idb = await this.idbPromise;
         const tx = idb.transaction([IdbBackend.CHECKPOINT_STORE], 'readwrite');
         const store = tx.objectStore(IdbBackend.CHECKPOINT_STORE);
-        await store.put(checkpoint, checkpoint.mutableObject);
+        await store.put(checkpoint);
     }
 
     async loadLastCheckpoint(mutableObject: Hash): Promise<StateCheckpoint|undefined> {

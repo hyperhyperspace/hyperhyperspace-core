@@ -251,7 +251,8 @@ abstract class MutableObject extends HashedObject {
                 const checkpoint = await this.getStore().loadLastCheckpoint(this.getLastHash());
 
                 if (checkpoint !== undefined) {
-                    this.restoreCheckpoint(checkpoint);
+                    console.log('Restoring checkpoint for ' + this.getClassName() + ' ' + this.getLastHash());
+                    await this.restoreCheckpoint(checkpoint);
     
                     // TODO: find a way to get the correct "start" parameter for loadByReference below
                     //       to make it ignore all the ops in the checkpoint
@@ -491,6 +492,11 @@ abstract class MutableObject extends HashedObject {
         return ok;
     }
 
+    async save(store?: Store) : Promise<void> {
+        await super.save(store);
+        await this.saveCheckpoint();
+    }
+
     async saveQueuedOps(store?: Store) : Promise<boolean> {
 
         if (store === undefined) {
@@ -522,7 +528,7 @@ abstract class MutableObject extends HashedObject {
                 }
                 
             }
-
+            await this.saveCheckpoint();
             return true;
         }
 
@@ -559,12 +565,16 @@ abstract class MutableObject extends HashedObject {
         };
     }
 
-    async saveCheckpoint() : Promise<StateCheckpoint> {
-
-        await this.saveQueuedOps();
-        const check = this.createCheckpoint();
-        await this.getStore().saveCheckpoint(check);
-        return check;
+    async saveCheckpoint() : Promise<StateCheckpoint | void> {
+        if(this._supportsCheckpoints) {
+            await this.saveQueuedOps();
+            const check = this.createCheckpoint();
+            await this.getStore().saveCheckpoint(check);
+            return check;
+        } else {
+            // should we throw an error if the object doesn't support checkpoints?
+            return;
+        }
     }
 
     async restoreCheckpoint(checkpoint: StateCheckpoint) {

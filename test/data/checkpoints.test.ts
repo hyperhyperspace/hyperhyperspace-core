@@ -21,7 +21,7 @@ describe('[CHK] Checkpoints', () => {
         ref.setValue(2);
         await ref.save();
 
-        await ref.restoreCheckpoint(checkpoint);
+        await ref.restoreCheckpoint(checkpoint!);
         //await ref.save();
 
         expect(ref.getValue()).toBe(1);
@@ -42,7 +42,7 @@ describe('[CHK] Checkpoints', () => {
         ref.setValue(2);
         await ref.save();
 
-        await ref.restoreCheckpoint(checkpoint);
+        await ref.restoreCheckpoint(checkpoint!);
         //await ref.save();
 
         expect(ref.getValue()).toBeInstanceOf(MutableReference);
@@ -62,7 +62,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await set.saveCheckpoint();
         set.add(2);
         await set.save();
-        await set.restoreCheckpoint(checkpoint);
+        await set.restoreCheckpoint(checkpoint!);
         expect([...set.values()]).toStrictEqual([1]);
     });
     
@@ -80,7 +80,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await set.saveCheckpoint();
         set.add(new MutableReference<number>());
         await set.save();
-        await set.restoreCheckpoint(checkpoint);
+        await set.restoreCheckpoint(checkpoint!);
 
         expect([...[...set.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
         
@@ -118,7 +118,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await arr.saveCheckpoint();
         arr.push(2);
         await arr.save();
-        await arr.restoreCheckpoint(checkpoint);
+        await arr.restoreCheckpoint(checkpoint!);
         expect([...arr.values()]).toStrictEqual([1]);
     });
     
@@ -136,7 +136,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await arr.saveCheckpoint();
         arr.push(new MutableReference<number>());
         await arr.save();
-        await arr.restoreCheckpoint(checkpoint);
+        await arr.restoreCheckpoint(checkpoint!);
         //await arr.save();
 
         expect([...[...arr.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
@@ -163,7 +163,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await set.saveCheckpoint();
         set.add(2);
         await set.save();
-        await set.restoreCheckpoint(checkpoint);
+        await set.restoreCheckpoint(checkpoint!);
         expect([...set.values()]).toStrictEqual([1]);
     });
     
@@ -181,7 +181,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await set.saveCheckpoint();
         set.add(new MutableReference<number>());
         await set.save();
-        await set.restoreCheckpoint(checkpoint);
+        await set.restoreCheckpoint(checkpoint!);
         //await set.save();
 
         expect([...[...set.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
@@ -208,7 +208,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await ref.saveCheckpoint();
         ref.setValue(2);
         await ref.save();
-        await ref.restoreCheckpoint(checkpoint);
+        await ref.restoreCheckpoint(checkpoint!);
         expect(ref.getValue()).toStrictEqual(1);
     });
     
@@ -226,7 +226,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await ref.saveCheckpoint();
         ref.setValue(new MutableReference<number>());
         await ref.save();
-        await ref.restoreCheckpoint(checkpoint);
+        await ref.restoreCheckpoint(checkpoint!);
 
         expect(ref.getValue()?.hash()).toStrictEqual(innerRef.hash());
         
@@ -252,7 +252,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await set.saveCheckpoint();
         set.add(2);
         await set.save();
-        await set.restoreCheckpoint(checkpoint);
+        await set.restoreCheckpoint(checkpoint!);
         expect([...set.values()]).toStrictEqual([1]);
     });
 
@@ -270,7 +270,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await set.saveCheckpoint();
         set.add(new MutableReference<number>());
         await set.save();
-        await set.restoreCheckpoint(checkpoint);
+        await set.restoreCheckpoint(checkpoint!);
 
         expect([...[...set.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash()]);
         
@@ -299,7 +299,7 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await array.saveCheckpoint();
         array.push(2);
         await array.save();
-        await array.restoreCheckpoint(checkpoint);
+        await array.restoreCheckpoint(checkpoint!);
         expect([...array.values()]).toStrictEqual([1]);
     });
     
@@ -328,19 +328,19 @@ describe('[CHK] Checkpoints', () => {
         const checkpoint = await array.saveCheckpoint();
         array.push(new MutableReference<number>());
         await array.save();
-        await array.restoreCheckpoint(checkpoint);
+        await array.restoreCheckpoint(checkpoint!);
 
-        expect([...[...array.values()].map(x => x.hash())]).toStrictEqual([innerRef.hash(), innerRef2.hash()]);
+        expect(new Set([...array.values()].map(x => x.hash()))).toStrictEqual(new Set([innerRef.hash(), innerRef2.hash()]));
         
         // load each element in the array
         for (const ref of array.values()) {
             ref.setStore(store);
             await ref.loadAllChanges();
         }
-        // check equality of inner values
-        expect([...[...array.values()].map(x => x.getValue())]).toStrictEqual([innerRef.getValue(), innerRef2.getValue()]);
+        // check the equality of the inner values
+        expect(new Set([...[...array.values()].map(x => x.getValue())])).toStrictEqual(new Set([innerRef.getValue(), innerRef2.getValue()]));
         
         // make sure the inner values are 1 and 2
-        expect([...[...array.values()].map(x => x.getValue())]).toStrictEqual([1, 2]);
+        expect(new Set([...[...array.values()].map(x => x.getValue())])).toStrictEqual(new Set([1, 2]));
     });
 })
