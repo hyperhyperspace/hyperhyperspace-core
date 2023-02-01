@@ -8,6 +8,7 @@ import { Authorizer } from '../../model/causal/Authorization';
 import { Verification } from '../../model/causal/Authorization';
 
 import { AuthError, BaseCausalCollection, CausalCollectionConfig } from './CausalCollection';
+import { isLiteralContext } from 'data/model/literals/Context';
 
 
 type UpdateSig = {
@@ -88,6 +89,22 @@ class CausalReference<T> extends BaseCausalCollection<T>  {
         }
 
         return this.applyNewOp(op);
+    }
+    
+    exportMutableState() {
+        return {
+            _causallyOrderedUpdates: this._causallyOrderedUpdates,
+            _latestValidIdx: this._latestValidIdx,
+            _value: this._value instanceof HashedObject? this._value?.toLiteralContext() : this._value,
+            _largestSequence: this._largestSequence
+        };
+    }
+    
+    importMutableState(state: any) {
+        this._value = isLiteralContext(state._value) ? HashedObject.fromLiteralContext(state._value) : state._value;
+        this._causallyOrderedUpdates = state._causallyOrderedUpdates;
+        this._latestValidIdx = state._latestValidIdx;
+        this._largestSequence = state._largestSequence;
     }
 
     protected createUpdateAuthorizer(author?: Identity): Authorizer {

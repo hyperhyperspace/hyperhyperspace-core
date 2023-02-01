@@ -1,8 +1,9 @@
 import { MultiMap } from 'util/multimap';
 
 import { Identity } from '../../identity';
-import { Hash, HashedObject, MutationOp, MutableContentEvents, ClassRegistry, Literal } from '../../model';
+import { Hash, HashedObject, MutationOp, MutableContentEvents, ClassRegistry, LiteralContext } from '../../model';
 import { BaseCollection, CollectionConfig, CollectionOp } from './Collection';
+import { isLiteralContext } from 'data/model/literals/Context';
 
 type ElmtHash = Hash;
 
@@ -79,7 +80,7 @@ class GrowOnlySet<T> extends BaseCollection<T> {
   exportMutableState() {
     return [...this._elements.entries()].map(([hash, elmt]) => [
       hash,
-      elmt instanceof HashedObject ? elmt.toLiteral() : elmt,
+      elmt instanceof HashedObject ? elmt.toLiteralContext() : elmt,
     ]);
   }
 
@@ -87,7 +88,7 @@ class GrowOnlySet<T> extends BaseCollection<T> {
     this._elements = new Map(
       state.map(([hash, elmt]: [Hash, Object]) => [
         hash,
-        HashedObject.isLiteral(elmt) ? HashedObject.fromLiteral(elmt as Literal) : elmt,
+        isLiteralContext(elmt) ? HashedObject.fromLiteralContext(elmt as LiteralContext) : elmt,
       ])
     );
   }

@@ -9,7 +9,7 @@ import { HashedSet } from '../../model/immutable/HashedSet';
 import { MutableSetEvents } from '../../collections/mutable/MutableSet';
 import { MutableContentEvents } from '../../model/mutable/MutableObject';
 import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig } from './CausalCollection';
-import { ClassRegistry } from 'data/model/literals';
+import { ClassRegistry, LiteralContext } from 'data/model/literals';
 
 /*
  * CausalSet: A set with an explicit membership attestation op that can be used by other objects
@@ -216,6 +216,23 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
 
     getClassName() {
         return CausalSet.className;
+    }
+
+    exportMutableState() {
+        return {
+            _validAddOpsPerElmt: [...this._validAddOpsPerElmt.entries()],
+            _validDeleteOpsPerAddOp: [...this._validDeleteOpsPerAddOp.entries()],
+            _currentAddOpsPerElmt: [...this._currentAddOpsPerElmt.entries()],
+            _currentAddOps: [...this._currentAddOps.entries()].map(([hash, op]) => [hash, op.toLiteralContext()]),
+
+        }
+    }
+    
+    importMutableState(state: any): void {
+        this._validAddOpsPerElmt = MultiMap.fromEntries(state._validAddOpsPerElmt);
+        this._validDeleteOpsPerAddOp = MultiMap.fromEntries(state._validDeleteOpsPerAddOp);
+        this._currentAddOpsPerElmt = MultiMap.fromEntries(state._currentAddOpsPerElmt);
+        this._currentAddOps = new Map(state._currentAddOps.map(([hash, op] : [Hash, LiteralContext]) => [hash, AddOp.fromLiteralContext(op)]));
     }
 
     // canAdd: if a parameter is absent, interpret it as if addition is allowed for any possible value

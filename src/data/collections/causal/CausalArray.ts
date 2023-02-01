@@ -11,12 +11,13 @@ import { Authorizer } from '../../model/causal/Authorization'
 import { Authorization, Verification } from '../../model/causal/Authorization';
 
 import { location } from 'util/events';
-import { ClassRegistry } from 'data/model/literals';
+import { ClassRegistry, LiteralContext } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
 import { InvalidateAfterOp } from 'data/model/causal';
 import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig } from './CausalCollection';
 import { Identity } from 'data/identity';
+import { isLiteralContext } from 'data/model/literals/Context';
 
 // A mutable list with a 
 
@@ -163,604 +164,747 @@ class MembershipAttestationOp<T> extends MutationOp {
 
 type MutableArrayConfig = { duplicates: boolean }
 
-class CausalArray<T> extends BaseCausalCollection<T> implements CausalCollection<T> {
+class CausalArray<T>
+  extends BaseCausalCollection<T>
+  implements CausalCollection<T>
+{
+  static className = "hhs/v0/CausalArray";
+  static opClasses = [InsertOp.className, DeleteOp.className];
+  static logger = new Logger(CausalArray.className, LogLevel.INFO);
 
-    static className = 'hhs/v0/CausalArray';
-    static opClasses = [InsertOp.className, DeleteOp.className];
-    static logger    = new Logger(CausalArray.className, LogLevel.INFO);
-    
-    duplicates: boolean;
+  duplicates: boolean;
 
-    _elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
-    _ordinalsPerElement: ArrayMap<Hash, Ordinal>;
-    _elements: Map<Hash, T>;
+  _elementsPerOrdinal: ArrayMap<Ordinal, Hash>;
+  _ordinalsPerElement: ArrayMap<Hash, Ordinal>;
+  _elements: Map<Hash, T>;
 
-    _currentInsertOps    : DedupMultiMap<Hash, InsertOp<T>>;
-    _currentInsertOpOrds : Map<Hash, Ordinal>;
+  _currentInsertOps: DedupMultiMap<Hash, InsertOp<T>>;
+  _currentInsertOpOrds: Map<Hash, Ordinal>;
 
-    _needToRebuild: boolean;
+  _needToRebuild: boolean;
 
-    _contents : Array<T>;
-    _hashes   : Array<Hash>;
-    _ordinals : Array<Ordinal>;
+  _contents: Array<T>;
+  _hashes: Array<Hash>;
+  _ordinals: Array<Ordinal>;
 
-    constructor(config?: MutableArrayConfig & CausalCollectionConfig) {
-        super(CausalArray.opClasses, {...config, supportsUndo: true});
+  constructor(config?: MutableArrayConfig & CausalCollectionConfig) {
+    super(CausalArray.opClasses, { ...config, supportsUndo: true });
 
-        this.setRandomId();
+    this.setRandomId();
 
-        this.duplicates = config?.duplicates === undefined? true: config?.duplicates;
+    this.duplicates =
+      config?.duplicates === undefined ? true : config?.duplicates;
 
-        this._elementsPerOrdinal = new ArrayMap();
-        this._ordinalsPerElement = new ArrayMap();
-        this._elements = new Map();
+    this._elementsPerOrdinal = new ArrayMap();
+    this._ordinalsPerElement = new ArrayMap();
+    this._elements = new Map();
 
-        this._currentInsertOps    = new DedupMultiMap();
-        this._currentInsertOpOrds = new Map();
+    this._currentInsertOps = new DedupMultiMap();
+    this._currentInsertOpOrds = new Map();
 
-        this._needToRebuild = false;
-        this._contents = [];
-        this._hashes   = [];
-        this._ordinals = [];
-    }
+    this._needToRebuild = false;
+    this._contents = [];
+    this._hashes = [];
+    this._ordinals = [];
+  }
 
-    // canInsert: if a parameter is absent, interpret it as if insertion is allowed for any possible value
+  exportMutableState() {
+    return {
+      _elementsPerOrdinal: [...this._elementsPerOrdinal.entries()],
+      _ordinalsPerElement: [...this._ordinalsPerElement.entries()],
+      _elements: [...this._elements.entries()].map(([k, v]) => [
+        k,
+        v instanceof HashedObject ? v.toLiteralContext() : v,
+      ]),
+      _currentInsertOps: [...this._currentInsertOps.entries()].map(([k, v]) => [
+        k,
+        [...v.values()].map((op) => op.toLiteralContext()),
+      ]),
+      _currentInsertOpOrds: [...this._currentInsertOpOrds.entries()],
+    };
+  }
 
-    //         e.g.: element === undefined, can add independently of what is being added,
-    //               author  === undefined, can add independently of who is doing it, etc.
+  importMutableState(state: any): void {
+    this._elementsPerOrdinal = ArrayMap.fromEntries(state._elementsPerOrdinal);
+    this._ordinalsPerElement = ArrayMap.fromEntries(state._ordinalsPerElement);
+    this._elements = new Map(
+      state._elements.map(([k, v]: [Hash, any]) => [
+        k,
+        isLiteralContext(v) ? HashedObject.fromLiteralContext(v) : v,
+      ])
+    );
+    this._currentInsertOps = DedupMultiMap.fromEntries(
+      state._currentInsertOps.map(([k, v]: [Hash, LiteralContext[]]) => [
+        k,
+        new Set(
+          v.map((op: LiteralContext) => HashedObject.fromLiteralContext(op))
+        ),
+      ])
+    );
+    this._currentInsertOpOrds = new Map(state._currentInsertOpOrds);
+  }
 
-    // same goes for canDelete, canDeleteByHash.
+  // canInsert: if a parameter is absent, interpret it as if insertion is allowed for any possible value
 
-    canInsert(element?: T, _idx?: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
+  //         e.g.: element === undefined, can add independently of what is being added,
+  //               author  === undefined, can add independently of who is doing it, etc.
 
-        // TODO: translate the idx into an actual ordinal and actually pass it on!
+  // same goes for canDelete, canDeleteByHash.
 
-        return Authorization.chain(this.createInsertAtAuthorizer(element, undefined, author), extraAuth).attempt();
-    }
+  canInsert(
+    element?: T,
+    _idx?: number,
+    author?: Identity,
+    extraAuth?: Authorizer
+  ): Promise<boolean> {
+    // TODO: translate the idx into an actual ordinal and actually pass it on!
 
-    canDelete(author?: Identity, _idx?: number, extraAuth?: Authorizer): Promise<boolean> {
+    return Authorization.chain(
+      this.createInsertAtAuthorizer(element, undefined, author),
+      extraAuth
+    ).attempt();
+  }
 
-        // TODO: find the actual ops that should be deleted and actually pass them on!
+  canDelete(
+    author?: Identity,
+    _idx?: number,
+    extraAuth?: Authorizer
+  ): Promise<boolean> {
+    // TODO: find the actual ops that should be deleted and actually pass them on!
 
-        return Authorization.chain(this.createDeleteAuthorizer(undefined, author), extraAuth).attempt();
-    }
+    return Authorization.chain(
+      this.createDeleteAuthorizer(undefined, author),
+      extraAuth
+    ).attempt();
+  }
 
-    async insertAt(element: T, idx: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
-        return this.insertManyAt([element], idx, author, extraAuth);
-    }
+  async insertAt(
+    element: T,
+    idx: number,
+    author?: Identity,
+    extraAuth?: Authorizer
+  ): Promise<boolean> {
+    return this.insertManyAt([element], idx, author, extraAuth);
+  }
 
-    async insertManyAt(elements: T[], idx: number, author?: Identity, extraAuth?: Authorizer): Promise<boolean> {
-        this.rebuild();
+  async insertManyAt(
+    elements: T[],
+    idx: number,
+    author?: Identity,
+    extraAuth?: Authorizer
+  ): Promise<boolean> {
+    this.rebuild();
 
-        // In the "no duplicates" case, any items we insert will disappear from their old positions. So
-        // we need to count how many are before position idx, and add that to idx to correct.
+    // In the "no duplicates" case, any items we insert will disappear from their old positions. So
+    // we need to count how many are before position idx, and add that to idx to correct.
 
-        if (!this.duplicates) {
+    if (!this.duplicates) {
+      let delta = 0;
 
-            let delta=0;
+      for (const element of elements) {
+        const elementHash = HashedObject.hashElement(element);
 
-            for (const element of elements) {
-                const elementHash = HashedObject.hashElement(element);
+        const elmtIdx = this._hashes.indexOf(elementHash);
 
-                const elmtIdx = this._hashes.indexOf(elementHash);
-
-                if (0 <= elmtIdx && elmtIdx <= idx) {
-                    delta = delta + 1;
-                }
-            }
-
-            idx = idx + delta;
+        if (0 <= elmtIdx && elmtIdx <= idx) {
+          delta = delta + 1;
         }
+      }
 
-        let after  : Ordinal|undefined = undefined;
-        let before : Ordinal|undefined = undefined;
+      idx = idx + delta;
+    }
 
-        if (0 < idx && idx <= this._hashes.length) {
-            after = this._ordinals[idx-1];
+    let after: Ordinal | undefined = undefined;
+    let before: Ordinal | undefined = undefined;
+
+    if (0 < idx && idx <= this._hashes.length) {
+      after = this._ordinals[idx - 1];
+    }
+
+    if (idx < this._hashes.length) {
+      before = this._ordinals[idx];
+    }
+
+    for (const element of elements) {
+      const elementHash = HashedObject.hashElement(element);
+
+      // MEGA FIXME: This is broken. It may be the case that after === before if there are several items
+      //             with the same ordinal in the array. In that case, the items with ordinal before need
+      //             to be re-inserted using a higher ordinal to make the insertion possible (only those that
+      //             come at and after idx, that is).
+      const ordinal = DenseOrder.between(after, before);
+
+      let oldInsertionOps: Set<InsertOp<T>> | undefined = undefined;
+
+      if (!this.duplicates) {
+        oldInsertionOps = this._currentInsertOps.get(elementHash);
+      }
+
+      const insertOp = new InsertOp(this, element, ordinal, author);
+
+      const auth = Authorization.chain(
+        this.createInsertAtAuthorizer(element, ordinal, author),
+        extraAuth
+      );
+
+      this.setCurrentPrevOpsTo(insertOp);
+
+      if (!(await auth.attempt(insertOp))) {
+        throw new AuthError(
+          "Cannot authorize insertion operation on CausalArray " +
+            this.hash() +
+            ", author is: " +
+            author?.hash()
+        );
+      }
+
+      await this.applyNewOp(insertOp);
+
+      // Note: in the "no duplicates" case, the delete -if necessary- has to come after the
+      // insert (taking care to exclude the newly inserted element). Then, if the new position
+      // comes after the old one, the insert will initially have no effect, and the element
+      // will "move" over there after the delete. Hence the size of the list will never decrease,
+      // and from the outside it will look like the element was just repositioned.
+
+      if (oldInsertionOps !== undefined) {
+        for (const oldInsertionOp of oldInsertionOps) {
+          const deleteOp = await this.deleteOpForInsertOp(
+            oldInsertionOp,
+            author,
+            extraAuth
+          );
+          await this.applyNewOp(deleteOp);
         }
+      }
 
-        if (idx < this._hashes.length) {
-            before = this._ordinals[idx];
+      after = ordinal;
+    }
+
+    return true;
+  }
+
+  async deleteAt(idx: number, author?: Identity, extraAuth?: Authorizer) {
+    await this.deleteManyAt(idx, 1, author, extraAuth);
+  }
+
+  async deleteManyAt(
+    idx: number,
+    count: number,
+    author?: Identity,
+    extraAuth?: Authorizer
+  ) {
+    this.rebuild();
+
+    while (idx < this._contents.length && count > 0) {
+      let hash = this._hashes[idx];
+
+      if (this.duplicates) {
+        await this.delete(hash, this._ordinals[idx], author, extraAuth);
+      } else {
+        await this.delete(hash, undefined, author, extraAuth);
+      }
+
+      idx = idx + 1;
+      count = count - 1;
+    }
+  }
+
+  async deleteElement(element: T, author?: Identity, extraAuth?: Authorizer) {
+    this.deleteElementByHash(
+      HashedObject.hashElement(element),
+      author,
+      extraAuth
+    );
+  }
+
+  async deleteElementByHash(
+    hash: Hash,
+    author?: Identity,
+    extraAuth?: Authorizer
+  ) {
+    this.rebuild();
+    this.delete(hash, undefined, author, extraAuth);
+  }
+
+  async push(element: T, author?: Identity, extraAuth?: Authorizer) {
+    await this.insertAt(element, this._contents.length, author, extraAuth);
+  }
+
+  async pop(author?: Identity, extraAuth?: Authorizer): Promise<T> {
+    this.rebuild();
+    const lastIdx = this._contents.length - 1;
+    const last = this._contents[lastIdx];
+    await this.deleteAt(lastIdx, author, extraAuth);
+
+    return last;
+  }
+
+  async concat(elements: T[], author?: Identity, extraAuth?: Authorizer) {
+    this.rebuild();
+    await this.insertManyAt(elements, this._contents.length, author, extraAuth);
+  }
+
+  contents() {
+    this.rebuild();
+    return Array.from(this._contents);
+  }
+
+  contentHashes() {
+    this.rebuild();
+    return Array.from(this._hashes);
+  }
+
+  lookup(idx: number): T {
+    this.rebuild();
+    return this._contents[idx];
+  }
+
+  lookupHash(idx: number): Hash {
+    this.rebuild();
+    return this._hashes[idx];
+  }
+
+  get(hash: Hash): T | undefined {
+    if (this.hasByHash(hash)) {
+      return this._elements.get(hash);
+    } else {
+      return undefined;
+    }
+  }
+
+  indexOf(element?: T) {
+    return this.indexOfByHash(HashedObject.hashElement(element));
+  }
+
+  indexOfByHash(hash?: Hash) {
+    if (hash === undefined) {
+      return -1;
+    }
+    this.rebuild();
+    return this._hashes.indexOf(hash);
+  }
+
+  valueAt(idx: number) {
+    this.rebuild();
+    return this._contents[idx];
+  }
+
+  private async delete(
+    hash: Hash,
+    ordinal?: Ordinal,
+    author?: Identity,
+    extraAuth?: Authorizer
+  ) {
+    let deleteOp: DeleteOp<T> | undefined = undefined;
+    const insertOps = this._currentInsertOps.get(hash);
+
+    const deleteOps: Array<DeleteOp<T>> = [];
+
+    for (const insertOp of insertOps.values()) {
+      if (
+        ordinal === undefined ||
+        this._currentInsertOpOrds.get(insertOp.getLastHash()) === ordinal
+      ) {
+        deleteOp = await this.deleteOpForInsertOp(insertOp, author, extraAuth);
+
+        deleteOps.push(deleteOp);
+
+        if (ordinal !== undefined) {
+          break;
         }
+      }
+    }
 
-        for (const element of elements) {
+    const deletions: Array<Promise<void>> = [];
 
-            const elementHash = HashedObject.hashElement(element);
+    for (const deleteOp of deleteOps) {
+      deletions.push(this.applyNewOp(deleteOp));
+    }
 
-            // MEGA FIXME: This is broken. It may be the case that after === before if there are several items
-            //             with the same ordinal in the array. In that case, the items with ordinal before need
-            //             to be re-inserted using a higher ordinal to make the insertion possible (only those that
-            //             come at and after idx, that is).
-            const ordinal = DenseOrder.between(after, before);
+    await Promise.all(deletions);
 
-            let oldInsertionOps: Set<InsertOp<T>>|undefined = undefined;
+    return deleteOps.length > 0;
+  }
 
+  private async deleteOpForInsertOp(
+    insertOp: InsertOp<T>,
+    author?: Identity,
+    extraAuth?: Authorizer
+  ) {
+    const deleteOp = new DeleteOp(insertOp, author);
+
+    const auth = Authorization.chain(
+      this.createDeleteAuthorizer(insertOp, author),
+      extraAuth
+    );
+
+    this.setCurrentPrevOpsTo(deleteOp);
+
+    if (!(await auth.attempt(deleteOp))) {
+      throw new AuthError(
+        "Cannot authorize delete operation on CausalArray " +
+          this.hash() +
+          ", author is: " +
+          author?.hash()
+      );
+    }
+
+    return deleteOp;
+  }
+
+  has(element: T): boolean {
+    return this.indexOf(element) >= 0;
+  }
+
+  hasByHash(hash: Hash): boolean {
+    return this.indexOfByHash(hash) >= 0;
+  }
+
+  async mutate(op: MutationOp): Promise<boolean> {
+    const opHash = op.getLastHash();
+
+    if (op instanceof InsertOp) {
+      const element = op.element as T;
+      const ordinal = op.ordinal as Ordinal;
+
+      const elementHash = HashedObject.hashElement(element);
+
+      this._elementsPerOrdinal.add(ordinal, elementHash);
+      this._ordinalsPerElement.add(elementHash, ordinal);
+
+      let wasNotBefore = false;
+
+      if (this._currentInsertOps.get(elementHash).size === 0) {
+        wasNotBefore = true;
+        this._elements.set(elementHash, element);
+      }
+
+      this._currentInsertOps.add(elementHash, op);
+      this._currentInsertOpOrds.set(opHash, ordinal);
+
+      this._needToRebuild = true;
+
+      if (wasNotBefore && element instanceof HashedObject) {
+        this._mutationEventSource?.emit({
+          emitter: this,
+          action: MutableContentEvents.AddObject,
+          data: element,
+        });
+      }
+
+      if (this.duplicates || wasNotBefore) {
+        this._mutationEventSource?.emit({
+          emitter: this,
+          action: "insert",
+          data: element,
+        } as InsertEvent<T>);
+      } else {
+        this._mutationEventSource?.emit({
+          emitter: this,
+          action: "move",
+          data: element,
+        } as MoveEvent<T>);
+      }
+    } else if (op instanceof DeleteOp) {
+      const deletedOp = op.getTargetOp() as InsertOp<T>;
+      const deletedOpHash = deletedOp.getLastHash();
+      const elementHash = HashedObject.hashElement(deletedOp.element);
+
+      let wasBefore = false;
+      let element: T | undefined;
+
+      if (this._currentInsertOps.get(elementHash).size > 0) {
+        wasBefore = true;
+        element = this._elements.get(elementHash);
+      }
+
+      let deletedOrdinal = false;
+
+      if (this._currentInsertOps.delete(elementHash, deletedOp)) {
+        const ordinal = this._currentInsertOpOrds.get(deletedOpHash) as Ordinal;
+        this._currentInsertOpOrds.delete(deletedOpHash);
+
+        this._elementsPerOrdinal.delete(ordinal, elementHash);
+        this._ordinalsPerElement.delete(elementHash, ordinal);
+
+        deletedOrdinal = true;
+      }
+
+      let current = this._currentInsertOps.get(elementHash);
+
+      const wasDeleted = current.size === 0;
+
+      this._needToRebuild = true;
+
+      if (wasDeleted) {
+        if (wasBefore) {
+          const element = this._elements.get(elementHash);
+          this._elements.delete(elementHash);
+          if (element instanceof HashedObject) {
+            this._mutationEventSource?.emit({
+              emitter: this,
+              action: MutableContentEvents.RemoveObject,
+              data: element,
+            });
+          }
+        }
+      }
+
+      if (
+        (this.duplicates && deletedOrdinal) ||
+        (!this.duplicates && wasBefore && wasDeleted)
+      ) {
+        this._mutationEventSource?.emit({
+          emitter: this,
+          action: "delete",
+          data: elementHash,
+        } as DeleteEvent<T>);
+      } else if (!this.duplicates && wasBefore) {
+        this._mutationEventSource?.emit({
+          emitter: this,
+          action: "move",
+          data: element,
+        } as MoveEvent<T>);
+      }
+    } else {
+      throw new Error("Invalid op type for MutableArray:" + op?.getClassName());
+    }
+
+    return true;
+  }
+
+  private rebuild() {
+    if (this._needToRebuild) {
+      this._contents = [];
+      this._hashes = [];
+      this._ordinals = [];
+
+      const ordinals = Array.from(this._elementsPerOrdinal.keys());
+      ordinals.sort();
+
+      const seen = new Set<Hash>();
+
+      for (const ordinal of ordinals) {
+        const elementHashes = this._elementsPerOrdinal.get(ordinal);
+
+        for (const elementHash of elementHashes) {
+          if (this.duplicates || !seen.has(elementHash)) {
+            this._contents.push(this._elements.get(elementHash) as T);
+            this._hashes.push(elementHash);
+            this._ordinals.push(ordinal);
             if (!this.duplicates) {
-                oldInsertionOps = this._currentInsertOps.get(elementHash);
+              seen.add(elementHash);
             }
-
-            const insertOp = new InsertOp(this, element, ordinal, author);
-
-            const auth = Authorization.chain(this.createInsertAtAuthorizer(element, ordinal, author), extraAuth);
-
-            this.setCurrentPrevOpsTo(insertOp);
-
-            if (!(await auth.attempt(insertOp))) {
-                throw new AuthError('Cannot authorize insertion operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
-            }
-
-            await this.applyNewOp(insertOp);
-
-            // Note: in the "no duplicates" case, the delete -if necessary- has to come after the 
-            // insert (taking care to exclude the newly inserted element). Then, if the new position
-            // comes after the old one, the insert will initially have no effect, and the element 
-            // will "move" over there after the delete. Hence the size of the list will never decrease,
-            // and from the outside it will look like the element was just repositioned.
-
-            if (oldInsertionOps !== undefined) {
-
-                for (const oldInsertionOp of oldInsertionOps) {
-                    const deleteOp = await this.deleteOpForInsertOp(oldInsertionOp, author, extraAuth);
-                    await this.applyNewOp(deleteOp);
-                }
-
-                
-            }
-
-            after = ordinal;
+          }
         }
+      }
 
-        return true;
+      this._needToRebuild = false;
+    }
+  }
+
+  getMutableContents(): MultiMap<Hash, HashedObject> {
+    const contents = new MultiMap<Hash, HashedObject>();
+
+    for (const [hash, elmt] of this._elements.entries()) {
+      if (elmt instanceof HashedObject) {
+        contents.add(hash, elmt);
+      }
     }
 
-    async deleteAt(idx: number, author?: Identity, extraAuth?: Authorizer) {
-        await this.deleteManyAt(idx, 1, author, extraAuth);
+    return contents;
+  }
+
+  getMutableContentByHash(hash: Hash): Set<HashedObject> {
+    const found = new Set<HashedObject>();
+
+    const elmt = this._elements.get(hash);
+
+    if (elmt instanceof HashedObject) {
+      found.add(elmt);
     }
 
-    async deleteManyAt(idx: number, count: number, author?: Identity, extraAuth?: Authorizer) {
-        this.rebuild();
+    return found;
+  }
 
-        while (idx < this._contents.length && count > 0) {
-            let hash = this._hashes[idx];
+  getClassName(): string {
+    return CausalArray.className;
+  }
 
-            if (this.duplicates) {
-                await this.delete(hash, this._ordinals[idx], author, extraAuth);
-            } else {
-                await this.delete(hash, undefined, author, extraAuth);
-            }
+  init(): void {}
 
-            idx = idx + 1;
-            count = count - 1;
-        }
+  shouldAcceptMutationOp(
+    op: MutationOp,
+    opReferences: Map<Hash, HashedObject>
+  ): boolean {
+    if (!super.shouldAcceptMutationOp(op, opReferences)) {
+      return false;
     }
 
-    async deleteElement(element: T, author?: Identity, extraAuth?: Authorizer) {
-        this.deleteElementByHash(HashedObject.hashElement(element), author, extraAuth);
+    if (op instanceof InsertOp && !this.shouldAcceptElement(op.element as T)) {
+      return false;
     }
 
-    async deleteElementByHash(hash: Hash, author?: Identity, extraAuth?: Authorizer) {
-        this.rebuild();
-        this.delete(hash, undefined, author, extraAuth);
+    if (op instanceof InsertOp || op instanceof DeleteOp) {
+      const author = op.getAuthor();
+
+      const auth =
+        op instanceof InsertOp
+          ? this.createInsertAtAuthorizer(op.element, op.ordinal, author)
+          : this.createDeleteAuthorizer(op.getInsertOp(), author);
+
+      const usedKeys = new Set<string>();
+
+      if (!auth.verify(op, usedKeys)) {
+        HashedObject.validationLog.warning(
+          "Could not verify authorization for op " +
+            op.hash() +
+            ", a " +
+            op.getClassName() +
+            " being applied to " +
+            this.hash() +
+            ", a " +
+            this.getClassName()
+        );
+
+        return false;
+      }
+
+      if (!Verification.checkKeys(usedKeys, op)) {
+        HashedObject.validationLog.warning(
+          "Authorization key checking step failed for op " +
+            op.hash() +
+            ", a " +
+            op.getClassName() +
+            " being applied to " +
+            this.hash() +
+            ", a " +
+            this.getClassName()
+        );
+        return false;
+      }
     }
 
-    async push(element: T, author?: Identity, extraAuth?: Authorizer) {
-        await this.insertAt(element, this._contents.length, author, extraAuth);
+    return true;
+  }
+
+  attestationKey(elmt: T) {
+    return this.attestationKeyByHash(HashedObject.hashElement(elmt));
+  }
+
+  attestationKeyByHash(hash: Hash) {
+    return "CausalArray/attest-member:" + hash + "-belongs-to-" + this.hash();
+  }
+
+  async attestMembershipForOp(elmt: T, op?: MutationOp): Promise<boolean> {
+    const hash = HashedObject.hashElement(elmt);
+
+    return this.attestMembershipForOpByHash(hash, op);
+  }
+
+  async attestMembershipForOpByHash(
+    hash: Hash,
+    op?: MutationOp
+  ): Promise<boolean> {
+    const insertOps = this._currentInsertOps.get(hash);
+
+    if (insertOps.size > 0) {
+      if (op !== undefined) {
+        const insertOp = insertOps.values().next().value as InsertOp<T>;
+
+        const attestOp = new MembershipAttestationOp(insertOp, op);
+
+        await this.applyNewOp(attestOp);
+        const key = this.attestationKeyByHash(hash);
+        op.addCausalOp(key, attestOp);
+      }
+
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+  verifyMembershipAttestationForOp(
+    elmt: T,
+    op: MutationOp,
+    usedKeys: Set<string>
+  ): boolean {
+    return this.checkMembershipAttestationByHashForOp(
+      HashedObject.hashElement(elmt),
+      op,
+      usedKeys
+    );
+  }
+
+  protected checkMembershipAttestationByHashForOp(
+    elmtHash: Hash,
+    op: MutationOp,
+    usedKeys: Set<string>
+  ): boolean {
+    const key = this.attestationKeyByHash(elmtHash);
+
+    const attestOp = op.getCausalOps().get(key);
+
+    if (attestOp === undefined) {
+      return false;
     }
 
-    async pop(author?: Identity, extraAuth?: Authorizer): Promise<T> {
-        this.rebuild();
-        const lastIdx = this._contents.length - 1;
-        const last = this._contents[lastIdx];
-        await this.deleteAt(lastIdx, author, extraAuth);
-
-        return last;
+    if (!(attestOp instanceof MembershipAttestationOp)) {
+      return false;
     }
 
-    async concat(elements: T[], author?: Identity, extraAuth?: Authorizer) {
-        this.rebuild();
-        await this.insertManyAt(elements, this._contents.length, author, extraAuth);
+    if (!attestOp.getTargetObject().equals(this)) {
+      return false;
     }
 
-    contents() {
-        this.rebuild();
-        return Array.from(this._contents);
+    if (attestOp.targetOpNonCausalHash !== op.nonCausalHash()) {
+      return false;
     }
 
-    contentHashes() {
-        this.rebuild();
-        return Array.from(this._hashes);
+    const insertOp = attestOp.getInsertOp();
+
+    if (HashedObject.hashElement(insertOp.element) !== elmtHash) {
+      return false;
     }
 
-    lookup(idx: number): T {
-        this.rebuild();
-        return this._contents[idx];
-    }
-
-    lookupHash(idx: number): Hash {
-        this.rebuild();
-        return this._hashes[idx];
-    }
-
-    get(hash: Hash): T|undefined {
-        if (this.hasByHash(hash)) {
-            return this._elements.get(hash);
-        } else {
-            return undefined;
-        }
-    }
-
-    indexOf(element?: T) {
-        return this.indexOfByHash(HashedObject.hashElement(element));
-    }
-
-    indexOfByHash(hash?: Hash) {
-        if (hash === undefined) {
-            return -1;
-        }
-        this.rebuild();
-        return this._hashes.indexOf(hash);
-    }
-    
-    valueAt(idx: number) {
-        this.rebuild();
-        return this._contents[idx];
-    }
-
-    private async delete(hash: Hash, ordinal?: Ordinal, author?: Identity, extraAuth?: Authorizer) {
-
-        let deleteOp: DeleteOp<T>|undefined = undefined;
-        const insertOps = this._currentInsertOps.get(hash);
-
-        const deleteOps: Array<DeleteOp<T>> = [];
-
-        for (const insertOp of insertOps.values()) {
-            if (ordinal === undefined || this._currentInsertOpOrds.get(insertOp.getLastHash()) === ordinal) {
-                
-                deleteOp = await this.deleteOpForInsertOp(insertOp, author, extraAuth);
-
-                deleteOps.push(deleteOp);
-                
-                if (ordinal !== undefined) {
-                    break;
-                }
-            }
-        }
-
-        const deletions: Array<Promise<void>> = [];
-
-        for (const deleteOp of deleteOps) {
-            deletions.push(this.applyNewOp(deleteOp));
-        }
-
-        await Promise.all(deletions);
-
-        return deleteOps.length > 0;
-    }
-
-    private async deleteOpForInsertOp(insertOp: InsertOp<T>, author?: Identity, extraAuth?: Authorizer) {
-        
-        const deleteOp = new DeleteOp(insertOp, author);
-
-        const auth = Authorization.chain(this.createDeleteAuthorizer(insertOp, author), extraAuth);
-
-        this.setCurrentPrevOpsTo(deleteOp);
-
-        if (!(await auth.attempt(deleteOp))) {
-            throw new AuthError('Cannot authorize delete operation on CausalArray ' + this.hash() + ', author is: ' + author?.hash());
-        }
-
-        return deleteOp;
-    }
-
-    has(element: T): boolean {
-        return this.indexOf(element) >= 0;
-    }
-
-    hasByHash(hash: Hash): boolean {
-        return this.indexOfByHash(hash) >= 0;
-    }
-
-    async mutate(op: MutationOp): Promise<boolean> {
-
-        const opHash = op.getLastHash();
-
-        if (op instanceof InsertOp) {
-
-            const element = op.element as T;
-            const ordinal = op.ordinal as Ordinal;
-
-            const elementHash = HashedObject.hashElement(element);
-
-            this._elementsPerOrdinal.add(ordinal, elementHash);
-            this._ordinalsPerElement.add(elementHash, ordinal);
-
-            let wasNotBefore = false;
-
-            if (this._currentInsertOps.get(elementHash).size === 0) {
-                wasNotBefore = true;
-                this._elements.set(elementHash, element);
-            }
-
-            this._currentInsertOps.add(elementHash, op);
-            this._currentInsertOpOrds.set(opHash, ordinal);
-
-            this._needToRebuild = true;
-
-            if (wasNotBefore && element instanceof HashedObject) {
-                this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.AddObject, data: element});
-            }
-
-            if (this.duplicates || wasNotBefore) {
-                this._mutationEventSource?.emit({emitter: this, action: 'insert', data: element} as InsertEvent<T>);
-            } else {
-                this._mutationEventSource?.emit({emitter: this, action: 'move', data: element} as MoveEvent<T>);
-            }
-
-        } else if (op instanceof DeleteOp) {
-
-            const deletedOp     = op.getTargetOp() as InsertOp<T>;
-            const deletedOpHash = deletedOp.getLastHash();
-            const elementHash   = HashedObject.hashElement(deletedOp.element);
-            
-
-            let wasBefore = false;
-            let element: T|undefined;
-
-            if (this._currentInsertOps.get(elementHash).size > 0) {
-                wasBefore = true;
-                element = this._elements.get(elementHash);
-            }
-
-            let deletedOrdinal = false;
-
-
-            if (this._currentInsertOps.delete(elementHash, deletedOp)) {
-                const ordinal = this._currentInsertOpOrds.get(deletedOpHash) as Ordinal;
-                this._currentInsertOpOrds.delete(deletedOpHash);
-
-                this._elementsPerOrdinal.delete(ordinal, elementHash);
-                this._ordinalsPerElement.delete(elementHash, ordinal);
-
-                deletedOrdinal = true;
-            }
-
-            let current = this._currentInsertOps.get(elementHash);
-
-            const wasDeleted = current.size === 0;
-
-            this._needToRebuild = true;
-
-            if (wasDeleted) {
-                if (wasBefore) {
-                    const element = this._elements.get(elementHash);
-                    this._elements.delete(elementHash);
-                    if (element instanceof HashedObject) {
-                        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RemoveObject, data: element});
-                    }
-                }
-            }
-
-            if ((this.duplicates && deletedOrdinal) || (!this.duplicates && wasBefore && wasDeleted)) {
-                this._mutationEventSource?.emit({emitter: this, action: 'delete', data: elementHash} as DeleteEvent<T>);
-            } else if (!this.duplicates && wasBefore) {
-                this._mutationEventSource?.emit({emitter: this, action: 'move', data: element} as MoveEvent<T>);
-            }
-
-            
-
-        } else {
-            throw new Error('Invalid op type for MutableArray:' + op?.getClassName());
-        }
-
-        return true;
-
-    }
-
-    private rebuild() {
-
-        if (this._needToRebuild) {
-            this._contents = [];
-            this._hashes   = [];
-            this._ordinals = [];
-
-            const ordinals = Array.from(this._elementsPerOrdinal.keys());
-            ordinals.sort();
-    
-            const seen = new Set<Hash>();
-    
-            for (const ordinal of ordinals) {
-                const elementHashes = this._elementsPerOrdinal.get(ordinal);
-    
-                for (const elementHash of elementHashes) {
-    
-                    if (this.duplicates || !seen.has(elementHash)) {
-                        this._contents.push(this._elements.get(elementHash) as T);
-                        this._hashes.push(elementHash);
-                        this._ordinals.push(ordinal);
-                        if (!this.duplicates) {
-                            seen.add(elementHash);
-                        }
-                    }
-                }
-            }
-
-            this._needToRebuild = false;
-        }
-    }
-
-    getMutableContents(): MultiMap<Hash, HashedObject> {
-
-        const contents = new MultiMap<Hash, HashedObject>();
-
-        for (const [hash, elmt] of this._elements.entries()) {
-            if (elmt instanceof HashedObject) {
-                contents.add(hash, elmt);
-            }
-        }
-
-        return contents;
-    }
-
-    getMutableContentByHash(hash: Hash): Set<HashedObject> {
-
-        const found = new Set<HashedObject>();
-
-        const elmt = this._elements.get(hash);
-
-        if (elmt instanceof HashedObject) {
-            found.add(elmt);
-        }
-
-        return found;
-    }
-
-
-    getClassName(): string {
-        return CausalArray.className;
-    }
-
-    init(): void {
-
-    }
-
-    shouldAcceptMutationOp(op: MutationOp, opReferences: Map<Hash, HashedObject>): boolean {
-
-        if (!super.shouldAcceptMutationOp(op, opReferences)) {
-            return false;
-        }
-
-        if (op instanceof InsertOp && !this.shouldAcceptElement(op.element as T)) {
-            return false;
-        }
-
-        if (op instanceof InsertOp || op instanceof DeleteOp) {
-            const author = op.getAuthor();
-
-            const auth = (op instanceof InsertOp) ?
-                                            this.createInsertAtAuthorizer(op.element, op.ordinal, author)
-                                                        :
-                                            this.createDeleteAuthorizer(op.getInsertOp(), author);
-
-            const usedKeys     = new Set<string>();
-
-            if (!auth.verify(op, usedKeys)) {
-                HashedObject.validationLog.warning('Could not verify authorization for op ' + op.hash() + ', a ' + op.getClassName() + ' being applied to ' + this.hash() + ', a ' + this.getClassName());
-
-                return false;
-            }
-
-            if (!Verification.checkKeys(usedKeys, op)) {
-                HashedObject.validationLog.warning('Authorization key checking step failed for op ' + op.hash() + ', a ' + op.getClassName() + ' being applied to ' + this.hash() + ', a ' + this.getClassName());
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-
-    attestationKey(elmt: T) {
-        return this.attestationKeyByHash(HashedObject.hashElement(elmt));
-    }
-
-    attestationKeyByHash(hash: Hash) {
-        return 'CausalArray/attest-member:' + hash + '-belongs-to-' + this.hash();
-    }
-
-    async attestMembershipForOp(elmt: T, op?: MutationOp): Promise<boolean> {
-
-        const hash = HashedObject.hashElement(elmt);
-
-        return this.attestMembershipForOpByHash(hash, op);
-    }
-
-    async attestMembershipForOpByHash(hash: Hash, op?: MutationOp): Promise<boolean> {
-
-        const insertOps = this._currentInsertOps.get(hash);
-
-        if (insertOps.size > 0) {
-
-            if (op !== undefined) {
-                const insertOp = insertOps.values().next().value as InsertOp<T>;
-
-                const attestOp = new MembershipAttestationOp(insertOp, op);
-    
-                await this.applyNewOp(attestOp);
-                const key = this.attestationKeyByHash(hash);
-                op.addCausalOp(key, attestOp);
-            }
-
-            return true;
-        } else {
-            return false;
-        }
-
-    }
-
-    verifyMembershipAttestationForOp(elmt: T, op: MutationOp, usedKeys: Set<string>): boolean {
-
-        return this.checkMembershipAttestationByHashForOp(HashedObject.hashElement(elmt), op, usedKeys);
-    }
-
-    protected checkMembershipAttestationByHashForOp(elmtHash: Hash, op: MutationOp, usedKeys: Set<string>): boolean {
-
-        const key = this.attestationKeyByHash(elmtHash);
-
-        const attestOp = op.getCausalOps().get(key);
-
-        if (attestOp === undefined) {
-            return false;
-        }
-
-        if (!(attestOp instanceof MembershipAttestationOp)) {
-            return false;
-        }
-
-        if (!attestOp.getTargetObject().equals(this)) {
-            return false;
-        }
-
-        if (attestOp.targetOpNonCausalHash !== op.nonCausalHash()) {
-            return false;
-        }
-
-        const insertOp = attestOp.getInsertOp();
-
-        if (HashedObject.hashElement(insertOp.element) !== elmtHash) {
-            return false;
-        }
-
-        usedKeys.add(key);
-
-        return true;
-    }
-
-    createMembershipAuthorizer(elmt: T): Authorizer {
-
-        return {
-            attempt : (op?:  MutationOp) => this.attestMembershipForOp(elmt, op),
-            verify  : (op: MutationOp, usedKeys: Set<string>) => this.verifyMembershipAttestationForOp(elmt, op, usedKeys)
-        };
-
-    }
-
-    protected createInsertAtAuthorizer(_element?: T, _ordinal?: Ordinal, author?: Identity): Authorizer {
-        return this.createWriteAuthorizer(author);
-    }
-
-    protected createDeleteAuthorizer(_insertOp?: InsertOp<T>, author?: Identity): Authorizer {
-        return this.createWriteAuthorizer(author);
-    }
-
-    values() {
-        this.rebuild();
-        return this._contents.values();
-    }
-    
-    size() {
-        this.rebuild()
-        return this._contents.length;
-    }
+    usedKeys.add(key);
+
+    return true;
+  }
+
+  createMembershipAuthorizer(elmt: T): Authorizer {
+    return {
+      attempt: (op?: MutationOp) => this.attestMembershipForOp(elmt, op),
+      verify: (op: MutationOp, usedKeys: Set<string>) =>
+        this.verifyMembershipAttestationForOp(elmt, op, usedKeys),
+    };
+  }
+
+  protected createInsertAtAuthorizer(
+    _element?: T,
+    _ordinal?: Ordinal,
+    author?: Identity
+  ): Authorizer {
+    return this.createWriteAuthorizer(author);
+  }
+
+  protected createDeleteAuthorizer(
+    _insertOp?: InsertOp<T>,
+    author?: Identity
+  ): Authorizer {
+    return this.createWriteAuthorizer(author);
+  }
+
+  values() {
+    this.rebuild();
+    return this._contents.values();
+  }
+
+  size() {
+    this.rebuild();
+    return this._contents.length;
+  }
 }
 
 ClassRegistry.register(InsertOp.className, InsertOp);

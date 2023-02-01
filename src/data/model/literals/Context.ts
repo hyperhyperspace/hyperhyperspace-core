@@ -6,6 +6,10 @@ import { Resources } from 'spaces/spaces';
 
 type LiteralContext = { rootHashes: Array<Hash>, literals: any };
 
+export const isLiteralContext = (obj: any): obj is LiteralContext => {
+    return obj.rootHashes !== undefined && obj.literals !== undefined;
+}
+
 class Context {
 
     rootHashes : Array<Hash>;
