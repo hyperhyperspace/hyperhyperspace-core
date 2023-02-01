@@ -23,10 +23,11 @@ import { MutationEvent } from 'data/model';
 
 enum MutableContentEvents {
     AddObject    = 'add-object',
-    RemoveObject = 'remove-object'
+    RemoveObject = 'remove-object',
+    RestoredCheckpoint = 'restored-checkpoint'
 };
 
-const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject];
+const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject, MutableContentEvents.RestoredCheckpoint];
 
 type MutableObjectConfig = {supportsUndo?: boolean, supportsCheckpoints?: boolean, checkpointFreq?: number};
 
@@ -107,6 +108,9 @@ abstract class MutableObject extends HashedObject {
                         MutableObject.addEventRelayForElmt(this._mutationEventSource, ev.data.getLastHash(), ev.data);
                     } else if (ev.action === MutableContentEvents.RemoveObject) {
                         MutableObject.removeEventRelayForElmt(this._mutationEventSource, ev.data.getLastHash(), ev.data);
+                    } else if (ev.action === MutableContentEvents.RestoredCheckpoint) {
+                        this._mutationEventSource?.removeAllUpstreamRelays();
+                        this.addEventRelaysForContents(this._mutationEventSource)   
                     }
                 }
 
@@ -605,6 +609,8 @@ abstract class MutableObject extends HashedObject {
         }
 
         this.importMutableState(checkpoint.exportedState);
+
+        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RestoredCheckpoint, data: undefined});
     }
 
 
