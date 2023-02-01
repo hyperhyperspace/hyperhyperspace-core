@@ -24,7 +24,7 @@ class MutableReference<T> extends BaseCollection<T> {
     _value?: T;
 
     constructor(config?: CollectionConfig) {
-        super([RefUpdateOp.className], {supportsCheckpoints: true, ...config});
+        super([RefUpdateOp.className], {...config, supportsCheckpoints: true});
         
         this.setRandomId();
     }

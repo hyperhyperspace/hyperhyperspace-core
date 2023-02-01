@@ -198,7 +198,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
 
 
     constructor(config: CausalCollectionConfig = {}) {
-        super(CausalSet.opClasses, {...config, supportsUndo: true});
+        super(CausalSet.opClasses, {...config, supportsUndo: true, supportsCheckpoints: true});
 
         this.setRandomId();
         

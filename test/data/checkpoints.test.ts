@@ -9,6 +9,9 @@ describe('[CHK] Checkpoints', () => {
     it('[CHK01] Exporting and importing MutableReference', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const ref = new MutableReference();
+        // check that it supports checkpoints
+        expect(ref._supportsCheckpoints).toBe(true);
+
         ref.setStore(store);
         ref.setValue(1);
         await ref.save();
@@ -49,6 +52,9 @@ describe('[CHK] Checkpoints', () => {
     it('[CHK03] Exporting and importing MutableSet', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<number>();
+        // check that it supports checkpoints
+        expect(set._supportsCheckpoints).toBe(true);
+
         set.setStore(store);
         set.add(1);
         await set.save();
@@ -92,6 +98,9 @@ describe('[CHK] Checkpoints', () => {
     it('[CHK05] Exporting and importing MutableArray', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const arr = new MutableArray<number>();
+        // check that it supports checkpoints
+        expect(arr._supportsCheckpoints).toBe(true);
+
         arr.setStore(store);
         arr.push(1);
         expect([...arr.values()]).toStrictEqual([1]);
@@ -144,6 +153,9 @@ describe('[CHK] Checkpoints', () => {
     it('[CHK07] Exporting and importing GrowOnlySet', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new MutableSet<number>();
+        // check that it supports checkpoints
+        expect(set._supportsCheckpoints).toBe(true);
+
         set.setStore(store);
         set.add(1);
         await set.save();
@@ -186,6 +198,9 @@ describe('[CHK] Checkpoints', () => {
     it('[CHK09] Exporting and importing CausalReference', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const ref = new CausalReference<number>();
+        // check that it supports checkpoints
+        expect(ref._supportsCheckpoints).toBe(true);
+
         ref.setStore(store);
         ref.setValue(1);
         await ref.save();
@@ -227,6 +242,9 @@ describe('[CHK] Checkpoints', () => {
     it('[CHK11] Exporting and importing CausalSet', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const set = new CausalSet<number>();
+        // check that it supports checkpoints:
+        expect(set._supportsCheckpoints).toStrictEqual(true);
+        
         set.setStore(store);
         set.add(1);
         await set.save();
@@ -271,6 +289,9 @@ describe('[CHK] Checkpoints', () => {
     it('[CHK13] Exporting and importing CausalArray', async () => {
         const store = new Store(new MemoryBackend('test-' + new RNGImpl().randomHexString(128)));
         const array = new CausalArray<number>();
+        // check that it supports checkpoints:
+        expect(array._supportsCheckpoints).toStrictEqual(true)
+
         array.setStore(store);
         array.push(1);
         await array.save();
@@ -302,7 +323,7 @@ describe('[CHK] Checkpoints', () => {
         array.push(innerRef2);
         await array.save();
 
-        expect([...array.values()]).toStrictEqual([innerRef, innerRef2]);
+        expect(new Set([...array.values()])).toStrictEqual(new Set([innerRef, innerRef2]));
 
         const checkpoint = await array.saveCheckpoint();
         array.push(new MutableReference<number>());

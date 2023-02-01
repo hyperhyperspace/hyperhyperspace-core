@@ -190,7 +190,7 @@ class MutableSet<T> extends BaseCollection<T> implements Collection<T> {
     _deleteElementCallback? : (element: T) => void;*/
 
     constructor(config?: CollectionConfig) {
-        super(MutableSet.opClasses, config);
+        super(MutableSet.opClasses, {...config, supportsCheckpoints: true});
 
         this.setRandomId();
 

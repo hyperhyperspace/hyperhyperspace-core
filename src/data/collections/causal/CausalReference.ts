@@ -55,7 +55,7 @@ class CausalReference<T> extends BaseCausalCollection<T>  {
     _largestSequence?: number;
 
     constructor(config?: CausalCollectionConfig) {
-        super([CausalRefUpdateOp.className], {...config, supportsUndo: true});
+        super([CausalRefUpdateOp.className], {...config, supportsUndo: true, supportsCheckpoints: true});
 
         this.setRandomId();
 

@@ -207,7 +207,7 @@ class MutableArray<T> extends BaseCollection<T> implements Collection<T> {
     _ordinals : Array<Ordinal>;
 
     constructor(config: MutableArrayConfig & CollectionConfig = {duplicates: true}) {
-        super(MutableArray.opClasses, config);
+        super(MutableArray.opClasses, {...config, supportsCheckpoints: true});
 
         this.setRandomId();
 

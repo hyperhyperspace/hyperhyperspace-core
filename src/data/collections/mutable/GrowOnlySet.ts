@@ -68,7 +68,7 @@ class GrowOnlySet<T> extends BaseCollection<T> {
   _elements: Map<ElmtHash, T>;
 
   constructor(config?: CollectionConfig) {
-    super([AddOp.className], config);
+    super([AddOp.className], {...config, supportsCheckpoints: true});
 
     this.setRandomId();
 
