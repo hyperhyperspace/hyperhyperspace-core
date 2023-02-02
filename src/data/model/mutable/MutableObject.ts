@@ -610,6 +610,11 @@ abstract class MutableObject extends HashedObject {
 
         this.importMutableState(checkpoint.exportedState);
 
+        const resources = this.getResources();
+        if (resources) {
+            this.setResources(resources);
+        }
+
         this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RestoredCheckpoint, data: undefined});
     }
 
