@@ -233,7 +233,7 @@ class CausalArray<T>
         isLiteralContext(v) ? HashedObject.fromLiteralContext(v) : v,
       ])
     );
-    this._currentInsertOps = DedupMultiMap.fromEntries(
+    this._currentInsertOps = DedupMultiMap.fromIterableEntries(
       state._currentInsertOps.map(([k, v]: [Hash, LiteralContext[]]) => [
         k,
         new Set(
@@ -242,6 +242,9 @@ class CausalArray<T>
       ])
     );
     this._currentInsertOpOrds = new Map(state._currentInsertOpOrds);
+    
+    this._needToRebuild = true;
+    this.rebuild();
   }
 
   // canInsert: if a parameter is absent, interpret it as if insertion is allowed for any possible value
