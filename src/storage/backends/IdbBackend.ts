@@ -54,6 +54,7 @@ class IdbBackend implements Backend {
 
     static readonly META_STORE = 'meta_store';
     static readonly OBJ_STORE  = 'object_store';
+    static readonly CHECKPOINT_STORE  = 'checkpoint_store';
     static readonly TERMINAL_OPS_STORE = 'terminal_ops_store';
     static readonly OP_HEADERS_STORE = 'op_headers_store';
 
@@ -86,6 +87,7 @@ class IdbBackend implements Backend {
                 let opHeadersStore = db.createObjectStore(IdbBackend.OP_HEADERS_STORE, {keyPath: 'literal.opHash'});
                 opHeadersStore.createIndex(IdbBackend.OP_HEADER_HASH_IDX_KEY + '_idx', 'literal.headerHash' );
                 db.createObjectStore(IdbBackend.META_STORE, { keyPath: 'name'});
+                db.createObjectStore(IdbBackend.CHECKPOINT_STORE, { keyPath: 'mutableObject'});
             },
             blocked() {
               // …
@@ -404,15 +406,25 @@ class IdbBackend implements Backend {
         }
     }
 
-    // TODO: add a STORE for the checkpoints, for now limited to max idb value size
-
     async storeCheckpoint(checkpoint: StateCheckpoint): Promise<void> {
-        checkpoint;
-        throw new Error('Method not implemented.');
+        if (this.closed) {
+            throw new Error('Attempted to store a checkpoint on a closed IndexedDB backend.')
+        }
+        const idb = await this.idbPromise;
+        const tx = idb.transaction([IdbBackend.CHECKPOINT_STORE], 'readwrite');
+        const store = tx.objectStore(IdbBackend.CHECKPOINT_STORE);
+        await store.put(checkpoint);
     }
 
-    async loadLastCheckpoint(): Promise<StateCheckpoint|undefined> {
-        throw new Error('Method not implemented.');
+    async loadLastCheckpoint(mutableObject: Hash): Promise<StateCheckpoint|undefined> {
+        if (this.closed) {
+            throw new Error('Attempted to load a checkpoint from a closed IndexedDB backend.')
+        }
+        const idb = await this.idbPromise;
+        const tx = idb.transaction([IdbBackend.CHECKPOINT_STORE], 'readonly');
+        const store = tx.objectStore(IdbBackend.CHECKPOINT_STORE);
+        const checkpoint = await store.get(mutableObject);
+        return checkpoint;
     }
 
     skipToObjectByClass(className: string, startObject: Hash): Promise<string | undefined> {
