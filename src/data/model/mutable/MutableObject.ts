@@ -612,7 +612,13 @@ abstract class MutableObject extends HashedObject {
 
         const resources = this.getResources();
         if (resources) {
-            this.setResources(resources);
+            // this.setResources(resources);
+            for (const aliases of this.getMutableContents().values()) {
+                for (const obj of aliases) {
+                  obj.setResources(resources);
+                }
+              }
+              
         }
 
         this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RestoredCheckpoint, data: undefined});
