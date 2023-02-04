@@ -240,19 +240,43 @@ class IdbBackend implements Backend {
     }
 
     async searchByClass(className: string, params?: BackendSearchParams): Promise<BackendSearchResults> {
-        return this.searchByIndex(IdbBackend.CLASS_SEQUENCE_IDX_KEY + '_idx', className, params);
+
+        const indexValue = className;
+
+        await this.computeStartOnIndexValue(indexValue, params);
+
+        return this.searchByIndex(IdbBackend.CLASS_SEQUENCE_IDX_KEY + '_idx', indexValue, params);
     }
 
     async searchByReference(referringPath: string, referencedHash: Hash, params?: BackendSearchParams): Promise<BackendSearchResults> {
+        
+        const indexValue = referringPath + '#' + referencedHash;
+
+        await this.computeStartOnIndexValue(indexValue, params);
+        
         return this.searchByIndex(IdbBackend.REFERENCES_SEQUENCE_IDX_KEY + '_idx', 
-                                  referringPath + '#' + referencedHash, params);
+                                  indexValue, params);
     }
 
     async searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: BackendSearchParams): Promise<BackendSearchResults> {
+        
+        const indexValue = referringClassName + '.' + referringPath + '#' + referencedHash;
+
+        await this.computeStartOnIndexValue(indexValue, params);
+        
         return this.searchByIndex(IdbBackend.REFERENCING_CLASS_SEQUENCE_IDX_KEY + '_idx', 
-                                  referringClassName + '.' + referringPath + '#' + referencedHash, params);
+                                  indexValue, params);
     }
-    
+
+    private async computeStartOnIndexValue(indexValue: string, params?: BackendSearchParams): Promise<void> {
+        if (params?.startOn !== undefined) {
+            const storable = await this.load(params.startOn);
+            if (storable !== undefined) {
+                params.start =  IdbBackend.addSequenceToValue(indexValue, storable.sequence);
+            }
+        }
+    }
+
     async loadOpHeader(opHash: string): Promise<StoredOpHeader | undefined> {
 
         if (this.closed) {
@@ -425,21 +449,6 @@ class IdbBackend implements Backend {
         const store = tx.objectStore(IdbBackend.CHECKPOINT_STORE);
         const checkpoint = await store.get(mutableObject);
         return checkpoint;
-    }
-
-    skipToObjectByClass(className: string, startObject: Hash): Promise<string | undefined> {
-        className; startObject
-        throw new Error('Method not implemented.');
-    }
-
-    skipToObjectByReference(referringPath: string, referencedHash: string, startObject: Hash): Promise<string | undefined> {
-        referringPath; referencedHash; startObject;
-        throw new Error('Method not implemented.');
-    }
-
-    skipToObjectByReferencingClass(referringClassName: string, referringPath: string, referencedHash: string, startObject: Hash): Promise<string | undefined> {
-        referringClassName; referringPath; referencedHash; startObject;
-        throw new Error('Method not implemented.');
     }
 }
 

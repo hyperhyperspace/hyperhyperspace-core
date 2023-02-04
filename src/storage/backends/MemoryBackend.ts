@@ -199,32 +199,32 @@ class MemoryBackend implements Backend {
     }
 
     searchByClass(className: string, params?: BackendSearchParams | undefined): Promise<BackendSearchResults> {
+
+        if (params?.startOn !== undefined) {
+            params.start = this.findIndexEntryForObject(className, this.repr.sortedClassIndex, params.startOn);
+        }
+
         return this.searchByIndex(className, this.repr.sortedClassIndex, params);
     }
 
     searchByReference(referringPath: string, referencedHash: string, params?: BackendSearchParams | undefined): Promise<BackendSearchResults> {
         let key =  referringPath + '#' + referencedHash;
+
+        if (params?.startOn !== undefined) {
+            params.start = this.findIndexEntryForObject(key, this.repr.sortedReferenceIndex, params.startOn);
+        }
+
         return this.searchByIndex(key, this.repr.sortedReferenceIndex, params);
     }
 
     searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: string, params?: BackendSearchParams | undefined): Promise<BackendSearchResults> {
         let key = referringClassName + '.' + referringPath + '#' + referencedHash;
+
+        if (params?.startOn !== undefined) {
+            params.start = this.findIndexEntryForObject(key, this.repr.sortedReferencingClassIndex, params.startOn);
+        }
+
         return this.searchByIndex(key, this.repr.sortedReferencingClassIndex, params);
-    }
-
-    skipToObjectByClass(className: string, startObject: Hash): Promise<string|undefined> {
-        return this.skipToObjectByIndex(className, this.repr.sortedClassIndex, startObject);
-    }
-    
-    skipToObjectByReference(referringPath: string, referencedHash: string, startObject: Hash): Promise<string|undefined> {
-        let key =  referringPath + '#' + referencedHash;
-        return this.skipToObjectByIndex(key, this.repr.sortedReferenceIndex, startObject);
-    }
-    
-    skipToObjectByReferencingClass(referringClassName: string, referringPath: string, referencedHash: string, startObject: Hash): Promise<string|undefined> {
-        let key = referringClassName + '.' + referringPath + '#' + referencedHash;
-        return this.skipToObjectByIndex(key, this.repr.sortedReferencingClassIndex, startObject);
-
     }
 
     async loadOpHeader(opHash: string): Promise<StoredOpHeader | undefined> {
@@ -235,7 +235,7 @@ class MemoryBackend implements Backend {
         return this.repr.opCausalHistoriesByHash.get(causalHistoryHash);
     }
 
-    private async skipToObjectByIndex(key: string, sortedIndex: Map<string, Hash[]>, objectHash: Hash): Promise<string|undefined> {
+    private findIndexEntryForObject(key: string, sortedIndex: Map<string, Hash[]>, objectHash: Hash): string|undefined {
 
         let classHashes = sortedIndex.get(key);
 
@@ -254,6 +254,10 @@ class MemoryBackend implements Backend {
     private async searchByIndex(key: string, sortedIndex: Map<string, Hash[]>, params?: BackendSearchParams | undefined): Promise<BackendSearchResults> {
         
         let classHashes = sortedIndex.get(key);
+
+        if (params?.startOn !== undefined && classHashes !== undefined) {
+
+        }
 
         if (classHashes === undefined) {
             return { items: [], start: '', end: ''}

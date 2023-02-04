@@ -3,7 +3,9 @@ import { Hash } from 'data/model/hashing/Hashing';
 import { StoredOpHeader } from '../store/Store';
 import { StateCheckpoint } from 'data/model';
 
-type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, limit?: number};
+// "start" below refers to an index entry, as returned by "start" and "end" in BackendSearchResults
+// if you want results to start on an specific object use startOn, and the index entry will be computed automatically
+type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, startOn?: Hash, limit?: number};
 type BackendSearchResults = {items : Array<Literal>, start?: string, end?: string };
 
 // The sequence number in a storable indicates the order in which objects have been persisted.
@@ -43,13 +45,6 @@ interface Backend {
     searchByClass(className: string, params? : BackendSearchParams) : Promise<BackendSearchResults>;
     searchByReference(referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
     searchByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params? : BackendSearchParams) : Promise<BackendSearchResults>;
-
-    // the fowllowing 3 return the "start" parameter for the search functions above (the one that goes into params.start) so that
-    // the results will fast forward to startObject, skipping all the previous entries
-
-    skipToObjectByClass(className: string, startObject: Hash) : Promise<string|undefined>;
-    skipToObjectByReference(referringPath: string, referencedHash: Hash, startObject: Hash) : Promise<string|undefined>;
-    skipToObjectByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, startObject: Hash) : Promise<string|undefined>;
 
     close(): void;
 
