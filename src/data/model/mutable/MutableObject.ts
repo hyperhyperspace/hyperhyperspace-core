@@ -34,6 +34,7 @@ type MutableObjectConfig = {supportsUndo?: boolean, supportsCheckpoints?: boolea
 type StateCheckpoint = {
     mutableObject: Hash,
     terminalOpHashes: Array<Hash>,
+    lastLoadedOpHash?: Hash,
     allAppliedOps: Array<Hash>,
     activeCascInvsPerOp: Array<[Hash, Array<Hash>]>, 
     exportedState: any
@@ -59,6 +60,8 @@ abstract class MutableObject extends HashedObject {
 
     _unsavedOps      : Array<MutationOp>;
     _unappliedOps    : Map<Hash, MutationOp>;
+
+    _lastLoadedOpHash? : Hash;
 
     _applyOpsLock : Lock;
 
@@ -250,21 +253,22 @@ abstract class MutableObject extends HashedObject {
 
         await super.loadAllChanges(batchSize, context);
 
-        if (this._supportsCheckpoints) {
+        if (this._supportsCheckpoints && this._allAppliedOps.size === 0) {
             try {
                 const checkpoint = await this.getStore().loadLastCheckpoint(this.getLastHash());
 
                 if (checkpoint !== undefined) {
-                    console.log('Restoring checkpoint for ' + this.getClassName() + ' ' + this.getLastHash());
+                    //console.log('Restoring checkpoint for ' + this.getClassName() + ' ' + this.getLastHash());
                     await this.restoreCheckpoint(checkpoint);
-    
-                    // TODO: find a way to get the correct "start" parameter for loadByReference below
-                    //       to make it ignore all the ops in the checkpoint
                 }    
             } catch (e) {
                 // Ignore for now
             }
         }
+
+        //const terminalOps = Array.from(this._terminalOps.values());
+
+        //const startOn = terminalOps.length < 0? terminalOps[terminalOps.length-1].getLastHash() : undefined;
 
         let results = await this.getStore()
                                 .loadByReference(
@@ -272,7 +276,8 @@ abstract class MutableObject extends HashedObject {
                                     this.getLastHash(), 
                                     {
                                         order: 'asc',
-                                        limit: batchSize
+                                        limit: batchSize,
+                                        startOn: this._lastLoadedOpHash
                                     },
                                     context);
 
@@ -281,6 +286,7 @@ abstract class MutableObject extends HashedObject {
             for (const obj of results.objects) {
                 if (obj instanceof MutationOp && this.isAcceptedMutationOpClass(obj)) {
                     await this.apply(obj, false);
+                    this._lastLoadedOpHash = obj.getLastHash();
                 }
             }
 
@@ -501,6 +507,7 @@ abstract class MutableObject extends HashedObject {
         await this.saveCheckpoint();
     }
 
+    // TODO: rename to saveAllChanges()
     async saveQueuedOps(store?: Store) : Promise<boolean> {
 
         if (store === undefined) {
@@ -532,7 +539,9 @@ abstract class MutableObject extends HashedObject {
                 }
                 
             }
+
             await this.saveCheckpoint();
+
             return true;
         }
 
@@ -562,7 +571,8 @@ abstract class MutableObject extends HashedObject {
     createCheckpoint(): StateCheckpoint {
         return {
             mutableObject: this.getLastHash(),
-            terminalOpHashes: Array.from(this._terminalOps.keys()), 
+            terminalOpHashes: Array.from(this._terminalOps.keys()),
+            lastLoadedOpHash: this._lastLoadedOpHash,
             allAppliedOps: Array.from(this._allAppliedOps), 
             activeCascInvsPerOp: Array.from(this._activeCascInvsPerOp.entries()).map((v: [Hash, Set<Hash>]) => [v[0], Array.from(v[1].values())]),
             exportedState: this.exportMutableState()
@@ -598,9 +608,11 @@ abstract class MutableObject extends HashedObject {
             terminalOps.set(opHash, op);
         }
 
-        this._terminalOps = terminalOps;
-        this._allAppliedOps = new Set(checkpoint.allAppliedOps.values());
+        this._terminalOps         = terminalOps;
+        this._lastLoadedOpHash    = checkpoint.lastLoadedOpHash;
+        this._allAppliedOps       = new Set(checkpoint.allAppliedOps.values());
         this._activeCascInvsPerOp = new MultiMap();
+
 
         for (const [k, vs] of checkpoint.activeCascInvsPerOp) {
             for (const v of vs) {
