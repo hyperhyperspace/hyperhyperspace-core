@@ -310,6 +310,22 @@ class MemoryBackend implements Backend {
         return this.repr.checkpoints.get(mutableObject);
     }
 
+    async loadLastCheckpointMeta(mutableObject: Hash): Promise<StateCheckpoint|undefined> {
+
+        const check = this.repr.checkpoints.get(mutableObject);
+
+        const copy: any = {};
+
+
+        Object.assign(copy, check);
+
+        const meta = copy as StateCheckpoint;
+
+        meta.exportedState = undefined;
+
+        return meta;
+    }
+
     async ready(): Promise<void> {
         
     }

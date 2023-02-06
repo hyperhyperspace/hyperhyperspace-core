@@ -28,6 +28,7 @@ interface Backend {
 
     storeCheckpoint(checkpoint: StateCheckpoint): Promise<void>;
     loadLastCheckpoint(mutableObject: Hash): Promise<StateCheckpoint|undefined>;
+    loadLastCheckpointMeta(mutableObject: Hash): Promise<StateCheckpoint|undefined>;
 
     loadOpHeader(opHash: Hash) : Promise<StoredOpHeader | undefined>;
     loadOpHeaderByHeaderHash(causalHistoryHash: Hash) : Promise<StoredOpHeader | undefined>;

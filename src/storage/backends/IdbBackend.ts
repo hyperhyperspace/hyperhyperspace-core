@@ -450,6 +450,26 @@ class IdbBackend implements Backend {
         const checkpoint = await store.get(mutableObject);
         return checkpoint;
     }
+
+    async loadLastCheckpointMeta(mutableObject: Hash): Promise<StateCheckpoint|undefined> {
+        if (this.closed) {
+            throw new Error('Attempted to load a checkpoint from a closed IndexedDB backend.')
+        }
+        const idb = await this.idbPromise;
+        const tx = idb.transaction([IdbBackend.CHECKPOINT_STORE], 'readonly');
+        const store = tx.objectStore(IdbBackend.CHECKPOINT_STORE);
+        const checkpoint = await store.get(mutableObject);
+
+        const copy: any = {};
+
+        Object.assign(copy, checkpoint);
+
+        const meta = copy as StateCheckpoint;
+
+        meta.exportedState = undefined;
+
+        return checkpoint;
+    }
 }
 
 Store.registerBackend(IdbBackend.backendName, (dbName: string) => new IdbBackend(dbName));
