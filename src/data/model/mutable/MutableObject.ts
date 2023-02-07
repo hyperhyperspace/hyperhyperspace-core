@@ -29,16 +29,28 @@ enum MutableContentEvents {
 
 const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject, MutableContentEvents.RestoredCheckpoint];
 
-type MutableObjectConfig = {supportsUndo?: boolean, supportsCheckpoints?: boolean, checkpointFreq?: number};
+type MutableObjectConfig = {
+    supportsUndo?: boolean, 
+    supportsCheckpoints?: boolean,
+    autoCheckpoint?: boolean,       // create checkpoints automatically?
+    autoCheckpointOpFreq?: number,      // how many ops must be applied and saved before a checkpoint is created automatically
+    autoCheckpointOpFreqDelay?: number  // how long to wait for more ops before doing so
+    autoCheckpointInactivityDelay?: number,     // how much time must pass for a checkpoint to be created automatically, even if there are few applied ops
+};
 
 type StateCheckpoint = {
     mutableObject: Hash,
     terminalOpHashes: Array<Hash>,
-    lastLoadedOpHash?: Hash,
+    lastLoadedOpHash: Hash,
+    loadedOpCount: number;
     allAppliedOps: Array<Hash>,
     activeCascInvsPerOp: Array<[Hash, Array<Hash>]>, 
     exportedState: any
 };
+
+const DEFAULT_AUTO_CHECK_OP_FREQ = 16;
+const DEFAULT_AUTO_CHECK_OP_DELAY = 15;
+const DEFAULT_AUTO_CHECK_INACT_DELAY = 300;
 
 abstract class MutableObject extends HashedObject {
 
@@ -46,7 +58,20 @@ abstract class MutableObject extends HashedObject {
     static prevOpsComputationLog = new Logger(MutableObject.name, LogLevel.INFO);
 
     readonly _acceptedMutationOpClasses : Array<string>;
+    
     readonly _supportsCheckpoints: boolean;
+
+    _autoCheckpointOpFreq: number;
+    _autoCheckpointOpFreqDelay: number;
+
+    _autoCheckpointInactivityDelay: number;
+
+    readonly _autoCheckpointCallback: () => void;
+
+    _autoCheckpoint: boolean;
+    
+    _autoCheckpointOpTimer: any;
+    _autoCheckpointInactivityTimer: any;
 
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
@@ -62,6 +87,8 @@ abstract class MutableObject extends HashedObject {
     _unappliedOps    : Map<Hash, MutationOp>;
 
     _lastLoadedOpHash? : Hash;
+    _loadedOpCount: number;
+    _loadedOpCountAtCheckpoint?: number;
 
     _applyOpsLock : Lock;
 
@@ -82,7 +109,46 @@ abstract class MutableObject extends HashedObject {
             }
         }
 
-        this._supportsCheckpoints = config?.supportsCheckpoints || false;
+        this._supportsCheckpoints   = config?.supportsCheckpoints || false;
+        this._autoCheckpoint        = config?.autoCheckpoint || true;
+        this._autoCheckpointOpFreq      = config?.autoCheckpointOpFreq || DEFAULT_AUTO_CHECK_OP_FREQ;
+        this._autoCheckpointOpFreqDelay = config?.autoCheckpointOpFreqDelay || DEFAULT_AUTO_CHECK_OP_DELAY;
+        this._autoCheckpointInactivityDelay     = config?.autoCheckpointInactivityDelay || DEFAULT_AUTO_CHECK_INACT_DELAY;
+
+        this._autoCheckpointCallback = async () => {
+            const store = this.getStore();
+
+            this.clearAutoCheckpointInactivityTimer();
+            this.clearAutoCheckpointOpTimer();
+
+            let behindStore = false;
+
+            if (store !== undefined) {
+                if (this._unsavedOps.length > 0) {
+                    // we need to reschedule a retry!
+                    this.setAutoCheckpointTimers();
+                } else {
+                    // ok there are no unsaved changes
+                    const lastCheckpointMeta = await store.loadLastCheckpointMeta(this.getLastHash());
+
+                    if (this._unsavedOps.length > 0) {
+                        // we need to reschedule a retry!
+                        this.setAutoCheckpointTimers();
+                    } else {
+                        if (lastCheckpointMeta === undefined || this._loadedOpCount > lastCheckpointMeta.loadedOpCount) {
+                            // ok we need to checkpoint
+                            this.saveCheckpoint();
+                        } else {
+                            behindStore = true;
+                        }
+                    }
+                }
+            }
+
+            if (!behindStore) {
+                this.setAutoCheckpointTimers();
+            }
+        }
         
         this._acceptedMutationOpClasses = acceptedOpClasses;
         this._boundToStore = false;
@@ -95,6 +161,8 @@ abstract class MutableObject extends HashedObject {
         this._unappliedOps    = new Map();
         
         this._applyOpsLock = new Lock();
+
+        this._loadedOpCount = 0;
 
         this._opCallback = async (hash: Hash) => {
             await this.applyOpFromStore(hash);
@@ -266,10 +334,6 @@ abstract class MutableObject extends HashedObject {
             }
         }
 
-        //const terminalOps = Array.from(this._terminalOps.values());
-
-        //const startOn = terminalOps.length < 0? terminalOps[terminalOps.length-1].getLastHash() : undefined;
-
         let results = await this.getStore()
                                 .loadByReference(
                                     'targetObject', 
@@ -285,8 +349,11 @@ abstract class MutableObject extends HashedObject {
 
             for (const obj of results.objects) {
                 if (obj instanceof MutationOp && this.isAcceptedMutationOpClass(obj)) {
-                    await this.apply(obj, false);
-                    this._lastLoadedOpHash = obj.getLastHash();
+                    if (!this._allAppliedOps.has(obj.getLastHash())) {
+                        await this.apply(obj, false);
+                        this._lastLoadedOpHash = obj.getLastHash();
+                        this._loadedOpCount   = this._loadedOpCount + 1;
+                    }
                 }
             }
 
@@ -301,6 +368,9 @@ abstract class MutableObject extends HashedObject {
                                     },
                                     context);
         }
+
+
+        this.setAutoCheckpointTimers();
     }
 
     async loadAndWatchForChanges(loadBatchSize=128) {
@@ -504,11 +574,16 @@ abstract class MutableObject extends HashedObject {
 
     async save(store?: Store) : Promise<void> {
         await super.save(store);
-        await this.saveCheckpoint();
     }
 
-    // TODO: rename to saveAllChanges()
+
+    // Deprecated! Use "saveAllChanges" instead.
     async saveQueuedOps(store?: Store) : Promise<boolean> {
+        return this.saveAllChanges(store);
+    }
+
+
+    async saveAllChanges(store?: Store) : Promise<boolean> {
 
         if (store === undefined) {
             store = this.getStore();
@@ -540,7 +615,7 @@ abstract class MutableObject extends HashedObject {
                 
             }
 
-            await this.saveCheckpoint();
+            this.setAutoCheckpointTimers();
 
             return true;
         }
@@ -572,29 +647,61 @@ abstract class MutableObject extends HashedObject {
         return {
             mutableObject: this.getLastHash(),
             terminalOpHashes: Array.from(this._terminalOps.keys()),
-            lastLoadedOpHash: this._lastLoadedOpHash,
+            lastLoadedOpHash: this._lastLoadedOpHash as Hash,
+            loadedOpCount: this._loadedOpCount,
             allAppliedOps: Array.from(this._allAppliedOps), 
             activeCascInvsPerOp: Array.from(this._activeCascInvsPerOp.entries()).map((v: [Hash, Set<Hash>]) => [v[0], Array.from(v[1].values())]),
             exportedState: this.exportMutableState()
         };
     }
 
-    async saveCheckpoint() : Promise<StateCheckpoint | void> {
-        if(this._supportsCheckpoints) {
-            await this.saveQueuedOps();
+    async saveCheckpoint() : Promise<StateCheckpoint> {
+        
+        if (this._supportsCheckpoints) {
+
+            this.clearAutoCheckpointOpTimer();
+            this.clearAutoCheckpointInactivityTimer();
+            
+
+            // Checkpoints use the linearization of ops as they go into the store. We need to make sure that no ops were
+            // saved and not loaded into this instance: otherwise we risk creating an inconsistent checkpoint (for example
+            // if later ops were applied directly in this instance and then saved, that potentially creates a "hole" in the
+            // checkpoint's history)
+
+            if (this._unsavedOps.length === 0) {
+                await this.loadAllChanges();
+            }
+            
+            while (this._unsavedOps.length > 0) {
+                await this.saveQueuedOps();
+                await this.loadAllChanges();
+            }
+
+            // At this point, sice there are no unsaved ops and we've loaded everything in the store up to this._lastLoadedOpHash
+            // we can ensure that the checkpoint will be consistent.
+
             const check = this.createCheckpoint();
+
+            this._loadedOpCountAtCheckpoint = this._loadedOpCount;
+    
             await this.getStore().saveCheckpoint(check);
+    
             return check;
         } else {
-            // should we throw an error if the object doesn't support checkpoints?
-            return;
+            throw new Error('A checkpoint was requested, but ' + this.getClassName() + ' does not support it.');
         }
     }
 
     async restoreCheckpoint(checkpoint: StateCheckpoint) {
+
         if (this.getLastHash() !== checkpoint.mutableObject) {
             throw new Error('Trying to apply a state checkpoint to ' + this.getLastHash() + ', but the checkpoint is for ' + checkpoint.mutableObject);
         }
+
+        //if (this._allAppliedOps.size > 0) {
+        //    // oops, the object was modified since the restore was requested, we could "ghost" some operations if we do it now!
+        //    throw new Error('Cannot restore checkpoint, the object has unsaved changes.');
+        //}
 
         const terminalOps = new Map<Hash, MutationOp>();
 
@@ -609,16 +716,19 @@ abstract class MutableObject extends HashedObject {
         }
 
         this._terminalOps         = terminalOps;
-        this._lastLoadedOpHash    = checkpoint.lastLoadedOpHash;
         this._allAppliedOps       = new Set(checkpoint.allAppliedOps.values());
         this._activeCascInvsPerOp = new MultiMap();
-
 
         for (const [k, vs] of checkpoint.activeCascInvsPerOp) {
             for (const v of vs) {
                 this._activeCascInvsPerOp.add(k, v);
             }
         }
+
+        this._lastLoadedOpHash    = checkpoint.lastLoadedOpHash;
+
+        this._loadedOpCount             = checkpoint.loadedOpCount;
+        this._loadedOpCountAtCheckpoint = checkpoint.loadedOpCount;
 
         this.importMutableState(checkpoint.exportedState);
 
@@ -739,6 +849,56 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
+    private setAutoCheckpointTimers() {
+        if (this._supportsCheckpoints && this._autoCheckpoint && this._loadedOpCount > 0) {
+
+            this.clearAutoCheckpointInactivityTimer();
+
+            if (this._autoCheckpointOpTimer !== undefined ||
+                (this._loadedOpCount - (this._loadedOpCountAtCheckpoint || 0) > this._autoCheckpointOpFreq)) {
+
+                    // if either we were on the waiting period before firing an op freq auto checkpoint, or
+                    // the threshold for creating one was just reached, (re) schedule it.
+
+                    if (this._autoCheckpointOpTimer !== undefined) {
+                        this.clearAutoCheckpointOpTimer()
+                    }
+
+                    this.setAutoCheckpointOpTimer();
+            } else if (this._loadedOpCount - (this._loadedOpCountAtCheckpoint || 0) > 0) {
+
+                // if not, but there are un-checkpointed ops, set the inactivity checkpoint timer
+
+                this.setAutoCheckpointInactivityTimer();
+
+            }
+        }
+    }
+
+    private setAutoCheckpointOpTimer() {
+        const delay = this._autoCheckpointOpFreqDelay * (0.90 + Math.random() * 0.20) * 1000;
+        this._autoCheckpointOpTimer = setTimeout(this._autoCheckpointCallback, delay);
+    }
+
+    private clearAutoCheckpointOpTimer() {
+        if (this._autoCheckpointOpTimer !== undefined) {
+            clearTimeout(this._autoCheckpointOpTimer);
+            this._autoCheckpointOpTimer = undefined;
+        }
+    }
+
+    private setAutoCheckpointInactivityTimer()  {
+        const delay = this._autoCheckpointInactivityDelay * (0.90 + Math.random() * 0.20) * 1000;
+        this._autoCheckpointInactivityTimer = setTimeout(this._autoCheckpointCallback, delay);
+    }
+
+    private clearAutoCheckpointInactivityTimer() {
+        if (this._autoCheckpointInactivityTimer !== undefined) {
+            clearTimeout(this._autoCheckpointInactivityTimer);
+            this._autoCheckpointInactivityTimer = undefined;
+        }
+    }
+
     createSyncAgent(peerGroupAgent: PeerGroupAgent) : StateSyncAgent {
         return new HeaderBasedSyncAgent(peerGroupAgent, this, this.getResources() as Resources, this._acceptedMutationOpClasses, this.getSyncAgentStateFilter());
         //return new TerminalOpsSyncAgent(peerGroupAgent, this.getLastHash(), this.getStore(), this._acceptedMutationOpClasses);
@@ -833,6 +993,23 @@ abstract class MutableObject extends HashedObject {
 
     static isContentChangeEvent(ev: MutationEvent) {
         return ContentChangeEventActions.indexOf(ev.action) >= 0;
+    }
+
+    enableAutoCheckpoints(autoCheckpointOpFreq?: number,autoCheckpointOpFreqDelay?: number, autoCheckpointInactivityDelay?: number) {
+        this._autoCheckpoint = true;
+        if (autoCheckpointOpFreq !== undefined) {
+            this._autoCheckpointOpFreq = autoCheckpointOpFreq;
+        }
+        if (autoCheckpointOpFreqDelay !== undefined) {
+            this._autoCheckpointOpFreqDelay = autoCheckpointOpFreqDelay
+        }
+        if (autoCheckpointInactivityDelay !== undefined) {
+            this._autoCheckpointInactivityDelay = autoCheckpointInactivityDelay;
+        }
+    }
+
+    disableAutoCheckpoints() {
+        
     }
 }
 

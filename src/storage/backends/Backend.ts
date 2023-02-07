@@ -26,7 +26,9 @@ interface Backend {
     store(literal : Literal, history?: StoredOpHeader) : Promise<void>;
     load(hash: Hash) : Promise<Storable | undefined>;
 
+    // caveat: storeCheckpoint should do nothing if the received checkpoint is older than the currently saved one
     storeCheckpoint(checkpoint: StateCheckpoint): Promise<void>;
+
     loadLastCheckpoint(mutableObject: Hash): Promise<StateCheckpoint|undefined>;
     loadLastCheckpointMeta(mutableObject: Hash): Promise<StateCheckpoint|undefined>;
 

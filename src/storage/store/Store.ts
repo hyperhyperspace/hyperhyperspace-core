@@ -928,6 +928,10 @@ class Store {
     async loadLastCheckpoint(mutableObject: Hash) {
         return this.backend.loadLastCheckpoint(mutableObject);
     }
+
+    async loadLastCheckpointMeta(mutableObject: Hash) {
+        return this.backend.loadLastCheckpointMeta(mutableObject);
+    }
 }
 
 export { Store, StoredOpHeader, LoadResults };
