@@ -8,6 +8,7 @@ import { StateCheckpoint } from 'data/model';
 type BackendSearchParams = {order?: 'asc'|'desc'|undefined, start?: string, startOn?: Hash, limit?: number};
 type BackendSearchResults = {items : Array<Literal>, start?: string, end?: string };
 
+
 // The sequence number in a storable indicates the order in which objects have been persisted.
 // It's useful, for example, as a rough approximation of the partial order defined by prevOps,
 // since a < b in the prevOps partial order, then seq(a) < seq(b).
@@ -42,7 +43,7 @@ interface Backend {
     // You can think of them as index values for the cursor that search is using. They can be saved and re-used later.
 
     // The common usage is then call searchBy___(...) first, using an arbitary size limit, and then repeatedly use the result.end
-    // to make more calls like searcgBy___(... {start: result.end}) to get all the results in fixed-sized batches.
+    // to make more calls like searchBy___(... {start: result.end}) to get all the results in fixed-sized batches.
 
     // These index values are always strings and can be compared lexicographically.
 

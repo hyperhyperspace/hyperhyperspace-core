@@ -16,7 +16,7 @@ import { OpHeader } from '../../history/OpHeader';
 
 import { MutationOp } from './MutationOp';
 import { EventRelay, Observer } from 'util/events';
-import { MutationEvent } from 'data/model';
+import { LiteralUtils, MutationEvent } from 'data/model';
 
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
@@ -375,39 +375,35 @@ abstract class MutableObject extends HashedObject {
     }
 
     private async loadOpHashes(startOn?: Hash, batchSize=512): Promise<Array<Hash>> {
-        const context = new Context();
-
 
         const opHashes: Array<Hash> = [];
 
         let results = await this.getStore()
-                                .loadByReference(
+                                .loadLiteralsByReference(
                                     'targetObject', 
                                     this.getLastHash(), 
                                     {
                                         order: 'asc',
                                         limit: batchSize,
                                         startOn: startOn
-                                    },
-                                    context);
+                                    });
 
-        while (results.objects.length > 0) {
-            for (const obj of results.objects) {
-                if (obj instanceof MutationOp && this.isAcceptedMutationOpClass(obj)) {
-                    opHashes.push(obj.getLastHash());
+        while (results.literals.length > 0) {
+            for (const lit of results.literals) {
+                if ( this._acceptedMutationOpClasses.indexOf(LiteralUtils.getClassName(lit)) >= 0) {
+                    opHashes.push(lit.hash);
                 }
             }
 
             results = await this.getStore()
-                                .loadByReference(
+                                .loadLiteralsByReference(
                                     'targetObject', 
                                     this.getLastHash(), 
                                     {
                                         order: 'asc',
                                         limit: batchSize,
                                         start: results.end
-                                    },
-                                    context);
+                                    });
         }
 
         return opHashes;

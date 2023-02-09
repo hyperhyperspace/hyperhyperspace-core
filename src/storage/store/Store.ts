@@ -20,6 +20,7 @@ type StoredOpHeader = { literal: OpHeaderLiteral };
 type LoadParams = BackendSearchParams;
 
 type LoadResults = { objects: Array<HashedObject>, start?: string, end?: string };
+type LoadLiteralsResults = { literals: Array<Literal>, start?: string, end?: string };
 
 class Store {
 
@@ -610,6 +611,29 @@ class Store {
         return this.loadSearchResults(searchResults, context);
     }
 
+    async loadLiteralsByClass(className: string, params?: LoadParams) : Promise<LoadLiteralsResults> {
+
+        let searchResults = await this.backend.searchByClass(className, params);
+
+        return this.loadSearchLiteralsResults(searchResults);
+
+    }
+
+    async loadLiteralsByReference(referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<LoadLiteralsResults> {
+
+        let searchResults = await this.backend.searchByReference(referringPath, referencedHash, params);
+
+        return this.loadSearchLiteralsResults(searchResults);
+    }
+
+    async loadLiteralsByReferencingClass(referringClassName: string, referringPath: string, referencedHash: Hash, params?: LoadParams) : Promise<LoadLiteralsResults> {
+
+        let searchResults = await this.backend.searchByReferencingClass(referringClassName, referringPath, referencedHash, params);
+
+        return this.loadSearchLiteralsResults(searchResults);
+    }
+
+
     async loadOpHeader(opHash: Hash): Promise<OpHeader | undefined> {
         const stored = await this.backend.loadOpHeader(opHash);
 
@@ -672,6 +696,17 @@ class Store {
         }
 
         return {objects: objects, start: searchResults.start, end: searchResults.end};    
+    }
+
+    private loadSearchLiteralsResults(searchResults: BackendSearchResults) : {literals: Array<Literal>, start?: string, end?: string} {
+
+        let literals = [] as Array<Literal>;
+        
+        for (let literal of searchResults.items) {
+            literals.push(literal);
+        }
+
+        return {literals: literals, start: searchResults.start, end: searchResults.end};    
     }
 
     async loadTerminalOpsForMutable(hash: Hash) 
