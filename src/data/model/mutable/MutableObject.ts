@@ -412,6 +412,8 @@ abstract class MutableObject extends HashedObject {
 
     async loadAllChanges(batchSize=128, context = new Context()) {
 
+        const initialLoadedOpCount = this._loadedOpCount;
+
         await super.loadAllChanges(batchSize, context);
 
         if (this._supportsCheckpoints && this._allAppliedOps.size === 0) {
@@ -472,7 +474,7 @@ abstract class MutableObject extends HashedObject {
             }
         }
 
-        if (!savedCheckpoint) {
+        if (this._loadedOpCount > initialLoadedOpCount && !savedCheckpoint) {
             this.setAutoCheckpointTimers();
         }
     }
@@ -995,8 +997,7 @@ abstract class MutableObject extends HashedObject {
             }
         } else {
             console.log('no conditions for auto checkpointing ' + this.getLastHash() + ', sorry')
-            console.log([this._supportsCheckpoints, this._autoCheckpoint, this._allAppliedOps.size]);
-            console.log(this._loadedOpCount);
+            console.log(new Error().stack);
         }
     }
 
