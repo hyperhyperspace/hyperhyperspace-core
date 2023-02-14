@@ -33,7 +33,7 @@ abstract class BaseCollection<T> extends MutableObject {
         if (config?.author !== undefined) {
             this.setAuthor(config.author);
         }
-
+        
         if (config?.writers !== undefined) {
             this.writers = new HashedSet<Identity>(config.writers);
 
@@ -59,21 +59,25 @@ abstract class BaseCollection<T> extends MutableObject {
         if (this.writers !== undefined && this.writers.size() === 0) {
             this.writers = undefined;
         }
+        
+        if (this.acceptedTypes === undefined) { // unnecessary if we're restoring from the store
+            if (config?.acceptedTypes !== undefined) {
+                this.acceptedTypes = new HashedSet<string>(config.acceptedTypes.values());
 
-        if (config?.acceptedTypes !== undefined) {
-            this.acceptedTypes = new HashedSet<string>(config.acceptedTypes.values());
-
-            for (const acceptedType of this.acceptedTypes.values()) {
-                if (typeof(acceptedType) !== 'string') {
-                    throw new Error('Accepted types in a CausalCollection should be strings (either class names, or primitive type names)');
+                for (const acceptedType of this.acceptedTypes.values()) {
+                    if (typeof(acceptedType) !== 'string') {
+                        throw new Error('Accepted types in a CausalCollection should be strings (either class names, or primitive type names)');
+                    }
                 }
             }
         }
 
-        if (config?.acceptedElements !== undefined) {
-            this.acceptedElementHashes = new HashedSet<Hash>();
-            for (const acceptedElement of config.acceptedElements.values()) {
-                this.acceptedElementHashes.add(HashedObject.hashElement(acceptedElement));
+        if (this.acceptedElementHashes === undefined) { // unnecessary if we're restoring from the store
+            if (config?.acceptedElements !== undefined) {
+                this.acceptedElementHashes = new HashedSet<Hash>();
+                for (const acceptedElement of config.acceptedElements.values()) {
+                    this.acceptedElementHashes.add(HashedObject.hashElement(acceptedElement));
+                }
             }
         }
     }

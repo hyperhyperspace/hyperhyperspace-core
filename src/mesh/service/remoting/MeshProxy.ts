@@ -243,7 +243,7 @@ class MeshProxy implements MeshInterface {
                             this.commandForwardingFn({
                                 type: 'forward-get-peers-reply',
                                 requestId: req.requestId,
-                                peers: value.map((pi: PeerInfo) => { return {endpoint: pi.endpoint, identityHash: pi.identityHash, identity: pi.identity?.toLiteralContext()}; }),
+                                peers: value.map((pi: PeerInfo) => { return {endpoint: pi.endpoint, identityHash: pi.identityHash, identity: pi.identity?.getLastLiteralContext()}; }),
                                 error: false
                         });
                         },
@@ -272,7 +272,7 @@ class MeshProxy implements MeshInterface {
                                 };
 
                                 if (value.identity !== undefined) {
-                                    peerInfoContext.identity = value.identity.toLiteralContext();
+                                    peerInfoContext.identity = value.identity.getLastLiteralContext();
                                 }
                             }
 
@@ -322,8 +322,8 @@ class MeshProxy implements MeshInterface {
             peerGroupId: pg.id,
             localPeerEndpoint: pg.localPeer.endpoint,
             localPeerIdentityHash: pg.localPeer.identityHash,
-            localPeerIdentity: pg.localPeer.identity === undefined? undefined : pg.localPeer.identity.toLiteralContext(),
-            localPeerIdentityKeyPair: pg.localPeer.identity?._keyPair === undefined? undefined: pg.localPeer.identity._keyPair.toLiteralContext(),
+            localPeerIdentity: pg.localPeer.identity === undefined? undefined : pg.localPeer.identity.getLastLiteralContext(),
+            localPeerIdentityKeyPair: pg.localPeer.identity?._keyPair === undefined? undefined: pg.localPeer.identity._keyPair.getLastLiteralContext(),
             config: config,
             usageToken: token
         };
@@ -373,7 +373,7 @@ class MeshProxy implements MeshInterface {
 
     syncObjectWithPeerGroup(peerGroupId: string, obj: HashedObject, mode:SyncMode=SyncMode.full, usageToken?: UsageToken): UsageToken {
         
-        const ctx = obj.toContext();
+        const ctx = obj.getLastContext();
 
         let stores: any = {};
 
@@ -393,7 +393,7 @@ class MeshProxy implements MeshInterface {
         const cmd: SyncObjectsWithPeerGroup = {
             type:'sync-objects-with-peer-group',
             peerGroupId: peerGroupId,
-            objContext: obj.toLiteralContext(),
+            objContext: obj.getLastLiteralContext(),
             stores: stores,
             mode: mode,
             usageTokens: tokens
@@ -411,7 +411,7 @@ class MeshProxy implements MeshInterface {
         let resultTokens: Map<Hash, UsageToken> = new Map();
 
         for (const obj of objs) {
-            objContext.merge(obj.toContext());
+            objContext.merge(obj.getLastContext());
             const token = usageTokens?.get(obj.getLastHash()) || Mesh.createUsageToken();
             tokens[obj.getLastHash()] = token;
             resultTokens.set(obj.getLastHash(), token);
@@ -466,7 +466,7 @@ class MeshProxy implements MeshInterface {
 
         const cmd: StartObjectBroadcast = {
             type: 'start-object-broadcast',
-            objContext: object.toLiteralContext(),
+            objContext: object.getLastLiteralContext(),
             linkupServers: linkupServers,
             replyEndpoints: replyEndpoints,
             broadcastedSuffixBits: broadcastedSuffixBits,
@@ -499,7 +499,7 @@ class MeshProxy implements MeshInterface {
             hash: hash,
             linkupServers: linkupServers,
             replyEndpoint: replyAddress.url(),
-            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.getLastLiteralContext(),
             count: count,
             maxAge: maxAge,
             strictEndpoints: strictEndpoints,
@@ -524,7 +524,7 @@ class MeshProxy implements MeshInterface {
             hashSuffix: hashSuffix,
             linkupServers: linkupServers,
             replyEndpoint: replyAddress.url(),
-            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.getLastLiteralContext(),
             count: count,
             maxAge: maxAge,
             strictEndpoints: strictEndpoints,
@@ -549,7 +549,7 @@ class MeshProxy implements MeshInterface {
             hash: hash,
             linkupServers: linkupServers,
             replyEndpoint: replyAddress.url(),
-            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.getLastLiteralContext(),
             count: count,
             retry: true,
         }
@@ -563,7 +563,7 @@ class MeshProxy implements MeshInterface {
             hashSuffix: hashSuffix,
             linkupServers: linkupServers,
             replyEndpoint: replyAddress.url(),
-            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.toLiteralContext(),
+            replyIdentity: replyAddress.identity === undefined? undefined: replyAddress.identity.getLastLiteralContext(),
             count: count,
             retry: true,
         }
@@ -581,8 +581,8 @@ class MeshProxy implements MeshInterface {
             type: 'add-object-spawn-callback',
             callbackId: callbackId,
             linkupServers: linkupServers,
-            receiver: receiver.toLiteralContext(),
-            receiverKeyPair: receiver.getKeyPair().toLiteralContext(),
+            receiver: receiver.getLastLiteralContext(),
+            receiverKeyPair: receiver.getKeyPair().getLastLiteralContext(),
             spawnId: spawnId
         }
 
@@ -595,11 +595,11 @@ class MeshProxy implements MeshInterface {
 
         const cmd: SendObjectSpawnRequest = {
             type: 'send-object-spawn-callback',
-            object: object.toLiteralContext(),
-            receiver: receiver.toLiteralContext(),
+            object: object.getLastLiteralContext(),
+            receiver: receiver.getLastLiteralContext(),
             receiverLinkupServers: receiverLinkupServers,
-            sender: sender.toLiteralContext(),
-            senderKeyPair: sender.getKeyPair().toLiteralContext(),
+            sender: sender.getLastLiteralContext(),
+            senderKeyPair: sender.getKeyPair().getLastLiteralContext(),
             senderEndpoint: senderEndpoint,
             spawnId: spawnId
         }
@@ -637,7 +637,7 @@ class MeshProxy implements MeshInterface {
                 type: 'forward-sync-state',
                 requestId: requestId,
                 peerGroupId: peerGroupId,
-                mutLiteralContext: mut.toLiteralContext()
+                mutLiteralContext: mut.getLastLiteralContext()
             };
     
             
@@ -665,7 +665,7 @@ class MeshProxy implements MeshInterface {
                 type: 'add-sync-observer',
                 observerId: observerId,
                 peerGroupId: peerGroupId,
-                mutLiteralContext: mut.toLiteralContext()
+                mutLiteralContext: mut.getLastLiteralContext()
             };
     
             
@@ -698,7 +698,7 @@ class MeshProxy implements MeshInterface {
                     type: 'remove-sync-observer',
                     observerId: observerId,
                     peerGroupId: peerGroupId,
-                    mutLiteralContext: mut.toLiteralContext()
+                    mutLiteralContext: mut.getLastLiteralContext()
                 };
                 
                 const to = window.setTimeout(() => {

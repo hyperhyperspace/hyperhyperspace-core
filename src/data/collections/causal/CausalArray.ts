@@ -1,4 +1,4 @@
-import { Hash } from '../../model/hashing';
+import { Hash, Hashing } from '../../model/hashing';
 import { HashedObject } from '../../model/immutable';
 import { MutationOp } from '../../model/mutable';
 
@@ -11,7 +11,7 @@ import { Authorizer } from '../../model/causal/Authorization'
 import { Authorization, Verification } from '../../model/causal/Authorization';
 
 import { location } from 'util/events';
-import { ClassRegistry, LiteralContext } from 'data/model/literals';
+import { ClassRegistry, Context } from 'data/model/literals';
 import { MutableContentEvents } from 'data/model/mutable/MutableObject';
 import { MultiMap } from 'util/multimap';
 import { InvalidateAfterOp } from 'data/model/causal';
@@ -209,39 +209,43 @@ class CausalArray<T>
   }
 
   exportMutableState() {
+
+    const context = new Context();
+    const currentInsertOpsValue    = HashedObject.literalizeField('', Array.from(this._currentInsertOpOrds.entries()), context).value;
+    const currentInsertOpsLiterals = context.toLiteralContext();
+
     return {
-      _elementsPerOrdinal: [...this._elementsPerOrdinal.entries()],
-      _ordinalsPerElement: [...this._ordinalsPerElement.entries()],
-      _elements: [...this._elements.entries()].map(([k, v]) => [
+      elementsPerOrdinal: [...this._elementsPerOrdinal.entries()],
+      ordinalsPerElement: [...this._ordinalsPerElement.entries()],
+      elements: [...this._elements.entries()].map(([k, v]) => [
         k,
         v instanceof HashedObject ? v.toLiteralContext() : v,
       ]),
-      _currentInsertOps: [...this._currentInsertOps.entries()].map(([k, v]) => [
-        k,
-        [...v.values()].map((op) => op.toLiteralContext()),
-      ]),
-      _currentInsertOpOrds: [...this._currentInsertOpOrds.entries()],
+      currentInsertOpsValue: currentInsertOpsValue,
+      currentInsertOpsLiterals: currentInsertOpsLiterals,
+      currentInsertOpOrds: [...this._currentInsertOpOrds.entries()],
     };
   }
 
   importMutableState(state: any): void {
-    this._elementsPerOrdinal = ArrayMap.fromEntries(state._elementsPerOrdinal);
-    this._ordinalsPerElement = ArrayMap.fromEntries(state._ordinalsPerElement);
+
+    this._elementsPerOrdinal = ArrayMap.fromEntries(state.elementsPerOrdinal);
+    
+    this._ordinalsPerElement = ArrayMap.fromEntries(state.ordinalsPerElement);
+    
     this._elements = new Map(
-      state._elements.map(([k, v]: [Hash, any]) => [
+      state.elements.map(([k, v]: [Hash, any]) => [
         k,
         isLiteralContext(v) ? HashedObject.fromLiteralContext(v) : v,
       ])
     );
-    this._currentInsertOps = DedupMultiMap.fromIterableEntries(
-      state._currentInsertOps.map(([k, v]: [Hash, LiteralContext[]]) => [
-        k,
-        new Set(
-          v.map((op: LiteralContext) => HashedObject.fromLiteralContext(op))
-        ),
-      ])
-    );
-    this._currentInsertOpOrds = new Map(state._currentInsertOpOrds);
+    
+    const context = new Context();
+    context.fromLiteralContext(state.currentInsertOpsLiterals);
+    this._currentInsertOps = DedupMultiMap.fromEntries(HashedObject.deliteralizeField(state.currentInsertOpsValue, context));
+
+    
+    this._currentInsertOpOrds = new Map(state.currentInsertOpOrds);
     
     this._needToRebuild = true;
     this.rebuild();
@@ -305,7 +309,7 @@ class CausalArray<T>
       let delta = 0;
 
       for (const element of elements) {
-        const elementHash = HashedObject.hashElement(element);
+        const elementHash = CausalArray.hashElement(element);
 
         const elmtIdx = this._hashes.indexOf(elementHash);
 
@@ -329,7 +333,7 @@ class CausalArray<T>
     }
 
     for (const element of elements) {
-      const elementHash = HashedObject.hashElement(element);
+      const elementHash = CausalArray.hashElement(element);
 
       // MEGA FIXME: This is broken. It may be the case that after === before if there are several items
       //             with the same ordinal in the array. In that case, the items with ordinal before need
@@ -414,7 +418,7 @@ class CausalArray<T>
 
   async deleteElement(element: T, author?: Identity, extraAuth?: Authorizer) {
     this.deleteElementByHash(
-      HashedObject.hashElement(element),
+      CausalArray.hashElement(element),
       author,
       extraAuth
     );
@@ -476,7 +480,7 @@ class CausalArray<T>
   }
 
   indexOf(element?: T) {
-    return this.indexOfByHash(HashedObject.hashElement(element));
+    return this.indexOfByHash(CausalArray.hashElement(element));
   }
 
   indexOfByHash(hash?: Hash) {
@@ -570,7 +574,7 @@ class CausalArray<T>
       const element = op.element as T;
       const ordinal = op.ordinal as Ordinal;
 
-      const elementHash = HashedObject.hashElement(element);
+      const elementHash = CausalArray.hashElement(element);
 
       this._elementsPerOrdinal.add(ordinal, elementHash);
       this._ordinalsPerElement.add(elementHash, ordinal);
@@ -611,7 +615,7 @@ class CausalArray<T>
     } else if (op instanceof DeleteOp) {
       const deletedOp = op.getTargetOp() as InsertOp<T>;
       const deletedOpHash = deletedOp.getLastHash();
-      const elementHash = HashedObject.hashElement(deletedOp.element);
+      const elementHash = CausalArray.hashElement(deletedOp.element);
 
       let wasBefore = false;
       let element: T | undefined;
@@ -792,7 +796,7 @@ class CausalArray<T>
   }
 
   attestationKey(elmt: T) {
-    return this.attestationKeyByHash(HashedObject.hashElement(elmt));
+    return this.attestationKeyByHash(CausalArray.hashElement(elmt));
   }
 
   attestationKeyByHash(hash: Hash) {
@@ -800,7 +804,7 @@ class CausalArray<T>
   }
 
   async attestMembershipForOp(elmt: T, op?: MutationOp): Promise<boolean> {
-    const hash = HashedObject.hashElement(elmt);
+    const hash = CausalArray.hashElement(elmt);
 
     return this.attestMembershipForOpByHash(hash, op);
   }
@@ -834,7 +838,7 @@ class CausalArray<T>
     usedKeys: Set<string>
   ): boolean {
     return this.checkMembershipAttestationByHashForOp(
-      HashedObject.hashElement(elmt),
+      CausalArray.hashElement(elmt),
       op,
       usedKeys
     );
@@ -867,7 +871,7 @@ class CausalArray<T>
 
     const insertOp = attestOp.getInsertOp();
 
-    if (HashedObject.hashElement(insertOp.element) !== elmtHash) {
+    if (CausalArray.hashElement(insertOp.element) !== elmtHash) {
       return false;
     }
 
@@ -907,6 +911,19 @@ class CausalArray<T>
   size() {
     this.rebuild();
     return this._contents.length;
+  }
+
+  static hashElement(element: any) : Hash {
+
+    let hash: Hash;
+
+    if (element instanceof HashedObject) {
+        hash = (element as HashedObject).getLastHash();
+    } else {
+        hash = Hashing.forValue(HashedObject.literalizeField('', element).value);
+    }
+
+    return hash;
   }
 }
 

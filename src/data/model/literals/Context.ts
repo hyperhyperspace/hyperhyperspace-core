@@ -73,6 +73,12 @@ class Context {
         }
     }
 
+    copy(): Context {
+        const another = new Context();
+        another.merge(this);
+        return another;
+    }
+
     // if a dependency is in more than one subobject, it will pick one of the shortest dep chains.
     findMissingDeps(hash: Hash, chain?: Array<Hash>, missing?: Map<Hash, Array<Hash>>) : Map<Hash, Array<Hash>> {
         

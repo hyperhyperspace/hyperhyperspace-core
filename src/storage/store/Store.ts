@@ -55,6 +55,7 @@ class Store {
     private resources?: Resources;
 
     private keyPairs: Map<Hash, RSAKeyPair>;
+    private keyPairHashForIdentityHash: Map<Hash, Hash>;
 
     private initKeyPairs: Promise<void>;
     private cache: LRUCache<Hash, Literal>;
@@ -78,6 +79,7 @@ class Store {
         this.classReferencesCallbacks = new MultiMap();
 
         this.keyPairs = new Map();
+        this.keyPairHashForIdentityHash = new Map();
 
         this.initKeyPairs = this.doInitKeypairs();
         this.cache = new LRUCache(1024);
@@ -142,10 +144,10 @@ class Store {
             }
 
             if (ctxObject instanceof Identity && !ctxObject.hasKeyPair()) {
-                const kp = this.keyPairs.get(ctxObject.getKeyPairHash());
+                const kp = this.keyPairs.get(this.getKeyPairHashForIdentity(ctxObject));
 
                 if (kp !== undefined) {
-                    ctxObject.addKeyPair(kp);
+                    ctxObject.addKeyPairUnsafe(kp);
                 }
             }
         }
@@ -261,9 +263,9 @@ class Store {
                 if (object.shouldSignOnSave() && !object.hasLastSignature()) {
 
                     if (!author.hasKeyPair()) {
-                        const kp = await this.load(author.getKeyPairHash(), false);
+                        const kp = await this.load(this.getKeyPairHashForIdentity(author), false);
                         if (kp instanceof RSAKeyPair) {
-                            author.addKeyPair(kp);
+                            author.addKeyPairUnsafe(kp);
                         }
                     }
     
@@ -498,6 +500,8 @@ class Store {
 
         const object = await this.loadWithContext(hash, context);
 
+        object?.setLastContext(context);
+
         if (loadMutations && object !== undefined) {
 
             if (watchForChanges) {
@@ -574,9 +578,9 @@ class Store {
                 if (ctxObj instanceof Identity) {
                     const id = ctxObj as Identity;
                     if (!id.hasKeyPair()) {
-                        let kp = this.keyPairs.get(id.getKeyPairHash());
+                        let kp = this.keyPairs.get(this.getKeyPairHashForIdentity(id));
                         if (kp !== undefined && kp instanceof RSAKeyPair) {
-                            id.addKeyPair(kp);
+                            id.addKeyPairUnsafe(kp);
                         }
                     }
                 }
@@ -966,6 +970,19 @@ class Store {
 
     async loadLastCheckpointMeta(mutableObject: Hash) {
         return this.backend.loadLastCheckpointMeta(mutableObject);
+    }
+
+    private getKeyPairHashForIdentity(identity: Identity) {
+
+        const identityHash = identity.getLastHash();
+        let keyPairHash = this.keyPairHashForIdentityHash.get(identityHash);
+
+        if (keyPairHash === undefined) {
+            keyPairHash = identity.getKeyPairHash();
+            this.keyPairHashForIdentityHash.set(identityHash, keyPairHash);
+        }
+
+        return keyPairHash;
     }
 }
 

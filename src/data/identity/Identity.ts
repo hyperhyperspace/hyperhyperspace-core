@@ -76,6 +76,10 @@ class Identity extends HashedObject {
             throw new Error('Trying to add key pair to identity, but it does not match identity public key');
         }
 
+        this.addKeyPairUnsafe(keyPair);
+    }
+
+    addKeyPairUnsafe(keyPair: RSAKeyPair) {
         this._keyPair = keyPair;
     }
 

@@ -124,13 +124,13 @@ abstract class MutableObject extends HashedObject {
             this.clearAutoCheckpointInactivityTimer();
             this.clearAutoCheckpointOpTimer();
 
-            console.log('callback!')
+            //console.log('callback!')
 
             if (store !== undefined) {
                 if (this._unsavedOps.length > 0) {
                     // we need to reschedule a retry!
                     this.setAutoCheckpointTimers();
-                    console.log('delay 1!')
+                    //console.log('delay 1!')
                 } else if (this._allAppliedOps.size > (this._loadedOpCountAtCheckpoint || 0)) {
                     // ok there are no unsaved changes
 
@@ -177,22 +177,22 @@ abstract class MutableObject extends HashedObject {
                                     
                                     ready = true;
                                 } else {
-                                    console.log('not all ops where loaded for ' + this.getLastHash())
+                                    //console.log('not all ops where loaded for ' + this.getLastHash())
                                 }
     
                             } else {
                                 // oops, more ops where applied while loadOpHashes was running
                                 // again, we need to reschedule a retry!
                                 this.setAutoCheckpointTimers();
-                                console.log('delay 2!')
+                                //console.log('delay 2!')
                                 
                             }
     
                         } else {
-                            console.log('a checkpoint was concurrently created for ' + this.getLastHash());
+                            //console.log('a checkpoint was concurrently created for ' + this.getLastHash());
                         }
                     } else {
-                        console.log('checkpoint could be fast-approved for ' + this.getLastHash());
+                        //console.log('checkpoint could be fast-approved for ' + this.getLastHash());
                     }
 
                     if (ready) {
@@ -200,10 +200,10 @@ abstract class MutableObject extends HashedObject {
                     }
                     
                 } else {
-                    console.log('no changes to checkpoint for ' + this.getLastHash());
+                    //console.log('no changes to checkpoint for ' + this.getLastHash());
                 }
             } else {
-                console.log('cancelling checkpoint (no store!) for ' + this.getLastHash());
+                //console.log('cancelling checkpoint (no store!) for ' + this.getLastHash());
             }
         }
         
@@ -421,7 +421,7 @@ abstract class MutableObject extends HashedObject {
                 const checkpoint = await this.getStore().loadLastCheckpoint(this.getLastHash());
 
                 if (checkpoint !== undefined && this._allAppliedOps.size === 0) {
-                    console.log('Restoring checkpoint for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + checkpoint.loadedOpCount + ' ops');
+                    //console.log('Restoring checkpoint for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + checkpoint.loadedOpCount + ' ops');
                     await this.restoreCheckpoint(checkpoint);
                 }    
             } catch (e) {
@@ -700,13 +700,13 @@ abstract class MutableObject extends HashedObject {
             }
         }
 
-        console.log('save! ' + this.getLastHash())
+        //console.log('save! ' + this.getLastHash())
 
         if (this._unsavedOps.length === 0) {
             return false;
         } else {
 
-            console.log('effective save!')
+            //console.log('effective save!')
 
             while (this._unsavedOps.length > 0) {
 
@@ -804,7 +804,7 @@ abstract class MutableObject extends HashedObject {
 
     private async doSaveCheckpoint(check: StateCheckpoint) : Promise<StateCheckpoint> {
 
-        console.log('Saving checkpoint for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
+        //console.log('Saving checkpoint for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
         this._loadedOpCountAtCheckpoint    = check.loadedOpCount;
         this._lastLoadedOpHashAtCheckpoint = check.lastLoadedOpHash;
         await this.getStore().saveCheckpoint(check);
@@ -996,34 +996,34 @@ abstract class MutableObject extends HashedObject {
 
             }
         } else {
-            console.log('no conditions for auto checkpointing ' + this.getLastHash() + ', sorry')
-            console.log(new Error().stack);
+            //console.log('no conditions for auto checkpointing ' + this.getLastHash() + ', sorry')
+            //console.log(new Error().stack);
         }
     }
 
     private setAutoCheckpointOpTimer() {
-        console.log('Set auto checkpoint op timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
+        //console.log('Set auto checkpoint op timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
         const delay = this._autoCheckpointOpFreqDelay * (0.90 + Math.random() * 0.20) * 1000;
         this._autoCheckpointOpTimer = setTimeout(this._autoCheckpointCallback, delay);
     }
 
     private clearAutoCheckpointOpTimer() {
         if (this._autoCheckpointOpTimer !== undefined) {
-            console.log('Cleared auto checkpoint op timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
+            //console.log('Cleared auto checkpoint op timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
             clearTimeout(this._autoCheckpointOpTimer);
             this._autoCheckpointOpTimer = undefined;
         }
     }
 
     private setAutoCheckpointInactivityTimer()  {
-        console.log('Set auto checkpoint inactivity timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
+        //console.log('Set auto checkpoint inactivity timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
         const delay = this._autoCheckpointInactivityDelay * (0.90 + Math.random() * 0.20) * 1000;
         this._autoCheckpointInactivityTimer = setTimeout(this._autoCheckpointCallback, delay);
     }
 
     private clearAutoCheckpointInactivityTimer() {
         if (this._autoCheckpointInactivityTimer !== undefined) {
-            console.log('Cleared auto checkpoint inactivity timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
+            //console.log('Cleared auto checkpoint inactivity timer for ' + this.getClassName() + ' ' + this.getLastHash() + ': ' + this._loadedOpCount + ' ops');
             clearTimeout(this._autoCheckpointInactivityTimer);
             this._autoCheckpointInactivityTimer = undefined;
         }

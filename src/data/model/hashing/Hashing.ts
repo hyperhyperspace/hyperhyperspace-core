@@ -15,13 +15,22 @@ class Hashing {
             seed = '';
         }
 
-        //const t = Date.now();
+        //Error.stackTraceLimit=300;
+        //console.log('hashing from:', new Error().stack);
+
+        //const t = performance.now();
 
         const firstPass  = Hashing.sha.sha256base64('0a' + text + seed);
+
+        //const ty = performance.now();
+
         const secondPass = Hashing.rmd.rmd160base64(text + firstPass); 
 
+        //const tz= performance.now();
+
         //console.trace();
-        //console.log(' *** hashing took ', Date.now() - t, ' for result ', secondPass);
+        //console.log(' *** hashing took ', tz - t, ' for result ', secondPass);
+        //console.log(' *** SHA: ', (ty-t), ' RMD: ', (tz-ty));
 
         return secondPass;
     }

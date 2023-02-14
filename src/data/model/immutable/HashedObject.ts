@@ -48,6 +48,7 @@ abstract class HashedObject {
     private _signOnSave      : boolean;
     private _lastHash?       : Hash;
     private _lastSignature?  : string;
+    private _lastContext?    : Context;
 
     private _resources? : Resources;
 
@@ -208,6 +209,8 @@ abstract class HashedObject {
 
         //console.log('about to hash a ' + this.getClassName())
         //console.trace();
+
+        this._lastContext   = undefined;        
 
         let hash = this.customHash(seed);
 
@@ -530,13 +533,25 @@ abstract class HashedObject {
         return context.toLiteralContext();
     }
 
+    getLastLiteralContext(): LiteralContext {
+        return this.getLastContext().toLiteralContext();
+    }
+
     toLiteral() : Literal {
         let context = this.toContext();
 
         return context.literals.get(context.rootHashes[0]) as Literal;
     }
 
+    getLastLiteral() {
+        let context = this.getLastContext();
+
+        return context.literals.get(context.rootHashes[0]) as Literal;
+    }
+
     toContext(context?: Context) : Context {
+
+        const cache = context === undefined;
 
         if (context === undefined) {
             context = new Context();
@@ -545,7 +560,24 @@ abstract class HashedObject {
         let hash = this.literalizeInContext(context, '');
         context.rootHashes.push(hash);
 
+        if (cache) {
+            this._lastContext = context.copy();
+        }
+
         return context;
+    }
+
+    getLastContext() {
+        if (this._lastContext === undefined) {
+            const ctx = this.toContext(new Context()); // to prevent the copy in toContext
+            this._lastContext = ctx;
+        }
+        
+        return this.toContext();
+    }
+
+    setLastContext(context: Context) {
+        this._lastContext = context;
     }
 
     literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {

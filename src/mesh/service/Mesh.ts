@@ -352,7 +352,7 @@ class Mesh implements MeshInterface {
             broadcastedSuffixBits = ObjectBroadcastAgent.defaultBroadcastedSuffixBits;
         }
 
-        const agentId = ObjectBroadcastAgent.agentIdForHash(object.hash(), broadcastedSuffixBits);
+        const agentId = ObjectBroadcastAgent.agentIdForHash(object.getLastHash(), broadcastedSuffixBits);
         let broadcastAgent = this.pod.getAgent(agentId) as ObjectBroadcastAgent;
         if (broadcastAgent === undefined) {
             broadcastAgent = new ObjectBroadcastAgent(object, broadcastedSuffixBits);
@@ -500,7 +500,7 @@ class Mesh implements MeshInterface {
             this.rootObjectStores.set(gossipId, rootStores);
         }
 
-        let hash = obj.hash();
+        let hash = obj.getLastHash();
 
         Mesh.syncCommandsLog.trace('adding root ' + hash);
 
@@ -597,7 +597,7 @@ class Mesh implements MeshInterface {
 
         const gossipId = gossip.gossipId;
 
-        let hash = obj.hash();
+        let hash = obj.getLastHash();
 
         Mesh.syncCommandsLog.trace('adding full object sync for  ' + hash + '(a ' + obj.getClassName() + ')');
 
@@ -734,7 +734,7 @@ class Mesh implements MeshInterface {
     private async trackOps(gossip: StateGossipAgent, mut: MutableObject, root: Hash) {
         
         let validOpClasses = mut.getAcceptedMutationOpClasses();
-        let refs = await mut.getStore().loadByReference('targetObject', mut.hash());
+        let refs = await mut.getStore().loadByReference('targetObject', mut.getLastHash());
 
 
         for (let obj of refs.objects) {
@@ -754,7 +754,7 @@ class Mesh implements MeshInterface {
             this.allNewOpCallbacks.set(gossip.gossipId, newOpCallbacks);
         }
 
-        let hash = mut.hash();
+        let hash = mut.getLastHash();
 
         if (!newOpCallbacks.has(hash)) {
             let callback = async (opHash: Hash) => {
@@ -762,7 +762,7 @@ class Mesh implements MeshInterface {
                 if (op !== undefined && 
                     mut.getAcceptedMutationOpClasses().indexOf(op.getClassName()) >= 0) {
                         let mutOp = op as MutationOp;
-                        const roots = this.allRootAncestors.get(gossip.gossipId)?.get(mutOp.getTargetObject().hash())
+                        const roots = this.allRootAncestors.get(gossip.gossipId)?.get(mutOp.getTargetObject().getLastHash())
 
                         if (roots !== undefined) {
                             for (const rootHash of roots) {
@@ -776,7 +776,7 @@ class Mesh implements MeshInterface {
 
             newOpCallbacks.set(hash, callback);
 
-            mut.getStore().watchReferences('targetObject', mut.hash(), callback);
+            mut.getStore().watchReferences('targetObject', mut.getLastHash(), callback);
         }
     }
 
