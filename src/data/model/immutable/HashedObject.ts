@@ -614,7 +614,7 @@ abstract class HashedObject {
     literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
         
         let fields = {} as any;
-        let dependencies = new Map<Hash, Dependency>();
+        let dependencies = new Map<string, Dependency>();
 
         for (const fieldName of Object.keys(this)) {
             if (fieldName.length > 0 && fieldName[0] !== '_') {
@@ -709,12 +709,12 @@ abstract class HashedObject {
         }
     }
 
-    static literalizeField(fieldPath: string, something: any, context?: Context) : { value: any, dependencies : Map<Hash, Dependency> }  {
+    static literalizeField(fieldPath: string, something: any, context?: Context) : { value: any, dependencies : Map<string, Dependency> }  {
 
         let typ = typeof(something);
 
         let value;
-        let dependencies = new Map<Hash, Dependency>();
+        let dependencies = new Map<string, Dependency>();
 
         if (typ === 'boolean' || typ === 'number' || typ === 'string') {
             value = something;
@@ -745,7 +745,7 @@ abstract class HashedObject {
                     let reference = something as HashReference<any>;
 
                     let dependency : Dependency = { path: fieldPath, hash: reference.hash, className: reference.className, type: 'reference', direct: true};
-                    dependencies.set(Hashing.forValue(dependency), dependency);
+                    dependencies.set(HashedObject.dependencyKey(dependency), dependency);
 
                     value = reference.literalize();
                 } else if (something instanceof HashedObject) {
@@ -758,9 +758,9 @@ abstract class HashedObject {
                     let hash = hashedObject.literalizeInContext(context, '');
 
                     let dependency : Dependency = { path: fieldPath, hash: hash, className: hashedObject.getClassName(), type: 'literal', direct: true};
-                    dependencies.set(Hashing.forValue(dependency), dependency);
+                    dependencies.set(HashedObject.dependencyKey(dependency), dependency);
 
-                    const hashedDeps = (context.literals.get(hash) as Literal).dependencies.map((d: Dependency)=>[Hashing.forValue(d), d] as [Hash, Dependency])
+                    const hashedDeps = (context.literals.get(hash) as Literal).dependencies.map((d: Dependency)=>[HashedObject.dependencyKey(d), d] as [string, Dependency])
 
                     HashedObject.collectChildDeps(dependencies, fieldPath, new Map(hashedDeps), false);
 
@@ -1061,7 +1061,7 @@ abstract class HashedObject {
         return hash;
     }
 
-    static collectChildDeps(parentDeps : Map<Hash, Dependency>, path: string, childDeps : Map<Hash, Dependency>, direct: boolean) {
+    static collectChildDeps(parentDeps : Map<string, Dependency>, path: string, childDeps : Map<string, Dependency>, direct: boolean) {
         for (const [_hash, childDep] of childDeps.entries()) {
 
             const sep = childDep.path.length > 0 && path.length > 0? '.' : '';
@@ -1073,8 +1073,12 @@ abstract class HashedObject {
                 type: childDep.type, 
                 direct: childDep.direct && direct
             };
-            parentDeps.set(Hashing.forValue(newDep), newDep);
+            parentDeps.set(HashedObject.dependencyKey(newDep), newDep);
         }
+    }
+
+    private static dependencyKey(dep: Dependency) {
+        return dep.path + '#' + dep.hash;
     }
 
     static generateIdForPath(parentId: string, path: string) {
