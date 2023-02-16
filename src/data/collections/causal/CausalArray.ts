@@ -17,7 +17,6 @@ import { MultiMap } from 'util/multimap';
 import { InvalidateAfterOp } from 'data/model/causal';
 import { AuthError, BaseCausalCollection, CausalCollection, CausalCollectionConfig } from './CausalCollection';
 import { Identity } from 'data/identity';
-import { isLiteralContext } from 'data/model/literals/Context';
 
 // A mutable list with a 
 
@@ -210,20 +209,22 @@ class CausalArray<T>
 
   exportMutableState() {
 
-    const context = new Context();
-    const currentInsertOpsValue    = HashedObject.literalizeField('', Array.from(this._currentInsertOpOrds.entries()), context).value;
-    const currentInsertOpsLiterals = context.toLiteralContext();
+    const currentInsertOpsContext = new Context();
+    const currentInsertOpsValue    = HashedObject.literalizeField('', Array.from(this._currentInsertOps.entries()), currentInsertOpsContext).value;
+    const currentInsertOpsLiterals = currentInsertOpsContext.toLiteralContext();
+
+    const elementsContext  = new Context();
+    const elementsValue    = HashedObject.literalizeField('', Array.from(this._elements.entries()), elementsContext).value;
+    const elementsLiterals = elementsContext.toLiteralContext(); 
 
     return {
-      elementsPerOrdinal: [...this._elementsPerOrdinal.entries()],
-      ordinalsPerElement: [...this._ordinalsPerElement.entries()],
-      elements: [...this._elements.entries()].map(([k, v]) => [
-        k,
-        v instanceof HashedObject ? v.toLiteralContext() : v,
-      ]),
+      elementsPerOrdinal: Array.from(this._elementsPerOrdinal.entries()),
+      ordinalsPerElement: Array.from(this._ordinalsPerElement.entries()),
+      elementsValue: elementsValue,
+      elementsLiterals: elementsLiterals,
       currentInsertOpsValue: currentInsertOpsValue,
       currentInsertOpsLiterals: currentInsertOpsLiterals,
-      currentInsertOpOrds: [...this._currentInsertOpOrds.entries()],
+      currentInsertOpOrds: Array.from(this._currentInsertOpOrds.entries()),
     };
   }
 
@@ -233,16 +234,13 @@ class CausalArray<T>
     
     this._ordinalsPerElement = ArrayMap.fromEntries(state.ordinalsPerElement);
     
-    this._elements = new Map(
-      state.elements.map(([k, v]: [Hash, any]) => [
-        k,
-        isLiteralContext(v) ? HashedObject.fromLiteralContext(v) : v,
-      ])
-    );
-    
-    const context = new Context();
-    context.fromLiteralContext(state.currentInsertOpsLiterals);
-    this._currentInsertOps = DedupMultiMap.fromEntries(HashedObject.deliteralizeField(state.currentInsertOpsValue, context));
+    const elementsContext = new Context();
+    elementsContext.fromLiteralContext(state.elementsLiterals);
+    this._elements = new Map(HashedObject.deliteralizeField(state.elementsValue, elementsContext));
+
+    const currentInsertOpsContext = new Context();
+    currentInsertOpsContext.fromLiteralContext(state.currentInsertOpsLiterals);
+    this._currentInsertOps = DedupMultiMap.fromEntries(HashedObject.deliteralizeField(state.currentInsertOpsValue, currentInsertOpsContext));
 
     
     this._currentInsertOpOrds = new Map(state.currentInsertOpOrds);

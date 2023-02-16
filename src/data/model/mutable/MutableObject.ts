@@ -415,7 +415,7 @@ abstract class MutableObject extends HashedObject {
         const initialLoadedOpCount = this._loadedOpCount;
 
         await super.loadAllChanges(batchSize, context);
-
+        
         if (this._supportsCheckpoints && this._allAppliedOps.size === 0) {
             try {
                 const checkpoint = await this.getStore().loadLastCheckpoint(this.getLastHash());
