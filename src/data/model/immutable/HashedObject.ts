@@ -5,6 +5,7 @@ import { RNGImpl } from 'crypto/random';
 import { Identity } from '../../identity/Identity';
 
 import { Hashing, Hash } from '../hashing/Hashing';
+import { Serialization } from '../hashing/Serialization';
 
 import { HashedSet } from './HashedSet';
 import { HashReference } from './HashReference';
@@ -46,9 +47,9 @@ abstract class HashedObject {
     
     private _derivedFields   : Set<string>;
     private _signOnSave      : boolean;
-    private _lastHash?       : Hash;
     private _lastSignature?  : string;
-    private _lastContext?    : Context;
+    private _lastLiteral?    : Literal;
+    private _lastCustomHash? : Hash;
 
     private _resources? : Resources;
 
@@ -75,7 +76,7 @@ abstract class HashedObject {
 
     setId(id: string) {
         this.id = id;
-        this._lastHash = undefined;
+        this._lastLiteral = undefined;
         
         for (const fieldName of this._derivedFields) {
             const obj = (this as any)[fieldName];
@@ -123,6 +124,7 @@ abstract class HashedObject {
 
     setLastSignature(signature: string) : void {
         this._lastSignature = signature;
+        this._lastLiteral   = undefined;
     }
 
     getLastSignature() : string {
@@ -184,33 +186,43 @@ abstract class HashedObject {
         }
     }
 
-    hasLastHash() {
-        return this._lastHash !== undefined;
+    hasLastLiteral() {
+        return this._lastLiteral !== undefined;
     }
 
-    setLastHash(hash: Hash) {
-        this._lastHash = hash;
+    getLastLiteral() {
+        return this._lastLiteral;
     }
 
-    getLastHash() {
-        
-        if (this._lastHash === undefined) {
-            this.hash();
-        }
-
-        return this._lastHash as Hash;
+    setLastLiteral(literal: Literal) {
+        this._lastLiteral = literal;
     }
 
     shouldSignOnSave() {
         return this._signOnSave;
+    }
+
+    hasLastHash() {
+        return this._lastLiteral?.hash !== undefined;
+    }
+
+    getLastHash() {
+        
+        if (this._lastCustomHash === undefined && this._lastLiteral === undefined) {
+            this.hash();
+        }
+
+        if (this._lastCustomHash !== undefined) {
+            return this._lastCustomHash;
+        } else {
+            return (this._lastLiteral as Literal).hash;
+        }
     }
   
     hash(seed?: string): Hash {
 
         //console.log('about to hash a ' + this.getClassName())
         //console.trace();
-
-        this._lastContext   = undefined;        
 
         let hash = this.customHash(seed);
 
@@ -222,11 +234,10 @@ abstract class HashedObject {
                 let literal = context.literals.get(context.rootHashes[0]) as Literal;
                 hash = Hashing.forValue(literal.value, seed);
             }
-            
-        }
-
-        if (seed === undefined) { 
-            this._lastHash = hash;
+        } else {
+            if (seed === undefined) {
+                this._lastCustomHash = hash;
+            }
         }
 
         return hash;
@@ -317,6 +328,14 @@ abstract class HashedObject {
 
         for (const subobj of this.getDirectSubObjects().values()) {
             subobj.forgetResources();
+        }
+    }
+
+    forgetCachedLiterals(): void {
+        this._lastLiteral = undefined;
+
+        for (const subobj of this.getDirectSubObjects().values()) {
+            subobj.forgetCachedLiterals();
         }
     }
 
@@ -533,25 +552,13 @@ abstract class HashedObject {
         return context.toLiteralContext();
     }
 
-    getLastLiteralContext(): LiteralContext {
-        return this.getLastContext().toLiteralContext();
-    }
-
     toLiteral() : Literal {
         let context = this.toContext();
 
         return context.literals.get(context.rootHashes[0]) as Literal;
     }
 
-    getLastLiteral() {
-        let context = this.getLastContext();
-
-        return context.literals.get(context.rootHashes[0]) as Literal;
-    }
-
     toContext(context?: Context) : Context {
-
-        const cache = context === undefined;
 
         if (context === undefined) {
             context = new Context();
@@ -560,24 +567,48 @@ abstract class HashedObject {
         let hash = this.literalizeInContext(context, '');
         context.rootHashes.push(hash);
 
-        if (cache) {
-            this._lastContext = context.copy();
+        return context;
+    }
+
+    getLastContext(context?: Context) : Context {
+
+        if (context === undefined) {
+            context = new Context();
         }
+
+        const hash = this.getContextFromLastLiteral(context);
+
+
+        context.rootHashes.push(hash);
 
         return context;
     }
 
-    getLastContext() {
-        if (this._lastContext === undefined) {
-            const ctx = this.toContext(new Context()); // to prevent the copy in toContext
-            this._lastContext = ctx;
+    private getContextFromLastLiteral(context: Context): Hash {
+
+        if (this._lastLiteral === undefined) {
+            return this.literalizeInContext(context, ''); 
+        } else {
+            const hash = (this._lastLiteral as Literal).hash;
+
+            if (context.resources?.aliasing?.get(hash) !== undefined) {
+                context.objects.set(hash, context.resources.aliasing.get(hash) as HashedObject);
+            } else {
+                context.objects.set(hash, this);
+            }
+            
+            context.literals.set(hash, this._lastLiteral);
+    
+            for (const subobj of this.getDirectSubObjects().values()) {
+                subobj.getContextFromLastLiteral(context);
+            }
+
+            return hash;
         }
-        
-        return this.toContext();
     }
 
-    setLastContext(context: Context) {
-        this._lastContext = context;
+    getLastLiteralContext() {
+        return this.getLastContext().toLiteralContext();
     }
 
     literalizeInContext(context: Context, path: string, flags?: Array<string>) : Hash {
@@ -606,13 +637,34 @@ abstract class HashedObject {
             _flags  : flags
         };
 
+        Object.freeze(fields);
+        Object.freeze(value);
+
         let hash = this.customHash();
 
+        let hashed = false;
+
         if (hash === undefined) {
-            hash = Hashing.forValue(value)
+
+            const serial = Serialization.default(value);
+
+            if (this._lastLiteral !== undefined && Serialization.default(this._lastLiteral.value) === serial) {
+                hash = this._lastLiteral.hash;
+            } else {
+                hash = Hashing.forString(serial);
+                hashed = true;
+            }
         }
 
         let literal: Literal = { hash: hash, value: value, dependencies: Array.from(dependencies.values()) };
+
+       /*for (const dep of dependencies.values()) {
+            if (dep.hash === 'aIhvrwQ1g7dbZ1Gvzijz/VnJjVo=') {
+                console.log('found aIhvrwQ1g7dbZ1Gvzijz/VnJjVo= (' + dep.className + ') as a dep of ' + hash + ' (' +  literal.value._class + ')!!!!')
+                console.log(dep);
+
+            }
+        }*/
 
         if (this.author !== undefined) {
             literal.author = value['_fields']['author']['_hash'];
@@ -631,7 +683,9 @@ abstract class HashedObject {
         
         context.literals.set(hash, literal);
 
-        this.setLastHash(hash);
+        if (hashed) {
+            this.setLastLiteral(literal);
+        }
 
         return hash;
     }
@@ -775,6 +829,7 @@ abstract class HashedObject {
         }
 
         if (context.objects.has(hash)) {
+
             return context.objects.get(hash) as HashedObject;
         } else {
 
@@ -784,48 +839,67 @@ abstract class HashedObject {
                 throw new Error('Literal for ' + hash + ' missing from context');
             }
 
-            for (const dep of literal.dependencies) {
+            if (literal.hash !== hash) {
+                throw new Error('Wrong hash for root object ' + hash + ', found ' + literal.hash + ' instead');
+            }
+
+            /*for (const dep of literal.dependencies) {
 
                 if (!context.objects.has(dep.hash)) {
                     await HashedObject.fromContextWithValidation(context, dep.hash);
                 }
-            }
+            }*/
 
-            const obj = HashedObject.fromContext(context, hash, true);
+            const obj = HashedObject.fromContextInternal(context, hash, true);
 
             if (obj.hash() !== hash) {
-                context.objects.delete(hash);
-                throw new Error('Wrong hash for ' + hash + ' of type ' + obj.getClassName() + ', hashed to ' + obj.getLastHash() + ' instead');
+                throw new Error('Wrong hash for root object ' + hash + ', computed ' + obj.getLastHash() + ' instead');
             }
-
-            if (obj.author !== undefined) {
-                if (literal.signature === undefined) {
-                    context.objects.delete(hash);
-                    throw new Error('Missing signature for ' + hash + ' of type ' + obj.getClassName());
-                }
-
-                if (!await obj.author.verifySignature(hash, literal.signature)) {
-                    context.objects.delete(hash);
-                    throw new Error('Invalid signature for ' + hash + ' of type ' + obj.getClassName());
-                }
-            }
-
+            
             if (context.resources !== undefined) {
                 obj.setResources(context.resources);
             }
             
-            if (!await obj.validate(context.objects)) {
-                context.objects.delete(hash);
-                throw new Error('Validation failed for ' + hash + ' of type ' + obj.getClassName());
-            }
+            await HashedObject.validateObject(obj, context, new Set());
 
             return obj;
         }
     }
+
+    private static async validateObject(obj: HashedObject, context: Context, done: Set<HashedObject>): Promise<void> {
+
+        if (done.has(obj)) {
+            return;
+        }
+
+        for (const subobj of obj.getDirectSubObjects().values()) {
+            await HashedObject.validateObject(subobj, context, done);
+        }
+
+        if (obj.author !== undefined) {
+            if (!obj.hasLastSignature()) {
+                throw new Error('Missing signature for ' + obj.getLastHash() + ' of type ' + obj.getClassName());
+            }
+
+            if (!await obj.author.verifySignature(obj.getLastHash(), obj.getLastSignature())) {
+                throw new Error('Invalid signature for ' + obj.getLastHash() + ' of type ' + obj.getClassName());
+            }
+        }
+
+        if (!await obj.validate(context.objects)) {
+            throw new Error('Validation failed for ' + obj.getLastHash() + ' of type ' + obj.getClassName());
+        }
+
+        done.add(obj);
+    }
     
+    static fromContext(context: Context, hash?: Hash) : HashedObject {
+        return HashedObject.fromContextInternal(context, hash);
+    }
+
     // do not use validate=true directly, use fromContextWithValidation
 
-    static fromContext(context: Context, hash?: Hash, validate=false) : HashedObject {
+    private static fromContextInternal(context: Context, hash?: Hash, validate=false) : HashedObject {
 
         if (hash === undefined) {
             if (context.rootHashes.length === 0) {
@@ -893,8 +967,16 @@ abstract class HashedObject {
             hashedObject.setResources(context.resources);
         }
         
-        hashedObject.setLastHash(hash);
-
+        if (!validate) {
+            hashedObject.setLastLiteral(literal);
+        } else {
+            const serial = Serialization.default(literal.value)
+            const hash = Hashing.forString(serial);
+            if (hash !== literal.hash) {
+                throw new Error('Error validating hash: declared value is ' + literal.hash + ', computed ' + hash);
+            }
+        }
+        
         hashedObject.init();
 
 

@@ -127,9 +127,8 @@ class Store {
 
         // The following is necessary in case the object (or a subobject) was already in the store,
         // and hence saveWithContext didn't visit all subobjects setting hashes and stores.
-        for (const [ctxHash, ctxObject] of context.objects.entries()) {
-            
-            ctxObject.setLastHash(ctxHash);
+        // * not hashes! they are not cached anymore, the entire literals should have been cached in toContext()
+        for (const ctxObject of context.objects.values()) {
             
             if (this.resources === undefined) {
                 const objResources = ctxObject.getResources()
@@ -242,10 +241,6 @@ class Store {
         } else {
             object.setResources(this.resources);
         }
-
-        //object.setStore(this);
-
-        object.setLastHash(hash);
 
         const author = object.getAuthor();
         const loadedLit = (await this.backend.load(hash))?.literal;
@@ -499,8 +494,6 @@ class Store {
         context.resources = this.resources;
 
         const object = await this.loadWithContext(hash, context);
-
-        object?.setLastContext(context);
 
         if (loadMutations && object !== undefined) {
 

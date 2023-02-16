@@ -919,6 +919,8 @@ class HistorySynchronizer {
                         if (reqInfo.receivedObjects?.objects?.get(dep.hash()) === undefined) {
                             reqInfo.receivedObjects?.objects.set(dep.hash(), dep);
                         }
+                    } else {
+                        console.log('****** YOU BOTCHED THE OMISSION PROOF SANTI *******')
                     }
                 }
 
@@ -994,11 +996,18 @@ class HistorySynchronizer {
                 try {
 
                     // throws if validation fails
-                    await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
+                    const obj = await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
 
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     
-                    await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
+                    // we need to create a new context so all the objects are in context.objects (otherwise, the ones that were omitted may
+                    // have dependencies missing there)
+
+                    const context = obj.toContext();
+                    await this.syncAgent.store.saveWithContext(literal.hash, context as Context);
+
+                    
+                    //await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
                     
                     // FIXME: there's no validation of the op matching the actual causal history op
                     // TODO:  validate, remove op and all history following if op does not match
@@ -1010,10 +1019,14 @@ class HistorySynchronizer {
                     }
 
                 } catch (e: any) {
+                    /*console.log('root obj: ' + o.getLastHash() );
+                    console.log('root obj auth:' + (o as any).targetObject?.getAuthor()?.getLastHash());
+                    console.log('all_before: ' + all_before);
+                    console.log('all: ' + all);*/
                     const detail = 'Error while deliteralizing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                     this.cancelRequest(reqInfo, 'invalid-literal', '\n'+this.logPrefix+'\n'+detail);
+                    this.opXferLog.warning(detail);
                     this.opXferLog.warning(e);
-                    this.opXferLog.warning(e.stack);
                     this.opXferLog.warning('\n'+this.logPrefix+'\nnextLiteralSequence='+reqInfo.nextLiteralSequence);
                     this.opXferLog.warning('\n'+this.logPrefix+'\nreceivedLiteralsCount='+reqInfo.receivedLiteralsCount);
                     return false;    
