@@ -53,7 +53,8 @@ type RequestInfo = {
     missingCurrentState?      : Set<Hash>; // uses op hashes!
 
     receivedObjects?  : Context,
-    validatedObjects? : Set<Hash> 
+    validatedObjects? : Set<Hash>,
+    readyToSaveObjects? : Context
 };
 
 class HistorySynchronizer {
@@ -997,6 +998,9 @@ class HistorySynchronizer {
 
             if (this.syncAgent.literalIsValidOp(literal)) {    
 
+                //const v =  Array.from(reqInfo.receivedObjects?.objects.keys()||[]);
+                //const l = Array.from(reqInfo.receivedObjects?.literals.keys()||[]);
+
                 try {
 
                     if (reqInfo.validatedObjects === undefined) {
@@ -1011,10 +1015,22 @@ class HistorySynchronizer {
                     // we need to create a new context so all the objects are in context.objects (otherwise, the ones that were omitted may
                     // have dependencies missing there)
 
-                    const context = obj.toContext();
-                    await this.syncAgent.store.saveWithContext(literal.hash, context as Context);
+                    if (reqInfo.readyToSaveObjects === undefined) {
+                        reqInfo.readyToSaveObjects = new Context();
+                    }
+
+                    obj.toContext(reqInfo.readyToSaveObjects);
+                    obj.addReferencesToContext(reqInfo.readyToSaveObjects, ((reqInfo.receivedObjects as Context).objects));
+
+                    await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.readyToSaveObjects);
 
                     
+                    if (obj.getClassName() === 'hhs/v0/CausalRefUpdateOp') {
+                        console.log('setting value of ' + ((obj as any).targetObject as any).getLastHash());
+                        console.log('new value: ' + (obj as any).value)
+
+                    }
+
                     //await this.syncAgent.store.saveWithContext(literal.hash, reqInfo.receivedObjects as Context);
                     
                     // FIXME: there's no validation of the op matching the actual causal history op
@@ -1026,10 +1042,8 @@ class HistorySynchronizer {
                         this.attemptNewRequests();
                     }
                 } catch (e: any) {
-                    /*console.log('root obj: ' + o.getLastHash() );
-                    console.log('root obj auth:' + (o as any).targetObject?.getAuthor()?.getLastHash());
-                    console.log('all_before: ' + all_before);
-                    console.log('all: ' + all);
+
+                    /*
                     console.log('objects in context before: ', v);
                     console.log('objects in context after: ', Array.from(reqInfo.receivedObjects?.objects.keys()||[]));
                     console.log('literals in context before: ', l);

@@ -575,6 +575,34 @@ abstract class HashedObject {
         return context;
     }
 
+    addReferencesToContext(context: Context, references: Map<Hash, HashedObject>) : Context {
+
+        const lit = context.literals.get(this.getLastHash()) as Literal;
+
+        for (const dep of lit?.dependencies) {
+            if (dep.direct) {
+
+                if (dep.type === 'literal') {
+                    const subobj = context.objects.get(dep.hash);
+
+                    if (subobj === undefined) {
+                        throw new Error('Trying to add references to context but subobject ' + dep.hash + ' (' + dep.path + ') is missing for ' + lit.hash);
+                    }
+    
+                    subobj.addReferencesToContext(context, references);
+                } else if (dep.type === 'reference') {
+                    const ref = references.get(dep.hash);
+
+                    if (ref !== undefined) {
+                        ref.toContext(context);
+                    }
+                }
+            }
+        }
+
+        return context;
+    }
+
     getLastContext(context?: Context) : Context {
 
         if (context === undefined) {
@@ -870,7 +898,7 @@ abstract class HashedObject {
         return object;
     }
 
-    private static async validateObject(obj: HashedObject, context: Context, done: Set<Hash>): Promise<void> {
+    private static async validateObject(obj: HashedObject, context: Context, alreadyValidated: Set<Hash>): Promise<void> {
 
         const literal = context.literals.get(obj.getLastHash());
 
@@ -880,7 +908,7 @@ abstract class HashedObject {
         }
 
         // if already validated, skip
-        if (done.has(obj.getLastHash())) {
+        if (alreadyValidated.has(obj.getLastHash())) {
             return;
         }
 
@@ -891,9 +919,17 @@ abstract class HashedObject {
             }
         }*/
 
-        for (const ref of obj.getDirectSubObjectsAndReferences().references.values()) {
+        const objContents = obj.getDirectSubObjectsAndReferences()
+
+        for (const [hash, subobj] of objContents.objects.entries()) {
+            if (context.literals.has(hash)) {
+                await HashedObject.validateObject(subobj, context, alreadyValidated);
+            }
+        }
+
+        for (const ref of objContents.references.values()) {
             if (context.literals.has(ref.hash) && !context.objects.has(ref.hash)) {
-                await HashedObject.fromContextWithValidation(context, ref.hash, done);
+                await HashedObject.fromContextWithValidation(context, ref.hash, alreadyValidated);
             }
         }
 
@@ -907,20 +943,12 @@ abstract class HashedObject {
             }
         }
 
-        try {
-            if (!await obj.validate(context.objects)) {
-                throw new Error('Validation failed for ' + obj.getLastHash() + ' of type ' + obj.getClassName());
-            }
-        } catch (e) {
-
-            console.log('RECEIVED LITERAL FOR OBJ THAT FAILED VALIDATION:');
-            console.log(JSON.stringify(literal, undefined, 4));
-
-            throw e;
+        if (!await obj.validate(context.objects)) {
+            throw new Error('Validation failed for ' + obj.getLastHash() + ' of type ' + obj.getClassName());
         }
         
 
-        done.add(obj.getLastHash());
+        alreadyValidated.add(obj.getLastHash());
     }
     
     static fromContext(context: Context, hash?: Hash) : HashedObject {
