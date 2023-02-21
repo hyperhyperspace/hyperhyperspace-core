@@ -194,7 +194,7 @@ class PeerGroupAgent implements Agent {
             minPeers: params.minPeers || 3,
             maxPeers: params.maxPeers || 12,
             peerConnectionTimeout: params.peerConnectionTimeout || 20,
-            peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 10,
+            peerConnectionAttemptInterval: params.peerConnectionAttemptInterval || 10,
             peerDiscoveryAttemptInterval: params.peerDiscoveryAttemptInterval || 15,
             tickInterval: params.tickInterval || 30
         };

@@ -48,11 +48,12 @@ type RequestInfo = {
     nextLiteralSequence       : number,
     nextLiteralPromise?       : Promise<boolean>,
 
-    outOfOrderLiterals        : Map<number, Literal>;
+    pendingLiterals        : Map<number, Literal>;
 
     missingCurrentState?      : Set<Hash>; // uses op hashes!
 
-    receivedObjects? : Context
+    receivedObjects?  : Context,
+    validatedObjects? : Set<Hash> 
 };
 
 class HistorySynchronizer {
@@ -491,7 +492,7 @@ class HistorySynchronizer {
             nextOpSequence: 0,
             nextLiteralSequence: 0,
             receivedLiteralsCount: 0,
-            outOfOrderLiterals: new Map(),
+            pendingLiterals: new Map(),
             requestSendingTimestamp: Date.now()
         };
 
@@ -786,8 +787,8 @@ class HistorySynchronizer {
             if (enqueue) {
                 reqInfo.lastLiteralTimestamp  = Date.now();
                 reqInfo.receivedLiteralsCount = reqInfo.receivedLiteralsCount + 1;
-                if (reqInfo.request.maxLiterals === undefined || reqInfo.outOfOrderLiterals.size < reqInfo.request.maxLiterals) {
-                    reqInfo.outOfOrderLiterals.set(msg.sequence, msg.literal);
+                if (reqInfo.request.maxLiterals === undefined || reqInfo.pendingLiterals.size < reqInfo.request.maxLiterals) {
+                    reqInfo.pendingLiterals.set(msg.sequence, msg.literal);
                 }
             }
 
@@ -910,17 +911,20 @@ class HistorySynchronizer {
                 for (const idx of resp.omittedObjs.keys()) {
 
                     
+                    // FIXME: don't load the same omitted dep more than once?
+
                     const hash = resp.omittedObjs[idx];
                     const omissionProof = resp.omittedObjsOwnershipProofs[idx];
     
                     const dep = await this.syncAgent.store.load(hash, false, false);
-                    
-                    if (dep !== undefined && dep.hash(reqInfo.request.omissionProofsSecret) === omissionProof) {
+                    const computed = dep?.hash(reqInfo.request.omissionProofsSecret)
+
+                    if (dep !== undefined && computed === omissionProof) {
                         if (reqInfo.receivedObjects?.objects?.get(dep.hash()) === undefined) {
                             reqInfo.receivedObjects?.objects.set(dep.hash(), dep);
                         }
                     } else {
-                        console.log('****** YOU BOTCHED THE OMISSION PROOF SANTI *******')
+                        this.opXferLog.warning('Error loading omission (incorrect proof?)mut=' + this.syncAgent.mutableObjHash + ' req=' + req.requestId + ' omitted hash=' + dep?.getLastHash() + ' received proof: ' + omissionProof  + ' computed proof: ' + computed);
                     }
                 }
 
@@ -947,24 +951,24 @@ class HistorySynchronizer {
             return;
         }
 
-        this.opXferLog.trace('\n'+this.logPrefix+'\nCalled attemptToProcessLiterals for ' + reqInfo.request.requestId + ': ' + reqInfo.outOfOrderLiterals.size + ' literals to process');
+        this.opXferLog.trace('\n'+this.logPrefix+'\nCalled attemptToProcessLiterals for ' + reqInfo.request.requestId + ': ' + reqInfo.pendingLiterals.size + ' literals to process');
 
 
-        while (reqInfo.outOfOrderLiterals.size > 0 && reqInfo.receivedObjects !== undefined) {
+        while (reqInfo.pendingLiterals.size > 0 && reqInfo.receivedObjects !== undefined) {
 
             // Check if the request has not been cancelled
             if (this.requests.get(reqInfo.request.requestId) === undefined) {
                 break;
             }
 
-            const literal = reqInfo.outOfOrderLiterals.get(reqInfo.nextLiteralSequence);
+            const literal = reqInfo.pendingLiterals.get(reqInfo.nextLiteralSequence);
 
 
             if (literal === undefined) {
                 break;
             } else {
 
-                reqInfo.outOfOrderLiterals.delete(reqInfo.nextLiteralSequence);
+                reqInfo.pendingLiterals.delete(reqInfo.nextLiteralSequence);
                 reqInfo.nextLiteralPromise = this.processLiteral(reqInfo, literal);
                 const done = !await reqInfo.nextLiteralPromise;
                 
@@ -988,16 +992,20 @@ class HistorySynchronizer {
             
         reqInfo.receivedObjects?.literals.set(literal.hash, literal);
         reqInfo.nextLiteralSequence = reqInfo.nextLiteralSequence + 1;
-
+        
         if ((reqInfo.response?.sendingOps as Hash[])[reqInfo.nextOpSequence as number] === literal.hash) {
 
-            if (this.syncAgent.literalIsValidOp(literal)) {
-                
+            if (this.syncAgent.literalIsValidOp(literal)) {    
+
                 try {
 
-                    // throws if validation fails
-                    const obj = await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash);
+                    if (reqInfo.validatedObjects === undefined) {
+                        reqInfo.validatedObjects = new Set();
+                    }
 
+                    // throws if validation fails
+                    const obj = await HashedObject.fromContextWithValidation(reqInfo.receivedObjects as Context, literal.hash, reqInfo.validatedObjects);
+            
                     reqInfo.nextOpSequence = reqInfo.nextOpSequence as number + 1;
                     
                     // we need to create a new context so all the objects are in context.objects (otherwise, the ones that were omitted may
@@ -1017,21 +1025,28 @@ class HistorySynchronizer {
                     if (removed) {
                         this.attemptNewRequests();
                     }
-
                 } catch (e: any) {
                     /*console.log('root obj: ' + o.getLastHash() );
                     console.log('root obj auth:' + (o as any).targetObject?.getAuthor()?.getLastHash());
                     console.log('all_before: ' + all_before);
-                    console.log('all: ' + all);*/
+                    console.log('all: ' + all);
+                    console.log('objects in context before: ', v);
+                    console.log('objects in context after: ', Array.from(reqInfo.receivedObjects?.objects.keys()||[]));
+                    console.log('literals in context before: ', l);
+                    console.log('literals in context after: ', Array.from(reqInfo.receivedObjects?.literals.keys()||[]));
+        
+                    console.log('omissions', reqInfo.response?.omittedObjs)*/
+        
                     const detail = 'Error while deliteralizing op ' + literal.hash + ' in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                     this.cancelRequest(reqInfo, 'invalid-literal', '\n'+this.logPrefix+'\n'+detail);
                     this.opXferLog.warning(detail);
                     this.opXferLog.warning(e);
+                    this.opXferLog.warning(e.stack);
                     this.opXferLog.warning('\n'+this.logPrefix+'\nnextLiteralSequence='+reqInfo.nextLiteralSequence);
                     this.opXferLog.warning('\n'+this.logPrefix+'\nreceivedLiteralsCount='+reqInfo.receivedLiteralsCount);
                     return false;    
                 }
-
+                    
             } else {
                 const detail = '\n'+this.logPrefix+'\nReceived op '+ literal.hash +' is not valid for mutableObj ' + this.syncAgent.mutableObjHash + ', in response to request ' + reqInfo.request.requestId + '(op sequence: ' + reqInfo.nextOpSequence + ')';
                 this.cancelRequest(reqInfo, 'invalid-literal', detail);

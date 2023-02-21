@@ -459,7 +459,7 @@ abstract class HashedObject {
         return subobjs;
     }
 
-    static collectDirectSubobjects(path: string, value: any, subobjects: Map<string, HashedObject>) {
+    static collectDirectSubobjects(path: string, value: any, subobjects: Map<string, HashedObject>, references: Map<Hash, HashReference<HashedObject>>) {
 
         //console.log('called collectDirectSubobjects() w/path', path, 'subobjects: ', subobjects.size);
         //console.log(new Error().stack);
@@ -474,18 +474,18 @@ abstract class HashedObject {
                 subobjects.set(path, value);
             } else if (Array.isArray(value)) {
                 for (const [idx, elmt] of value.entries()) {
-                    HashedObject.collectDirectSubobjects(path + '[' + idx + ']', elmt, subobjects);
+                    HashedObject.collectDirectSubobjects(path + '[' + idx + ']', elmt, subobjects, references);
                 }
             } else if (value instanceof HashedSet) {
                 for (const [hash, elmt] of value.entries()) {
-                    HashedObject.collectDirectSubobjects(path + '[' + hash + ']', elmt, subobjects);
+                    HashedObject.collectDirectSubobjects(path + '[' + hash + ']', elmt, subobjects, references);
                 }
             } else if (value instanceof HashedMap) {
                 for (const [key, elmt] of value.entries()) {
-                    HashedObject.collectDirectSubobjects(path + '[' + key + ']', elmt, subobjects);
+                    HashedObject.collectDirectSubobjects(path + '[' + key + ']', elmt, subobjects, references);
                 }
             } else if (value instanceof HashReference) {
-                // do nothing
+                references.set(path, value);
             } else { // value is a plain object dictionary
                 for (const fieldName of Object.keys(value)) {
 
@@ -494,17 +494,22 @@ abstract class HashedObject {
                     const sep = fieldName.length > 0 && path.length > 0? '.' : '';
                     const newPath = path + sep + fieldName;
 
-                    HashedObject.collectDirectSubobjects(newPath, fieldValue, subobjects);                    
+                    HashedObject.collectDirectSubobjects(newPath, fieldValue, subobjects, references);                    
                 }
             }
         }
     }
 
     getDirectSubObjects(): Map<string, HashedObject> {
+        return this.getDirectSubObjectsAndReferences().objects;
+    }
+
+    getDirectSubObjectsAndReferences(): { objects: Map<Hash, HashedObject>, references: Map<Hash, HashReference<HashedObject>> } {
 
         //return this.getSubObjects(context, true);
 
-        const subobjects = new Map<string, HashedObject>();
+        const subobjects = new Map<Hash, HashedObject>();
+        const references = new Map<Hash, HashReference<HashedObject>>();
         const objectKeys = Object.keys(this)
         // console.log('getDirectSubObjects: iterating over', objectKeys.length, 'keys')
         for (const fieldName of objectKeys) {
@@ -512,11 +517,11 @@ abstract class HashedObject {
                 // console.log('getDirectSubObjects', fieldName, this)
                 let value = (this as any)[fieldName];
 
-                HashedObject.collectDirectSubobjects(fieldName, value, subobjects);
+                HashedObject.collectDirectSubobjects(fieldName, value, subobjects, references);
             }
         }
 
-        return subobjects;
+        return { objects: subobjects, references: references };
 
         /*
         let literal: Literal;
@@ -818,7 +823,7 @@ abstract class HashedObject {
 
     // IMPORTANT: this method is NOT reentrant / thread safe!
 
-    static async fromContextWithValidation(context: Context, hash?: Hash): Promise<HashedObject> {
+    static async fromContextWithValidation(context: Context, hash?: Hash, alreadyValidated=new Set<Hash>()): Promise<HashedObject> {
         if (hash === undefined) {
             if (context.rootHashes.length === 0) {
                 throw new Error('Cannot deliteralize object because the hash was not provided, and there are no hashes in its literal representation.');
@@ -828,10 +833,9 @@ abstract class HashedObject {
             hash = context.rootHashes[0];
         }
 
-        if (context.objects.has(hash)) {
+        let object = context.objects.get(hash);
 
-            return context.objects.get(hash) as HashedObject;
-        } else {
+        if (object === undefined) {
 
             const literal = context.literals.get(hash);
 
@@ -850,30 +854,47 @@ abstract class HashedObject {
                 }
             }*/
 
-            const obj = HashedObject.fromContextInternal(context, hash, true);
+            object = HashedObject.fromContextInternal(context, hash, true);
 
-            if (obj.hash() !== hash) {
-                throw new Error('Wrong hash for root object ' + hash + ', computed ' + obj.getLastHash() + ' instead');
+            if (object.hash() !== hash) {
+                throw new Error('Wrong hash for root object ' + hash + ', computed ' + object.getLastHash() + ' instead');
             }
             
             if (context.resources !== undefined) {
-                obj.setResources(context.resources);
+                object.setResources(context.resources);
             }
-            
-            await HashedObject.validateObject(obj, context, new Set());
 
-            return obj;
+            await HashedObject.validateObject(object, context, alreadyValidated);
         }
+
+        return object;
     }
 
-    private static async validateObject(obj: HashedObject, context: Context, done: Set<HashedObject>): Promise<void> {
+    private static async validateObject(obj: HashedObject, context: Context, done: Set<Hash>): Promise<void> {
 
-        if (done.has(obj)) {
+        const literal = context.literals.get(obj.getLastHash());
+
+        // if this object wasn't rebuilt from a literal, no need to validate
+        if (literal === undefined) {
             return;
         }
 
-        for (const subobj of obj.getDirectSubObjects().values()) {
-            await HashedObject.validateObject(subobj, context, done);
+        // if already validated, skip
+        if (done.has(obj.getLastHash())) {
+            return;
+        }
+
+        /*for (const dep of literal.dependencies) {
+
+            if (dep.direct && context.literals.has(dep.hash) && !context.objects.has(dep.hash)) {
+                await HashedObject.fromContextWithValidation(context, dep.hash, done);           
+            }
+        }*/
+
+        for (const ref of obj.getDirectSubObjectsAndReferences().references.values()) {
+            if (context.literals.has(ref.hash) && !context.objects.has(ref.hash)) {
+                await HashedObject.fromContextWithValidation(context, ref.hash, done);
+            }
         }
 
         if (obj.author !== undefined) {
@@ -886,11 +907,20 @@ abstract class HashedObject {
             }
         }
 
-        if (!await obj.validate(context.objects)) {
-            throw new Error('Validation failed for ' + obj.getLastHash() + ' of type ' + obj.getClassName());
-        }
+        try {
+            if (!await obj.validate(context.objects)) {
+                throw new Error('Validation failed for ' + obj.getLastHash() + ' of type ' + obj.getClassName());
+            }
+        } catch (e) {
 
-        done.add(obj);
+            console.log('RECEIVED LITERAL FOR OBJ THAT FAILED VALIDATION:');
+            console.log(JSON.stringify(literal, undefined, 4));
+
+            throw e;
+        }
+        
+
+        done.add(obj.getLastHash());
     }
     
     static fromContext(context: Context, hash?: Hash) : HashedObject {
@@ -959,6 +989,7 @@ abstract class HashedObject {
 
         for (const [fieldName, fieldValue] of Object.entries(value['_fields'])) {
             if (fieldName.length>0 && fieldName[0] !== '_') {
+
                 (hashedObject as any)[fieldName] = HashedObject.deliteralizeField(fieldValue, context, validate);
             }
         }

@@ -47,7 +47,9 @@ abstract class MutationOp extends HashedObject {
             const prevOp = references.get(prevOpRef.hash);
 
             if (prevOp === undefined) {
-                MutationOp.validationLog.debug('prevOps for ' + this.hash() + ' contains undefined');
+                MutationOp.validationLog.debug('prevOps for ' + this.hash() + ' contains undefined, op hash: ' + prevOpRef.hash);
+                console.log(JSON.stringify(this.toLiteral(), undefined, 4));
+                console.log(new Error().stack);
                 return false;
             } else if (! (prevOp instanceof MutationOp)) {
                 MutationOp.validationLog.debug('a prevOp for ' + this.hash() + ' is not an instance of MutationOp');
