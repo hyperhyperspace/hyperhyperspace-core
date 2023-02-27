@@ -116,6 +116,10 @@ class IdbBackend implements Backend {
         return this.name;
     }
 
+    getURL() {
+        return this.getBackendName() + '://' + this.getName();
+    }
+
     async store(literal: Literal, opHeader?: StoredOpHeader): Promise<void> {
 
         if (this.closed) {
@@ -472,6 +476,17 @@ class IdbBackend implements Backend {
     }
 }
 
-Store.registerBackend(IdbBackend.backendName, (dbName: string) => new IdbBackend(dbName));
+Store.registerBackend(IdbBackend.backendName, (url: string) => { 
+    
+    const parts = url.split('://');
+
+    if (parts[0] !== IdbBackend.backendName) {
+        throw new Error('Trying to open this backend url "' + url + '" using IdbBackend, but only URLs starting with ' + IdbBackend.backendName + ':// are supported.');
+    }
+
+    const dbName = parts.slice(1).join('://');
+
+    return new IdbBackend(dbName);
+});
 
 export { IdbBackend };

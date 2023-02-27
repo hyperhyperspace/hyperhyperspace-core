@@ -23,6 +23,7 @@ interface Backend {
 
     getBackendName() : string;
     getName() : string;
+    getURL(): string;
 
     store(literal : Literal, history?: StoredOpHeader) : Promise<void>;
     load(hash: Hash) : Promise<Storable | undefined>;
@@ -34,9 +35,9 @@ interface Backend {
     loadLastCheckpointMeta(mutableObject: Hash): Promise<StateCheckpoint|undefined>;
 
     loadOpHeader(opHash: Hash) : Promise<StoredOpHeader | undefined>;
-    loadOpHeaderByHeaderHash(causalHistoryHash: Hash) : Promise<StoredOpHeader | undefined>;
+    loadOpHeaderByHeaderHash(opHeaderHash: Hash) : Promise<StoredOpHeader | undefined>;
 
-    loadTerminalOpsForMutable(hash: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined>;
+    loadTerminalOpsForMutable(mutableObject: Hash) : Promise<{lastOp: Hash, terminalOps: Array<Hash>} | undefined>;
 
     // The BackendSearchResults struct returned by the following three contains two strings, start & end, that can be used to
     // fetch more search results, for example by using the "end" string in params.start in another call to the search function.

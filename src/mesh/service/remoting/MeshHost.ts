@@ -510,18 +510,18 @@ class MeshHost {
             for (const [hash, obj] of context.objects.entries()) {
                 if (syncObjs.stores[hash] !== undefined) {
                     const backendName = syncObjs.stores[hash]['backendName'];
-                    const dbName = syncObjs.stores[hash]['dbName']
+                    const url = syncObjs.stores[hash]['storeURL']
 
                     if (!this.stores.has(backendName)) {
                         this.stores.set(backendName, new Map());
                     }
 
-                    let db = this.stores.get(backendName)?.get(dbName);
+                    let db = this.stores.get(backendName)?.get(url);
 
                     if (db === undefined) {
-                        db = Store.load(backendName, dbName);
+                        db = Store.load(backendName, url);
                         if (db !== undefined) {
-                            this.stores.get(backendName)?.set(dbName, db);
+                            this.stores.get(backendName)?.set(url, db);
                         }
                     }
 
@@ -700,6 +700,7 @@ class MeshHost {
                 } else {
 
                     let peerInfo: PeerInfo | undefined = undefined;
+                    let identityError = false;
 
                     if (reply.peerInfoContext !== undefined) {
                         peerInfo = { 
@@ -711,6 +712,7 @@ class MeshHost {
                             const identity = HashedObject.fromLiteralContext(reply.peerInfoContext.identity);
 
                             if (!(identity instanceof Identity)) {
+                                identityError = true;
                                 ex.reject('Received an invalid identity through remoting');
                             } else {
                                 peerInfo.identity = identity;
@@ -718,7 +720,9 @@ class MeshHost {
                         }
                     }
 
-                    ex.resolve(peerInfo);
+                    if (!identityError) {
+                        ex.resolve(peerInfo);
+                    }
                 }
             }
         }

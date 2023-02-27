@@ -94,7 +94,7 @@ class WebWorkerMeshHost {
             console.log(ev);
         };
 
-        this.worker.onmessage = (msg :{ data : any }) => {
+        this.worker.onmessage = (msg: { data : any }) => {
         
             const data = msg?.data;
         

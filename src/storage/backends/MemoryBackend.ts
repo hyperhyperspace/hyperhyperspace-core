@@ -101,6 +101,10 @@ class MemoryBackend implements Backend {
         return this.name;
     }
 
+    getURL() {
+        return MemoryBackend.backendName + '://' + this.name;
+    }
+
     async store(literal: Literal, history?: StoredOpHeader): Promise<void> {
         
         // store object
@@ -331,7 +335,15 @@ class MemoryBackend implements Backend {
     }
 } 
 
-Store.registerBackend(MemoryBackend.backendName, (dbName: string) => {
+Store.registerBackend(MemoryBackend.backendName, (url: string) => {
+
+    const parts = url.split('://');
+
+    if (parts[0] !== MemoryBackend.backendName) {
+        throw new Error('Trying to open this backend url "' + url + '" using MemoryBackend, but only URLs starting with ' + MemoryBackend.backendName + ':// are supported.');
+    }
+
+    const dbName = parts.slice(1).join('://');
 
     let mb = MemoryBackend.instances.get(dbName);
 

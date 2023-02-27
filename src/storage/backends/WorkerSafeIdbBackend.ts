@@ -40,6 +40,8 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
         return WorkerSafeIdbBackend.backendName;
     }
 
+    //getURL() no need since it uses getBackendName overriden above
+
     async store(literal: Literal, history?: StoredOpHeader): Promise<void> {
         await super.store(literal, history);
 
@@ -52,7 +54,18 @@ class WorkerSafeIdbBackend extends IdbBackend implements Backend {
     
 }
 
-Store.registerBackend(WorkerSafeIdbBackend.backendName, (dbName: string) => new WorkerSafeIdbBackend(dbName));
+Store.registerBackend(WorkerSafeIdbBackend.backendName, (url: string) => { 
+
+    const parts = url.split('://');
+
+    if (parts[0] !== WorkerSafeIdbBackend.backendName) {
+        throw new Error('Trying to open this backend url "' + url + '" using WorkerSafeIdbBackend, but only URLs starting with ' + WorkerSafeIdbBackend.backendName + ':// are supported.');
+    }
+
+    const dbName = parts.slice(1).join('://');
+    
+    return new WorkerSafeIdbBackend(dbName);
+});
 
 
 export { WorkerSafeIdbBackend };

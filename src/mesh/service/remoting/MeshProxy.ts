@@ -380,7 +380,7 @@ class MeshProxy implements MeshInterface {
         for (const [hash, o] of ctx.objects.entries()) {
             const store = o.getStore();
             if (store !== undefined) {
-                stores[hash] = {backendName: store.getBackendName(), dbName: store.getName()};
+                stores[hash] = {backendName: store.getBackendName(), storeURL: store.getURL()};
             }
         }
 
@@ -422,7 +422,7 @@ class MeshProxy implements MeshInterface {
         for (const [hash, o] of objContext.objects.entries()) {
             const store = o.getStore();
             if (store !== undefined) {
-                stores[hash] = {backendName: store.getBackendName(), dbName: store.getName()};
+                stores[hash] = {backendName: store.getBackendName(), storeURL: store.getURL()};
             }
         }
 

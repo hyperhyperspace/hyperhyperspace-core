@@ -812,6 +812,10 @@ class Store {
         return this.backend.getName();
     }
 
+    getURL() {
+        return this.backend.getURL();
+    }
+
     getBackendName() {
         return this.backend.getBackendName();
     }
