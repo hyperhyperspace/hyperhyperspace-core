@@ -1,6 +1,6 @@
 import { Identity } from '../../identity';
 import { Hash, HashedObject } from '../../model';
-import { MutationOp, InvalidateAfterOp } from '../../model';
+import { MutationOp, InvalidateAfterOp, Context } from '../../model';
 import { Authorizer } from '../../model/causal/Authorization'
 
 import { MultiMap } from 'util/multimap';
@@ -219,20 +219,47 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
     }
 
     exportMutableState() {
-        return {
-            _validAddOpsPerElmt: [...this._validAddOpsPerElmt.entries()],
-            _validDeleteOpsPerAddOp: [...this._validDeleteOpsPerAddOp.entries()],
-            _currentAddOpsPerElmt: [...this._currentAddOpsPerElmt.entries()],
-            _currentAddOps: [...this._currentAddOps.entries()].map(([hash, op]) => [hash, op.toLiteralContext()]),
 
+        const literalElements = {} as any;
+        const context = new Context();
+
+        for (const [hash, elmt] of this._allElements.entries()) {
+            if (elmt instanceof HashedObject) {
+                elmt.toContext(context);
+            } else {
+                literalElements[hash] = elmt;
+            }
+        }
+
+        return {
+            validAddOpsPerElmt: [...this._validAddOpsPerElmt.entries()],
+            validDeleteOpsPerAddOp: [...this._validDeleteOpsPerAddOp.entries()],
+            currentAddOpsPerElmt: [...this._currentAddOpsPerElmt.entries()],
+            currentAddOps: [...this._currentAddOps.entries()].map(([hash, op]) => [hash, op.toLiteralContext()]),
+            objectElements: context.toLiteralContext(),
+            literalElements: literalElements
         }
     }
     
     importMutableState(state: any): void {
-        this._validAddOpsPerElmt = MultiMap.fromEntries(state._validAddOpsPerElmt);
-        this._validDeleteOpsPerAddOp = MultiMap.fromEntries(state._validDeleteOpsPerAddOp);
-        this._currentAddOpsPerElmt = MultiMap.fromEntries(state._currentAddOpsPerElmt);
+        this._validAddOpsPerElmt = MultiMap.fromEntries(state.validAddOpsPerElmt);
+        this._validDeleteOpsPerAddOp = MultiMap.fromEntries(state.validDeleteOpsPerAddOp);
+        this._currentAddOpsPerElmt = MultiMap.fromEntries(state.currentAddOpsPerElmt);
         this._currentAddOps = new Map(state._currentAddOps.map(([hash, op] : [Hash, LiteralContext]) => [hash, AddOp.fromLiteralContext(op)]));
+
+        this._allElements = new Map();
+
+        const context = new Context();
+        context.fromLiteralContext(state.objectElements);
+
+        for (const hash of context.rootHashes) {
+            const obj = HashedObject.fromContext(context, hash) as any as T;
+            this._allElements.set(hash, obj);
+        }
+
+        for (const [hash, literal] of Object.entries(state.literalElements)) {
+            this._allElements.set(hash, literal as T);
+        }
     }
 
     // canAdd: if a parameter is absent, interpret it as if addition is allowed for any possible value

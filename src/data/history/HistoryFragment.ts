@@ -6,16 +6,16 @@ import { FullHistoryWalk } from './FullHistoryWalk';
 import { OpHeader } from './OpHeader';
 
 
-// A CasualHistoryFragment is built from a (sub)set of operations
+// A HistoryFragment is built from a (sub)set of operations
 // for a given MutableObject target, that are stored in the "contents"
-// (Hash -> OpCausalHistory) map.
+// (Hash -> OpHeader) map.
 
 // Since during sync the ops themselves are not available, a supplemental
-// OpCausalHistory object is used. It only contains the hash of the op,
-// the hash of the OpCausalHistory objects of its predecessors, and some
+// OpHeader object is used. It only contains the hash of the op,
+// the hash of the OpHeader objects of its predecessors, and some
 // extra information.
 
-// All history manipulation is done over OpCausalHistory objects, the actual
+// All history manipulation is done over OpHeader objects, the actual
 // op hashes can be obtained once the causality has been sorted out.
 
 // The fragment keeps track of the set of terminal ops (ops without any
@@ -26,8 +26,8 @@ import { OpHeader } from './OpHeader';
 // fragment but are not in it (in the "missingPrevOpHistories" field).
 
 // Therefore the fragment may be seen as a set of ops that takes the target
-// MutableObject from a state that contains all the ops in "missingPrevOpHistories" to a
-// state that contains all the ops in "terminalOpHistories".
+// MutableObject from a state that contains all the ops in "missingPrevOpHeaders" to a
+// state that contains all the ops in "terminalOpHeaders".
 
 // lemma: if an op is new to the fragment, then it either
 //
