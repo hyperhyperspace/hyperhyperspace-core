@@ -187,7 +187,7 @@ class CausalArray<T>
   _ordinals: Array<Ordinal>;
 
   constructor(config?: MutableArrayConfig & CausalCollectionConfig) {
-    super(CausalArray.opClasses, { ...config, supportsUndo: true, supportsCheckpoints: true });
+    super(CausalArray.opClasses, { ...config, supportsCausalInvalidation: true, supportsCheckpoints: true });
 
     this.setRandomId();
 

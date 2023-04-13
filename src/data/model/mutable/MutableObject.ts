@@ -21,16 +21,26 @@ import { LiteralUtils, MutationEvent } from 'data/model';
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';
 
+enum CheckpointEvents {
+    RestoredCheckpoint = 'restored-checkpoint'
+}
+
 enum MutableContentEvents {
     AddObject    = 'add-object',
-    RemoveObject = 'remove-object',
-    RestoredCheckpoint = 'restored-checkpoint'
+    RemoveObject = 'remove-object'
 };
 
-const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject, MutableContentEvents.RestoredCheckpoint];
+const ContentChangeEventActions: Array<string> = [MutableContentEvents.AddObject, MutableContentEvents.RemoveObject];
+
+enum OpInvalidationEvents {
+    InvalidateOp = 'invalidate-op',
+    RevalidateOp = 'revalidate-op'
+}
+
+const OpInvaidationEventActions: Array<string> = [OpInvalidationEvents.InvalidateOp, OpInvalidationEvents.RevalidateOp];
 
 type MutableObjectConfig = {
-    supportsUndo?: boolean, 
+    supportsCausalInvalidation?: boolean,
     supportsCheckpoints?: boolean,
     autoCheckpoint?: boolean,       // create checkpoints automatically?
     autoCheckpointOpFreq?: number,      // how many ops must be applied and saved before a checkpoint is created automatically
@@ -76,12 +86,11 @@ abstract class MutableObject extends HashedObject {
     _allAppliedOps : Set<Hash>;
     _terminalOps   : Map<Hash, MutationOp>;
 
-    // We only keep track of inv. for the op at the very end of
+    // For causal deps: we only keep track of inv. for the op at the very end of
     // an undo / redo chain (e.g. for each causal dep an op has,
     // only an undo op at the very end of the chain can be in
     // _activeCascInvsPerOp).
     _activeCascInvsPerOp       : MultiMap<Hash, Hash>;
-
 
     _unsavedOps      : Array<MutationOp>;
     _unappliedOps    : Map<Hash, MutationOp>;
@@ -95,7 +104,7 @@ abstract class MutableObject extends HashedObject {
 
     _opCallback : (hash: Hash) => Promise<void>;
 
-    // If anyone using this mutable object needs to be notified whenever it changes,
+    // If anyone using this mutable object needs to be notified whenever an op is applied,
     // an external mutation callback should be registered below.
     _externalMutationCallbacks : Set<(mut: MutationOp) => void>;
 
@@ -104,7 +113,7 @@ abstract class MutableObject extends HashedObject {
     constructor(acceptedOpClasses : Array<string>, config?: MutableObjectConfig) {
         super();
 
-        if (config?.supportsUndo || false) {
+        if (config?.supportsCausalInvalidation || false) {
             if (acceptedOpClasses.indexOf(CascadedInvalidateOp.className) < 0) {
                 acceptedOpClasses.push(CascadedInvalidateOp.className);
             }
@@ -212,7 +221,8 @@ abstract class MutableObject extends HashedObject {
 
         this._allAppliedOps = new Set();
         this._terminalOps   = new Map();
-        this._activeCascInvsPerOp  = new MultiMap();
+
+        this._activeCascInvsPerOp = new MultiMap();
 
         this._unsavedOps      = [];
         this._unappliedOps    = new Map();
@@ -236,7 +246,7 @@ abstract class MutableObject extends HashedObject {
                         MutableObject.addEventRelayForElmt(this._mutationEventSource, ev.data.getLastHash(), ev.data);
                     } else if (ev.action === MutableContentEvents.RemoveObject) {
                         MutableObject.removeEventRelayForElmt(this._mutationEventSource, ev.data.getLastHash(), ev.data);
-                    } else if (ev.action === MutableContentEvents.RestoredCheckpoint) {
+                    } else if (ev.action === CheckpointEvents.RestoredCheckpoint) {
                         this._mutationEventSource?.removeAllUpstreamRelays();
                         this.addEventRelaysForContents(this._mutationEventSource)   
                     }
@@ -247,7 +257,7 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
-    supportsUndo() {
+    supportsCausalInvalidation() {
         return this._acceptedMutationOpClasses.indexOf(CascadedInvalidateOp.className) >= 0
     }
 
@@ -599,6 +609,8 @@ abstract class MutableObject extends HashedObject {
                 }
             }
 
+            op.hash(); // to ensure the's not an incorrect leftover cached hash value after the modifications above
+
             const done = this.apply(op, true);
             
             return done.then(() => {});                
@@ -607,10 +619,6 @@ abstract class MutableObject extends HashedObject {
 
     // returns true if the op was applied
     protected apply(op: MutationOp, isNew: boolean) : Promise<boolean> {
-
-        if (isNew) {
-            op.hash();
-        }
 
         const opHash = op.getLastHash();
 
@@ -632,9 +640,16 @@ abstract class MutableObject extends HashedObject {
 
         let result = Promise.resolve(false);
 
+        let shouldMutate       = true;
+        let invalidationChange = false;
+        let isValidNow         = true;
+        let isCascade          = false;
+
+        let finalTargetOp: MutationOp = op;
+        
         if (op instanceof CascadedInvalidateOp) {
 
-            const finalTargetOp     = op.getFinalTargetOp();
+            finalTargetOp     = op.getFinalTargetOp();
             const finalTargetOpHash = finalTargetOp.hash();
             
             const wasValid = this.isValidOp(finalTargetOpHash);
@@ -645,14 +660,18 @@ abstract class MutableObject extends HashedObject {
                 this._activeCascInvsPerOp.delete(finalTargetOpHash, op.getTargetOp().hash());
             }
 
-            const isValidNow = this.isValidOp(finalTargetOpHash);
-            const isCascade  = op.targetOp instanceof CascadedInvalidateOp;
+            isValidNow = this.isValidOp(finalTargetOpHash);
+            isCascade  = op.targetOp instanceof CascadedInvalidateOp;
 
-            if (wasValid !==  isValidNow) {
-                result = this.mutate(finalTargetOp, isValidNow, isCascade);
+            invalidationChange = wasValid !== isValidNow;
+
+            if (!invalidationChange) {
+                shouldMutate = false;
             }
-        } else {
-            result = this.mutate(op, true, false);
+        }
+
+        if (shouldMutate) {
+            result = this.mutate(finalTargetOp, isValidNow, isCascade);
         }
 
         const done = result.then((mutated: boolean) => {
@@ -663,7 +682,13 @@ abstract class MutableObject extends HashedObject {
             }        
         });
 
-        return done.then(() => true);
+        return done.then(() => {
+            if (invalidationChange) {
+                const action = isValidNow? OpInvalidationEvents.RevalidateOp : OpInvalidationEvents.InvalidateOp;
+                this._mutationEventSource?.emit({emitter: this, action: action, data: finalTargetOp});
+            }
+            return true;
+        });
     }
 
     private canApplyOp(op: MutationOp): boolean {
@@ -865,7 +890,7 @@ abstract class MutableObject extends HashedObject {
               
         }
 
-        this._mutationEventSource?.emit({emitter: this, action: MutableContentEvents.RestoredCheckpoint, data: undefined});
+        this._mutationEventSource?.emit({emitter: this, action: CheckpointEvents.RestoredCheckpoint, data: undefined});
     }
 
 
@@ -877,7 +902,7 @@ abstract class MutableObject extends HashedObject {
 
         flags.push('mutable');
 
-        if (this.supportsUndo()) {
+        if (this.supportsCausalInvalidation()) {
             flags.push('supports_undo')
         }
 
@@ -1113,16 +1138,32 @@ abstract class MutableObject extends HashedObject {
         }
     }
 
+    static isCheckpointRestoreEvent(ev: MutationEvent) {
+        return ev.action === CheckpointEvents.RestoredCheckpoint;
+    }
+
+    static isContentChangeEvent(ev: MutationEvent) {
+        return ContentChangeEventActions.indexOf(ev.action) >= 0 || MutableObject.isCheckpointRestoreEvent(ev);
+    }
+
+    static isOpInvalidationEvent(ev: MutationEvent) {
+        return OpInvaidationEventActions.indexOf(ev.action) >= 0 || MutableObject.isCheckpointRestoreEvent(ev);
+    }
+
     isOwnEvent(ev: MutationEvent) {
         return ev.emitter === this
+    }
+
+    isOwnCheckpointRestoreEvent(ev: MutationEvent) {
+        return this.isOwnEvent(ev) && MutableObject.isCheckpointRestoreEvent(ev);
     }
 
     isOwnContentChangeEvent(ev: MutationEvent) {
         return this.isOwnEvent(ev) && MutableObject.isContentChangeEvent(ev);
     }
 
-    static isContentChangeEvent(ev: MutationEvent) {
-        return ContentChangeEventActions.indexOf(ev.action) >= 0;
+    isOwnOpInvalidationEvent(ev: MutationEvent) {
+        return this.isOwnEvent(ev) && MutableObject.isOpInvalidationEvent(ev);
     }
 
     enableAutoCheckpoints(autoCheckpointOpFreq?: number,autoCheckpointOpFreqDelay?: number, autoCheckpointInactivityDelay?: number) {

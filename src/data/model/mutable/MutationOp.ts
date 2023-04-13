@@ -9,9 +9,9 @@ import { HashedMap } from '../immutable/HashedMap';
 
 abstract class MutationOp extends HashedObject {
 
-    targetObject?  : MutableObject;
-    prevOps? : HashedSet<HashReference<MutationOp>>;
-    causalOps?: HashedMap<string, MutationOp>;
+    targetObject? : MutableObject;
+    prevOps?      : HashedSet<HashReference<MutationOp>>;
+    causalOps?    : HashedMap<string, MutationOp>;
 
     constructor(targetObject?: MutableObject) {
         super();
@@ -60,7 +60,7 @@ abstract class MutationOp extends HashedObject {
             }
         }
 
-        if (!this.targetObject.supportsUndo() && this.causalOps !== undefined) {
+        if (!this.targetObject.supportsCausalInvalidation() && this.causalOps !== undefined) {
             MutationOp.validationLog.debug('The target object for ' + this.hash() + ', a ' + this.getTargetObject().getClassName() + ', does not support undo, yet this op has causalOps !== undefined');
             return false;
         }

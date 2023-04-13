@@ -198,7 +198,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
 
 
     constructor(config: CausalCollectionConfig = {}) {
-        super(CausalSet.opClasses, {...config, supportsUndo: true, supportsCheckpoints: true});
+        super(CausalSet.opClasses, {...config, supportsCausalInvalidation: true, supportsCheckpoints: true});
 
         this.setRandomId();
         
@@ -245,7 +245,7 @@ class CausalSet<T> extends BaseCausalCollection<T> implements CausalCollection<T
         this._validAddOpsPerElmt = MultiMap.fromEntries(state.validAddOpsPerElmt);
         this._validDeleteOpsPerAddOp = MultiMap.fromEntries(state.validDeleteOpsPerAddOp);
         this._currentAddOpsPerElmt = MultiMap.fromEntries(state.currentAddOpsPerElmt);
-        this._currentAddOps = new Map(state._currentAddOps.map(([hash, op] : [Hash, LiteralContext]) => [hash, AddOp.fromLiteralContext(op)]));
+        this._currentAddOps = new Map(state.currentAddOps.map(([hash, op] : [Hash, LiteralContext]) => [hash, AddOp.fromLiteralContext(op)]));
 
         this._allElements = new Map();
 

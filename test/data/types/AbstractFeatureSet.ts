@@ -188,7 +188,7 @@ abstract class AbstractFeatureSet extends MutableObject {
     _validEnableOpsPerFeature: MultiMap<FeatureName, Hash>;
 
     constructor(featureNames?: IterableIterator<string>) {
-        super(AbstractFeatureSet.opClasses, {supportsUndo: true});
+        super(AbstractFeatureSet.opClasses, {supportsCausalInvalidation: true});
 
         if (featureNames !== undefined) {
             this.featureNames = new HashedSet(featureNames);

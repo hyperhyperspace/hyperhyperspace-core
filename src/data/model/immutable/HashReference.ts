@@ -2,6 +2,12 @@ import { Hash } from '../hashing/Hashing'
 import { HashedObject } from './HashedObject';
 
 
+// FIXME: can className be used to induce unwanted malleability? Validating that it is correct in
+//        validate seems awkward, at least automatically - would require to de-structure the
+//        object again it seems :-P
+
+// if that's the case better stick to just using the hash
+
 class HashReference<_T extends HashedObject> {
     hash      : Hash;
     className : string;

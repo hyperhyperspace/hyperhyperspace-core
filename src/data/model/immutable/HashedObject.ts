@@ -257,6 +257,11 @@ abstract class HashedObject {
         return another !== undefined && this.hash() === another.hash();
     }
 
+    equalsUsingLastHash(another: HashedObject | undefined) {
+
+        return another !== undefined && this.getLastHash() === another.getLastHash();
+    }
+
     clone() : this {
         const c = this.toContext();
         
