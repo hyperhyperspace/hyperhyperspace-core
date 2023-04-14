@@ -85,7 +85,7 @@ abstract class TransitionLog<T extends LinearObject> extends LinearObject<LogEnt
         }
     }
 
-    async getStateInfoAtEntry(transitionTargetHash: Hash, logEntryOp: LogEntryOp<T>): Promise<StateInfo|undefined> {
+    async getStateInfoAtEntry(transitionTargetHash: Hash, logEntryOp: LogEntryOp<T>, references?: Map<Hash, HashedObject>): Promise<StateInfo|undefined> {
 
         let currentStateInfo: (StateInfo|undefined) = undefined;
         let currentLogEntryOp: (LogEntryOp<T>|undefined) = logEntryOp;
@@ -111,10 +111,17 @@ abstract class TransitionLog<T extends LinearObject> extends LinearObject<LogEnt
             if (prevLinearOpHash === undefined) {
                 currentLogEntryOp = undefined;
             } else {
+                
                 currentLogEntryOp = this._allLinearOps.get(prevLinearOpHash);
+
+                if (currentLogEntryOp === undefined) {
+                    currentLogEntryOp = references?.get(prevLinearOpHash) as (LogEntryOp<T>|undefined);
+                }
+
                 if (currentLogEntryOp === undefined) {
                     currentLogEntryOp = (await this.loadOp(prevLinearOpHash)) as (LogEntryOp<T>|undefined);
                 }
+
                 if (currentLogEntryOp === undefined) {
                     throw new Error('Trying to load the current state info for transition target ' + transitionTargetHash + ' from the store, but it seems to be missing.')
                 }

@@ -55,7 +55,7 @@ class LogEntryOp<T extends LinearObject> extends LinearizationOp {
                     return false;
                 }
 
-                const prevStateInfo = await this.getTargetObject().getStateInfoAtEntry(transOp.transitionTarget?.getLastHash() as Hash, prevLogEntryOp);
+                const prevStateInfo = await this.getTargetObject().getStateInfoAtEntry(transOp.transitionTarget?.getLastHash() as Hash, prevLogEntryOp, references);
 
                 if (prevStateInfo?.stateHash !== transOp.getTransitionStartOpHash()) {
                     LogEntryOp.validationLog.warning('TransitionOp previous state mismatch. Stated: ' + transOp.getTransitionStartOpHash() + ' Actual: ' + prevStateInfo?.stateHash);
