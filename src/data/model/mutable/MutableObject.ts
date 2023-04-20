@@ -261,7 +261,9 @@ abstract class MutableObject extends HashedObject {
         return this._acceptedMutationOpClasses.indexOf(CascadedInvalidateOp.className) >= 0
     }
 
+    // return true if there was indeed a mutation (that is, if mutation callbacks should be called)
     abstract mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean>;
+    
     abstract getMutableContents(): MultiMap<Hash, HashedObject>;
     abstract getMutableContentByHash(hash: Hash): Set<HashedObject>;
 

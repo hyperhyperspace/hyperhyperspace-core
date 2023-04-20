@@ -5,11 +5,12 @@ import { TransitionOp } from './TransitionOp';
 import { TransitionLog } from './TransitionLog';
 
 
-class LogEntryOp<T extends LinearObject> extends LinearizationOp {
+class LogEntryOp<T extends LinearObject, I=undefined> extends LinearizationOp {
 
     static className = 'hhs/v0/LogEntryOp';
 
     transitionOps?: HashedSet<TransitionOp<T>>;
+    info?: I;
 
     _transitionOpsByObjectCache?: Map<Hash, TransitionOp<T>>;
 

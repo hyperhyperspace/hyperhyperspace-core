@@ -1,48 +1,27 @@
-import { LinearObject } from 'data/model/linearizable/LinearObject';
-import { MultiMap } from 'util/multimap';
 import { Hash, HashedObject, HashedSet, MutableObjectConfig } from '../model';
+import { LinearObject, LinearObjectConfig } from '../model';
+import { MultiMap } from 'util/multimap';
 
 import { TransitionOp } from './TransitionOp';
 import { LogEntryOp } from './LogEntryOp';
-
-type TransitionLogConfig = {
-    
-}
 
 type StateInfo = {
     stateHash: Hash,
     logEntryOpHash: Hash
 }
 
-abstract class TransitionLog<T extends LinearObject> extends LinearObject<LogEntryOp<T>> {
+abstract class TransitionLog<T extends LinearObject, I=undefined> extends LinearObject<LogEntryOp<T, I>> {
 
     static className = 'hhs/v0/TransitionLog';
     static opClasses = [TransitionOp.className, LogEntryOp.className];
 
     _currentLinearizedStates: Map<Hash, StateInfo>; // obj hash -> current StateInfo
 
-    constructor(config: MutableObjectConfig & TransitionLogConfig = {}) {
+    constructor(config: MutableObjectConfig & LinearObjectConfig = {}) {
         super(TransitionLog.opClasses, config);
 
         this._currentLinearizedStates = new Map();
     }
-
-    /*async mutate(op: MutationOp, valid: boolean, cascade: boolean): Promise<boolean> {
-        op; valid; cascade;
-        
-        if (op instanceof LogEntryOp) {
-
-            
-
-        }
-
-        return true;
-    }*/
-
-
-    /* Adapt the contents of _currentLinearizedStates, so it always reflects the 
-       current state of all the tracked objects (the last transition included in
-       the current linearization). */
 
     onCurrentLinearizationChange(opHash: Hash, linearized: boolean) {
 
@@ -85,10 +64,10 @@ abstract class TransitionLog<T extends LinearObject> extends LinearObject<LogEnt
         }
     }
 
-    async getStateInfoAtEntry(transitionTargetHash: Hash, logEntryOp: LogEntryOp<T>, references?: Map<Hash, HashedObject>): Promise<StateInfo|undefined> {
+    async getStateInfoAtEntry(transitionTargetHash: Hash, logEntryOp: LogEntryOp<T, I>, references?: Map<Hash, HashedObject>): Promise<StateInfo|undefined> {
 
         let currentStateInfo: (StateInfo|undefined) = undefined;
-        let currentLogEntryOp: (LogEntryOp<T>|undefined) = logEntryOp;
+        let currentLogEntryOp: (LogEntryOp<T, I>|undefined) = logEntryOp;
 
         // First look for the most recent state transition in logEntryOp and its predecessors, but stop if we
         // arrive at the current linearization 
@@ -111,15 +90,15 @@ abstract class TransitionLog<T extends LinearObject> extends LinearObject<LogEnt
             if (prevLinearOpHash === undefined) {
                 currentLogEntryOp = undefined;
             } else {
-                
+
                 currentLogEntryOp = this._allLinearOps.get(prevLinearOpHash);
 
                 if (currentLogEntryOp === undefined) {
-                    currentLogEntryOp = references?.get(prevLinearOpHash) as (LogEntryOp<T>|undefined);
+                    currentLogEntryOp = references?.get(prevLinearOpHash) as (LogEntryOp<T, I>|undefined);
                 }
 
                 if (currentLogEntryOp === undefined) {
-                    currentLogEntryOp = (await this.loadOp(prevLinearOpHash)) as (LogEntryOp<T>|undefined);
+                    currentLogEntryOp = (await this.loadOp(prevLinearOpHash)) as (LogEntryOp<T, I>|undefined);
                 }
 
                 if (currentLogEntryOp === undefined) {

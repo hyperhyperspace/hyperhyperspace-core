@@ -24,7 +24,7 @@ class TransitionOp<T extends LinearObject> extends MutationOp {
                                         //    even without having synchronized the full log (this 
                                         //    object).
 
-    // TODO: it'd make sense to filter TransitionOps in outgoing gossip if themaxLogEntryNumber or
+    // TODO: it'd make sense to filter TransitionOps in outgoing gossip if the maxLogEntryNumber or
     //       prevTransitionLogEntryHash don't make sense.
     //       (Can't do it in validation because the prevTransitionLogEntry may not have arrived at 
     //       the peer yet).
@@ -179,10 +179,6 @@ class TransitionOp<T extends LinearObject> extends MutationOp {
             return false;
         }
 
-        // We also need to check that the transitions match the previous state in the chain
-
-
-
         // Other stuff
 
         
@@ -201,8 +197,6 @@ class TransitionOp<T extends LinearObject> extends MutationOp {
         }
 
         return true;
-
-        // prev transition stuff
 
     }
 

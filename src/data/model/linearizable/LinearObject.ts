@@ -2,9 +2,27 @@ import { MultiMap } from 'util/multimap';
 import { Hash } from '../hashing';
 import { MutableObject, MutableObjectConfig, MutationEvent, MutationOp } from '../mutable';
 import { LinearizationOp } from './LinearizationOp';
+import { LinearizationRule } from './LinearizationRule';
+
+/*
+ * TODO BEFORE PRIME TIME:
+ * 
+ *           - Add observer to LinearObject to apply this.linearizationRule when there's cascading of a
+ *             dependency's linearization.
+ *           - Add config option to sync so all the ops in the local store are applied to the target object.
+ *           - When validating ops during sync, alias the target object so the one where all
+ *             the ops have been applied is used.
+ *           - Add config option to sync so only outgoing ops, incoming ops, or both are considered (that'd be:
+ *             only push data to peers, only pull data from peers, full sync). This would be used for light clients
+ *             to be able to create ops in the logbook.
+ * 
+ * 
+ */ 
+
+
 
 /* LinearObject: Base class for types that need to periodically "linearize" their history, choosing a unique sequence
- *               of steps amongst many possible such linearizations. They use an op (deriving from) LinearizationOp to
+ *               of steps among many possible such linearizations. They use an op (deriving from) LinearizationOp to
  *               model this linear steps. These linear types may depend on other linear types, and this is expressed by
  *               using the linearCausalOps field in LinearizationOp. This should be interpreted as: op can be in the 
  *               current linearization iif all the ops in op.linearCausalOps are in the current linearizations of their
@@ -36,6 +54,25 @@ import { LinearizationOp } from './LinearizationOp';
  *               Finally, to set the current linearization, call setCurrentLastLinearOp(op). 
  */
 
+type LinearObjectConfig<L extends LinearizationOp=LinearizationOp, R=LinearizationRule<L>> = {
+    linearizationRule?: R,
+
+    noDisconnectedOps?: boolean   // --> If true, no ops without predecessors may appear within the linearized op set in
+                                  //     a given LinearizationOp (after the first linearization op). All the ops being
+                                  //     linearized must lead, through iterated this.prevOps deferencing, 
+                                  //     to this.prevLinearOp. Default: false.
+                                       
+    enforceContinuity?: boolean   // --> If true, the previous linear op (if there is one) must be reachable through the
+                                  //     set of linearized ops in a given LinearizationOp (following prevOps). 
+                                  //     Default: false.
+    
+    noLinearizationsAsPrevOps?: boolean; // --> If true, the only instance of a LinearizationOp that can appear when
+                                         // recoursing on this.prevOps on a LinearizationOp is this.prevLinearOp.
+                                         // That is, other instances of LinearizationOp cannot appear as regular
+                                         // prevOps, unless that's the current prevLinearOp. Default: true.
+                        
+}
+
 enum LinearizationEvents {
     LinearizedOp = 'linearized-op',
     UnLinearizedOp = 'un-linearized-op'
@@ -43,7 +80,7 @@ enum LinearizationEvents {
 
 const LinearizationEventActions: Array<string>  = [LinearizationEvents.LinearizedOp, LinearizationEvents.UnLinearizedOp];
 
-abstract class LinearObject<L extends LinearizationOp=LinearizationOp> extends MutableObject {
+abstract class LinearObject<L extends LinearizationOp=LinearizationOp, R extends LinearizationRule=LinearizationRule> extends MutableObject {
 
     // All linear ops, indexed by their hashes (they will form a tree -wait no- a forest actually):
     _allLinearOps: Map<Hash, L>;
@@ -75,7 +112,13 @@ abstract class LinearObject<L extends LinearizationOp=LinearizationOp> extends M
 
     _linearDepTargets: Map<Hash, LinearObject>;
 
-    constructor(acceptedOpClasses : Array<string>, config?: MutableObjectConfig) {
+    _linearizationRule?: R;
+
+    _noDisconnectedOps         : boolean;
+    _enforceContinuity         : boolean;
+    _noLinearizationsAsPrevOps : boolean;
+
+    constructor(acceptedOpClasses : Array<string>, config?: MutableObjectConfig & LinearObjectConfig<L, R>) {
         super(acceptedOpClasses, config);
 
         this._allLinearOps = new Map();
@@ -91,6 +134,14 @@ abstract class LinearObject<L extends LinearizationOp=LinearizationOp> extends M
         this._allReverseLinearOpDeps = new MultiMap();
 
         this._linearDepTargets = new Map();
+
+        this._linearizationRule = config?.linearizationRule;
+
+        this._linearizationRule?.setTarget(this);
+
+        this._noDisconnectedOps         = config?.noDisconnectedOps || false;
+        this._enforceContinuity         = config?.enforceContinuity || false;
+        this._noLinearizationsAsPrevOps = config?.noLinearizationsAsPrevOps === undefined || config?.noLinearizationsAsPrevOps;
 
         const linearValidityMonitor = (ev: MutationEvent) => {
 
@@ -121,7 +172,7 @@ abstract class LinearObject<L extends LinearizationOp=LinearizationOp> extends M
                         this._unmetLinearOpDeps.add(opHash, depOpHash);
                         this._reverseUnmetLinearOpDeps.add(depOpHash, opHash);
 
-                        if(this._allValidLinearOps.has(opHash)) {
+                        if (this._allValidLinearOps.has(opHash)) {
                             this._allValidLinearOps.delete(opHash);
                             this.onLinearValidityChange(opHash, false);
                         }
@@ -240,7 +291,7 @@ abstract class LinearObject<L extends LinearizationOp=LinearizationOp> extends M
 
             this._nextLinearOps.add(op.prevLinearOp?.hash as Hash, opHash);
 
-            let isValid = true;
+            let isLinearlyValid = true;
 
             if (op.linearCausalOps !== undefined) {
 
@@ -255,18 +306,30 @@ abstract class LinearObject<L extends LinearizationOp=LinearizationOp> extends M
                         this._unmetLinearOpDeps.add(op.getLastHash(), linearOpDep.getLastHash());
                         this._reverseUnmetLinearOpDeps.add(linearOpDep.getLastHash(), op.getLastHash());
                     } else {
-                        isValid = false;
+                        isLinearlyValid = false;
                     }
 
                 }
             }
 
-            if (isValid) {
+            if (isLinearlyValid) {
                 this._allValidLinearOps.add(opHash);
             }
         }
 
         return super.apply(op, isNew);
+    }
+
+    async mutate(op: MutationOp, valid: boolean): Promise<boolean> {
+        if (this._linearizationRule === undefined) {
+            throw new Error('The "mutate" method was called on a LinearObject of class ' + this.getClassName() + ', and no linearization rule was provided. Please either provide one or implement "mutate" explicitly.');
+        } else {
+            if (op instanceof LinearizationOp) {
+                return this._linearizationRule.applyRule(op, valid);
+            } else {
+                return true;
+            }
+        }
     }
 
     private getLinearDepTargetSubobj(depTarget: LinearObject): LinearObject {
@@ -299,4 +362,4 @@ abstract class LinearObject<L extends LinearizationOp=LinearizationOp> extends M
     }
 }
 
-export { LinearObject };
+export { LinearObject, LinearObjectConfig };
