@@ -1,9 +1,8 @@
-import { ChoiceBasedLinearizationRule, Hash, HashedObject, HashedSet, HashReference, LinearizationOp, LinearObject, MutationOp } from 'data/model';
-import { LinearizableOp } from 'data/model/linearizable/LinearizableOp';
+import { ForkableObject, Hash, HashedObject, HashedSet, HashReference, LinearOp, MergeOp, MutationOp } from 'data/model';
 import { MultiMap } from 'index';
 
 
-class CounterSettlementOp extends LinearizationOp {
+class CounterSettlementOp extends MergeOp {
 
     static className = 'hhs-test/CounterSettlementOp';
 
@@ -66,7 +65,7 @@ class CounterSettlementOp extends LinearizationOp {
     }
 }
 
-class CounterChangeOp extends LinearizableOp {
+class CounterChangeOp extends LinearOp {
     
     static className = 'hhs-test/CounterChangeOp';
 
