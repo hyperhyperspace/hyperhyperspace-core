@@ -1,5 +1,5 @@
-import { Hash, HashedObject, HashedSet, MutableObjectConfig } from '../model';
-import { LinearObject, LinearObjectConfig } from '../model';
+import { ForkChoiceRule, Hash, HashedObject, MutableObjectConfig } from '../model';
+import { ForkableObject, ForkableObjectConfig } from '../model';
 import { MultiMap } from 'util/multimap';
 
 import { TransitionOp } from './TransitionOp';
@@ -10,59 +10,71 @@ type StateInfo = {
     logEntryOpHash: Hash
 }
 
-abstract class TransitionLog<T extends LinearObject, I=undefined> extends LinearObject<LogEntryOp<T, I>> {
+abstract class TransitionLog<T extends ForkableObject, I=undefined, R extends ForkChoiceRule<LogEntryOp<T,I>, never>|undefined=undefined> extends ForkableObject<LogEntryOp<T, I>, never, R> {
 
     static className = 'hhs/v0/TransitionLog';
     static opClasses = [TransitionOp.className, LogEntryOp.className];
 
-    _currentLinearizedStates: Map<Hash, StateInfo>; // obj hash -> current StateInfo
+    _currentForkStates: Map<Hash, StateInfo>; // obj hash -> current StateInfo
 
-    constructor(config: MutableObjectConfig & LinearObjectConfig = {}) {
+    constructor(config?: MutableObjectConfig & ForkableObjectConfig<LogEntryOp<T,I>, never, R> ) {
         super(TransitionLog.opClasses, config);
 
-        this._currentLinearizedStates = new Map();
+        this._currentForkStates = new Map();
     }
 
-    onCurrentLinearizationChange(opHash: Hash, linearized: boolean) {
 
-        const op = this._allLinearOps.get(opHash);
+    onCurrentForkChange(addedToCurrentFork: Set<Hash>, removedFromCurrentFork: Set<Hash>) {
 
-        if (op === undefined) {
-            throw new Error('onCurrentLinearizationChange callback was invoked, but the received opHash is not present: ' + opHash);
-        }
+        for (const hash of removedFromCurrentFork) {
+            const logEntryOp = this._allForkableOps.get(hash);
 
-        if (op.transitionOps === undefined) {
-            return;
-        }
+            if (logEntryOp !== undefined) {
+                for (const transitionOp of logEntryOp.transitionOps?.values()!) {
 
-        for (const transitionOp of (op.transitionOps as HashedSet<TransitionOp<T>>).values()) {
-                
-            const newStateHash = transitionOp.transitionEndOp?.getLastHash() as Hash;
-            const oldStateHash = transitionOp.transitionEndOp?.prevLinearOp?.hash;
-            
-            const transitionTargetHash = (transitionOp.transitionTarget as T).getLastHash();
-            const currentStateHash = this._currentLinearizedStates.get(transitionTargetHash)?.stateHash;
+                    // TODO: check that transitionOp reflects the current state in this._currentForkStates.
 
-            if (linearized) {
-                
-                if (oldStateHash !== currentStateHash) {
-                    throw new Error ('Error adding op ' + opHash + ' to TransitionLog linearization: state mismatch.');
-                }
+                    const targetHash = transitionOp.transitionTarget?.getLastHash() as Hash;
 
-                this._currentLinearizedStates.set(transitionTargetHash, {stateHash: newStateHash, logEntryOpHash: opHash});
-            } else {
-                if (newStateHash !== currentStateHash) {
-                    throw new Error ('Error removing op ' + opHash + ' from TransitionLog linearization: state mismatch.');
-                }
+                    if (transitionOp.transitionStartOp === undefined) {
+                        this._currentForkStates.delete(targetHash);
+                    } else {
 
-                if (oldStateHash === undefined) {
-                    this._currentLinearizedStates.delete(transitionTargetHash);
-                } else { 
-                    this._currentLinearizedStates.set(transitionTargetHash, {stateHash: oldStateHash, logEntryOpHash: transitionOp.prevTransitionLogEntryHash as Hash});
+                        const restoredStateInfo = {
+                            stateHash: transitionOp.transitionStartOp.getLastHash(), 
+                            logEntryOpHash: transitionOp.prevTransitionLogEntryHash as Hash
+                        };
+
+                        this._currentForkStates.set(targetHash, restoredStateInfo);
+                    }
                 }
             }
         }
+
+        for (const hash of addedToCurrentFork) {
+            const logEntryOp = this._allForkableOps.get(hash);
+
+            if (logEntryOp !== undefined) {
+                for (const transitionOp of logEntryOp.transitionOps?.values()!) {
+
+                    // TODO: check that the starting state in transitionOp matches the one in this._currentForkStates.
+
+                    const targetHash = transitionOp.transitionTarget?.getLastHash() as Hash;
+
+                    const newStateInfo = {
+                        stateHash: transitionOp.transitionEndOp?.getLastHash() as Hash,
+                        logEntryOpHash: transitionOp.prevTransitionLogEntryHash as Hash
+                    }
+
+                    this._currentForkStates.set(targetHash, newStateInfo);
+
+                } 
+            }
+        }
+
     }
+
+    // TODO: use an index / checkpoints
 
     async getStateInfoAtEntry(transitionTargetHash: Hash, logEntryOp: LogEntryOp<T, I>, references?: Map<Hash, HashedObject>): Promise<StateInfo|undefined> {
 
@@ -72,8 +84,8 @@ abstract class TransitionLog<T extends LinearObject, I=undefined> extends Linear
         // First look for the most recent state transition in logEntryOp and its predecessors, but stop if we
         // arrive at the current linearization 
 
-        while (currentStateInfo === undefined && currentLogEntryOp !== undefined && !this._currentLinearOps.has(currentLogEntryOp.getLastHash())) {
-            const transOp = currentLogEntryOp.getTransitionOpsByTransitionTarget().get(transitionTargetHash);
+        while (currentStateInfo === undefined && currentLogEntryOp !== undefined && !this._allCurrentForkOps.has(currentLogEntryOp.getLastHash())) {
+            const transOp = currentLogEntryOp.getTransitionOpsByTarget().get(transitionTargetHash);
             
             if (transOp !== undefined) {
 
@@ -86,12 +98,12 @@ abstract class TransitionLog<T extends LinearObject, I=undefined> extends Linear
             
             // Walk back one log entry.
 
-            const prevLinearOpHash = currentLogEntryOp.prevLinearOp?.hash;
+            const prevLinearOpHash = currentLogEntryOp.prevForkableOp?.hash;
             if (prevLinearOpHash === undefined) {
                 currentLogEntryOp = undefined;
             } else {
 
-                currentLogEntryOp = this._allLinearOps.get(prevLinearOpHash);
+                currentLogEntryOp = this._allForkableOps.get(prevLinearOpHash);
 
                 if (currentLogEntryOp === undefined) {
                     currentLogEntryOp = references?.get(prevLinearOpHash) as (LogEntryOp<T, I>|undefined);
@@ -113,37 +125,37 @@ abstract class TransitionLog<T extends LinearObject, I=undefined> extends Linear
 
 
             // Use the current state in the linearization,
-            currentStateInfo = this._currentLinearizedStates.get(transitionTargetHash);
+            currentStateInfo = this._currentForkStates.get(transitionTargetHash);
 
             // but we must check if this was changed after logEntryOp, and undo such changes.
             if (currentStateInfo !== undefined) {
-                let backtrackCurrentLinearOp = this._currentLastLinearOp;
+                let backtrackCurrentLinearOp = this._currentForkTerminalOp;
 
                 // Undo the transitions walking back, starting from the current linearization last op, all the way
                 // to the op where the logEntryOp branch converged with the current branch: 
                 while (!backtrackCurrentLinearOp?.equalsUsingLastHash(currentLogEntryOp)) {
 
                     // Try to update the state, if there's a transition for transitionTargetHash
-                    const transOp = currentLogEntryOp.getTransitionOpsByTransitionTarget().get(transitionTargetHash);
+                    const transOp = currentLogEntryOp.getTransitionOpsByTarget().get(transitionTargetHash);
             
                     if (transOp !== undefined) {                        
-                        if (transOp.prevTransitionLogEntryHash === undefined) {
+                        if (transOp.transitionStartOp === undefined) {
                             currentStateInfo = undefined;
                             break;
                         } else {
                             currentStateInfo = {
-                                stateHash: transOp.transitionEndOp?.prevLinearOp?.hash as Hash,
-                                logEntryOpHash: transOp.prevTransitionLogEntryHash
+                                stateHash: transOp.transitionStartOp?.getLastHash() as Hash,
+                                logEntryOpHash: transOp.prevTransitionLogEntryHash as Hash
                             };
                         }
                     }
 
                     // Walk back one log entry.
 
-                    if (backtrackCurrentLinearOp?.prevLinearOp?.hash === undefined) {
+                    if (backtrackCurrentLinearOp?.prevForkableOp?.hash === undefined) {
                         backtrackCurrentLinearOp = undefined;
                     } else {
-                        backtrackCurrentLinearOp = this._allLinearOps.get(backtrackCurrentLinearOp?.prevLinearOp.hash);
+                        backtrackCurrentLinearOp = this._allForkableOps.get(backtrackCurrentLinearOp?.prevForkableOp.hash);
                     }
                 }
             }

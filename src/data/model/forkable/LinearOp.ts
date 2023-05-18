@@ -1,34 +1,50 @@
 import { Hash } from '../hashing';
-import { HashedObject, HashedSet, HashReference } from '../immutable';
-import { MutationOp } from '../mutable';
-import { LinearObject } from './LinearObject';
+import { HashedObject, HashReference } from '../immutable';
 
-abstract class LinearizationOp extends MutationOp {
+import { ForkableObject } from './ForkableObject';
+import { ForkableOp } from './ForkableOp';
 
-    seq?: bigint;
+abstract class LinearOp extends ForkableOp {
 
-    prevLinearOp?: HashReference<this>;
-    linearCausalOps?: HashedSet<LinearizationOp>;
+    prevForkableOp?: HashReference<ForkableOp>;
 
-    constructor(targetObject?: LinearObject, prevLinearOp?: LinearizationOp, linearCausalOps?: IterableIterator<LinearizationOp>) {
-        super(targetObject);
+    constructor(targetObject?: ForkableObject, prevForkableOp?: ForkableOp, forkCausalOps?: IterableIterator<ForkableOp>) {
+        super(targetObject, forkCausalOps);
 
-        this.seq = prevLinearOp === undefined? BigInt(0) : (prevLinearOp.seq as bigint) + BigInt(1);
-        
-        this.prevLinearOp = prevLinearOp?.createReference();
+        if (this.targetObject !== undefined) {
 
-        if (linearCausalOps !== undefined) {
-            this.linearCausalOps = new HashedSet(linearCausalOps);
-
-            if (this.linearCausalOps.size() === 0) {
-                this.linearCausalOps = undefined;
+            if (prevForkableOp !== undefined) {
+                if (!targetObject?.equalsUsingLastHash(prevForkableOp?.getTargetObject())) {
+                    throw new Error('Cannot create LinearOp: prevForkableOp ' + prevForkableOp?.getLastHash() + ' has a different ForkableObject as target');
+                }
             }
-        }        
+        }
+                
     }
 
-    async loadLinearizedOps(ops?: Map<Hash, MutationOp>, opts?: {checkOnly?: boolean, useStore?: boolean}): Promise<{ all: HashedSet<MutationOp>, disconnectedFromPrevLinearOp: Set<Hash> }> {
+    getPrevForkOpRefs(): IterableIterator<HashReference<ForkableOp>> {
+        const r = new Array<HashReference<ForkableOp>>();
 
-        const all = (opts?.checkOnly||false)? undefined : new HashedSet<MutationOp>();
+        if (this.prevForkableOp !== undefined) {
+            r.push(this.prevForkableOp);
+        }
+
+        return r.values();
+    }
+
+    getPrevForkOpHashes(): IterableIterator<Hash> {
+        const r = new Array<Hash>();
+
+        if (this.prevForkableOp !== undefined) {
+            r.push(this.prevForkableOp.hash);
+        }
+
+        return r.values();
+    }
+
+    /*async loadLinearizedOps(ops?: Map<Hash, MutationOp>, opts?: {checkOnly?: boolean, useStore?: boolean}): Promise<{ all: HashedSet<LinearizableOp>, disconnectedFromPrevLinearOp: Set<Hash> }> {
+
+        const all = (opts?.checkOnly||false)? undefined : new HashedSet<LinearizableOp>();
         const reachable = new Set<Hash>();
         const toVisit   = new Set<Hash>();
         const disconnected     = new Set<Hash>();
@@ -76,34 +92,38 @@ abstract class LinearizationOp extends MutationOp {
                     }
                 }
 
-                if (this.getTargetObject()._noLinearizationsAsPrevOps && op instanceof LinearizationOp) {
+                if (this.getTargetObject()._noLinearizationsAsPrevOps && op instanceof LinearOp) {
                     throw new Error('Unexpected LinearizationOp ' + nextHashToVisit + ' found while fetching linearized ops for ' + this.getLastHash());
                 }
 
-                if (!reachable.has(op.getLastHash())) {
-                    reachable.add(op.getLastHash());
-                    all?.add(op);
-
-                    let hasPreds = false;
-
-                    for (const opRef of op.getPrevOps()) {
-
-                        hasPreds = hasPreds || opRef.hash !== this.prevLinearOp?.hash;
-
-                        if (!reachable.has(opRef.hash)) {
-                            toVisit.add(opRef.hash);    
+                if (op instanceof LinearizableOp) {
+                    if (!reachable.has(op.getLastHash())) {
+                        reachable.add(op.getLastHash());
+                        all?.add(op);
+    
+                        let hasPreds = false;
+    
+                        for (const opRef of op.getPrevOps()) {
+    
+                            hasPreds = hasPreds || opRef.hash !== this.prevLinearOp?.hash;
+    
+                            if (!reachable.has(opRef.hash)) {
+                                toVisit.add(opRef.hash);    
+                            }
                         }
-                    }
-
-                    if (!hasPreds) {
-
-                        if (this.getTargetObject()._noDisconnectedOps && this.prevLinearOp?.hash !== undefined) {
-                            throw new Error('Found an unexpected root op: ' + nextHashToVisit + ' in linearization op ' + this.getLastHash());
+    
+                        if (!hasPreds) {
+    
+                            if (this.getTargetObject()._noDisconnectedOps && this.prevLinearOp?.hash !== undefined) {
+                                throw new Error('Found an unexpected root op: ' + nextHashToVisit + ' in linearization op ' + this.getLastHash());
+                            }
+    
+                            disconnected.add(op.getLastHash());
                         }
-
-                        disconnected.add(op.getLastHash());
                     }
                 }
+
+                
             }
         }
         
@@ -113,7 +133,7 @@ abstract class LinearizationOp extends MutationOp {
 
         return { all: (all||new HashedSet()), disconnectedFromPrevLinearOp: disconnected };
 
-    }
+    }*/
 
     /* This check-only version of the function above (loadLinearizedOps) has better space requirements,
        since it works storing just the hashes (instead of the ops themselves). Should be useful for
@@ -124,6 +144,7 @@ abstract class LinearizationOp extends MutationOp {
              the store.
     */
 
+    /*
     checkLinearizedOps(ops?: Map<Hash, MutationOp>): boolean {
 
 
@@ -139,26 +160,18 @@ abstract class LinearizationOp extends MutationOp {
         }
 
         return true;
-    }
+    }*/
 
-    gerPrevLinearOpHash(): Hash {
-        if (this.prevLinearOp === undefined) {
-            throw new Error('LinearObject: prevLinearOp reference is missing, but its hash was requested.');
+    gerPrevForkableOpHash(): Hash {
+        if (this.prevForkableOp === undefined) {
+            throw new Error('ForkableObject: prevForkableOp reference is missing, but its hash was requested.');
         }
 
-        return this.prevLinearOp.hash;
+        return this.prevForkableOp.hash;
     }
 
-    getLinearCausalOps(): HashedSet<LinearizationOp> {
-        if (this.linearCausalOps === undefined) {
-            throw new Error('LinearObject: linearOpDeps was requested, but it is missing.');
-        }
-
-        return this.linearCausalOps;
-    }
-
-    getTargetObject(): LinearObject {
-        return super.getTargetObject() as LinearObject;
+    getTargetObject(): ForkableObject {
+        return super.getTargetObject() as ForkableObject;
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
@@ -167,28 +180,28 @@ abstract class LinearizationOp extends MutationOp {
             return false;
         }
 
-        if (!(typeof(this.seq) === 'bigint')) {
-            return false;
+        if (this.prevForkableOp !== undefined) {
+
+            if (this.prevOps === undefined || !this.prevOps.has(this.prevForkableOp)) {
+                return false;
+            }
+
+            const prev = references.get(this.prevForkableOp.hash);
+
+            if (!(prev instanceof LinearOp)) {
+                return false;
+            }
         }
 
-        if (this.prevLinearOp === undefined) {
-            if (this.seq !== BigInt(0)) {
-                return false;
-            }
-        } else {
+        /*
 
-            if (this.prevOps === undefined || !this.prevOps.has(this.prevLinearOp)) {
-                return false;
-            }
+        for (const prevOpRef of (this.prevOps as HashedSet<HashReference<MutationOp>>).values()) {
+            const prevOp = references.get(prevOpRef.hash);
 
-            const prev = references.get(this.prevLinearOp.hash);
-
-            if (!(prev instanceof LinearizationOp)) {
-                return false;
-            }
-
-            if (this.seq + BigInt(1) !== prev.seq) {
-                return false;
+            if (prevOp instanceof LinearizableOp) {
+                if (this.prevLinearOp?.hash === prevOp.prevLinearizationOp?.hash) {
+                    return false;
+                }
             }
         }
 
@@ -196,8 +209,10 @@ abstract class LinearizationOp extends MutationOp {
             return false;
         }
 
+        */
+
         return true;
     }
 }
 
-export { LinearizationOp };
+export { LinearOp };

@@ -42,10 +42,10 @@ const OpInvaidationEventActions: Array<string> = [OpInvalidationEvents.Invalidat
 type MutableObjectConfig = {
     supportsCausalInvalidation?: boolean,
     supportsCheckpoints?: boolean,
-    autoCheckpoint?: boolean,       // create checkpoints automatically?
-    autoCheckpointOpFreq?: number,      // how many ops must be applied and saved before a checkpoint is created automatically
-    autoCheckpointOpFreqDelay?: number  // how long to wait for more ops before doing so
-    autoCheckpointInactivityDelay?: number,     // how much time must pass for a checkpoint to be created automatically, even if there are few applied ops
+    autoCheckpoint?: boolean,               // create checkpoints automatically?
+    autoCheckpointOpFreq?: number,          // how many ops must be applied and saved before a checkpoint is created automatically
+    autoCheckpointOpFreqDelay?: number      // how long to wait for more ops before doing so
+    autoCheckpointInactivityDelay?: number, // how much time must pass for a checkpoint to be created automatically, even if there are few applied ops
 };
 
 type StateCheckpoint = {

@@ -1,4 +1,5 @@
 import { ChoiceBasedLinearizationRule, Hash, HashedObject, HashedSet, HashReference, LinearizationOp, LinearObject, MutationOp } from 'data/model';
+import { LinearizableOp } from 'data/model/linearizable/LinearizableOp';
 import { MultiMap } from 'index';
 
 
@@ -24,9 +25,9 @@ class CounterSettlementOp extends LinearizationOp {
         let computedSettlement   = BigInt(0);
         let computedChangeAmount = BigInt(0);
 
-        if (this.prevLinearOp !== undefined) {
+        if (this.prevLinearizationOp !== undefined) {
 
-            const prevLinearOp = references.get(this.prevLinearOp.hash);
+            const prevLinearOp = references.get(this.prevLinearizationOp.hash);
 
             if (!(prevLinearOp instanceof CounterSettlementOp)) {
                 return false;
@@ -37,7 +38,7 @@ class CounterSettlementOp extends LinearizationOp {
 
         if (prevOps !== undefined) {
             for (const prevOpRef of prevOps) {
-                if (prevOpRef.hash !== this.prevLinearOp?.hash) {
+                if (prevOpRef.hash !== this.prevLinearizationOp?.hash) {
 
                     const prevOp = references.get(prevOpRef.hash);
 
@@ -65,15 +66,15 @@ class CounterSettlementOp extends LinearizationOp {
     }
 }
 
-class CounterChangeOp extends MutationOp {
+class CounterChangeOp extends LinearizableOp {
     
     static className = 'hhs-test/CounterChangeOp';
 
     changeAmount?: bigint;
     newValue?: bigint;
 
-    constructor(changeAmount?: bigint, newValue?: bigint) {
-        super();
+    constructor(changeAmount?: bigint, newValue?: bigint, prevSettlementOp?: CounterSettlementOp) {
+        super(prevSettlementOp);
 
         this.setRandomId();
 
@@ -224,7 +225,7 @@ class PositiveCounter extends LinearObject<CounterSettlementOp> {
         return false;
     }
 
-    getUnsettledValue(): bigint {
+    getValue(): bigint {
         if (this._currentLastLinearOp === undefined) {
             return this._unsettledInitialAmount;
         } else {
@@ -234,11 +235,56 @@ class PositiveCounter extends LinearObject<CounterSettlementOp> {
     }
 
     getSettledValue(): bigint {
-        
+        if (this._currentLastLinearOp === undefined) {
+            return BigInt(0);
+        } else {
+            return (this._currentLastLinearOp.settledValue as bigint) + 
+                   (this._unsettledAmountAfterSettlement.get(this._currentLastLinearOp.getLastHash()) || BigInt(0))
+        }
     }
 
-    settle(ops?: HashedSet<MutationOp>) {
+    async changeBy(changeAmount: bigint, after?: MutationOp): Promise<void> {
 
+        let newValue = changeAmount;
+
+        if (after === undefined) {
+            const ts = await this.getTerminalUnsettledOps();
+
+            if (ts.size() > 0) {
+                const prevChangeOp = ts.values().next().value as CounterChangeOp;
+                newValue = newValue + (prevChangeOp.newValue as bigint);
+            } else if (this._currentLastLinearOp !== undefined) {
+                newValue = newValue + (this._currentLastLinearOp.settledValue as bigint);
+            }
+        }
+
+        const op = new CounterChangeOp(changeAmount, newValue, this._currentLastLinearOp);
+
+        op.setPrevOps(new HashedSet<MutationOp>().values()); // FIXME
+
+        return this.applyNewOp(op);
+    }
+
+    settle(includeOps?: HashedSet<MutationOp>) {
+
+    }
+
+    getUnsettledOps(): Promise<HashedSet<CounterChangeOp>> {
+
+        if (this._currentLastLinearOp === undefined) {
+            return this.getAllInitialLinearizableOps();
+        } else {
+            return this.getAllLinearizableOpsAfter(this._currentLastLinearOp.getLastHash());
+        }
+    }
+
+    getTerminalUnsettledOps(): Promise<HashedSet<CounterChangeOp>> {
+
+        if (this._currentLastLinearOp === undefined) {
+            return this.getTerminalInitialLinearizableOps();
+        } else {
+            return this.getTerminalLinearizableOpsAfter(this._currentLastLinearOp.getLastHash());
+        }
     }
 
     getMutableContents(): MultiMap<string, HashedObject> {
