@@ -1,11 +1,10 @@
 import { Hash } from '../hashing';
-import { HashedSet, HashReference } from '../immutable';
+import { HashedObject, HashedSet, HashReference } from '../immutable';
 import { MutationOp } from '../mutable';
 import { ForkableObject } from './ForkableObject';
 
 abstract class ForkableOp extends MutationOp {
 
-    //seq?: bigint;
     forkCausalOps?: HashedSet<ForkableOp>;
 
     constructor(targetObject?: ForkableObject, forkCausalOps?: IterableIterator<ForkableOp>) {
@@ -16,12 +15,6 @@ abstract class ForkableOp extends MutationOp {
             if (!(targetObject instanceof ForkableObject)) {
                 throw new Error('ForkableOp instances are meant to have ForkableObjects as targets');
             }
-
-            /*if (typeof(seq) !== 'bigint') {
-                throw new Error('The seq parameter in a ForkableOp is meant to be a bigint (got ' + typeof (seq) + ' instead).');
-            }
-
-            this.seq = seq;*/
 
             if (forkCausalOps !== undefined) {
                 this.forkCausalOps = new HashedSet<ForkableOp>();
@@ -39,6 +32,27 @@ abstract class ForkableOp extends MutationOp {
                 }
             }
         }
+    }
+
+    async validate(references: Map<string, HashedObject>): Promise<boolean> {
+        if (!(await super.validate(references))) {
+            return false;
+        }
+
+        if (this.forkCausalOps !== undefined) {
+            if (!(this.forkCausalOps instanceof HashedSet)) {
+                HashedObject.validationLog.warning('ForkableOp ' + this.getLastHash() + ' of class ' + this.getClassName() + ' has a forkableOps that is not an instance of HashedSet as it should.');
+                return false;
+            }
+
+            for (const forkCausalOp of this.forkCausalOps.values()) {
+                if (!(forkCausalOp instanceof ForkableOp)) {
+                    HashedObject.validationLog.warning('ForkableOp ' + this.getLastHash() + ' of class ' + this.getClassName() + ' has a forkable op that is not an instance of ForkableOp as it should.');
+                }
+            }
+        }
+        
+        return true;
     }
 
     getForkCausalOps(): HashedSet<ForkableOp> {

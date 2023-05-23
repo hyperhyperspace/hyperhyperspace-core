@@ -29,18 +29,26 @@ class LogEntryOp<T extends ForkableObject, I=undefined> extends LinearOp {
             return false;
         }
 
+        if (typeof(this.entryNumber) !== 'bigint') {
+            HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' entryNumber is not of type bigint as it should.');
+            return false;
+        }
+
         if (!(this.transitionOps instanceof HashedSet)) {
+            HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' transitionOps is not an instance of HashedSet as it should.');
             return false;
         }
 
         for (const transOp of this.transitionOps.values()) {
             if (!(transOp instanceof TransitionOp)) {
+                HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' contains a transition operation that is not an instance of TransitionOp.');
                 return false;
             }
 
             // Since we check that transOp is in prevOps, we know that its traget is
             // the same as this.targetObject
             if (!(this.prevOps as HashedSet<HashReference<MutationOp>>).has(transOp.createReference())) {
+                HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' has a transOp, ' + transOp.getLastHash() + ', that is not in prevOps as it should.');
                 return false;
             }
 
@@ -71,13 +79,33 @@ class LogEntryOp<T extends ForkableObject, I=undefined> extends LinearOp {
             }
         }
 
-        // We know that super.prevLinearOp is in prevOps, and so are all transitionOps.
+        // We know that super.prevForkableOp is in prevOps, and so are all transitionOps.
         // Let's check that there's not anything else in there:
 
         const prevOpsSize = (this.prevOps as HashedSet<HashReference<MutationOp>>).size();
 
         if (prevOpsSize !== this.transitionOps.size() + 1) {
+            HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' has unexpected ops in prevOps.');
             return false;
+        }
+
+        if (this.prevForkableOp === undefined) {
+            if (this.entryNumber !== BigInt(0)) {
+                HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' entry number should be 0, instead got: ' + this.entryNumber + '.');
+                return false;
+            }
+        } else {
+            const prevForkableOp = references.get(this.prevForkableOp.hash);
+
+            if (!(prevForkableOp instanceof LogEntryOp)) {
+                HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' prevForkableOp is not an instance of LogEntryOp as it should');
+                return false;
+            }
+
+            if (this.entryNumber + BigInt(1) !== prevForkableOp.entryNumber) {
+                HashedObject.validationLog.warning('LogEntryOp ' + this.getLastHash() + ' entryNumber is not one more than that of its prevForkableOp, as it should.');
+                return false;
+            }
         }
 
         return true;

@@ -1,4 +1,5 @@
-import { ForkableObject, Hash, HashedObject, HashedSet, HashReference, LinearOp, MergeOp, MutationOp } from 'data/model';
+import { , Hash, HashedObject, HashedSet, HashReference, MutationOp } from 'data/model';
+import { ForkableObject, LinearOp, MergeOp, ForkChoiceRule } from 'data/model';
 import { MultiMap } from 'index';
 
 
@@ -148,9 +149,9 @@ class CounterChangeOp extends LinearOp {
     }
 }
 
-class SettlementRule extends ChoiceBasedLinearizationRule<CounterSettlementOp> {
+class SettlementRule implements ForkChoiceRule<CounterChangeOp, CounterSettlementOp> {
     
-    shouldUseNewLastOp(newLastOp: CounterSettlementOp, currentLastOp: CounterSettlementOp): boolean {
+    shouldReplaceCurrent(newLastOp: CounterSettlementOp, currentLastOp: CounterSettlementOp): boolean {
         
         return (newLastOp.seq as bigint) > (currentLastOp.seq as bigint) ||
                ((newLastOp.seq as bigint) === (currentLastOp.seq as bigint) && newLastOp.getLastHash().localeCompare(currentLastOp.getLastHash()) > 0 )      
@@ -158,7 +159,7 @@ class SettlementRule extends ChoiceBasedLinearizationRule<CounterSettlementOp> {
     }
 }
 
-class PositiveCounter extends LinearObject<CounterSettlementOp> {
+class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementOp> {
 
     static className = 'hhs-test/PositiveCounter';
     static opClasses = [CounterSettlementOp.className, CounterChangeOp.className];
