@@ -2,6 +2,19 @@ import { Hash, HashedObject, HashReference } from 'data/model';
 import { ForkableObject, LinearOp, MergeOp, ForkChoiceRule } from 'data/model';
 import { Identity, MultiMap } from 'index';
 
+/* PositiveCounter: this dummy type is intended as a test case for the new forkable type logic.
+ *
+ * A positive counter (it should be called a NonNegativeCounter actually, will fix) is a counter from which
+ * one can add and substract arbitrary values, but it cannot go negative. If the counter is modified concurrently,
+ * it will fork. An arbitrary deterministic rule will chose which of the values tu use, so all peers see a matching
+ * value. If the sum of all the changes is positive, the counter can be "settled" to a new amount, incoporating all 
+ * the changes. If all the changes add up to a negative amount, you'll need to add to the counter before it can be
+ * settled.
+ * 
+ * IMPORTANT: still no actual test cases have been written, this is all probably bug ridden down to the forkable types logic.
+ */
+
+
 type CounterOp = CounterSettlementOp|CounterChangeOp;
 
 class CounterSettlementOp extends MergeOp {
@@ -92,6 +105,8 @@ class CounterSettlementOp extends MergeOp {
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
+
+        
 
         const settledOps = new Set<CounterOp>();
 
@@ -184,6 +199,10 @@ class CounterChangeOp extends LinearOp {
     }
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
+
+        if (!(await super.validate(references))) {
+            return false;
+        }
 
         const prev = this.prevForkableOp === undefined? undefined : references.get(this.prevForkableOp.hash) as CounterOp;
 
