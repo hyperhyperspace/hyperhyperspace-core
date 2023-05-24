@@ -232,12 +232,6 @@ class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementO
     static className = 'hhs-test/PositiveCounter';
     static opClasses = [CounterSettlementOp.className, CounterChangeOp.className];
 
-    _unsettledInitialAmount: bigint;
-    _unsettledAmountAfterSettlement: Map<Hash, bigint>;
-    _prevSettlementOpForChangeOp: Map<Hash, Hash>;
-
-    _allChangeOps: Map<Hash, CounterChangeOp>;
-
     constructor() {
         super(PositiveCounter.opClasses, 
               { 
@@ -246,13 +240,6 @@ class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementO
             );
 
         this.setRandomId();
-
-        this._unsettledInitialAmount = BigInt(0);
-
-        this._unsettledAmountAfterSettlement = new Map();
-        this._prevSettlementOpForChangeOp = new Map();
-
-        this._allChangeOps = new Map();
     }
 
     getValue() {
