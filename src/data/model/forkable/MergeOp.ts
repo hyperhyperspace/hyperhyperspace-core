@@ -4,11 +4,19 @@ import { HashedObject, HashedSet, HashReference } from '../immutable';
 import { ForkableObject } from './ForkableObject';
 import { ForkableOp } from './ForkableOp';
 import { Queue } from 'util/queue';
+import { MutationOp } from '../mutable';
 
 
 abstract class MergeOp extends ForkableOp {
 
-    mergedForkableOps?: HashedSet<HashReference<ForkableOp>>;
+    // the immediately previous ops being merged
+    mergedOps?: HashedSet<HashReference<ForkableOp>>;
+
+    // ALL the divergent ops that need to be merged
+    allMergeContents?: HashedSet<HashReference<ForkableOp>>;
+
+    // the point at which history diverged
+    // (may be undefined if merging fragments with different starting points altogether)
     forkPointOp?: HashReference<ForkableOp>;
 
     constructor(targetObject?: ForkableObject, mergeTargetOps?: IterableIterator<ForkableOp>, forkCausalOps?: IterableIterator<ForkableOp>) {
@@ -17,7 +25,8 @@ abstract class MergeOp extends ForkableOp {
         if (this.targetObject !== undefined) {
 
             if (mergeTargetOps !== undefined) {
-                this.mergedForkableOps = new HashedSet<HashReference<ForkableOp>>();
+                const mergeTargetOpSet = new Set<ForkableOp>();
+                
 
                 for (const forkableOp of mergeTargetOps) {
                     if (!(forkableOp instanceof ForkableOp)) {
@@ -28,14 +37,10 @@ abstract class MergeOp extends ForkableOp {
                         throw new Error('The op ' + forkableOp.getLastHash() + ' in mergedForkableOps points to a different targetObject than the op itself.');
                     }
 
-                    this.mergedForkableOps.add(forkableOp.createReference());
+                    mergeTargetOpSet.add(forkableOp);
                 }
 
-                if (this.mergedForkableOps.size() === 0) {
-                    this.mergedForkableOps = undefined;
-                }
-
-                const forkPoint = this.findForkPoint(mergeTargetOps);
+                const forkPoint = MergeOp.findForkPoint(this.getTargetObject(), mergeTargetOpSet.values());
                 const forkPointOp = forkPoint.forkPointOp;
 
                 if (forkPointOp !== undefined) {
@@ -49,22 +54,30 @@ abstract class MergeOp extends ForkableOp {
     
                     this.forkPointOp = forkPointOp.createReference();
                 }
+
+                this.mergedOps = new HashedSet<HashReference<ForkableOp>>();
+                for (const forkableOp of forkPoint.mergeTerminalOps.values()) {
+                    this.mergedOps.add(forkableOp.createReference());
+                }
+
+                this.allMergeContents = new HashedSet<HashReference<ForkableOp>>();
+                for (const forkableOp of forkPoint.mergeConentOps.values()) {
+                    this.allMergeContents.add(forkableOp.createReference());
+                }
+
+                this.prevOps = new HashedSet<HashReference<MutationOp>>(this.mergedOps.values());
             }
-
-            
-
-            
         }
     }
 
-    private findForkPoint(mergeTargetOps: IterableIterator<ForkableOp>, references?: Map<Hash, HashedObject>): {forkPointOp?: ForkableOp, toMerge: Set<ForkableOp>} {
+    static findForkPoint(target: ForkableObject, mergeTargetOps: IterableIterator<ForkableOp>, references?: Map<Hash, HashedObject>): {forkPointOp?: ForkableOp, mergeConentOps: Set<ForkableOp>, mergeTerminalOps: Set<ForkableOp>} {
 
-        const mergeTargetOpSet = new Map<Hash, ForkableOp>();
+        const declaredMergeTargetOpSet = new Map<Hash, ForkableOp>();
         const toVisit = new Queue<{targetOpHash: Hash, opHash: Hash}>();
         const visited = new Map<Hash, ForkableOp>();
 
         for (const forkableOp of mergeTargetOps) {
-            mergeTargetOpSet.set(forkableOp.getLastHash(), forkableOp);
+            declaredMergeTargetOpSet.set(forkableOp.getLastHash(), forkableOp);
             toVisit.enqueue({targetOpHash: forkableOp.getLastHash(), opHash: forkableOp.getLastHash()});
         }
 
@@ -89,7 +102,7 @@ abstract class MergeOp extends ForkableOp {
         while (toVisit.size() > 0) {
             const next = toVisit.dequeue();
             const opHash = next.opHash;
-            const op = this.getForkableOp(opHash, references);
+            const op = target.getForkableOp(opHash, references);
             visited.set(opHash, op);
 
             if (!mergedContentMap.get(opHash).has(next.targetOpHash)) {
@@ -104,7 +117,7 @@ abstract class MergeOp extends ForkableOp {
                     mergedNextOps.add(prevOpHash, opHash);
                 }
                 
-                if (mergedContentMap.get(opHash).size === mergeTargetOpSet.size) {
+                if (mergedContentMap.get(opHash).size === declaredMergeTargetOpSet.size) {
                     intersectionOps.add(opHash);
 
                     // Invariant 2: forkPointOps contains exactly the set of "initial" ops of intersectionOps
@@ -170,13 +183,18 @@ abstract class MergeOp extends ForkableOp {
             }
         }
 
-        const toMerge = new Set<ForkableOp>();
+        const mergeContentOps  = new Set<ForkableOp>();
+        const mergeTerminalOps = new Set<ForkableOp>();
 
         for (const candidateOpHash of mergedContentMap.keys()) {
             // If not, we need to add all of the intersection to the set of ops that we need to merge! There is no fork
             // point, the intersection has at least two distinct starting ops.
             if (forkPointOpHash === undefined || !intersectionOps.has(candidateOpHash)) {
-                toMerge.add(visited.get(candidateOpHash) as ForkableOp);
+                mergeContentOps.add(visited.get(candidateOpHash) as ForkableOp);
+
+                if (mergedNextOps.get(candidateOpHash).size === 0) {
+                    mergeTerminalOps.add(visited.get(candidateOpHash) as ForkableOp);
+                }
             }
         }
 
@@ -185,29 +203,14 @@ abstract class MergeOp extends ForkableOp {
                           :
                                 visited.get(forkPointOpHash) as ForkableOp;
 
-        return { forkPointOp: forkPointOp, toMerge: toMerge};
-    }
-
-    private getForkableOp(opHash: Hash, references?: Map<Hash, HashedObject>): ForkableOp {
-
-        let op = references?.get(opHash) as ForkableOp|undefined;
-
-        if (op === undefined) {
-            op = this.getTargetObject()._allForkableOps.get(opHash);
-        }
-
-        if (op === undefined) {
-            throw new Error('Could not get forkable op with hash ' + opHash + ': it was not applied to loaded instance of ' + this.getTargetObject().getLastHash());
-        }
-
-        return op;
+        return { forkPointOp: forkPointOp, mergeConentOps: mergeContentOps, mergeTerminalOps: mergeTerminalOps};
     }
 
     getPrevForkOpRefs(): IterableIterator<HashReference<ForkableOp>> {
-        if (this.mergedForkableOps === undefined) {
+        if (this.mergedOps === undefined) {
             return [].values();
         } else {
-            return this.mergedForkableOps.values();
+            return this.mergedOps.values();
         }
     }
 

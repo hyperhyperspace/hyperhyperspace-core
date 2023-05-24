@@ -1,5 +1,6 @@
 import { Hash } from '../hashing';
-import { HashedObject, HashReference } from '../immutable';
+import { HashedObject, HashedSet, HashReference } from '../immutable';
+import { MutationOp } from '../mutable';
 
 import { ForkableObject } from './ForkableObject';
 import { ForkableOp } from './ForkableOp';
@@ -17,6 +18,10 @@ abstract class LinearOp extends ForkableOp {
                 if (!targetObject?.equalsUsingLastHash(prevForkableOp?.getTargetObject())) {
                     throw new Error('Cannot create LinearOp: prevForkableOp ' + prevForkableOp?.getLastHash() + ' has a different ForkableObject as target');
                 }
+
+                this.prevForkableOp = prevForkableOp.createReference();
+
+                this.prevOps = new HashedSet<HashReference<MutationOp>>([this.prevForkableOp].values());
             }
         }
                 

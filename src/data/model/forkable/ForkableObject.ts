@@ -8,6 +8,7 @@ import { MergeOp } from './MergeOp';
 import { ForkableOp } from './ForkableOp';
 import { ForkChoiceRule } from './ForkChoiceRule';
 import { Queue } from 'util/queue';
+import { HashedObject } from '../immutable';
 
 /*
  * TODO BEFORE PRIME TIME:
@@ -74,7 +75,7 @@ type ForkChangeInfo = {
 
 const ForkEventActions: Array<string>  = [ForkEvents.ForkChange];
 
-abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|never=never, R extends ForkChoiceRule<L, M>|undefined=undefined> extends MutableObject {
+abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|never=MergeOp|never, R extends ForkChoiceRule<L, M>|undefined=ForkChoiceRule<L, M>|undefined> extends MutableObject {
 
     // All linear ops, indexed by their hashes (they will form a tree -wait no- a forest actually):
     _allForkableOps: Map<Hash, L|M>;
@@ -575,6 +576,21 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
         }
     }
 
+    getForkableOp(opHash: Hash, references?: Map<Hash, HashedObject>): ForkableOp {
+
+        let op = references?.get(opHash) as ForkableOp|undefined;
+
+        if (op === undefined) {
+            op = this._allForkableOps.get(opHash);
+        }
+
+        if (op === undefined) {
+            throw new Error('Could not get forkable op with hash ' + opHash + ': it was not applied to loaded instance of ' + this.getLastHash());
+        }
+
+        return op;
+    }
+
     private applyForkChoiceRule(chiocesToAdd: Set<Hash>, choicesToRemove: Set<Hash>) {
 
         if (this._forkChoiceRule === undefined) {
@@ -622,96 +638,6 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
 
     }
 
-
-    /*
-    async getAllInitialForkableOps(): Promise<HashedSet<O>> {
-
-        return this.getInitialForkableOps({onlyTerminalOps: false});
-
-    }
-
-    async getTerminalInitialForkableOps(): Promise<HashedSet<O>> {
-
-        return this.getInitialForkableOps({onlyTerminalOps: true});
-
-    }
-
-    private async getInitialForkableOps(opts: {onlyTerminalOps: boolean}): Promise<HashedSet<ForkableOp>> {
-
-        const result = new HashedSet<O>();
-        const store = this.getStore();
-
-        let loaded = await store.loadByReference('targetObject', this.getLastHash(), {order: 'asc', limit: 50});
-
-        while (loaded.objects.length > 0) {
-
-            for (const obj of loaded.objects) {
-                if (obj instanceof ForkableOp && obj.prevForkableOp === undefined) {
-                    result.add(obj as ForkableOp);
-
-                    if (opts.onlyTerminalOps && obj.prevOps !== undefined) {
-                        for (const prevOpRef of obj.prevOps.values()) {
-                            result.removeByHash(prevOpRef.hash);
-                        }
-                    }
-                }
-            }
-
-            loaded = await store.loadByReference('targetObject', this.getLastHash(), {order: 'asc', limit: 50, start: loaded.end});
-        }
-
-        return result;
-    }
-
-    async getAllForkableOpsAfter(linearizationOpHash: Hash): Promise<HashedSet<ForkableOp>> {
-
-        return this.getForkableOpsAfter(linearizationOpHash, {onlyTerminalOps: false});
-
-    }
-
-    async getTerminalForkableOpsAfter(linearizationOpHash: Hash): Promise<HashedSet<ForkableOp>> {
-
-        return this.getForkableOpsAfter(linearizationOpHash, {onlyTerminalOps: true});
-
-    }
-    private async getForkableOpsAfter(forkableOpHash: Hash, opts: {onlyTerminalOps: boolean}): Promise<HashedSet<ForkableOp>> {
-
-        const result = new HashedSet<ForkableOp>();
-        const store = this.getStore();
-
-        let linear = await store.loadByReference('prevForkableOp', forkableOpHash, {order: 'asc', limit: 50});
-        let merges = await store.loadByReference('mergedForkableOps', forkableOpHash, {order: 'asc', limit: 50});
-
-        while (linear.objects.length > 0 || merges.objects.length > 0) {
-
-            const all = linear.objects.concat(merges.objects);
-
-            for (const obj of all) {
-                if (obj instanceof ForkableOp) {
-                    result.add(obj as ForkableOp);
-
-                    if (opts.onlyTerminalOps) {
-                        for (const prevOpHash of obj.getPrevForkOpHashes()) {
-                            result.removeByHash(prevOpHash);
-                        }
-                    }
-                }
-            }
-
-            if (linear.objects.length > 0) {
-                linear = await store.loadByReference('prevForkableOp', forkableOpHash, {order: 'asc', limit: 50, start: linear.end});
-            }
-
-            if (merges.objects.length > 0) {
-                merges = await store.loadByReference('prevForkableOps', forkableOpHash, {order: 'asc', limit: 50, start: merges.end});
-            }
-            
-        }
-
-        return result;
-    }
-    */
-
     private getLinearDepTargetSubobj(depTarget: ForkableObject): ForkableObject<any, any, any> {
 
         const depTargetHash = depTarget.getLastHash();
@@ -739,6 +665,16 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
 
     static isForkRelatedEvent(ev: MutationEvent) {
         return ForkEventActions.indexOf(ev.action) >= 0;
+    }
+
+    getTerminalEligibleOps() {
+        const ops = new Set<L|M>();
+
+        for (const opHash of this._terminalEligibleOps.values()) {
+            ops.add(this._allForkableOps.get(opHash) as (L|M));
+        }
+
+        return ops;
     }
 }
 

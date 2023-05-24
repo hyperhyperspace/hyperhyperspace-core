@@ -66,6 +66,9 @@ abstract class ForkableOp extends MutationOp {
     getTargetObject() : ForkableObject {
         return this.targetObject as ForkableObject;
     }
+    getForkableOp(opHash: Hash, references?: Map<Hash, HashedObject>): ForkableOp {
+        return this.getTargetObject().getForkableOp(opHash, references);
+    }
 
     abstract getPrevForkOpRefs(): IterableIterator<HashReference<ForkableOp>>;
     abstract getPrevForkOpHashes(): IterableIterator<Hash>;
