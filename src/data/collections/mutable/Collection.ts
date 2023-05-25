@@ -1,7 +1,7 @@
 import { HashedObject, HashedSet } from '../../model/immutable';
 import { MutableObject, MutableObjectConfig, MutationOp } from '../../model/mutable';
 import { Identity } from '../../identity';
-import { Hash} from '../../model/hashing'
+import { Hash } from '../../model/hashing'
 
 
 type CollectionConfig = {

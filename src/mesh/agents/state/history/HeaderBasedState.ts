@@ -1,5 +1,6 @@
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
-import { Hash, HashedObject, HashedSet } from 'data/model';
+import { Hash} from 'data/model/hashing';
+import { HashedObject, HashedSet } from 'data/model/immutable';
 import { Store } from 'storage/store';
 
 

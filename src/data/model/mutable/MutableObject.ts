@@ -2,6 +2,7 @@ import { Store } from 'storage/store';
 
 import { HashedObject } from '../immutable/HashedObject';
 import { Context } from '../literals/Context';
+import { LiteralUtils } from '../literals/LiteralUtils';
 import { Hash } from '../hashing/Hashing';
 import { Logger, LogLevel } from 'util/logging';
 import { HeaderBasedSyncAgent, StateSyncAgent, StateFilter, SyncState, SyncObserver } from 'mesh/agents/state';
@@ -16,7 +17,9 @@ import { OpHeader } from '../../history/OpHeader';
 
 import { MutationOp } from './MutationOp';
 import { EventRelay, Observer } from 'util/events';
-import { LiteralUtils, MutationEvent } from 'data/model';
+
+
+import { MutationEvent } from './MutationObserver';
 
 //import { ObjectStateAgent } from 'sync/agents/state/ObjectStateAgent';
 //import { TerminalOpsStateAgent } from 'sync/agents/state/TerminalOpsStateAgent';

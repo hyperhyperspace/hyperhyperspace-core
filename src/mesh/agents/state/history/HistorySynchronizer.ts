@@ -2,7 +2,10 @@ import { RNGImpl } from 'crypto/random';
 
 import { HistoryFragment } from 'data/history/HistoryFragment';
 import { OpHeader, OpHeaderLiteral } from 'data/history/OpHeader';
-import { Context, Hash, HashedObject, Literal, LiteralUtils, MutationOp } from 'data/model';
+import { Hash } from 'data/model/hashing';
+import { Context, Literal, LiteralUtils } from 'data/model/literals';
+import { HashedObject } from 'data/model/immutable';
+import { MutationOp } from 'data/model/mutable';
 
 import { Endpoint } from 'mesh/agents/network/NetworkAgent';
 

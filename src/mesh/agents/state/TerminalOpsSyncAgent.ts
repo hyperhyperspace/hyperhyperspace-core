@@ -1,6 +1,7 @@
-import { HashedObject, HashedSet, Hash, MutableObject } from 'data/model';
-import { MutationOp } from 'data/model';
-import { Context, Literal, LiteralContext, Dependency } from 'data/model';
+import { Hash } from 'data/model/hashing';
+import { HashedObject, HashedSet } from 'data/model/immutable';
+import { MutableObject, MutationOp } from 'data/model/mutable';
+import { Context, Literal, LiteralContext, Dependency } from 'data/model/literals';
 
 import { Store } from 'storage/store';
 

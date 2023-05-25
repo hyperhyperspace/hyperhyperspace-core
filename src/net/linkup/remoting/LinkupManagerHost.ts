@@ -1,5 +1,6 @@
 import { Identity } from 'data/identity';
-import { HashedObject, LiteralContext } from 'data/model';
+import { HashedObject } from 'data/model/immutable';
+import { LiteralContext } from 'data/model/literals';
 import { Endpoint } from 'mesh/agents/network';
 import { LinkupAddress } from '../LinkupAddress';
 import { LinkupManager } from '../LinkupManager';

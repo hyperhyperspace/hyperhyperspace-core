@@ -1,6 +1,6 @@
 import { Agent, AgentId } from './Agent';
 import { Logger, LogLevel } from 'util/logging';
-import { HashedObject } from 'data/model';
+import { HashedObject } from 'data/model/immutable';
 
 type AgentEvent = { type: string, content: any };
 

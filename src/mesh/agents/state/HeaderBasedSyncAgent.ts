@@ -1,4 +1,7 @@
-import { Hash, HashedObject, HashedSet, Literal, LiteralUtils, MutableObject, MutationOp } from 'data/model';
+import { Hash } from 'data/model/hashing';
+import { Literal, LiteralUtils } from 'data/model/literals';
+import { HashedObject, HashedSet } from 'data/model/immutable';
+import { MutableObject, MutationOp } from 'data/model/mutable';
 import { AgentEvent, AgentPod } from 'mesh/service/AgentPod';
 import { Store } from 'storage/store';
 import { Logger, LogLevel } from 'util/logging';

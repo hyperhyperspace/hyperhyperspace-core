@@ -6,7 +6,8 @@ import { AgentId } from '../../service/Agent';
 import { Endpoint } from '../network/NetworkAgent';
 
 import { HashedMap } from 'data/model/immutable';
-import { Hash, HashedObject } from 'data/model';
+import { HashedObject } from 'data/model/immutable';
+import { Hash } from 'data/model/hashing'
 import { Shuffle } from 'util/shuffling';
 import { Logger, LogLevel } from 'util/logging';
 import { PeerGroupAgent, PeerMeshEventType, NewPeerEvent, LostPeerEvent } from '../peer/PeerGroupAgent';

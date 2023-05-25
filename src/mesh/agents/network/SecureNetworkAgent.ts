@@ -11,8 +11,10 @@ import { HMACImpl }     from 'crypto/hmac';
 import { ChaCha20Impl } from 'crypto/ciphers';
 
 import { Identity }     from 'data/identity';
-import { Hash, Hashing, LiteralContext, 
-         HashedObject } from 'data/model';
+import { HashedObject } from 'data/model/immutable';
+import { Hash, Hashing } from 'data/model/hashing';
+import { LiteralContext } from 'data/model/literals';
+
 
 import { Strings }          from 'util/strings';
 import { Logger, LogLevel } from 'util/logging';
