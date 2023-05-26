@@ -85,7 +85,7 @@ class CounterSettlementOp extends MergeOp {
                     this.settledValue += (op.settledValue as bigint);
                 } else if (op instanceof CounterChangeOp) {
                     this.settledValue += (op.newValue as bigint);
-                } else {
+                } else if (op !== undefined) {
                     throw new Error('Trying to create a CounterSettlementOp that reference a merged op that is of the wrong class.');
                 }
             }
@@ -173,7 +173,7 @@ class CounterChangeOp extends LinearOp {
                 this.newValue = this.newValue + (prevCounterOp.newValue as bigint);
             } else if (prevCounterOp instanceof CounterSettlementOp) {
                 this.newValue = this.newValue + (prevCounterOp.settledValue as bigint);
-            } else {
+            } else if (prevCounterOp !== undefined) {
                 throw new Error('Attempting to create a CounterChangeOp, but the prevCounterOp is not a CounterOp.');
             }
     
@@ -242,7 +242,6 @@ class SettlementRule implements ForkChoiceRule<CounterChangeOp, CounterSettlemen
         
         return (newLastOp.height as bigint) > (currentLastOp.height as bigint) ||
                ((newLastOp.height as bigint) === (currentLastOp.height as bigint) && newLastOp.getLastHash().localeCompare(currentLastOp.getLastHash()) > 0 )      
-
     }
 }
 
@@ -278,7 +277,7 @@ class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementO
     async changeValueBy(amount: bigint) {
         const op = new CounterChangeOp(this, amount, this._currentForkTerminalOp);
 
-        return this.apply(op, true);
+        return this.applyNewOp(op);
     }
 
     isSettled() {
@@ -313,7 +312,7 @@ class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementO
     async settle() {
         if (!this.isSettled()) {
             const op = new CounterSettlementOp(this, this.getTerminalEligibleOps().values());
-            return this.apply(op, true);
+            return this.applyNewOp(op);
         } else {
             return false;
         }

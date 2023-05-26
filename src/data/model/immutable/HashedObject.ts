@@ -22,6 +22,7 @@ import { ClassRegistry } from '../literals/ClassRegistry';
 import { EventRelay } from 'util/events';
 
 import { MutationObserver } from '../mutable';
+import { BigIntParser } from '../literals';
 
 const BITS_FOR_ID = 128;
 
@@ -754,8 +755,10 @@ abstract class HashedObject {
         let value;
         let dependencies = new Map<string, Dependency>();
 
-        if (typ === 'boolean' || typ === 'number' || typ === 'string') {
+        if (typ === 'boolean' || typ === 'number' || typ === 'string') {
             value = something;
+        } else if (typ === 'bigint') { 
+            value = BigIntParser.literalize(something);
         } else if (typ === 'object') {
             if (Array.isArray(something)) {
                 value = [];
@@ -1087,7 +1090,9 @@ abstract class HashedObject {
                     something[fieldName] = HashedObject.deliteralizeField(fieldValue, context, validate);
                 }
             } else {
-                if (value['_type'] === 'hashed_set') {
+                if (value['_type'] === 'bigint_literal') {
+                    something = BigIntParser.deliteralize(value, validate);
+                } else if (value['_type'] === 'hashed_set') {
                     something = HashedSet.deliteralize(value, context, validate);
                 } else if (value['_type'] === 'hashed_map') { 
                     something = HashedMap.deliteralize(value, context, validate);

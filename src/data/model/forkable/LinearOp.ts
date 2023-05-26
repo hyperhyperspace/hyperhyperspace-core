@@ -22,6 +22,8 @@ abstract class LinearOp extends ForkableOp {
                 this.prevForkableOp = prevForkableOp.createReference();
 
                 this.prevOps = new HashedSet<HashReference<MutationOp>>([this.prevForkableOp].values());
+            } else {
+                this.prevOps = new HashedSet<HashReference<MutationOp>>();
             }
         }
                 

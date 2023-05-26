@@ -285,7 +285,25 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
     }
 
     isForkEligible(opHash: Hash) {
-        return !this._unmetForkableOpDeps.hasKey(opHash) && !this._unmetForkablePrevOps.hasKey(opHash) && this.isValidOp(opHash);
+        const result = !this._unmetForkableOpDeps.hasKey(opHash) && !this._unmetForkablePrevOps.hasKey(opHash) && this.isValidOp(opHash);
+
+        /*console.log(opHash + ' isForkEligible: ' + result);
+
+        if (!result) {
+            if (this._unmetForkableOpDeps.hasKey(opHash)) {
+                console.log('DEPS');
+            }
+
+            if (this._unmetForkablePrevOps.hasKey(opHash)) {
+                console.log('PREV');
+            }
+
+            if (!this.isValidOp(opHash)) {
+                console.log('VALID');
+            }
+        }*/
+
+        return result;
     }
 
     isForkEligibleTerminalOp(opHash: Hash) {
@@ -362,7 +380,7 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
 
         const newForkOps = new Set<Hash>();
 
-        for (const opHash in newForkOpsQueue.reverse()) {
+        for (const opHash of newForkOpsQueue.reverse()) {
             if (!newForkOps.has(opHash)) {
                 newForkOps.add(opHash);
             }
@@ -455,7 +473,7 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
                                 {newForkOps: new Set<Hash>(), forking: new Set<Hash>()};
             
             const toRemove = this.toRemoveFromCurrentFork(backtrack.forking);
-    
+
             for (const opHash of toRemove.values()) {
                 this._allCurrentForkOps.delete(opHash);
             }
@@ -495,7 +513,7 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
     }
 
     protected apply(op: MutationOp, isNew: boolean) : Promise<boolean> {
-    
+
         const opHash = op.getLastHash();
 
         if (op instanceof ForkableOp && !this._allForkableOps.has(opHash)) {
@@ -563,8 +581,10 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
 
                 this.updateEligibleTerminalOps(addedEligibleOps, removedEligibleOps, addedTerminalEligibleOps, removedTerminalEligibleOps);
             
-                this.applyForkChoiceRule(addedTerminalEligibleOps, removedTerminalEligibleOps);
-
+                if (this._forkChoiceRule !== undefined) {
+                    this.applyForkChoiceRule(addedTerminalEligibleOps, removedTerminalEligibleOps);
+                }
+                
                 this.onForkEligibilityChange(addedEligibleOps, removedEligibleOps, addedTerminalEligibleOps, removedTerminalEligibleOps);
 
                 return true;
