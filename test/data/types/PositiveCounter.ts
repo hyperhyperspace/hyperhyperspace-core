@@ -1,4 +1,4 @@
-import { Hash, HashedObject, HashReference } from 'data/model';
+import { ClassRegistry, Hash, HashedObject, HashReference } from 'data/model';
 import { ForkableObject, LinearOp, MergeOp, ForkChoiceRule } from 'data/model';
 import { Identity, MultiMap } from 'index';
 
@@ -241,7 +241,7 @@ class SettlementRule implements ForkChoiceRule<CounterChangeOp, CounterSettlemen
     shouldReplaceCurrent(newLastOp: CounterSettlementOp, currentLastOp: CounterSettlementOp): boolean {
         
         return (newLastOp.height as bigint) > (currentLastOp.height as bigint) ||
-               ((newLastOp.height as bigint) === (currentLastOp.height as bigint) && newLastOp.getLastHash().localeCompare(currentLastOp.getLastHash()) > 0 )      
+               ((newLastOp.height as bigint) === (currentLastOp.height as bigint) && newLastOp.getLastHash().localeCompare(currentLastOp.getLastHash()) > 0 ) ;     
     }
 }
 
@@ -313,8 +313,6 @@ class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementO
         if (!this.isSettled()) {
             const op = new CounterSettlementOp(this, this.getTerminalEligibleOps().values());
             return this.applyNewOp(op);
-        } else {
-            return false;
         }
     }
 
@@ -338,5 +336,9 @@ class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementO
         return this.hasId();
     }
 }
+
+ClassRegistry.register(PositiveCounter.className, PositiveCounter);
+ClassRegistry.register(CounterChangeOp.className, CounterChangeOp);
+ClassRegistry.register(CounterSettlementOp.className, CounterSettlementOp);
 
 export { PositiveCounter, CounterChangeOp, CounterSettlementOp };

@@ -105,7 +105,7 @@ class NetworkAgent implements Agent {
 
     static logger        = new Logger(NetworkAgent.name, LogLevel.INFO);
     static connLogger    = new Logger(NetworkAgent.name + ' conn', LogLevel.INFO);
-    static messageLogger = new Logger(NetworkAgent.name + ' msg', LogLevel.TRACE);
+    static messageLogger = new Logger(NetworkAgent.name + ' msg', LogLevel.INFO);
     
     logger        : Logger;
     connLogger    : Logger;

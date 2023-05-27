@@ -198,7 +198,9 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
     }
 
     private cascadeEligibleOpAdditions(toCheckForAddition: Set<Hash>, addedEligibleOps: Set<Hash>) {
+
         while (toCheckForAddition.size > 0) {
+            
             const opHash = toCheckForAddition.values().next().value as Hash;
             toCheckForAddition.delete(opHash);
 
@@ -525,7 +527,7 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
             for (const prevForkableOpHash of op.getPrevForkOpHashes()) {
                 this._nextForkableOps.add(prevForkableOpHash as Hash, opHash); 
                 
-                if (!this.isInCurrentFork(prevForkableOpHash)) {
+                if (!this.isForkEligible(prevForkableOpHash)) {
                     this._unmetForkablePrevOps.add(opHash, prevForkableOpHash);
                     this._reverseUnmetForkablePrevOps.add(prevForkableOpHash, opHash);
 
