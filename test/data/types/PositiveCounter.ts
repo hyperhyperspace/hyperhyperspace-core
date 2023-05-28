@@ -106,8 +106,6 @@ class CounterSettlementOp extends MergeOp {
 
     async validate(references: Map<string, HashedObject>): Promise<boolean> {
 
-        
-
         const settledOps = new Set<CounterOp>();
 
         for (const opRef of this.mergedOps?.values() as IterableIterator<HashReference<CounterOp>>) {
@@ -238,7 +236,7 @@ class CounterChangeOp extends LinearOp {
 
 class SettlementRule implements ForkChoiceRule<CounterChangeOp, CounterSettlementOp> {
     
-    shouldReplaceCurrent(newLastOp: CounterSettlementOp, currentLastOp: CounterSettlementOp): boolean {
+    shouldReplaceCurrent(currentLastOp: CounterSettlementOp|CounterChangeOp, newLastOp: CounterSettlementOp|CounterChangeOp): boolean {
         
         return (newLastOp.height as bigint) > (currentLastOp.height as bigint) ||
                ((newLastOp.height as bigint) === (currentLastOp.height as bigint) && newLastOp.getLastHash().localeCompare(currentLastOp.getLastHash()) > 0 ) ;     
@@ -298,7 +296,10 @@ class PositiveCounter extends ForkableObject<CounterChangeOp, CounterSettlementO
             }
 
             for (const op of fork.mergeConentOps.values()) {
-                settledValue = settledValue + (op as CounterOp).getValue();
+                if (op instanceof CounterChangeOp) {
+                    settledValue = settledValue + (op.changeAmount as bigint);
+                }
+               
             }
 
             return settledValue;

@@ -142,7 +142,7 @@ abstract class ForkableObject<L extends LinearOp=LinearOp, M extends MergeOp|nev
         
         const forkableOpEligibilityMonitor = (ev: MutationEvent) => {
 
-            if (ForkableObject.isForkRelatedEvent(ev)) {
+            if (ForkableObject.isForkRelatedEvent(ev) && !ev.emitter.equalsUsingLastHash(this)) {
                 if (ev.action === ForkEvents.ForkChange) {
 
                     const forkInfo = ev.data as ForkChangeInfo;

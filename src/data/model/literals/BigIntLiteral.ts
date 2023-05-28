@@ -23,7 +23,7 @@ class BigIntParser {
     static encode(n: bigint): BigIntAsHexString {
         const sign = (n < BigInt(0)) ? '-' : '+'; 
 
-        return sign + n.toString(16);
+        return sign + (n < BigInt(0)? -n : n).toString(16);
     }
 
     static decode(h: BigIntAsHexString): bigint {
