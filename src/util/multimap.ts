@@ -24,6 +24,12 @@ class MultiMap<K, V> {
         
     }
 
+    addMany(key: K, values: IterableIterator<V>) {
+        for (const value of values) {
+            this.add(key, value);
+        }
+    }
+
     delete(key: K, value: V): boolean {
         let s = this.inner.get(key);
 
