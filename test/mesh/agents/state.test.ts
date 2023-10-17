@@ -107,25 +107,25 @@ describeProxy('[SYN] State sync', () => {
 
     test('[SYN13] Causal history agent-based set staged sync in small peer group (ws)', async (done) => {
 
-        await stagedSyncInSmallPeerGroup(done, 'ws');
+        await stagedSyncInSmallPeerGroup(done, 'ws', 5400);
 
     }, 300000);
 
     test('[SYN14] Causal history agent-based set diamond-shaped sync in small peer group (ws)', async (done) => {
 
-        await diamondSyncInSmallPeerGroup(done, 'ws');
+        await diamondSyncInSmallPeerGroup(done, 'ws', 5500);
 
     }, 300000);
 
     test('[SYN15] Causal history agent-based set deep sync in small peer group (ws)', async (done) => {
 
-        await deepSyncInSmallPeerGroup(done, 'ws', undefined, undefined);
+        await deepSyncInSmallPeerGroup(done, 'ws', 5600, undefined);
 
     }, 300000);
 
     test('[SYN16] Causal history agent-based set sync in small peer group (ws) using big objects', async (done) => {
 
-        await syncInSmallPeerGroup(done, 'ws', undefined, undefined, undefined, true);
+        await syncInSmallPeerGroup(done, 'ws', 5700, undefined, undefined, true);
 
     }, 300000);
 
