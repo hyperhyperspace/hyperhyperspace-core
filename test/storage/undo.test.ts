@@ -7,6 +7,7 @@ import { FeatureSet } from 'data/types/FeatureSet';
 import { Features, MessageSet } from 'data/types/Messaging';
 import { PermissionedFeatureSet } from 'data/types/PermissionedFeatureSet';
 import { PermissionTest } from 'data/types/PermissionTest';
+import { WebRTCConnection } from 'index';
 import { PeerGroupAgent } from 'mesh/agents/peer';
 import { HeaderBasedSyncAgent, StateGossipAgent, TerminalOpsSyncAgent } from 'mesh/agents/state';
 import { TestPeerGroupPods } from 'mesh/mock/TestPeerGroupPods';
@@ -18,6 +19,13 @@ import { LogLevel } from 'util/logging';
 HashedObject.validationLog.level = LogLevel.TRACE;
 
 describeProxy('[UND] Undo support', () => {
+
+    const haveWebRTC = WebRTCConnection.isAvailable();
+
+    if (!haveWebRTC) {
+        console.log('[UND] WebRTC is not available, skipping some undo logic tests.')
+    }
+
     test( '[UND01] Basic undo w/ IndexedDB backend', async (done) => {
 
         let store = new Store(new IdbBackend('test-basic-undo'));
@@ -40,12 +48,42 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 30000);
 
-    test( '[UND03] Basic undo w/ IndexedDB backend over sync', async (done) => {
+    if (haveWebRTC) {
+        test( '[UND03] Basic undo w/ IndexedDB backend over sync (wrtc)', async (done) => {
+
+            let stores = [new Store(new IdbBackend('test-basic-undo-over-sync-1')),
+                        new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
+            
+            await testBasicUndoCycleWithSync(stores);
+
+            /*for (const store of stores) {
+                store.close();
+            }*/
+
+            done();
+        }, 50000);
+
+        test( '[UND04] Basic undo w/ memory backend over sync (wrtc)', async (done) => {
+
+            let stores = [new Store(new MemoryBackend('test-basic-undo-over-sync-1')),
+                        new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
+            
+            await testBasicUndoCycleWithSync(stores);
+
+            /*for (const store of stores) {
+                store.close();
+            }*/
+
+            done();
+        }, 50000);
+    }
+
+    test( '[UND05] Basic undo w/ IndexedDB backend over sync (ws)', async (done) => {
 
         let stores = [new Store(new IdbBackend('test-basic-undo-over-sync-1')),
-                      new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
+                    new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
         
-        await testBasicUndoCycleWithSync(stores);
+        await testBasicUndoCycleWithSync(stores, 'ws', 20000);
 
         /*for (const store of stores) {
             store.close();
@@ -54,12 +92,12 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 50000);
 
-    test( '[UND04] Basic undo w/ memory backend over sync', async (done) => {
+    test( '[UND06] Basic undo w/ memory backend over sync (ws)', async (done) => {
 
         let stores = [new Store(new MemoryBackend('test-basic-undo-over-sync-1')),
-                      new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
+                    new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
         
-        await testBasicUndoCycleWithSync(stores);
+        await testBasicUndoCycleWithSync(stores, 'ws', 20100);
 
         /*for (const store of stores) {
             store.close();
@@ -68,7 +106,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 50000);
 
-    test( '[UND05] Multi object undo cascade w/ IndexedDB backend', async (done) => {
+    test( '[UND07] Multi object undo cascade w/ IndexedDB backend', async (done) => {
 
         let store = new Store(new IdbBackend('test-basic-undo'));
         
@@ -79,7 +117,7 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 30000);
 
-    test( '[UND06] Multi object undo cascade  w/ memory backend', async (done) => {
+    test( '[UND08] Multi object undo cascade  w/ memory backend', async (done) => {
 
         let store = new Store(new MemoryBackend('test-basic-undo'));
         
@@ -90,12 +128,70 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 30000);
 
-    test( '[UND07] Multi object undo cascade w/ IndexedDB backend over sync', async (done) => {
+    if (haveWebRTC) {
+        test( '[UND09] Multi object undo cascade w/ IndexedDB backend over sync (wrtc)', async (done) => {
+
+            let stores = [new Store(new IdbBackend('test-basic-undo-over-sync-1')),
+                        new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
+            
+            await testMultiObjectUndoCascadeWithSync(stores);
+
+            /*for (const store of stores) {
+                store.close();
+            }*/
+
+            done();
+        }, 50000);
+
+        test( '[UND10] Multi object undo cascade w/ memory backend over sync (wrtc)', async (done) => {
+
+            let stores = [new Store(new MemoryBackend('test-basic-undo-over-sync-1')),
+                        new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
+            
+            await testMultiObjectUndoCascadeWithSync(stores);
+
+            /*for (const store of stores) {
+                store.close();
+            }*/
+
+            done();
+        }, 100000);
+
+        test( '[UND11] CausalSet undo cascade w/ IndexedDB backend over sync (wrtc)', async (done) => {
+
+            let stores = [new Store(new IdbBackend('causal-set-undo-over-sync-1')),
+                        new Store(new IdbBackend('causal-set-undo-over-sync-2'))];
+            
+            await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores);
+
+            /*for (const store of stores) {
+                store.close();
+            }*/
+
+            done();
+        }, 100000);
+
+        test( '[UND12] CausalSet undo cascade w/ memory backend over sync (wrtc)', async (done) => {
+
+            let stores = [new Store(new MemoryBackend('causal-set-undo-over-sync-1')),
+                        new Store(new MemoryBackend('causal-set-undo-over-sync-2'))];
+            
+            await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores);
+
+            /*for (const store of stores) {
+                store.close();
+            }*/
+
+            done();
+        }, 100000);
+    }
+
+    test( '[UND13] Multi object undo cascade w/ IndexedDB backend over sync (ws)', async (done) => {
 
         let stores = [new Store(new IdbBackend('test-basic-undo-over-sync-1')),
-                      new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
+                    new Store(new IdbBackend('test-basic-undo-over-sync-2'))];
         
-        await testMultiObjectUndoCascadeWithSync(stores);
+        await testMultiObjectUndoCascadeWithSync(stores, 'ws', 20200);
 
         /*for (const store of stores) {
             store.close();
@@ -104,12 +200,12 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 50000);
 
-    test( '[UND08] Multi object undo cascade w/ memory backend over sync', async (done) => {
+    test( '[UND14] Multi object undo cascade w/ memory backend over sync (ws)', async (done) => {
 
         let stores = [new Store(new MemoryBackend('test-basic-undo-over-sync-1')),
-                      new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
+                    new Store(new MemoryBackend('test-basic-undo-over-sync-2'))];
         
-        await testMultiObjectUndoCascadeWithSync(stores);
+        await testMultiObjectUndoCascadeWithSync(stores, 'ws', 20300);
 
         /*for (const store of stores) {
             store.close();
@@ -118,12 +214,12 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 100000);
 
-    test( '[UND09] CausalSet undo cascade w/ IndexedDB backend over sync', async (done) => {
+    test( '[UND15] CausalSet undo cascade w/ IndexedDB backend over sync (ws)', async (done) => {
 
         let stores = [new Store(new IdbBackend('causal-set-undo-over-sync-1')),
-                      new Store(new IdbBackend('causal-set-undo-over-sync-2'))];
+                    new Store(new IdbBackend('causal-set-undo-over-sync-2'))];
         
-        await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores);
+        await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores, 'ws', 20400);
 
         /*for (const store of stores) {
             store.close();
@@ -132,12 +228,12 @@ describeProxy('[UND] Undo support', () => {
         done();
     }, 100000);
 
-    test( '[UND10] CausalSet undo cascade w/ memory backend over sync', async (done) => {
+    test( '[UND16] CausalSet undo cascade w/ memory backend over sync (ws)', async (done) => {
 
         let stores = [new Store(new MemoryBackend('causal-set-undo-over-sync-1')),
-                      new Store(new MemoryBackend('causal-set-undo-over-sync-2'))];
+                    new Store(new MemoryBackend('causal-set-undo-over-sync-2'))];
         
-        await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores);
+        await testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores, 'ws', 20500);
 
         /*for (const store of stores) {
             store.close();
@@ -206,7 +302,7 @@ async function testBasicUndoCycle(store: Store) {
 
 }
 
-async function testBasicUndoCycleWithSync(stores: Store[]) {
+async function testBasicUndoCycleWithSync(stores: Store[], network: 'wrtc'|'ws'|'mix'='wrtc', basePort?: number) {
 
 
     // create pods and add gossip agent
@@ -215,7 +311,7 @@ async function testBasicUndoCycleWithSync(stores: Store[]) {
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, 'wrtc', 'no-discovery');
+    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort);
     
     for (let i=0; i<size; i++) {
         const peerNetwork = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
@@ -410,7 +506,7 @@ async function testMultiObjectUndoCascade(store: Store) {
 
 }
 
-async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
+async function testMultiObjectUndoCascadeWithSync(stores: Store[], network: 'wrtc'|'ws'|'mix'='wrtc', basePort?: number) {
 
 
     // create pods and add gossip agent
@@ -419,7 +515,7 @@ async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, 'wrtc', 'no-discovery');
+    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort);
     
     for (let i=0; i<size; i++) {
         const peerNetwork = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
@@ -546,7 +642,7 @@ async function testMultiObjectUndoCascadeWithSync(stores: Store[]) {
     }
 }
 
-async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]) {
+async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[], network: 'wrtc'|'ws'|'mix'='wrtc', basePort?: number) {
 
 
     // create pods and add gossip agent
@@ -555,7 +651,7 @@ async function testMultiObjectUndoCascadeWithSyncUsingCausalSets(stores: Store[]
         
     let peerNetworkId = new RNGImpl().randomHexString(64);
 
-    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, 'wrtc', 'no-discovery');
+    let pods = await TestPeerGroupPods.generate(peerNetworkId, size, size, size-1, network, 'no-discovery', basePort);
     
     for (let i=0; i<size; i++) {
         const peerNetwork = pods[i].getAgent(PeerGroupAgent.agentIdForPeerGroup(peerNetworkId)) as PeerGroupAgent;
