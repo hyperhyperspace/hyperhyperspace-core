@@ -10,11 +10,11 @@ import { PeerGroupAgent } from 'mesh/agents/peer';
 import { describeProxy } from 'config';
 import { WebRTCConnection } from 'index';
 
-if (WebRTCConnection.isAvailable()) {
 
-    describeProxy('[SPA] Group shared spaces', () => {
 
-        
+describeProxy('[SPA] Group shared spaces', () => {
+
+    if (WebRTCConnection.isAvailable()) {        
         test('[SPA01] 3-node sync test', async (done) => {
 
             const size = 3;
@@ -84,136 +84,138 @@ if (WebRTCConnection.isAvailable()) {
             
         }, 300000);
 
-    test('[SPA02] 2-node nested sync test', async (done) => {
+        test('[SPA02] 2-node nested sync test', async (done) => {
 
-        const size = 2;
+            const size = 2;
 
-        let spaceId = new RNGImpl().randomHexString(32);
+            let spaceId = new RNGImpl().randomHexString(32);
 
-        let samplePeers = await generateSamplePeers(size);
-        let spaces      = generateSpacesForPeers(spaceId, samplePeers);
+            let samplePeers = await generateSamplePeers(size);
+            let spaces      = generateSpacesForPeers(spaceId, samplePeers);
 
 
-        for (let i=0; i<size; i++) {
-            let space = spaces[i];
+            for (let i=0; i<size; i++) {
+                let space = spaces[i];
 
-            let things = new MutableSet();
-            space.connect();
-            await space.attach('things', things);
+                let things = new MutableSet();
+                space.connect();
+                await space.attach('things', things);
+                
+            }
+
+            let things = await spaces[0].get('things') as MutableSet<MutableSet<SamplePeer>>;
+
+            let inner = new MutableSet<SamplePeer>();
+
+            await things.add(inner);
+            await things.saveQueuedOps();
+
+            await inner.add(samplePeers[0]);
+            await inner.saveQueuedOps();
+
+            let logger = new Logger('2-way nested sync test');
+            logger.setLevel(LogLevel.INFO);
+
+            //startSpaceWithLogger(spaces[0], logger);  
+
+            /*{
+                let logger = new Logger('things sync');
+                logger.setLevel(LogLevel.TRACE);
+                let peersSync = spaces[0].syncAgents.get(things.hash()) as TerminalOpsSyncAgent;
+                peersSync;
+                peersSync.controlLog     = logger;
+                peersSync.peerMessageLog = logger;
+                peersSync.opTransferLog  = logger;
+            }   
+
+            {
+                let logger = new Logger('inner sync');
+                logger.setLevel(LogLevel.TRACE);
+                let peersSync = spaces[0].syncAgents.get(inner.hash()) as TerminalOpsSyncAgent;
+                peersSync;
+                peersSync.controlLog     = logger;
+                peersSync.peerMessageLog = logger;
+                peersSync.opTransferLog  = logger;
+            } */
+
+
+            let lastThings = spaces[size-1].get('things') as MutableSet<MutableSet<SamplePeer>>;
+            lastThings.loadAllChanges();
+
+            let ticks = 0;
+            while (ticks++ < 1200 && lastThings.size() < 1) {
+                await new Promise(r => setTimeout(r, 50));
+                await lastThings?.loadAllChanges();
+                //console.log('T'+ticks);
+            }
+
+            expect(lastThings.size()).toEqual(1);
+
+            let lastInner = lastThings?.size() > 0 ? lastThings.values().next().value : undefined;
+
+            ticks = 0;
+            while (lastInner !== undefined && ticks++ < 1200 && (lastInner?.size() === 0)) {
+                await new Promise(r => setTimeout(r, 50));
+                await lastInner.loadAllChanges();
+                //console.log('I'+ticks);
+            }
+
+            let samplePeer = lastInner?.size() > 0 ? lastInner.values().next().value : undefined;
+
+            //expect((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length).toEqual(size-1);
             
-        }
+            expect(lastInner.size()).toEqual(1);
+            expect(samplePeer?.hash()).toEqual(samplePeers[0].hash());
 
-        let things = await spaces[0].get('things') as MutableSet<MutableSet<SamplePeer>>;
+            for (const space of spaces) {
+                space.mesh.pod.shutdown();
+            }
 
-        let inner = new MutableSet<SamplePeer>();
-
-        await things.add(inner);
-        await things.saveQueuedOps();
-
-        await inner.add(samplePeers[0]);
-        await inner.saveQueuedOps();
-
-        let logger = new Logger('2-way nested sync test');
-        logger.setLevel(LogLevel.INFO);
-
-        //startSpaceWithLogger(spaces[0], logger);  
-
-        /*{
-            let logger = new Logger('things sync');
-            logger.setLevel(LogLevel.TRACE);
-            let peersSync = spaces[0].syncAgents.get(things.hash()) as TerminalOpsSyncAgent;
-            peersSync;
-            peersSync.controlLog     = logger;
-            peersSync.peerMessageLog = logger;
-            peersSync.opTransferLog  = logger;
-        }   
-
-        {
-            let logger = new Logger('inner sync');
-            logger.setLevel(LogLevel.TRACE);
-            let peersSync = spaces[0].syncAgents.get(inner.hash()) as TerminalOpsSyncAgent;
-            peersSync;
-            peersSync.controlLog     = logger;
-            peersSync.peerMessageLog = logger;
-            peersSync.opTransferLog  = logger;
-        } */
+            done();
+        }, 300000);
+    } else {
+        test('[SPA] sync test (omitted)', async (done) => {
+            done();
+        });
+    }
+});
 
 
-        let lastThings = spaces[size-1].get('things') as MutableSet<MutableSet<SamplePeer>>;
-        lastThings.loadAllChanges();
+let generateSamplePeers = async (size: number) => {
 
-        let ticks = 0;
-        while (ticks++ < 1200 && lastThings.size() < 1) {
-            await new Promise(r => setTimeout(r, 50));
-            await lastThings?.loadAllChanges();
-            //console.log('T'+ticks);
-        }
-
-        expect(lastThings.size()).toEqual(1);
-
-        let lastInner = lastThings?.size() > 0 ? lastThings.values().next().value : undefined;
-
-        ticks = 0;
-        while (lastInner !== undefined && ticks++ < 1200 && (lastInner?.size() === 0)) {
-            await new Promise(r => setTimeout(r, 50));
-            await lastInner.loadAllChanges();
-            //console.log('I'+ticks);
-        }
-
-        let samplePeer = lastInner?.size() > 0 ? lastInner.values().next().value : undefined;
-
-        //expect((spaces[0].mesh.pod.getAgent(PeerGroupAgent.agentIdForPeerGroup(spaces[0].spaceId)) as PeerGroupAgent).getPeers().length).toEqual(size-1);
-        
-        expect(lastInner.size()).toEqual(1);
-        expect(samplePeer?.hash()).toEqual(samplePeers[0].hash());
-
-        for (const space of spaces) {
-            space.mesh.pod.shutdown();
-        }
-
-        done();
-    }, 300000);
-    });
-
-
-
-    let generateSamplePeers = async (size: number) => {
-
-        let samplePeers = new Array<SamplePeer>();
-        for (let i=0; i<size; i++) {
-            let id = Identity.fromKeyPair({'order': i}, await RSAKeyPair.generate(1024));
-            let samplePeer = new SamplePeer(id);
-            samplePeers.push(samplePeer);
-        }
-
-        return samplePeers;
+    let samplePeers = new Array<SamplePeer>();
+    for (let i=0; i<size; i++) {
+        let id = Identity.fromKeyPair({'order': i}, await RSAKeyPair.generate(1024));
+        let samplePeer = new SamplePeer(id);
+        samplePeers.push(samplePeer);
     }
 
-    let hashSamplePeers = (samplePeers: Array<SamplePeer>) => {
+    return samplePeers;
+}
 
-        let hashedPeers = new Map<Hash, SamplePeer>();
-        for (let samplePeer of samplePeers) {
-            hashedPeers.set(samplePeer.hash(), samplePeer);
-        }
+let hashSamplePeers = (samplePeers: Array<SamplePeer>) => {
 
-        return hashedPeers;
+    let hashedPeers = new Map<Hash, SamplePeer>();
+    for (let samplePeer of samplePeers) {
+        hashedPeers.set(samplePeer.hash(), samplePeer);
     }
 
-    let generateSpacesForPeers = (spaceId: string, samplePeers: Array<SamplePeer>) => {
+    return hashedPeers;
+}
 
-        let allPeers = hashSamplePeers(samplePeers);
+let generateSpacesForPeers = (spaceId: string, samplePeers: Array<SamplePeer>) => {
 
-        let spaces = new Array<SharedNamespace>();
+    let allPeers = hashSamplePeers(samplePeers);
 
-        for (let i=0; i<samplePeers.length; i++) {
-            let samplePeer = samplePeers[i];
-            let space = new SharedNamespace(spaceId, samplePeer.getPeer(), {peerGroupAgentConfig: { tickInterval: 1.5, peerConnectionAttemptInterval: 15, peerConnectionTimeout: 14 }});
-            let samplePeerSource = new SamplePeerSource(space.getStore(), allPeers);
-            space.setPeerSource(samplePeerSource);
-            spaces.push(space);
-        }
+    let spaces = new Array<SharedNamespace>();
 
-        return spaces;
+    for (let i=0; i<samplePeers.length; i++) {
+        let samplePeer = samplePeers[i];
+        let space = new SharedNamespace(spaceId, samplePeer.getPeer(), {peerGroupAgentConfig: { tickInterval: 1.5, peerConnectionAttemptInterval: 15, peerConnectionTimeout: 14 }});
+        let samplePeerSource = new SamplePeerSource(space.getStore(), allPeers);
+        space.setPeerSource(samplePeerSource);
+        spaces.push(space);
     }
 
+    return spaces;
 }
