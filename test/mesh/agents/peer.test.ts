@@ -2,14 +2,24 @@ import { RNGImpl } from 'crypto/random';
 import { PeerGroupAgent } from 'mesh/agents/peer';
 import { TestPeerGroupPods } from '../mock/TestPeerGroupPods';
 import { describeProxy } from 'config';
+import { WebRTCConnection } from 'index';
 //import { Logger, LogLevel } from 'util/logging';
 
 describeProxy('[PGM] Peer group management', () => {
-    test('[PGM01] 2-peer group set up (wrtc)', async (done) => {
 
-        await twoPeerGroupTest(done, 'wrtc', 'no-discovery');
-        
-    }, 300000);
+    const haveWebRTC = WebRTCConnection.isAvailable();
+
+    if (!haveWebRTC) {
+        console.log('[PGM] WebRTC is not available, skipping some peer group management tests.')
+    }
+
+    if (haveWebRTC) {
+        test('[PGM01] 2-peer group set up (wrtc)', async (done) => {
+
+            await twoPeerGroupTest(done, 'wrtc', 'no-discovery');
+            
+        }, 300000);
+    }
 
     test('[PGM02] 2-peer group set up (ws)', async (done) => {
 
@@ -17,23 +27,25 @@ describeProxy('[PGM] Peer group management', () => {
 
     }, 300000);
 
-    test('[PGM03] 2-peer group set up (mix)', async (done) => {
+    if (haveWebRTC) {
+        test('[PGM03] 2-peer group set up (mix)', async (done) => {
 
-        await twoPeerGroupTest(done, 'mix', 'no-discovery', 6100);
+            await twoPeerGroupTest(done, 'mix', 'no-discovery', 6100);
 
-    }, 300000);
+        }, 300000);
 
-    test('[PGM04] 2-peer group set up (wrtc) with peer discovery', async (done) => {
+        test('[PGM04] 2-peer group set up (wrtc) with peer discovery', async (done) => {
 
-        await twoPeerGroupTest(done, 'wrtc', 'linkup-discovery');
+            await twoPeerGroupTest(done, 'wrtc', 'linkup-discovery');
 
-    }, 300000);
+        }, 300000);
 
-    test('[PGM05] 4-peer group clique set up (wrtc)', async (done) => {
+        test('[PGM05] 4-peer group clique set up (wrtc)', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, 'wrtc', 'no-discovery');
+            await fourPeerCliqueGroupTest(done, 'wrtc', 'no-discovery');
 
-    }, 300000);
+        }, 300000);
+    }
 
     test('[PGM06] 4-peer group clique set up (ws)', async (done) => {
 
@@ -41,23 +53,25 @@ describeProxy('[PGM] Peer group management', () => {
 
     }, 300000);
 
-    test('[PGM07] 4-peer group clique set up (mix)', async (done) => {
+    if (haveWebRTC) {
+        test('[PGM07] 4-peer group clique set up (mix)', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, 'mix', 'no-discovery', 6110);
+            await fourPeerCliqueGroupTest(done, 'mix', 'no-discovery', 6110);
 
-    }, 300000);
+        }, 300000);
 
-    test('[PGM08] 4-peer group clique set up (wrtc) with peer discovery', async (done) => {
+        test('[PGM08] 4-peer group clique set up (wrtc) with peer discovery', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery');
+            await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery');
 
-    }, 400000);
+        }, 400000);
 
-    test('[PGM09] 4-peer group clique set up (wrtc) with peer discovery and a shared secret', async (done) => {
+        test('[PGM09] 4-peer group clique set up (wrtc) with peer discovery and a shared secret', async (done) => {
 
-        await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery-secret');
+            await fourPeerCliqueGroupTest(done, 'wrtc', 'linkup-discovery-secret');
 
-    }, 400000);
+        }, 400000);
+    }
 });
 
 async function twoPeerGroupTest(done: (() => void), network: 'wrtc'|'ws'|'mix' = 'wrtc', discovery:'linkup-discovery'|'no-discovery', basePort?: number) {

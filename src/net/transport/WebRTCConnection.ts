@@ -16,6 +16,10 @@ const ICE_CANDIDATE = 'ICE_CANDIDATE';
 
 class WebRTCConnection implements Connection {
 
+    static isAvailable() {
+        return globalThis.RTCPeerConnection !== undefined;
+    }
+
     static logger = new Logger(WebRTCConnection.name, LogLevel.INFO);
     static iceLogger = new Logger(WebRTCConnection.name, LogLevel.INFO)
 

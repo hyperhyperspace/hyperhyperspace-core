@@ -16,16 +16,26 @@ import { HeaderBasedSyncAgent, HistorySynchronizer, TerminalOpsSyncAgent } from 
 import { Logger, LogLevel } from 'util/logging';
 import { Resources } from 'spaces/Resources';
 import { NetworkAgent } from 'mesh/agents/network';
+import { WebRTCConnection } from 'index';
 //import { SQLiteBackend } from '../../../../sqlite/dist';
 
 describeProxy;
 
 describeProxy('[SYN] State sync', () => {
-    test('[SYN01] Gossip agent in small peer group (wrtc)', async (done) => {
 
-        await gossipInSmallPeerGroup(done, 'wrtc');
+    const haveWebRTC = WebRTCConnection.isAvailable();
 
-    }, 300000);
+    if (!haveWebRTC) {
+        console.log('[SYN] WebRTC is not available, skipping some sync engine tests.')
+    }
+
+    if (haveWebRTC) {
+        test('[SYN01] Gossip agent in small peer group (wrtc)', async (done) => {
+
+            await gossipInSmallPeerGroup(done, 'wrtc');
+
+        }, 300000);
+    }
 
     test('[SYN02] Gossip agent in small peer group (ws)', async (done) => {
 
@@ -33,61 +43,89 @@ describeProxy('[SYN] State sync', () => {
 
     }, 300000);
 
-    test('[SYN03] Gossip agent in small peer group (mix)', async (done) => {
+    if (haveWebRTC) {
+        test('[SYN03] Gossip agent in small peer group (mix)', async (done) => {
 
-        await gossipInSmallPeerGroup(done, 'mix', 5210);
+            await gossipInSmallPeerGroup(done, 'mix', 5210);
 
-    }, 300000);
+        }, 300000);
 
-    test('[SYN04] Causal history agent-based set sync in small peer group (wrtc)', async (done) => {
+        test('[SYN04] Causal history agent-based set sync in small peer group (wrtc)', async (done) => {
 
-        await syncInSmallPeerGroup(done, 'wrtc');
+            await syncInSmallPeerGroup(done, 'wrtc');
 
-    }, 300000);
+        }, 300000);
+    }
 
     test('[SYN05] Causal history agent-based set sync in small peer group (ws)', async (done) => {
 
         await syncInSmallPeerGroup(done, 'ws', 5300);
     }, 300000);
 
-    test('[SYN06] Causal history agent-based set sync in small peer group (mix)', async (done) => {
+    if (haveWebRTC) {
+        test('[SYN06] Causal history agent-based set sync in small peer group (mix)', async (done) => {
 
-        await syncInSmallPeerGroup(done, 'mix', 5310);
+            await syncInSmallPeerGroup(done, 'mix', 5310);
+        }, 300000);
+
+        test('[SYN07] Causal history agent-based set sync in small peer group (wrtc) w/remoting', async (done) => {
+
+            await syncInSmallPeerGroup(done, 'wrtc', undefined, true);
+
+        }, 300000);
+
+        test('[SYN08] Causal history agent-based set staged sync in small peer group (wrtc)', async (done) => {
+
+            await stagedSyncInSmallPeerGroup(done, 'wrtc');
+
+        }, 300000);
+
+        test('[SYN09] Causal history agent-based set deep sync in small peer group with faulty network (wrtc)', async (done) => {
+
+            await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined, true);
+
+        }, 300000);
+
+        test('[SYN10] Causal history agent-based set diamond-shaped sync in small peer group (wrtc)', async (done) => {
+
+            await diamondSyncInSmallPeerGroup(done, 'wrtc');
+
+        }, 300000);
+
+        test('[SYN11] Causal history agent-based set deep sync in small peer group (wrtc)', async (done) => {
+
+            await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined);
+
+        }, 300000);
+
+        test('[SYN12] Causal history agent-based set sync in small peer group (wrtc) using big objects', async (done) => {
+
+            await syncInSmallPeerGroup(done, 'wrtc', undefined, undefined, undefined, true);
+
+        }, 300000);
+    }
+
+    test('[SYN13] Causal history agent-based set staged sync in small peer group (ws)', async (done) => {
+
+        await stagedSyncInSmallPeerGroup(done, 'ws');
+
     }, 300000);
 
-    test('[SYN07] Causal history agent-based set sync in small peer group (wrtc) w/remoting', async (done) => {
+    test('[SYN14] Causal history agent-based set diamond-shaped sync in small peer group (ws)', async (done) => {
 
-        await syncInSmallPeerGroup(done, 'wrtc', undefined, true);
-
-    }, 300000);
-
-    test('[SYN08] Causal history agent-based set staged sync in small peer group (wrtc)', async (done) => {
-
-        await stagedSyncInSmallPeerGroup(done, 'wrtc');
+        await diamondSyncInSmallPeerGroup(done, 'ws');
 
     }, 300000);
 
-    test('[SYN09] Causal history agent-based set deep sync in small peer group with faulty network (wrtc)', async (done) => {
+    test('[SYN15] Causal history agent-based set deep sync in small peer group (ws)', async (done) => {
 
-        await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined, true);
-
-    }, 300000);
-
-    test('[SYN10] Causal history agent-based set diamond-shaped sync in small peer group (wrtc)', async (done) => {
-
-        await diamondSyncInSmallPeerGroup(done, 'wrtc');
+        await deepSyncInSmallPeerGroup(done, 'ws', undefined, undefined);
 
     }, 300000);
 
-    test('[SYN11] Causal history agent-based set deep sync in small peer group (wrtc)', async (done) => {
+    test('[SYN16] Causal history agent-based set sync in small peer group (ws) using big objects', async (done) => {
 
-        await deepSyncInSmallPeerGroup(done, 'wrtc', undefined, undefined);
-
-    }, 300000);
-
-    test('[SYN12] Causal history agent-based set sync in small peer group (wrtc) using big objects', async (done) => {
-
-        await syncInSmallPeerGroup(done, 'wrtc', undefined, undefined, undefined, true);
+        await syncInSmallPeerGroup(done, 'ws', undefined, undefined, undefined, true);
 
     }, 300000);
 

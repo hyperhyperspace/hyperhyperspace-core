@@ -12,7 +12,7 @@ class LinkupManager {
     static logger = new Logger(LinkupManager.name, LogLevel.DEBUG);
 
     static defaultLinkupServer =  'wrtc+wss://mypeer.net:443';
-    //static defaultLinkupServer =  'wrtc+ws://localhost:3002';
+    //static defaultLinkupServer =  'wrtc+wss://hhs.s.dweb.city:3002';
     //static defaultLinkupServer = 'wrtc+ws://192.168.0.105:8765';
 
     serverConnections : Map<string, LinkupServer>;

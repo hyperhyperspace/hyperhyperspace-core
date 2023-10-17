@@ -5,16 +5,25 @@ import { TestConnectionAgent } from '../mock/TestConnectionAgent';
 import { NetworkAgent } from 'mesh/agents/network';
 import { LinkupManager } from 'net/linkup';
 import { describeProxy } from 'config';
+import { WebRTCConnection } from 'index';
 
 let linkupServer = LinkupManager.defaultLinkupServer;
 
 describeProxy('[NET] Basic networking', () => {
 
-    test('[NET01] 2-node network test (wrtc)', async (done) => {
+    const haveWebRTC = WebRTCConnection.isAvailable();
 
-        await twoNodeNetworkTest(linkupServer, linkupServer, done);
+    if (!haveWebRTC) {
+        console.log('[NET] WebRTC is not available, skipping some networking tests.')
+    }
 
-    }, 45000);
+    if (haveWebRTC) {
+        test('[NET01] 2-node network test (wrtc)', async (done) => {
+
+            await twoNodeNetworkTest(linkupServer, linkupServer, done);
+
+        }, 45000);
+    }
 
     test('[NET02] 2-node network test (ws)', async (done) => {
 
@@ -22,11 +31,13 @@ describeProxy('[NET] Basic networking', () => {
 
     }, 45000);
 
-    test('[NET03] 2-node network test (mixed)', async (done) => {
+    if (haveWebRTC) {
+        test('[NET03] 2-node network test (mixed)', async (done) => {
 
-        await twoNodeNetworkTest( 'ws://localhost:10112', linkupServer, done);
+            await twoNodeNetworkTest( 'ws://localhost:10112', linkupServer, done);
 
-    }, 45000);
+        }, 45000);
+    }
 });
 
 async function twoNodeNetworkTest(linkupHost1: string, linkupHost2: string, done: () => void) {
