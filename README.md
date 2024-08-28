@@ -77,3 +77,7 @@ Re-wiring the demo to use the current version of the library is currently WIP. C
 ## Using outside the browser
 
 If you need to use this library directly in NodeJs, outside of a web browser, you need to import [@hyper-hyper-space/node-env](https://www.npmjs.com/package/@hyper-hyper-space/node-env).
+
+## Funding
+
+This project is funded through [NGI Assure](https://nlnet.nl/assure), a fund established by [NLnet](https://nlnet.nl) with financial support from the European Commission's [Next Generation Internet](https://ngi.eu) program. Learn more at the [NLnet project page](https://nlnet.nl/project/HyperHyperSpace).
