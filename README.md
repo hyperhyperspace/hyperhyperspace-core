@@ -1,4 +1,8 @@
-# This version of Hyper Hyper Space has been deprecated. Development of V3 lives here: https://github.com/hyperhyperspace/hhs3-ts
+# This version of Hyper Hyper Space has been deprecated.
+
+# Development of V3 lives here:
+
+# https://github.com/hyperhyperspace/hhs3-ts
 
 ![Hyper Hyper Space](https://www.hyperhyperspace.org/logos/HHS_Logo_500px.png)
 
